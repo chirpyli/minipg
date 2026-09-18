@@ -142,7 +142,7 @@ test: bitmapops combocid advisory_lock
 # 同名表不能在同一个并发组里，故拆成两组
 test: select arrays limit
 
-test: subselect groupingsets
+test: subselect
 
 test: delete drop_if_exists functional_deps create_view
 

@@ -495,19 +495,7 @@ ProcessClientWriteInterrupt(bool blocked)
 List *
 pg_parse_query(const char *query_string)
 {
-	List	   *raw_parsetree_list;
-
-	TRACE_POSTGRESQL_QUERY_PARSE_START(query_string);
-
-	raw_parsetree_list = raw_parser(query_string, RAW_PARSE_DEFAULT);
-
-	/*
-	 * Currently, outfuncs/readfuncs support is missing for many raw parse
-	 * tree nodes, so we don't try to implement WRITE_READ_PARSE_PLAN_TREES
-	 * here.
-	 */
-
-	TRACE_POSTGRESQL_QUERY_PARSE_DONE(query_string);
+	List	   *raw_parsetree_list = raw_parser(query_string, RAW_PARSE_DEFAULT);
 
 	return raw_parsetree_list;
 }

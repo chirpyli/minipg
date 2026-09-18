@@ -1031,27 +1031,7 @@ ExecInitExprRec(Expr *node, ExprState *state,
 				break;
 			}
 
-		case T_GroupingFunc:
-			{
-				GroupingFunc *grp_node = (GroupingFunc *) node;
-				Agg		   *agg;
 
-				if (!state->parent || !IsA(state->parent, AggState) ||
-					!IsA(state->parent->plan, Agg))
-					elog(ERROR, "GroupingFunc found in non-Agg plan node");
-
-				scratch.opcode = EEOP_GROUPING_FUNC;
-
-				agg = (Agg *) (state->parent->plan);
-
-				if (agg->groupingSets)
-					scratch.d.grouping_func.clauses = grp_node->cols;
-				else
-					scratch.d.grouping_func.clauses = NIL;
-
-				ExprEvalPushStep(state, &scratch);
-				break;
-			}
 
 		case T_SubscriptingRef:
 			{
@@ -2326,12 +2306,9 @@ expr_setup_walker(Node *node, ExprSetupInfo *info)
 	/*
 	 * Don't examine the arguments or filters of Aggrefs or WindowFuncs,
 	 * because those do not represent expressions to be evaluated within the
-	 * calling expression's econtext.  GroupingFunc arguments are never
-	 * evaluated at all.
+	 * calling expression's econtext.
 	 */
 	if (IsA(node, Aggref))
-		return false;
-	if (IsA(node, GroupingFunc))
 		return false;
 	return expression_tree_walker(node, expr_setup_walker,
 								  (void *) info);

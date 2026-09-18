@@ -820,21 +820,6 @@ makeIndexInfo(int numattrs, int numkeyattrs, Oid amoid, List *expressions,
 }
 
 /*
- * makeGroupingSet
- *
- */
-GroupingSet *
-makeGroupingSet(GroupingSetKind kind, List *content, int location)
-{
-	GroupingSet *n = makeNode(GroupingSet);
-
-	n->kind = kind;
-	n->content = content;
-	n->location = location;
-	return n;
-}
-
-/*
  * makeVacuumRelation -
  *	  create a VacuumRelation node
  */

@@ -88,48 +88,26 @@ typedef struct
 	List	   *groupClause;	/* overrides parse->groupClause */
 } standard_qp_extra;
 
-/*
- * Data specific to grouping sets
- */
-
-typedef struct
-{
-	List	   *rollups;
-	List	   *hash_sets_idx;
-	double		dNumHashGroups;
-	bool		any_hashable;
-	Bitmapset  *unsortable_refs;
-	Bitmapset  *unhashable_refs;
-	List	   *unsortable_sets;
-	int		   *tleref_to_colnum_map;
-} grouping_sets_data;
-
 
 /* Local functions */
 static Node *preprocess_expression(PlannerInfo *root, Node *expr, int kind);
 static void preprocess_qual_conditions(PlannerInfo *root, Node *jtnode);
 static void grouping_planner(PlannerInfo *root, double tuple_fraction);
-static grouping_sets_data *preprocess_grouping_sets(PlannerInfo *root);
-static List *remap_to_groupclause_idx(List *groupClause, List *gsets,
-									  int *tleref_to_colnum_map);
+
 static void preprocess_rowmarks(PlannerInfo *root);
 static double preprocess_limit(PlannerInfo *root,
 							   double tuple_fraction,
 							   int64 *offset_est, int64 *count_est);
 static void remove_useless_groupby_columns(PlannerInfo *root);
 static List *preprocess_groupclause(PlannerInfo *root, List *force);
-static List *extract_rollup_sets(List *groupingSets);
-static List *reorder_grouping_sets(List *groupingSets, List *sortclause);
 static void standard_qp_callback(PlannerInfo *root, void *extra);
 static double get_number_of_groups(PlannerInfo *root,
 								   double path_rows,
-								   grouping_sets_data *gd,
 								   List *target_list);
 static RelOptInfo *create_grouping_paths(PlannerInfo *root,
 										 RelOptInfo *input_rel,
 										 PathTarget *target,
-										 bool target_parallel_safe,
-										 grouping_sets_data *gd);
+										 bool target_parallel_safe);
 static bool is_degenerate_grouping(PlannerInfo *root);
 static void create_degenerate_grouping_paths(PlannerInfo *root,
 											 RelOptInfo *input_rel,
@@ -141,17 +119,8 @@ static void create_ordinary_grouping_paths(PlannerInfo *root,
 										   RelOptInfo *input_rel,
 										   RelOptInfo *grouped_rel,
 										   const AggClauseCosts *agg_costs,
-										   grouping_sets_data *gd,
 										   GroupPathExtraData *extra,
 										   RelOptInfo **partially_grouped_rel_p);
-static void consider_groupingsets_paths(PlannerInfo *root,
-										RelOptInfo *grouped_rel,
-										Path *path,
-										bool is_sorted,
-										bool can_hash,
-										grouping_sets_data *gd,
-										const AggClauseCosts *agg_costs,
-										double dNumGroups);
 static RelOptInfo *create_distinct_paths(PlannerInfo *root,
 										 RelOptInfo *input_rel);
 static RelOptInfo *create_ordered_paths(PlannerInfo *root,
@@ -173,13 +142,11 @@ static void add_paths_to_grouping_rel(PlannerInfo *root, RelOptInfo *input_rel,
 									  RelOptInfo *grouped_rel,
 									  RelOptInfo *partially_grouped_rel,
 									  const AggClauseCosts *agg_costs,
-									  grouping_sets_data *gd,
 									  double dNumGroups,
 									  GroupPathExtraData *extra);
 static RelOptInfo *create_partial_grouping_paths(PlannerInfo *root,
 												 RelOptInfo *grouped_rel,
 												 RelOptInfo *input_rel,
-												 grouping_sets_data *gd,
 												 GroupPathExtraData *extra,
 												 bool force_rel_creation);
 static void gather_grouping_paths(PlannerInfo *root, RelOptInfo *rel);
@@ -492,7 +459,7 @@ subquery_planner(PlannerGlobal *glob, Query *parse,
 	memset(root->upper_targets, 0, sizeof(root->upper_targets));
 	root->processed_tlist = NIL;
 	root->update_colnos = NIL;
-	root->grouping_map = NULL;
+
 	root->minmax_aggs = NIL;
 	root->qual_security_level = 0;
 	root->hasPseudoConstantQuals = false;
@@ -730,15 +697,14 @@ subquery_planner(PlannerGlobal *glob, Query *parse,
 	{
 		Node	   *havingclause = (Node *) lfirst(l);
 
-		if ((parse->groupClause && parse->groupingSets) ||
-			contain_agg_clause(havingclause) ||
+		if (contain_agg_clause(havingclause) ||
 			contain_volatile_functions(havingclause) ||
 			contain_subplans(havingclause))
 		{
 			/* keep it in HAVING */
 			newHaving = lappend(newHaving, havingclause);
 		}
-		else if (parse->groupClause && !parse->groupingSets)
+		else if (parse->groupClause)
 		{
 			/* move it to WHERE */
 			parse->jointree->quals = (Node *)
@@ -1010,7 +976,6 @@ grouping_planner(PlannerInfo *root, double tuple_fraction)
 	bool		scanjoin_target_parallel_safe;
 	bool		scanjoin_target_same_exprs;
 	bool		have_grouping;
-	grouping_sets_data *gset_data = NULL;
 	standard_qp_extra qp_extra;
 
 	/* Tweak caller-supplied tuple_fraction if have LIMIT/OFFSET */
@@ -1033,17 +998,9 @@ grouping_planner(PlannerInfo *root, double tuple_fraction)
 		/* A recursive query (WITH RECURSIVE) is handled separately */
 		Assert(!root->hasRecursion);
 
-		/* Preprocess grouping sets and GROUP BY clause, if any */
-		if (parse->groupingSets)
-		{
-			gset_data = preprocess_grouping_sets(root);
-		}
-		else
-		{
-			/* Preprocess regular GROUP BY clause, if any */
-			if (parse->groupClause)
-				parse->groupClause = preprocess_groupclause(root, NIL);
-		}
+		/* Preprocess regular GROUP BY clause, if any */
+		if (parse->groupClause)
+			parse->groupClause = preprocess_groupclause(root, NIL);
 
 		/*
 		 * Preprocess targetlist.  Note that much of the remaining planning
@@ -1083,7 +1040,6 @@ grouping_planner(PlannerInfo *root, double tuple_fraction)
 		 * grouping/aggregation operations, or SRFs in the tlist.
 		 */
 		if (parse->groupClause ||
-			parse->groupingSets ||
 			parse->distinctClause ||
 			parse->hasAggs ||
 			parse->hasTargetSRFs ||
@@ -1093,9 +1049,7 @@ grouping_planner(PlannerInfo *root, double tuple_fraction)
 			root->limit_tuples = limit_tuples;
 
 		/* Set up data needed by standard_qp_callback */
-		qp_extra.groupClause = (gset_data
-								? (gset_data->rollups ? linitial_node(RollupData, gset_data->rollups)->groupClause : NIL)
-								: parse->groupClause);
+		qp_extra.groupClause = parse->groupClause;
 
 		/*
 		 * Generate the best unsorted and presorted paths for the scan/join
@@ -1151,7 +1105,7 @@ grouping_planner(PlannerInfo *root, double tuple_fraction)
 		 * plan node must emit what the grouping step wants; otherwise, it
 		 * should emit grouping_target.
 		 */
-		have_grouping = (parse->groupClause || parse->groupingSets ||
+		have_grouping = (parse->groupClause ||
 						 parse->hasAggs || root->hasHavingQual);
 		if (have_grouping)
 		{
@@ -1238,8 +1192,7 @@ grouping_planner(PlannerInfo *root, double tuple_fraction)
 			current_rel = create_grouping_paths(root,
 												current_rel,
 												grouping_target,
-												grouping_target_parallel_safe,
-												gset_data);
+												grouping_target_parallel_safe);
 			/* Fix things up if grouping_target contains SRFs */
 			if (parse->hasTargetSRFs)
 				adjust_paths_for_srfs(root, current_rel,
@@ -1456,219 +1409,6 @@ grouping_planner(PlannerInfo *root, double tuple_fraction)
 	/* Note: currently, we leave it to callers to do set_cheapest() */
 }
 
-/*
- * Do preprocessing for groupingSets clause and related data.  This handles the
- * preliminary steps of expanding the grouping sets, organizing them into lists
- * of rollups, and preparing annotations which will later be filled in with
- * size estimates.
- */
-static grouping_sets_data *
-preprocess_grouping_sets(PlannerInfo *root)
-{
-	Query	   *parse = root->parse;
-	List	   *sets;
-	int			maxref = 0;
-	ListCell   *lc;
-	ListCell   *lc_set;
-	grouping_sets_data *gd = palloc0(sizeof(grouping_sets_data));
-
-	parse->groupingSets = expand_grouping_sets(parse->groupingSets, parse->groupDistinct, -1);
-
-	gd->any_hashable = false;
-	gd->unhashable_refs = NULL;
-	gd->unsortable_refs = NULL;
-	gd->unsortable_sets = NIL;
-
-	if (parse->groupClause)
-	{
-		ListCell   *lc;
-
-		foreach(lc, parse->groupClause)
-		{
-			SortGroupClause *gc = lfirst_node(SortGroupClause, lc);
-			Index		ref = gc->tleSortGroupRef;
-
-			if (ref > maxref)
-				maxref = ref;
-
-			if (!gc->hashable)
-				gd->unhashable_refs = bms_add_member(gd->unhashable_refs, ref);
-
-			if (!OidIsValid(gc->sortop))
-				gd->unsortable_refs = bms_add_member(gd->unsortable_refs, ref);
-		}
-	}
-
-	/* Allocate workspace array for remapping */
-	gd->tleref_to_colnum_map = (int *) palloc((maxref + 1) * sizeof(int));
-
-	/*
-	 * If we have any unsortable sets, we must extract them before trying to
-	 * prepare rollups. Unsortable sets don't go through
-	 * reorder_grouping_sets, so we must apply the GroupingSetData annotation
-	 * here.
-	 */
-	if (!bms_is_empty(gd->unsortable_refs))
-	{
-		List	   *sortable_sets = NIL;
-
-		foreach(lc, parse->groupingSets)
-		{
-			List	   *gset = (List *) lfirst(lc);
-
-			if (bms_overlap_list(gd->unsortable_refs, gset))
-			{
-				GroupingSetData *gs = makeNode(GroupingSetData);
-
-				gs->set = gset;
-				gd->unsortable_sets = lappend(gd->unsortable_sets, gs);
-
-				/*
-				 * We must enforce here that an unsortable set is hashable;
-				 * later code assumes this.  Parse analysis only checks that
-				 * every individual column is either hashable or sortable.
-				 *
-				 * Note that passing this test doesn't guarantee we can
-				 * generate a plan; there might be other showstoppers.
-				 */
-				if (bms_overlap_list(gd->unhashable_refs, gset))
-					ereport(ERROR,
-							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-							 errmsg("could not implement GROUP BY"),
-							 errdetail("Some of the datatypes only support hashing, while others only support sorting.")));
-			}
-			else
-				sortable_sets = lappend(sortable_sets, gset);
-		}
-
-		if (sortable_sets)
-			sets = extract_rollup_sets(sortable_sets);
-		else
-			sets = NIL;
-	}
-	else
-		sets = extract_rollup_sets(parse->groupingSets);
-
-	foreach(lc_set, sets)
-	{
-		List	   *current_sets = (List *) lfirst(lc_set);
-		RollupData *rollup = makeNode(RollupData);
-		GroupingSetData *gs;
-
-		/*
-		 * Reorder the current list of grouping sets into correct prefix
-		 * order.  If only one aggregation pass is needed, try to make the
-		 * list match the ORDER BY clause; if more than one pass is needed, we
-		 * don't bother with that.
-		 *
-		 * Note that this reorders the sets from smallest-member-first to
-		 * largest-member-first, and applies the GroupingSetData annotations,
-		 * though the data will be filled in later.
-		 */
-		current_sets = reorder_grouping_sets(current_sets,
-											 (list_length(sets) == 1
-											  ? parse->sortClause
-											  : NIL));
-
-		/*
-		 * Get the initial (and therefore largest) grouping set.
-		 */
-		gs = linitial_node(GroupingSetData, current_sets);
-
-		/*
-		 * Order the groupClause appropriately.  If the first grouping set is
-		 * empty, then the groupClause must also be empty; otherwise we have
-		 * to force the groupClause to match that grouping set's order.
-		 *
-		 * (The first grouping set can be empty even though parse->groupClause
-		 * is not empty only if all non-empty grouping sets are unsortable.
-		 * The groupClauses for hashed grouping sets are built later on.)
-		 */
-		if (gs->set)
-			rollup->groupClause = preprocess_groupclause(root, gs->set);
-		else
-			rollup->groupClause = NIL;
-
-		/*
-		 * Is it hashable? We pretend empty sets are hashable even though we
-		 * actually force them not to be hashed later. But don't bother if
-		 * there's nothing but empty sets (since in that case we can't hash
-		 * anything).
-		 */
-		if (gs->set &&
-			!bms_overlap_list(gd->unhashable_refs, gs->set))
-		{
-			rollup->hashable = true;
-			gd->any_hashable = true;
-		}
-
-		/*
-		 * Now that we've pinned down an order for the groupClause for this
-		 * list of grouping sets, we need to remap the entries in the grouping
-		 * sets from sortgrouprefs to plain indices (0-based) into the
-		 * groupClause for this collection of grouping sets. We keep the
-		 * original form for later use, though.
-		 */
-		rollup->gsets = remap_to_groupclause_idx(rollup->groupClause,
-												 current_sets,
-												 gd->tleref_to_colnum_map);
-		rollup->gsets_data = current_sets;
-
-		gd->rollups = lappend(gd->rollups, rollup);
-	}
-
-	if (gd->unsortable_sets)
-	{
-		/*
-		 * We have not yet pinned down a groupclause for this, but we will
-		 * need index-based lists for estimation purposes. Construct
-		 * hash_sets_idx based on the entire original groupclause for now.
-		 */
-		gd->hash_sets_idx = remap_to_groupclause_idx(parse->groupClause,
-													 gd->unsortable_sets,
-													 gd->tleref_to_colnum_map);
-		gd->any_hashable = true;
-	}
-
-	return gd;
-}
-
-/*
- * Given a groupclause and a list of GroupingSetData, return equivalent sets
- * (without annotation) mapped to indexes into the given groupclause.
- */
-static List *
-remap_to_groupclause_idx(List *groupClause,
-						 List *gsets,
-						 int *tleref_to_colnum_map)
-{
-	int			ref = 0;
-	List	   *result = NIL;
-	ListCell   *lc;
-
-	foreach(lc, groupClause)
-	{
-		SortGroupClause *gc = lfirst_node(SortGroupClause, lc);
-
-		tleref_to_colnum_map[gc->tleSortGroupRef] = ref++;
-	}
-
-	foreach(lc, gsets)
-	{
-		List	   *set = NIL;
-		ListCell   *lc2;
-		GroupingSetData *gs = lfirst_node(GroupingSetData, lc);
-
-		foreach(lc2, gs->set)
-		{
-			set = lappend_int(set, tleref_to_colnum_map[lfirst_int(lc2)]);
-		}
-
-		result = lappend(result, set);
-	}
-
-	return result;
-}
 
 
 /*
@@ -2098,9 +1838,7 @@ remove_useless_groupby_columns(PlannerInfo *root)
 	if (list_length(parse->groupClause) < 2)
 		return;
 
-	/* Don't fiddle with the GROUP BY clause if the query has grouping sets */
-	if (parse->groupingSets)
-		return;
+
 
 	/*
 	 * Scan the GROUP BY clause to find GROUP BY items that are simple Vars.
@@ -2324,280 +2062,6 @@ preprocess_groupclause(PlannerInfo *root, List *force)
 }
 
 /*
- * Extract lists of grouping sets that can be implemented using a single
- * rollup-type aggregate pass each. Returns a list of lists of grouping sets.
- *
- * Input must be sorted with smallest sets first. Result has each sublist
- * sorted with smallest sets first.
- *
- * We want to produce the absolute minimum possible number of lists here to
- * avoid excess sorts. Fortunately, there is an algorithm for this; the problem
- * of finding the minimal partition of a partially-ordered set into chains
- * (which is what we need, taking the list of grouping sets as a poset ordered
- * by set inclusion) can be mapped to the problem of finding the maximum
- * cardinality matching on a bipartite graph, which is solvable in polynomial
- * time with a worst case of no worse than O(n^2.5) and usually much
- * better. Since our N is at most 4096, we don't need to consider fallbacks to
- * heuristic or approximate methods.  (Planning time for a 12-d cube is under
- * half a second on my modest system even with optimization off and assertions
- * on.)
- */
-static List *
-extract_rollup_sets(List *groupingSets)
-{
-	int			num_sets_raw = list_length(groupingSets);
-	int			num_empty = 0;
-	int			num_sets = 0;	/* distinct sets */
-	int			num_chains = 0;
-	List	   *result = NIL;
-	List	  **results;
-	List	  **orig_sets;
-	Bitmapset **set_masks;
-	int		   *chains;
-	short	  **adjacency;
-	short	   *adjacency_buf;
-	BipartiteMatchState *state;
-	int			i;
-	int			j;
-	int			j_size;
-	ListCell   *lc1 = list_head(groupingSets);
-	ListCell   *lc;
-
-	/*
-	 * Start by stripping out empty sets.  The algorithm doesn't require this,
-	 * but the planner currently needs all empty sets to be returned in the
-	 * first list, so we strip them here and add them back after.
-	 */
-	while (lc1 && lfirst(lc1) == NIL)
-	{
-		++num_empty;
-		lc1 = lnext(groupingSets, lc1);
-	}
-
-	/* bail out now if it turns out that all we had were empty sets. */
-	if (!lc1)
-		return list_make1(groupingSets);
-
-	/*----------
-	 * We don't strictly need to remove duplicate sets here, but if we don't,
-	 * they tend to become scattered through the result, which is a bit
-	 * confusing (and irritating if we ever decide to optimize them out).
-	 * So we remove them here and add them back after.
-	 *
-	 * For each non-duplicate set, we fill in the following:
-	 *
-	 * orig_sets[i] = list of the original set lists
-	 * set_masks[i] = bitmapset for testing inclusion
-	 * adjacency[i] = array [n, v1, v2, ... vn] of adjacency indices
-	 *
-	 * chains[i] will be the result group this set is assigned to.
-	 *
-	 * We index all of these from 1 rather than 0 because it is convenient
-	 * to leave 0 free for the NIL node in the graph algorithm.
-	 *----------
-	 */
-	orig_sets = palloc0((num_sets_raw + 1) * sizeof(List *));
-	set_masks = palloc0((num_sets_raw + 1) * sizeof(Bitmapset *));
-	adjacency = palloc0((num_sets_raw + 1) * sizeof(short *));
-	adjacency_buf = palloc((num_sets_raw + 1) * sizeof(short));
-
-	j_size = 0;
-	j = 0;
-	i = 1;
-
-	for_each_cell(lc, groupingSets, lc1)
-	{
-		List	   *candidate = (List *) lfirst(lc);
-		Bitmapset  *candidate_set = NULL;
-		ListCell   *lc2;
-		int			dup_of = 0;
-
-		foreach(lc2, candidate)
-		{
-			candidate_set = bms_add_member(candidate_set, lfirst_int(lc2));
-		}
-
-		/* we can only be a dup if we're the same length as a previous set */
-		if (j_size == list_length(candidate))
-		{
-			int			k;
-
-			for (k = j; k < i; ++k)
-			{
-				if (bms_equal(set_masks[k], candidate_set))
-				{
-					dup_of = k;
-					break;
-				}
-			}
-		}
-		else if (j_size < list_length(candidate))
-		{
-			j_size = list_length(candidate);
-			j = i;
-		}
-
-		if (dup_of > 0)
-		{
-			orig_sets[dup_of] = lappend(orig_sets[dup_of], candidate);
-			bms_free(candidate_set);
-		}
-		else
-		{
-			int			k;
-			int			n_adj = 0;
-
-			orig_sets[i] = list_make1(candidate);
-			set_masks[i] = candidate_set;
-
-			/* fill in adjacency list; no need to compare equal-size sets */
-
-			for (k = j - 1; k > 0; --k)
-			{
-				if (bms_is_subset(set_masks[k], candidate_set))
-					adjacency_buf[++n_adj] = k;
-			}
-
-			if (n_adj > 0)
-			{
-				adjacency_buf[0] = n_adj;
-				adjacency[i] = palloc((n_adj + 1) * sizeof(short));
-				memcpy(adjacency[i], adjacency_buf, (n_adj + 1) * sizeof(short));
-			}
-			else
-				adjacency[i] = NULL;
-
-			++i;
-		}
-	}
-
-	num_sets = i - 1;
-
-	/*
-	 * Apply the graph matching algorithm to do the work.
-	 */
-	state = BipartiteMatch(num_sets, num_sets, adjacency);
-
-	/*
-	 * Now, the state->pair* fields have the info we need to assign sets to
-	 * chains. Two sets (u,v) belong to the same chain if pair_uv[u] = v or
-	 * pair_vu[v] = u (both will be true, but we check both so that we can do
-	 * it in one pass)
-	 */
-	chains = palloc0((num_sets + 1) * sizeof(int));
-
-	for (i = 1; i <= num_sets; ++i)
-	{
-		int			u = state->pair_vu[i];
-		int			v = state->pair_uv[i];
-
-		if (u > 0 && u < i)
-			chains[i] = chains[u];
-		else if (v > 0 && v < i)
-			chains[i] = chains[v];
-		else
-			chains[i] = ++num_chains;
-	}
-
-	/* build result lists. */
-	results = palloc0((num_chains + 1) * sizeof(List *));
-
-	for (i = 1; i <= num_sets; ++i)
-	{
-		int			c = chains[i];
-
-		Assert(c > 0);
-
-		results[c] = list_concat(results[c], orig_sets[i]);
-	}
-
-	/* push any empty sets back on the first list. */
-	while (num_empty-- > 0)
-		results[1] = lcons(NIL, results[1]);
-
-	/* make result list */
-	for (i = 1; i <= num_chains; ++i)
-		result = lappend(result, results[i]);
-
-	/*
-	 * Free all the things.
-	 *
-	 * (This is over-fussy for small sets but for large sets we could have
-	 * tied up a nontrivial amount of memory.)
-	 */
-	BipartiteMatchFree(state);
-	pfree(results);
-	pfree(chains);
-	for (i = 1; i <= num_sets; ++i)
-		if (adjacency[i])
-			pfree(adjacency[i]);
-	pfree(adjacency);
-	pfree(adjacency_buf);
-	pfree(orig_sets);
-	for (i = 1; i <= num_sets; ++i)
-		bms_free(set_masks[i]);
-	pfree(set_masks);
-
-	return result;
-}
-
-/*
- * Reorder the elements of a list of grouping sets such that they have correct
- * prefix relationships. Also inserts the GroupingSetData annotations.
- *
- * The input must be ordered with smallest sets first; the result is returned
- * with largest sets first.  Note that the result shares no list substructure
- * with the input, so it's safe for the caller to modify it later.
- *
- * If we're passed in a sortclause, we follow its order of columns to the
- * extent possible, to minimize the chance that we add unnecessary sorts.
- * (We're trying here to ensure that GROUPING SETS ((a,b,c),(c)) ORDER BY c,b,a
- * gets implemented in one pass.)
- */
-static List *
-reorder_grouping_sets(List *groupingsets, List *sortclause)
-{
-	ListCell   *lc;
-	List	   *previous = NIL;
-	List	   *result = NIL;
-
-	foreach(lc, groupingsets)
-	{
-		List	   *candidate = (List *) lfirst(lc);
-		List	   *new_elems = list_difference_int(candidate, previous);
-		GroupingSetData *gs = makeNode(GroupingSetData);
-
-		while (list_length(sortclause) > list_length(previous) &&
-			   list_length(new_elems) > 0)
-		{
-			SortGroupClause *sc = list_nth(sortclause, list_length(previous));
-			int			ref = sc->tleSortGroupRef;
-
-			if (list_member_int(new_elems, ref))
-			{
-				previous = lappend_int(previous, ref);
-				new_elems = list_delete_int(new_elems, ref);
-			}
-			else
-			{
-				/* diverged from the sortclause; give up on it */
-				sortclause = NIL;
-				break;
-			}
-		}
-
-		previous = list_concat(previous, new_elems);
-
-		gs->set = list_copy(previous);
-		result = lcons(gs, result);
-	}
-
-	list_free(previous);
-
-	return result;
-}
-
-/*
  * Compute query_pathkeys and other pathkeys during plan generation
  */
 static void
@@ -2669,17 +2133,10 @@ standard_qp_callback(PlannerInfo *root, void *extra)
  * Estimate number of groups produced by grouping clauses (1 if not grouping)
  *
  * path_rows: number of output rows from scan/join step
- * gd: grouping sets data including list of grouping sets and their clauses
- * target_list: target list containing group clause references
- *
- * If doing grouping sets, we also annotate the gsets data with the estimates
- * for each set and each individual rollup list, with a view to later
- * determining whether some combination of them could be hashed instead.
  */
 static double
 get_number_of_groups(PlannerInfo *root,
 					 double path_rows,
-					 grouping_sets_data *gd,
 					 List *target_list)
 {
 	Query	   *parse = root->parse;
@@ -2689,70 +2146,6 @@ get_number_of_groups(PlannerInfo *root,
 	{
 		List	   *groupExprs;
 
-		if (parse->groupingSets)
-		{
-			/* Add up the estimates for each grouping set */
-			ListCell   *lc;
-			ListCell   *lc2;
-
-			Assert(gd);			/* keep Coverity happy */
-
-			dNumGroups = 0;
-
-			foreach(lc, gd->rollups)
-			{
-				RollupData *rollup = lfirst_node(RollupData, lc);
-				ListCell   *lc;
-
-				groupExprs = get_sortgrouplist_exprs(rollup->groupClause,
-													 target_list);
-
-				rollup->numGroups = 0.0;
-
-				forboth(lc, rollup->gsets, lc2, rollup->gsets_data)
-				{
-					List	   *gset = (List *) lfirst(lc);
-					GroupingSetData *gs = lfirst_node(GroupingSetData, lc2);
-					double		numGroups = estimate_num_groups(root,
-																groupExprs,
-																path_rows,
-																&gset,
-																NULL);
-
-					gs->numGroups = numGroups;
-					rollup->numGroups += numGroups;
-				}
-
-				dNumGroups += rollup->numGroups;
-			}
-
-			if (gd->hash_sets_idx)
-			{
-				ListCell   *lc;
-
-				gd->dNumHashGroups = 0;
-
-				groupExprs = get_sortgrouplist_exprs(parse->groupClause,
-													 target_list);
-
-				forboth(lc, gd->hash_sets_idx, lc2, gd->unsortable_sets)
-				{
-					List	   *gset = (List *) lfirst(lc);
-					GroupingSetData *gs = lfirst_node(GroupingSetData, lc2);
-					double		numGroups = estimate_num_groups(root,
-																groupExprs,
-																path_rows,
-																&gset,
-																NULL);
-
-					gs->numGroups = numGroups;
-					gd->dNumHashGroups += numGroups;
-				}
-
-				dNumGroups += gd->dNumHashGroups;
-			}
-		}
-		else
 		{
 			/* Plain GROUP BY */
 			groupExprs = get_sortgrouplist_exprs(parse->groupClause,
@@ -2761,11 +2154,6 @@ get_number_of_groups(PlannerInfo *root,
 			dNumGroups = estimate_num_groups(root, groupExprs, path_rows,
 											 NULL, NULL);
 		}
-	}
-	else if (parse->groupingSets)
-	{
-		/* Empty grouping sets ... one result row for each one */
-		dNumGroups = list_length(parse->groupingSets);
 	}
 	else if (parse->hasAggs || root->hasHavingQual)
 	{
@@ -2793,7 +2181,6 @@ get_number_of_groups(PlannerInfo *root,
  *
  * input_rel: contains the source-data Paths
  * target: the pathtarget for the result Paths to compute
- * gd: grouping sets data including list of grouping sets and their clauses
  *
  * Note: all Paths in input_rel are expected to return the target computed
  * by make_group_input_target.
@@ -2802,8 +2189,8 @@ static RelOptInfo *
 create_grouping_paths(PlannerInfo *root,
 					  RelOptInfo *input_rel,
 					  PathTarget *target,
-					  bool target_parallel_safe,
-					  grouping_sets_data *gd)
+					  bool target_parallel_safe
+					  )
 {
 	Query	   *parse = root->parse;
 	RelOptInfo *grouped_rel;
@@ -2842,8 +2229,7 @@ create_grouping_paths(PlannerInfo *root,
 		 * of them; in this case, we need can_sort to be true as long as we
 		 * must consider any sorted-input plan.
 		 */
-		if ((gd && gd->rollups != NIL)
-			|| grouping_is_sortable(parse->groupClause))
+		if (grouping_is_sortable(parse->groupClause))
 			flags |= GROUPING_CAN_USE_SORT;
 
 		/*
@@ -2868,7 +2254,7 @@ create_grouping_paths(PlannerInfo *root,
 		 */
 		if ((parse->groupClause != NIL &&
 			 root->numOrderedAggs == 0 &&
-			 (gd ? gd->any_hashable : grouping_is_hashable(parse->groupClause))))
+			 grouping_is_hashable(parse->groupClause)))
 			flags |= GROUPING_CAN_USE_HASH;
 
 		/*
@@ -2884,7 +2270,7 @@ create_grouping_paths(PlannerInfo *root,
 		extra.partial_costs_set = false;
 
 		create_ordinary_grouping_paths(root, input_rel, grouped_rel,
-									   &agg_costs, gd, &extra,
+									   &agg_costs, &extra,
 									   &partially_grouped_rel);
 	}
 
@@ -2950,7 +2336,7 @@ is_degenerate_grouping(PlannerInfo *root)
 {
 	Query	   *parse = root->parse;
 
-	return (root->hasHavingQual || parse->groupingSets) &&
+	return root->hasHavingQual &&
 		!parse->hasAggs && parse->groupClause == NIL;
 }
 
@@ -2974,7 +2360,7 @@ create_degenerate_grouping_paths(PlannerInfo *root, RelOptInfo *input_rel,
 	int			nrows;
 	Path	   *path;
 
-	nrows = list_length(parse->groupingSets);
+	nrows = 0;
 	if (nrows > 1)
 	{
 		/*
@@ -3034,7 +2420,7 @@ static void
 create_ordinary_grouping_paths(PlannerInfo *root, RelOptInfo *input_rel,
 							   RelOptInfo *grouped_rel,
 							   const AggClauseCosts *agg_costs,
-							   grouping_sets_data *gd,
+							   
 							   GroupPathExtraData *extra,
 							   RelOptInfo **partially_grouped_rel_p)
 {
@@ -3055,7 +2441,6 @@ create_ordinary_grouping_paths(PlannerInfo *root, RelOptInfo *input_rel,
 			create_partial_grouping_paths(root,
 										  grouped_rel,
 										  input_rel,
-										  gd,
 										  extra,
 										  force_rel_creation);
 	}
@@ -3075,12 +2460,11 @@ create_ordinary_grouping_paths(PlannerInfo *root, RelOptInfo *input_rel,
 	 */
 	dNumGroups = get_number_of_groups(root,
 									  cheapest_path->rows,
-									  gd,
 									  extra->targetList);
 
 	/* Build final grouping paths */
 	add_paths_to_grouping_rel(root, input_rel, grouped_rel,
-							  partially_grouped_rel, agg_costs, gd,
+							  partially_grouped_rel, agg_costs,
 							  dNumGroups, extra);
 
 	/* Give a helpful error if we failed to find any implementation */
@@ -3097,363 +2481,6 @@ create_ordinary_grouping_paths(PlannerInfo *root, RelOptInfo *input_rel,
 									extra);
 }
 
-/*
- * For a given input path, consider the possible ways of doing grouping sets on
- * it, by combinations of hashing and sorting.  This can be called multiple
- * times, so it's important that it not scribble on input.  No result is
- * returned, but any generated paths are added to grouped_rel.
- */
-static void
-consider_groupingsets_paths(PlannerInfo *root,
-							RelOptInfo *grouped_rel,
-							Path *path,
-							bool is_sorted,
-							bool can_hash,
-							grouping_sets_data *gd,
-							const AggClauseCosts *agg_costs,
-							double dNumGroups)
-{
-	Query	   *parse = root->parse;
-	Size		hash_mem_limit = get_hash_memory_limit();
-
-	/*
-	 * If we're not being offered sorted input, then only consider plans that
-	 * can be done entirely by hashing.
-	 *
-	 * We can hash everything if it looks like it'll fit in hash_mem. But if
-	 * the input is actually sorted despite not being advertised as such, we
-	 * prefer to make use of that in order to use less memory.
-	 *
-	 * If none of the grouping sets are sortable, then ignore the hash_mem
-	 * limit and generate a path anyway, since otherwise we'll just fail.
-	 */
-	if (!is_sorted)
-	{
-		List	   *new_rollups = NIL;
-		RollupData *unhashed_rollup = NULL;
-		List	   *sets_data;
-		List	   *empty_sets_data = NIL;
-		List	   *empty_sets = NIL;
-		ListCell   *lc;
-		ListCell   *l_start = list_head(gd->rollups);
-		AggStrategy strat = AGG_HASHED;
-		double		hashsize;
-		double		exclude_groups = 0.0;
-
-		Assert(can_hash);
-
-		/*
-		 * If the input is coincidentally sorted usefully (which can happen
-		 * even if is_sorted is false, since that only means that our caller
-		 * has set up the sorting for us), then save some hashtable space by
-		 * making use of that. But we need to watch out for degenerate cases:
-		 *
-		 * 1) If there are any empty grouping sets, then group_pathkeys might
-		 * be NIL if all non-empty grouping sets are unsortable. In this case,
-		 * there will be a rollup containing only empty groups, and the
-		 * pathkeys_contained_in test is vacuously true; this is ok.
-		 *
-		 * XXX: the above relies on the fact that group_pathkeys is generated
-		 * from the first rollup. If we add the ability to consider multiple
-		 * sort orders for grouping input, this assumption might fail.
-		 *
-		 * 2) If there are no empty sets and only unsortable sets, then the
-		 * rollups list will be empty (and thus l_start == NULL), and
-		 * group_pathkeys will be NIL; we must ensure that the vacuously-true
-		 * pathkeys_contained_in test doesn't cause us to crash.
-		 */
-		if (l_start != NULL &&
-			pathkeys_contained_in(root->group_pathkeys, path->pathkeys))
-		{
-			unhashed_rollup = lfirst_node(RollupData, l_start);
-			exclude_groups = unhashed_rollup->numGroups;
-			l_start = lnext(gd->rollups, l_start);
-		}
-
-		hashsize = estimate_hashagg_tablesize(root,
-											  path,
-											  agg_costs,
-											  dNumGroups - exclude_groups);
-
-		/*
-		 * gd->rollups is empty if we have only unsortable columns to work
-		 * with.  Override hash_mem in that case; otherwise, we'll rely on the
-		 * sorted-input case to generate usable mixed paths.
-		 */
-		if (hashsize > hash_mem_limit && gd->rollups)
-			return;				/* nope, won't fit */
-
-		/*
-		 * We need to burst the existing rollups list into individual grouping
-		 * sets and recompute a groupClause for each set.
-		 */
-		sets_data = list_copy(gd->unsortable_sets);
-
-		for_each_cell(lc, gd->rollups, l_start)
-		{
-			RollupData *rollup = lfirst_node(RollupData, lc);
-
-			/*
-			 * If we find an unhashable rollup that's not been skipped by the
-			 * "actually sorted" check above, we can't cope; we'd need sorted
-			 * input (with a different sort order) but we can't get that here.
-			 * So bail out; we'll get a valid path from the is_sorted case
-			 * instead.
-			 *
-			 * The mere presence of empty grouping sets doesn't make a rollup
-			 * unhashable (see preprocess_grouping_sets), we handle those
-			 * specially below.
-			 */
-			if (!rollup->hashable)
-				return;
-
-			sets_data = list_concat(sets_data, rollup->gsets_data);
-		}
-		foreach(lc, sets_data)
-		{
-			GroupingSetData *gs = lfirst_node(GroupingSetData, lc);
-			List	   *gset = gs->set;
-			RollupData *rollup;
-
-			if (gset == NIL)
-			{
-				/* Empty grouping sets can't be hashed. */
-				empty_sets_data = lappend(empty_sets_data, gs);
-				empty_sets = lappend(empty_sets, NIL);
-			}
-			else
-			{
-				rollup = makeNode(RollupData);
-
-				rollup->groupClause = preprocess_groupclause(root, gset);
-				rollup->gsets_data = list_make1(gs);
-				rollup->gsets = remap_to_groupclause_idx(rollup->groupClause,
-														 rollup->gsets_data,
-														 gd->tleref_to_colnum_map);
-				rollup->numGroups = gs->numGroups;
-				rollup->hashable = true;
-				rollup->is_hashed = true;
-				new_rollups = lappend(new_rollups, rollup);
-			}
-		}
-
-		/*
-		 * If we didn't find anything nonempty to hash, then bail.  We'll
-		 * generate a path from the is_sorted case.
-		 */
-		if (new_rollups == NIL)
-			return;
-
-		/*
-		 * If there were empty grouping sets they should have been in the
-		 * first rollup.
-		 */
-		Assert(!unhashed_rollup || !empty_sets);
-
-		if (unhashed_rollup)
-		{
-			new_rollups = lappend(new_rollups, unhashed_rollup);
-			strat = AGG_MIXED;
-		}
-		else if (empty_sets)
-		{
-			RollupData *rollup = makeNode(RollupData);
-
-			rollup->groupClause = NIL;
-			rollup->gsets_data = empty_sets_data;
-			rollup->gsets = empty_sets;
-			rollup->numGroups = list_length(empty_sets);
-			rollup->hashable = false;
-			rollup->is_hashed = false;
-			new_rollups = lappend(new_rollups, rollup);
-			strat = AGG_MIXED;
-		}
-
-		add_path(grouped_rel, (Path *)
-				 create_groupingsets_path(root,
-										  grouped_rel,
-										  path,
-										  (List *) parse->havingQual,
-										  strat,
-										  new_rollups,
-										  agg_costs,
-										  dNumGroups));
-		return;
-	}
-
-	/*
-	 * If we have sorted input but nothing we can do with it, bail.
-	 */
-	if (list_length(gd->rollups) == 0)
-		return;
-
-	/*
-	 * Given sorted input, we try and make two paths: one sorted and one mixed
-	 * sort/hash. (We need to try both because hashagg might be disabled, or
-	 * some columns might not be sortable.)
-	 *
-	 * can_hash is passed in as false if some obstacle elsewhere (such as
-	 * ordered aggs) means that we shouldn't consider hashing at all.
-	 */
-	if (can_hash && gd->any_hashable)
-	{
-		List	   *rollups = NIL;
-		List	   *hash_sets = list_copy(gd->unsortable_sets);
-		double		availspace = hash_mem_limit;
-		ListCell   *lc;
-
-		/*
-		 * Account first for space needed for groups we can't sort at all.
-		 */
-		availspace -= estimate_hashagg_tablesize(root,
-												 path,
-												 agg_costs,
-												 gd->dNumHashGroups);
-
-		if (availspace > 0 && list_length(gd->rollups) > 1)
-		{
-			double		scale;
-			int			num_rollups = list_length(gd->rollups);
-			int			k_capacity;
-			int		   *k_weights = palloc(num_rollups * sizeof(int));
-			Bitmapset  *hash_items = NULL;
-			int			i;
-
-			/*
-			 * We treat this as a knapsack problem: the knapsack capacity
-			 * represents hash_mem, the item weights are the estimated memory
-			 * usage of the hashtables needed to implement a single rollup,
-			 * and we really ought to use the cost saving as the item value;
-			 * however, currently the costs assigned to sort nodes don't
-			 * reflect the comparison costs well, and so we treat all items as
-			 * of equal value (each rollup we hash instead saves us one sort).
-			 *
-			 * To use the discrete knapsack, we need to scale the values to a
-			 * reasonably small bounded range.  We choose to allow a 5% error
-			 * margin; we have no more than 4096 rollups in the worst possible
-			 * case, which with a 5% error margin will require a bit over 42MB
-			 * of workspace. (Anyone wanting to plan queries that complex had
-			 * better have the memory for it.  In more reasonable cases, with
-			 * no more than a couple of dozen rollups, the memory usage will
-			 * be negligible.)
-			 *
-			 * k_capacity is naturally bounded, but we clamp the values for
-			 * scale and weight (below) to avoid overflows or underflows (or
-			 * uselessly trying to use a scale factor less than 1 byte).
-			 */
-			scale = Max(availspace / (20.0 * num_rollups), 1.0);
-			k_capacity = (int) floor(availspace / scale);
-
-			/*
-			 * We leave the first rollup out of consideration since it's the
-			 * one that matches the input sort order.  We assign indexes "i"
-			 * to only those entries considered for hashing; the second loop,
-			 * below, must use the same condition.
-			 */
-			i = 0;
-			for_each_from(lc, gd->rollups, 1)
-			{
-				RollupData *rollup = lfirst_node(RollupData, lc);
-
-				if (rollup->hashable)
-				{
-					double		sz = estimate_hashagg_tablesize(root,
-																path,
-																agg_costs,
-																rollup->numGroups);
-
-					/*
-					 * If sz is enormous, but hash_mem (and hence scale) is
-					 * small, avoid integer overflow here.
-					 */
-					k_weights[i] = (int) Min(floor(sz / scale),
-											 k_capacity + 1.0);
-					++i;
-				}
-			}
-
-			/*
-			 * Apply knapsack algorithm; compute the set of items which
-			 * maximizes the value stored (in this case the number of sorts
-			 * saved) while keeping the total size (approximately) within
-			 * capacity.
-			 */
-			if (i > 0)
-				hash_items = DiscreteKnapsack(k_capacity, i, k_weights, NULL);
-
-			if (!bms_is_empty(hash_items))
-			{
-				rollups = list_make1(linitial(gd->rollups));
-
-				i = 0;
-				for_each_from(lc, gd->rollups, 1)
-				{
-					RollupData *rollup = lfirst_node(RollupData, lc);
-
-					if (rollup->hashable)
-					{
-						if (bms_is_member(i, hash_items))
-							hash_sets = list_concat(hash_sets,
-													rollup->gsets_data);
-						else
-							rollups = lappend(rollups, rollup);
-						++i;
-					}
-					else
-						rollups = lappend(rollups, rollup);
-				}
-			}
-		}
-
-		if (!rollups && hash_sets)
-			rollups = list_copy(gd->rollups);
-
-		foreach(lc, hash_sets)
-		{
-			GroupingSetData *gs = lfirst_node(GroupingSetData, lc);
-			RollupData *rollup = makeNode(RollupData);
-
-			Assert(gs->set != NIL);
-
-			rollup->groupClause = preprocess_groupclause(root, gs->set);
-			rollup->gsets_data = list_make1(gs);
-			rollup->gsets = remap_to_groupclause_idx(rollup->groupClause,
-													 rollup->gsets_data,
-													 gd->tleref_to_colnum_map);
-			rollup->numGroups = gs->numGroups;
-			rollup->hashable = true;
-			rollup->is_hashed = true;
-			rollups = lcons(rollup, rollups);
-		}
-
-		if (rollups)
-		{
-			add_path(grouped_rel, (Path *)
-					 create_groupingsets_path(root,
-											  grouped_rel,
-											  path,
-											  (List *) parse->havingQual,
-											  AGG_MIXED,
-											  rollups,
-											  agg_costs,
-											  dNumGroups));
-		}
-	}
-
-	/*
-	 * Now try the simple sorted case.
-	 */
-	if (!gd->unsortable_sets)
-		add_path(grouped_rel, (Path *)
-				 create_groupingsets_path(root,
-										  grouped_rel,
-										  path,
-										  (List *) parse->havingQual,
-										  AGG_SORTED,
-										  gd->rollups,
-										  agg_costs,
-										  dNumGroups));
-}
 
 /*
  * make_sort_input_target
@@ -4179,7 +3206,7 @@ add_paths_to_grouping_rel(PlannerInfo *root, RelOptInfo *input_rel,
 						  RelOptInfo *grouped_rel,
 						  RelOptInfo *partially_grouped_rel,
 						  const AggClauseCosts *agg_costs,
-						  grouping_sets_data *gd, double dNumGroups,
+						  double dNumGroups,
 						  GroupPathExtraData *extra)
 {
 	Query	   *parse = root->parse;
@@ -4218,13 +3245,7 @@ add_paths_to_grouping_rel(PlannerInfo *root, RelOptInfo *input_rel,
 													 -1.0);
 
 				/* Now decide what to stick atop it */
-				if (parse->groupingSets)
-				{
-					consider_groupingsets_paths(root, grouped_rel,
-												path, true, can_hash,
-												gd, agg_costs, dNumGroups);
-				}
-				else if (parse->hasAggs)
+				if (parse->hasAggs)
 				{
 					/*
 					 * We have aggregation, possibly with plain GROUP BY. Make
@@ -4292,13 +3313,7 @@ add_paths_to_grouping_rel(PlannerInfo *root, RelOptInfo *input_rel,
 														 -1.0);
 
 			/* Now decide what to stick atop it */
-			if (parse->groupingSets)
-			{
-				consider_groupingsets_paths(root, grouped_rel,
-											path, true, can_hash,
-											gd, agg_costs, dNumGroups);
-			}
-			else if (parse->hasAggs)
+			if (parse->hasAggs)
 			{
 				/*
 				 * We have aggregation, possibly with plain GROUP BY. Make an
@@ -4445,16 +3460,6 @@ add_paths_to_grouping_rel(PlannerInfo *root, RelOptInfo *input_rel,
 
 	if (can_hash)
 	{
-		if (parse->groupingSets)
-		{
-			/*
-			 * Try for a hash-only groupingsets path over unsorted input.
-			 */
-			consider_groupingsets_paths(root, grouped_rel,
-										cheapest_path, false, true,
-										gd, agg_costs, dNumGroups);
-		}
-		else
 		{
 			/*
 			 * Generate a HashAgg Path.  We just need an Agg over the
@@ -4519,7 +3524,7 @@ static RelOptInfo *
 create_partial_grouping_paths(PlannerInfo *root,
 							  RelOptInfo *grouped_rel,
 							  RelOptInfo *input_rel,
-							  grouping_sets_data *gd,
+							  
 							  GroupPathExtraData *extra,
 							  bool force_rel_creation)
 {
@@ -4601,13 +3606,11 @@ create_partial_grouping_paths(PlannerInfo *root,
 		dNumPartialGroups =
 			get_number_of_groups(root,
 								 cheapest_total_path->rows,
-								 gd,
 								 extra->targetList);
 	if (cheapest_partial_path != NULL)
 		dNumPartialPartialGroups =
 			get_number_of_groups(root,
 								 cheapest_partial_path->rows,
-								 gd,
 								 extra->targetList);
 
 	if (can_sort && cheapest_total_path != NULL)
@@ -4971,11 +3974,6 @@ can_partial_agg(PlannerInfo *root)
 		 */
 		return false;
 	}
-	else if (parse->groupingSets)
-	{
-		/* We don't know how to do grouping sets in parallel. */
-		return false;
-	}
 	else if (root->hasNonPartialAggs || root->hasNonSerialAggs)
 	{
 		/* Insufficient support for partial mode. */
@@ -5152,7 +4150,7 @@ create_distinct_paths(PlannerInfo *root,
 	distinct_rel->consider_parallel = input_rel->consider_parallel;
 
 	/* Estimate number of distinct rows there will be */
-	if (parse->groupClause || parse->groupingSets || parse->hasAggs ||
+	if (parse->groupClause || parse->hasAggs ||
 		root->hasHavingQual)
 	{
 		/*

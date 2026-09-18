@@ -19,11 +19,7 @@ extern void transformAggregateCall(ParseState *pstate, Aggref *agg,
 								   List *args, List *aggorder,
 								   bool agg_distinct);
 
-extern Node *transformGroupingFunc(ParseState *pstate, GroupingFunc *g);
-
 extern void parseCheckAggregates(ParseState *pstate, Query *qry);
-
-extern List *expand_grouping_sets(List *groupingSets, bool groupDistinct, int limit);
 
 extern int	get_aggregate_argtypes(Aggref *aggref, Oid *inputTypes);
 

@@ -471,7 +471,6 @@ ExecInterpExpr(ExprState *state, ExprContext *econtext, bool *isnull)
 		&&CASE_EEOP_SCALARARRAYOP,
 		&&CASE_EEOP_HASHED_SCALARARRAYOP,
 		&&CASE_EEOP_AGGREF,
-		&&CASE_EEOP_GROUPING_FUNC,
 		&&CASE_EEOP_SUBPLAN,
 		&&CASE_EEOP_AGG_STRICT_DESERIALIZE,
 		&&CASE_EEOP_AGG_DESERIALIZE,
@@ -1413,14 +1412,6 @@ ExecInterpExpr(ExprState *state, ExprContext *econtext, bool *isnull)
 
 			*op->resvalue = econtext->ecxt_aggvalues[aggno];
 			*op->resnull = econtext->ecxt_aggnulls[aggno];
-
-			EEO_NEXT();
-		}
-
-		EEO_CASE(EEOP_GROUPING_FUNC)
-		{
-			/* too complex/uncommon for an inline implementation */
-			ExecEvalGroupingFunc(state, op);
 
 			EEO_NEXT();
 		}
@@ -3482,37 +3473,6 @@ ExecEvalHashedScalarArrayOp(ExprState *state, ExprEvalStep *op, ExprContext *eco
 
 	*op->resvalue = result;
 	*op->resnull = resultnull;
-}
-
-/*
- * ExecEvalGroupingFunc
- *
- * Computes a bitmask with a bit for each (unevaluated) argument expression
- * (rightmost arg is least significant bit).
- *
- * A bit is set if the corresponding expression is NOT part of the set of
- * grouping expressions in the current grouping set.
- */
-void
-ExecEvalGroupingFunc(ExprState *state, ExprEvalStep *op)
-{
-	AggState   *aggstate = castNode(AggState, state->parent);
-	int			result = 0;
-	Bitmapset  *grouped_cols = aggstate->grouped_cols;
-	ListCell   *lc;
-
-	foreach(lc, op->d.grouping_func.clauses)
-	{
-		int			attnum = lfirst_int(lc);
-
-		result <<= 1;
-
-		if (!bms_is_member(attnum, grouped_cols))
-			result |= 1;
-	}
-
-	*op->resvalue = Int32GetDatum(result);
-	*op->resnull = false;
 }
 
 /*

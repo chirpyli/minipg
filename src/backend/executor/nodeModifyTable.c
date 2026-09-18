@@ -137,66 +137,6 @@ ExecCheckPlanOutput(Relation resultRel, List *targetList)
 }
 
 /*
- * ExecCheckTupleVisible -- verify tuple is visible
- *
- * It would not be consistent with guarantees of the higher isolation levels to
- * proceed with avoiding insertion (taking speculative insertion's alternative
- * path) on the basis of another tuple that is not visible to MVCC snapshot.
- * Check for the need to raise a serialization failure, and do so as necessary.
- */
-static void
-ExecCheckTupleVisible(EState *estate,
-					  Relation rel,
-					  TupleTableSlot *slot)
-{
-	if (!IsolationUsesXactSnapshot())
-		return;
-
-	if (!table_tuple_satisfies_snapshot(rel, slot, estate->es_snapshot))
-	{
-		Datum		xminDatum;
-		TransactionId xmin;
-		bool		isnull;
-
-		xminDatum = slot_getsysattr(slot, MinTransactionIdAttributeNumber, &isnull);
-		Assert(!isnull);
-		xmin = DatumGetTransactionId(xminDatum);
-
-		/*
-		 * We should not raise a serialization failure if the conflict is
-		 * against a tuple inserted by our own transaction, even if it's not
-		 * visible to our snapshot.  (This would happen, for example, if
-		 * conflicting keys are proposed for insertion in a single command.)
-		 */
-		if (!TransactionIdIsCurrentTransactionId(xmin))
-			ereport(ERROR,
-					(errcode(ERRCODE_T_R_SERIALIZATION_FAILURE),
-					 errmsg("could not serialize access due to concurrent update")));
-	}
-}
-
-/*
- * ExecCheckTIDVisible -- convenience variant of ExecCheckTupleVisible()
- */
-static void
-ExecCheckTIDVisible(EState *estate,
-					ResultRelInfo *relinfo,
-					ItemPointer tid,
-					TupleTableSlot *tempSlot)
-{
-	Relation	rel = relinfo->ri_RelationDesc;
-
-	/* Redundantly check isolation level */
-	if (!IsolationUsesXactSnapshot())
-		return;
-
-	if (!table_tuple_fetch_row_version(rel, tid, SnapshotAny, tempSlot))
-		elog(ERROR, "failed to fetch conflicting tuple for ON CONFLICT");
-	ExecCheckTupleVisible(estate, rel, tempSlot);
-	ExecClearTuple(tempSlot);
-}
-
-/*
  * ExecInitInsertProjection
  *		Do one-time initialization of projection data for INSERT tuples.
  *

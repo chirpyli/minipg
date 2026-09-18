@@ -3306,27 +3306,7 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 	 * determines the size of some allocations.  Also calculate the number of
 	 * phases, since all hashed/mixed nodes contribute to only a single phase.
 	 */
-	if (node->groupingSets)
-	{
-		numGroupingSets = list_length(node->groupingSets);
 
-		foreach(l, node->chain)
-		{
-			Agg		   *agg = lfirst(l);
-
-			numGroupingSets = Max(numGroupingSets,
-								  list_length(agg->groupingSets));
-
-			/*
-			 * additional AGG_HASHED aggs become part of phase 0, but all
-			 * others add an extra phase.
-			 */
-			if (agg->aggstrategy != AGG_HASHED)
-				++numPhases;
-			else
-				++numHashes;
-		}
-	}
 
 	aggstate->maxsets = numGroupingSets;
 	aggstate->numphases = numPhases;
@@ -3467,21 +3447,10 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 	}
 
 	phase = 0;
-	for (phaseidx = 0; phaseidx <= list_length(node->chain); ++phaseidx)
+	for (phaseidx = 0; phaseidx <= 0; ++phaseidx)
 	{
-		Agg		   *aggnode;
-		Sort	   *sortnode;
-
-		if (phaseidx > 0)
-		{
-			aggnode = list_nth_node(Agg, node->chain, phaseidx - 1);
-			sortnode = castNode(Sort, aggnode->plan.lefttree);
-		}
-		else
-		{
-			aggnode = node;
-			sortnode = NULL;
-		}
+		Agg		   *aggnode = node;
+		Sort	   *sortnode = NULL;
 
 		Assert(phase <= 1 || sortnode);
 
@@ -3516,41 +3485,9 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 		else
 		{
 			AggStatePerPhase phasedata = &aggstate->phases[++phase];
-			int			num_sets;
-
-			phasedata->numsets = num_sets = list_length(aggnode->groupingSets);
-
-			if (num_sets)
-			{
-				phasedata->gset_lengths = palloc(num_sets * sizeof(int));
-				phasedata->grouped_cols = palloc(num_sets * sizeof(Bitmapset *));
-
-				i = 0;
-				foreach(l, aggnode->groupingSets)
-				{
-					int			current_length = list_length(lfirst(l));
-					Bitmapset  *cols = NULL;
-
-					/* planner forces this to be correct */
-					for (j = 0; j < current_length; ++j)
-						cols = bms_add_member(cols, aggnode->grpColIdx[j]);
-
-					phasedata->grouped_cols[i] = cols;
-					phasedata->gset_lengths[i] = current_length;
-
-					++i;
-				}
-
-				all_grouped_cols = bms_add_members(all_grouped_cols,
-												   phasedata->grouped_cols[0]);
-			}
-			else
-			{
-				Assert(phaseidx == 0);
-
-				phasedata->gset_lengths = NULL;
-				phasedata->grouped_cols = NULL;
-			}
+			phasedata->numsets = 0;
+			phasedata->gset_lengths = NULL;
+			phasedata->grouped_cols = NULL;
 
 			/*
 			 * If we are grouping, precompute fmgr lookup data for inner loop.

@@ -249,7 +249,6 @@ JumbleQueryInternal(JumbleState *jstate, Query *query)
 	JumbleExpr(jstate, (Node *) query->targetList);
 	JumbleExpr(jstate, (Node *) query->groupClause);
 	APP_JUMB(query->groupDistinct);
-	JumbleExpr(jstate, (Node *) query->groupingSets);
 	JumbleExpr(jstate, query->havingQual);
 	JumbleExpr(jstate, (Node *) query->distinctClause);
 	JumbleExpr(jstate, (Node *) query->sortClause);
@@ -400,14 +399,7 @@ JumbleExpr(JumbleState *jstate, Node *node)
 				JumbleExpr(jstate, (Node *) expr->aggfilter);
 			}
 			break;
-		case T_GroupingFunc:
-			{
-				GroupingFunc *grpnode = (GroupingFunc *) node;
 
-				JumbleExpr(jstate, (Node *) grpnode->refs);
-				APP_JUMB(grpnode->agglevelsup);
-			}
-			break;
 		case T_SubscriptingRef:
 			{
 				SubscriptingRef *sbsref = (SubscriptingRef *) node;
@@ -649,13 +641,7 @@ JumbleExpr(JumbleState *jstate, Node *node)
 				APP_JUMB(sgc->nulls_first);
 			}
 			break;
-		case T_GroupingSet:
-			{
-				GroupingSet *gsnode = (GroupingSet *) node;
 
-				JumbleExpr(jstate, (Node *) gsnode->content);
-			}
-			break;
 		case T_RangeTblFunction:
 			{
 				RangeTblFunction *rtfunc = (RangeTblFunction *) node;

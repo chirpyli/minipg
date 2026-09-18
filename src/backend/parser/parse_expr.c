@@ -192,10 +192,6 @@ transformExprRecurse(ParseState *pstate, Node *expr)
 			result = transformFuncCall(pstate, (FuncCall *) expr);
 			break;
 
-		case T_GroupingFunc:
-			result = transformGroupingFunc(pstate, (GroupingFunc *) expr);
-			break;
-
 		case T_NamedArgExpr:
 			{
 				NamedArgExpr *na = (NamedArgExpr *) expr;

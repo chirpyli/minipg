@@ -307,7 +307,6 @@ struct PlannerInfo
 	List	   *update_colnos;
 
 	/* Fields filled during create_plan() for use in setrefs.c */
-	AttrNumber *grouping_map;	/* for GroupingFunc fixup */
 	List	   *minmax_aggs;	/* List of MinMaxAggInfos */
 
 	MemoryContext planner_cxt;	/* context holding PlannerInfo */
@@ -1505,42 +1504,6 @@ typedef struct AggPath
 	List	   *groupClause;	/* a list of SortGroupClause's */
 	List	   *qual;			/* quals (HAVING quals), if any */
 } AggPath;
-
-/*
- * Various annotations used for grouping sets in the planner.
- */
-
-typedef struct GroupingSetData
-{
-	NodeTag		type;
-	List	   *set;			/* grouping set as list of sortgrouprefs */
-	double		numGroups;		/* est. number of result groups */
-} GroupingSetData;
-
-typedef struct RollupData
-{
-	NodeTag		type;
-	List	   *groupClause;	/* applicable subset of parse->groupClause */
-	List	   *gsets;			/* lists of integer indexes into groupClause */
-	List	   *gsets_data;		/* list of GroupingSetData */
-	double		numGroups;		/* est. number of result groups */
-	bool		hashable;		/* can be hashed */
-	bool		is_hashed;		/* to be implemented as a hashagg */
-} RollupData;
-
-/*
- * GroupingSetsPath represents a GROUPING SETS aggregation
- */
-
-typedef struct GroupingSetsPath
-{
-	Path		path;
-	Path	   *subpath;		/* path representing input source */
-	AggStrategy aggstrategy;	/* basic strategy */
-	List	   *rollups;		/* list of RollupData */
-	List	   *qual;			/* quals (HAVING quals), if any */
-	uint64		transitionSpace;	/* for pass-by-ref transition data */
-} GroupingSetsPath;
 
 /*
  * MinMaxAggPath represents computation of MIN/MAX aggregates from indexes

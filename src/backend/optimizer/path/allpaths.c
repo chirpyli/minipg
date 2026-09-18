@@ -1560,7 +1560,6 @@ set_subquery_pathlist(PlannerInfo *root, RelOptInfo *rel,
 	 */
 	if (parse->hasAggs ||
 		parse->groupClause ||
-		parse->groupingSets ||
 		parse->havingQual ||
 		parse->distinctClause ||
 		parse->sortClause ||
@@ -2364,10 +2363,6 @@ subquery_is_pushdown_safe(Query *subquery, Query *topquery,
 	if (subquery->limitOffset != NULL || subquery->limitCount != NULL)
 		return false;
 
-	/* Check point 6 */
-	if (subquery->groupClause && subquery->groupingSets)
-		return false;
-
 	/* Check points 3, 4, and 5 */
 	if (subquery->distinctClause ||
 		subquery->hasTargetSRFs)
@@ -2592,7 +2587,7 @@ subquery_push_qual(Query *subquery, RangeTblEntry *rte, Index rti, Node *qual)
 		 * subquery uses grouping or aggregation, put it in HAVING (since the
 		 * qual really refers to the group-result rows).
 		 */
-		if (subquery->hasAggs || subquery->groupClause || subquery->groupingSets || subquery->havingQual)
+		if (subquery->hasAggs || subquery->groupClause || subquery->havingQual)
 			subquery->havingQual = make_and_qual(subquery->havingQual, qual);
 		else
 			subquery->jointree->quals =
@@ -3003,10 +2998,7 @@ print_path(PlannerInfo *root, Path *path, int indent)
 			ptype = "Agg";
 			subpath = ((AggPath *) path)->subpath;
 			break;
-		case T_GroupingSetsPath:
-			ptype = "GroupingSets";
-			subpath = ((GroupingSetsPath *) path)->subpath;
-			break;
+
 		case T_MinMaxAggPath:
 			ptype = "MinMaxAgg";
 			break;

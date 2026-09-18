@@ -339,17 +339,16 @@ build_subplan(PlannerInfo *root, Plan *plan, PlannerInfo *subroot,
 		Node	   *arg = pitem->item;
 
 		/*
-		 * The Var, PlaceHolderVar, Aggref or GroupingFunc has already been
+		 * The Var, PlaceHolderVar, or Aggref has already been
 		 * adjusted to have the correct varlevelsup, phlevelsup, or
 		 * agglevelsup.
 		 *
-		 * If it's a PlaceHolderVar, Aggref or GroupingFunc, its arguments
+		 * If it's a PlaceHolderVar or Aggref, its arguments
 		 * might contain SubLinks, which have not yet been processed (see the
 		 * comments for SS_replace_correlation_vars).  Do that now.
 		 */
 		if (IsA(arg, PlaceHolderVar) ||
-			IsA(arg, Aggref) ||
-			IsA(arg, GroupingFunc))
+			IsA(arg, Aggref))
 			arg = SS_process_sublinks(root, arg, false);
 
 		splan->parParam = lappend_int(splan->parParam, pitem->paramId);
@@ -1114,7 +1113,6 @@ simplify_EXISTS_query(PlannerInfo *root, Query *query)
 	 */
 	if (query->commandType != CMD_SELECT ||
 		query->hasAggs ||
-		query->groupingSets ||
 		query->hasTargetSRFs ||
 		query->havingQual ||
 		query->limitOffset ||
@@ -1452,11 +1450,7 @@ replace_correlation_vars_mutator(Node *node, PlannerInfo *root)
 		if (((Aggref *) node)->agglevelsup > 0)
 			return (Node *) replace_outer_agg(root, (Aggref *) node);
 	}
-	if (IsA(node, GroupingFunc))
-	{
-		if (((GroupingFunc *) node)->agglevelsup > 0)
-			return (Node *) replace_outer_grouping(root, (GroupingFunc *) node);
-	}
+
 	return expression_tree_mutator(node,
 								   replace_correlation_vars_mutator,
 								   (void *) root);
@@ -1511,11 +1505,10 @@ process_sublinks_mutator(Node *node, process_sublinks_context *context)
 	}
 
 	/*
-	 * Don't recurse into the arguments of an outer PHV, Aggref or
-	 * GroupingFunc here.  Any SubLinks in the arguments have to be dealt with
-	 * at the outer query level; they'll be handled when build_subplan
-	 * collects the PHV, Aggref or GroupingFunc into the arguments to be
-	 * passed down to the current subplan.
+	 * Don't recurse into the arguments of an outer PHV or Aggref here.
+	 * Any SubLinks in the arguments have to be dealt with at the outer query
+	 * level; they'll be handled when build_subplan collects the PHV or Aggref
+	 * into the arguments to be passed down to the current subplan.
 	 */
 	if (IsA(node, PlaceHolderVar))
 	{
@@ -1527,11 +1520,7 @@ process_sublinks_mutator(Node *node, process_sublinks_context *context)
 		if (((Aggref *) node)->agglevelsup > 0)
 			return node;
 	}
-	else if (IsA(node, GroupingFunc))
-	{
-		if (((GroupingFunc *) node)->agglevelsup > 0)
-			return node;
-	}
+
 
 	/*
 	 * We should never see a SubPlan expression in the input (since this is
@@ -1644,7 +1633,7 @@ SS_identify_outer_params(PlannerInfo *root)
 	outer_params = NULL;
 	for (proot = root->parent_root; proot != NULL; proot = proot->parent_root)
 	{
-		/* Include ordinary Var/PHV/Aggref/GroupingFunc params */
+		/* Include ordinary Var/PHV/Aggref params */
 		foreach(l, proot->plan_params)
 		{
 			PlannerParamItem *pitem = (PlannerParamItem *) lfirst(l);

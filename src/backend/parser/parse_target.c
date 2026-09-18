@@ -1658,10 +1658,6 @@ FigureColnameInternal(Node *node, char **name)
 				}
 			}
 			break;
-		case T_GroupingFunc:
-			/* make GROUPING() act like a regular function */
-			*name = "grouping";
-			return 2;
 		case T_SubLink:
 			switch (((SubLink *) node)->subLinkType)
 			{

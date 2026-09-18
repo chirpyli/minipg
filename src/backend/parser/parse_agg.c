@@ -66,13 +66,7 @@ static void check_ungrouped_columns(Node *node, ParseState *pstate, Query *qry,
 									List **func_grouped_rels);
 static bool check_ungrouped_columns_walker(Node *node,
 										   check_ungrouped_columns_context *context);
-static void finalize_grouping_exprs(Node *node, ParseState *pstate, Query *qry,
-									List *groupClauses, bool hasJoinRTEs,
-									bool have_non_var_grouping);
-static bool finalize_grouping_exprs_walker(Node *node,
-										   check_ungrouped_columns_context *context);
 static void check_agglevels_and_constraints(ParseState *pstate, Node *expr);
-static List *expand_groupingset_node(GroupingSet *gs);
 static Node *make_agg_arg(Oid argtype, Oid argcollation);
 
 
@@ -212,46 +206,6 @@ transformAggregateCall(ParseState *pstate, Aggref *agg,
 }
 
 /*
- * transformGroupingFunc
- *		Transform a GROUPING expression
- *
- * GROUPING() behaves very like an aggregate.  Processing of levels and nesting
- * is done as for aggregates.  We set p_hasAggs for these expressions too.
- */
-Node *
-transformGroupingFunc(ParseState *pstate, GroupingFunc *p)
-{
-	ListCell   *lc;
-	List	   *args = p->args;
-	List	   *result_list = NIL;
-	GroupingFunc *result = makeNode(GroupingFunc);
-
-	if (list_length(args) > 31)
-		ereport(ERROR,
-				(errcode(ERRCODE_TOO_MANY_ARGUMENTS),
-				 errmsg("GROUPING must have fewer than 32 arguments"),
-				 parser_errposition(pstate, p->location)));
-
-	foreach(lc, args)
-	{
-		Node	   *current_result;
-
-		current_result = transformExpr(pstate, (Node *) lfirst(lc), pstate->p_expr_kind);
-
-		/* acceptability of expressions is checked later */
-
-		result_list = lappend(result_list, current_result);
-	}
-
-	result->args = result_list;
-	result->location = p->location;
-
-	check_agglevels_and_constraints(pstate, (Node *) result);
-
-	return (Node *) result;
-}
-
-/*
  * Aggregate functions and grouping operations (which are combined in the spec
  * as <set function specification>) are very similar with regard to level and
  * nesting restrictions (though we allow a lot more things than the spec does).
@@ -281,13 +235,7 @@ check_agglevels_and_constraints(ParseState *pstate, Node *expr)
 		p_levelsup = &agg->agglevelsup;
 	}
 	else
-	{
-		GroupingFunc *grp = (GroupingFunc *) expr;
-
-		args = grp->args;
-		location = grp->location;
-		p_levelsup = &grp->agglevelsup;
-	}
+		elog(ERROR, "unexpected node type in check_agglevels_and_constraints");
 
 	/*
 	 * Check the arguments to compute the aggregate's level and detect
@@ -612,21 +560,6 @@ check_agg_arguments_walker(Node *node,
 		}
 		/* Continue and descend into subtree */
 	}
-	if (IsA(node, GroupingFunc))
-	{
-		int			agglevelsup = ((GroupingFunc *) node)->agglevelsup;
-
-		/* convert levelsup to frame of reference of original query */
-		agglevelsup -= context->sublevels_up;
-		/* ignore local aggs of subqueries */
-		if (agglevelsup >= 0)
-		{
-			if (context->min_agglevel < 0 ||
-				context->min_agglevel > agglevelsup)
-				context->min_agglevel = agglevelsup;
-		}
-		/* Continue and descend into subtree */
-	}
 
 	/*
 	 * SRFs and window functions can be rejected immediately, unless we are
@@ -682,7 +615,6 @@ check_agg_arguments_walker(Node *node,
 void
 parseCheckAggregates(ParseState *pstate, Query *qry)
 {
-	List	   *gset_common = NIL;
 	List	   *groupClauses = NIL;
 	List	   *groupClauseCommonVars = NIL;
 	bool		have_non_var_grouping;
@@ -693,54 +625,7 @@ parseCheckAggregates(ParseState *pstate, Query *qry)
 	Node	   *clause;
 
 	/* This should only be called if we found aggregates or grouping */
-	Assert(pstate->p_hasAggs || qry->groupClause || qry->havingQual || qry->groupingSets);
-
-	/*
-	 * If we have grouping sets, expand them and find the intersection of all
-	 * sets.
-	 */
-	if (qry->groupingSets)
-	{
-		/*
-		 * The limit of 4096 is arbitrary and exists simply to avoid resource
-		 * issues from pathological constructs.
-		 */
-		List	   *gsets = expand_grouping_sets(qry->groupingSets, qry->groupDistinct, 4096);
-
-		if (!gsets)
-			ereport(ERROR,
-					(errcode(ERRCODE_STATEMENT_TOO_COMPLEX),
-					 errmsg("too many grouping sets present (maximum 4096)"),
-					 parser_errposition(pstate,
-										qry->groupClause
-										? exprLocation((Node *) qry->groupClause)
-										: exprLocation((Node *) qry->groupingSets))));
-
-		/*
-		 * The intersection will often be empty, so help things along by
-		 * seeding the intersect with the smallest set.
-		 */
-		gset_common = linitial(gsets);
-
-		if (gset_common)
-		{
-			for_each_from(l, gsets, 1)
-			{
-				gset_common = list_intersection_int(gset_common, lfirst(l));
-				if (!gset_common)
-					break;
-			}
-		}
-
-		/*
-		 * If there was only one grouping set in the expansion, AND if the
-		 * groupClause is non-empty (meaning that the grouping set is not
-		 * empty either), then we can ditch the grouping set and pretend we
-		 * just had a normal GROUP BY.
-		 */
-		if (list_length(gsets) == 1 && qry->groupClause)
-			qry->groupingSets = NIL;
-	}
+	Assert(pstate->p_hasAggs || qry->groupClause || qry->havingQual);
 
 	/*
 	 * Scan the range table to see if there are JOIN or self-reference CTE
@@ -804,8 +689,7 @@ parseCheckAggregates(ParseState *pstate, Query *qry)
 		{
 			have_non_var_grouping = true;
 		}
-		else if (!qry->groupingSets ||
-				 list_member_int(gset_common, tle->ressortgroupref))
+		else
 		{
 			groupClauseCommonVars = lappend(groupClauseCommonVars, tle->expr);
 		}
@@ -819,13 +703,8 @@ parseCheckAggregates(ParseState *pstate, Query *qry)
 	 * WINDOW clauses.  For that matter, it's also going to examine the
 	 * grouping expressions themselves --- but they'll all pass the test ...
 	 *
-	 * We also finalize GROUPING expressions, but for that we need to traverse
-	 * the original (unflattened) clause in order to modify nodes.
 	 */
 	clause = (Node *) qry->targetList;
-	finalize_grouping_exprs(clause, pstate, qry,
-							groupClauses, hasJoinRTEs,
-							have_non_var_grouping);
 	if (hasJoinRTEs)
 		clause = flatten_join_alias_vars(qry, clause);
 	check_ungrouped_columns(clause, pstate, qry,
@@ -834,9 +713,6 @@ parseCheckAggregates(ParseState *pstate, Query *qry)
 							&func_grouped_rels);
 
 	clause = (Node *) qry->havingQual;
-	finalize_grouping_exprs(clause, pstate, qry,
-							groupClauses, hasJoinRTEs,
-							have_non_var_grouping);
 	if (hasJoinRTEs)
 		clause = flatten_join_alias_vars(qry, clause);
 	check_ungrouped_columns(clause, pstate, qry,
@@ -939,16 +815,6 @@ check_ungrouped_columns_walker(Node *node,
 		 * levels, however.
 		 */
 		if ((int) agg->agglevelsup > context->sublevels_up)
-			return false;
-	}
-
-	if (IsA(node, GroupingFunc))
-	{
-		GroupingFunc *grp = (GroupingFunc *) node;
-
-		/* handled GroupingFunc separately, no need to recheck at this level */
-
-		if ((int) grp->agglevelsup >= context->sublevels_up)
 			return false;
 	}
 
@@ -1073,424 +939,11 @@ check_ungrouped_columns_walker(Node *node,
 								  (void *) context);
 }
 
-/*
- * finalize_grouping_exprs -
- *	  Scan the given expression tree for GROUPING() and related calls,
- *	  and validate and process their arguments.
- *
- * This is split out from check_ungrouped_columns above because it needs
- * to modify the nodes (which it does in-place, not via a mutator) while
- * check_ungrouped_columns may see only a copy of the original thanks to
- * flattening of join alias vars. So here, we flatten each individual
- * GROUPING argument as we see it before comparing it.
- */
-static void
-finalize_grouping_exprs(Node *node, ParseState *pstate, Query *qry,
-						List *groupClauses, bool hasJoinRTEs,
-						bool have_non_var_grouping)
-{
-	check_ungrouped_columns_context context;
 
-	context.pstate = pstate;
-	context.qry = qry;
-	context.hasJoinRTEs = hasJoinRTEs;
-	context.groupClauses = groupClauses;
-	context.groupClauseCommonVars = NIL;
-	context.have_non_var_grouping = have_non_var_grouping;
-	context.func_grouped_rels = NULL;
-	context.sublevels_up = 0;
-	context.in_agg_direct_args = false;
-	finalize_grouping_exprs_walker(node, &context);
-}
 
-static bool
-finalize_grouping_exprs_walker(Node *node,
-							   check_ungrouped_columns_context *context)
-{
-	ListCell   *gl;
 
-	if (node == NULL)
-		return false;
-	if (IsA(node, Const) ||
-		IsA(node, Param))
-		return false;			/* constants are always acceptable */
 
-	if (IsA(node, Aggref))
-	{
-		Aggref	   *agg = (Aggref *) node;
 
-		if ((int) agg->agglevelsup == context->sublevels_up)
-		{
-			/*
-			 * If we find an aggregate call of the original level, do not
-			 * recurse into its normal arguments, ORDER BY arguments, or
-			 * filter; GROUPING exprs of this level are not allowed there. But
-			 * check direct arguments as though they weren't in an aggregate.
-			 */
-			bool		result;
-
-			Assert(!context->in_agg_direct_args);
-			context->in_agg_direct_args = true;
-			result = finalize_grouping_exprs_walker((Node *) agg->aggdirectargs,
-													context);
-			context->in_agg_direct_args = false;
-			return result;
-		}
-
-		/*
-		 * We can skip recursing into aggregates of higher levels altogether,
-		 * since they could not possibly contain exprs of concern to us (see
-		 * transformAggregateCall).  We do need to look at aggregates of lower
-		 * levels, however.
-		 */
-		if ((int) agg->agglevelsup > context->sublevels_up)
-			return false;
-	}
-
-	if (IsA(node, GroupingFunc))
-	{
-		GroupingFunc *grp = (GroupingFunc *) node;
-
-		/*
-		 * We only need to check GroupingFunc nodes at the exact level to
-		 * which they belong, since they cannot mix levels in arguments.
-		 */
-
-		if ((int) grp->agglevelsup == context->sublevels_up)
-		{
-			ListCell   *lc;
-			List	   *ref_list = NIL;
-
-			foreach(lc, grp->args)
-			{
-				Node	   *expr = lfirst(lc);
-				Index		ref = 0;
-
-				if (context->hasJoinRTEs)
-					expr = flatten_join_alias_vars(context->qry, expr);
-
-				/*
-				 * Each expression must match a grouping entry at the current
-				 * query level. Unlike the general expression case, we don't
-				 * allow functional dependencies or outer references.
-				 */
-
-				if (IsA(expr, Var))
-				{
-					Var		   *var = (Var *) expr;
-
-					if (var->varlevelsup == context->sublevels_up)
-					{
-						foreach(gl, context->groupClauses)
-						{
-							TargetEntry *tle = lfirst(gl);
-							Var		   *gvar = (Var *) tle->expr;
-
-							if (IsA(gvar, Var) &&
-								gvar->varno == var->varno &&
-								gvar->varattno == var->varattno &&
-								gvar->varlevelsup == 0)
-							{
-								ref = tle->ressortgroupref;
-								break;
-							}
-						}
-					}
-				}
-				else if (context->have_non_var_grouping &&
-						 context->sublevels_up == 0)
-				{
-					foreach(gl, context->groupClauses)
-					{
-						TargetEntry *tle = lfirst(gl);
-
-						if (equal(expr, tle->expr))
-						{
-							ref = tle->ressortgroupref;
-							break;
-						}
-					}
-				}
-
-				if (ref == 0)
-					ereport(ERROR,
-							(errcode(ERRCODE_GROUPING_ERROR),
-							 errmsg("arguments to GROUPING must be grouping expressions of the associated query level"),
-							 parser_errposition(context->pstate,
-												exprLocation(expr))));
-
-				ref_list = lappend_int(ref_list, ref);
-			}
-
-			grp->refs = ref_list;
-		}
-
-		if ((int) grp->agglevelsup > context->sublevels_up)
-			return false;
-	}
-
-	if (IsA(node, Query))
-	{
-		/* Recurse into subselects */
-		bool		result;
-
-		context->sublevels_up++;
-		result = query_tree_walker((Query *) node,
-								   finalize_grouping_exprs_walker,
-								   (void *) context,
-								   0);
-		context->sublevels_up--;
-		return result;
-	}
-	return expression_tree_walker(node, finalize_grouping_exprs_walker,
-								  (void *) context);
-}
-
-
-/*
- * Given a GroupingSet node, expand it and return a list of lists.
- *
- * For EMPTY nodes, return a list of one empty list.
- *
- * For SIMPLE nodes, return a list of one list, which is the node content.
- *
- * For CUBE and ROLLUP nodes, return a list of the expansions.
- *
- * For SET nodes, recursively expand contained CUBE and ROLLUP.
- */
-static List *
-expand_groupingset_node(GroupingSet *gs)
-{
-	List	   *result = NIL;
-
-	switch (gs->kind)
-	{
-		case GROUPING_SET_EMPTY:
-			result = list_make1(NIL);
-			break;
-
-		case GROUPING_SET_SIMPLE:
-			result = list_make1(gs->content);
-			break;
-
-		case GROUPING_SET_ROLLUP:
-			{
-				List	   *rollup_val = gs->content;
-				ListCell   *lc;
-				int			curgroup_size = list_length(gs->content);
-
-				while (curgroup_size > 0)
-				{
-					List	   *current_result = NIL;
-					int			i = curgroup_size;
-
-					foreach(lc, rollup_val)
-					{
-						GroupingSet *gs_current = (GroupingSet *) lfirst(lc);
-
-						Assert(gs_current->kind == GROUPING_SET_SIMPLE);
-
-						current_result = list_concat(current_result,
-													 gs_current->content);
-
-						/* If we are done with making the current group, break */
-						if (--i == 0)
-							break;
-					}
-
-					result = lappend(result, current_result);
-					--curgroup_size;
-				}
-
-				result = lappend(result, NIL);
-			}
-			break;
-
-		case GROUPING_SET_CUBE:
-			{
-				List	   *cube_list = gs->content;
-				int			number_bits = list_length(cube_list);
-				uint32		num_sets;
-				uint32		i;
-
-				/* parser should cap this much lower */
-				Assert(number_bits < 31);
-
-				num_sets = (1U << number_bits);
-
-				for (i = 0; i < num_sets; i++)
-				{
-					List	   *current_result = NIL;
-					ListCell   *lc;
-					uint32		mask = 1U;
-
-					foreach(lc, cube_list)
-					{
-						GroupingSet *gs_current = (GroupingSet *) lfirst(lc);
-
-						Assert(gs_current->kind == GROUPING_SET_SIMPLE);
-
-						if (mask & i)
-							current_result = list_concat(current_result,
-														 gs_current->content);
-
-						mask <<= 1;
-					}
-
-					result = lappend(result, current_result);
-				}
-			}
-			break;
-
-		case GROUPING_SET_SETS:
-			{
-				ListCell   *lc;
-
-				foreach(lc, gs->content)
-				{
-					List	   *current_result = expand_groupingset_node(lfirst(lc));
-
-					result = list_concat(result, current_result);
-				}
-			}
-			break;
-	}
-
-	return result;
-}
-
-/* list_sort comparator to sort sub-lists by length */
-static int
-cmp_list_len_asc(const ListCell *a, const ListCell *b)
-{
-	int			la = list_length((const List *) lfirst(a));
-	int			lb = list_length((const List *) lfirst(b));
-
-	return (la > lb) ? 1 : (la == lb) ? 0 : -1;
-}
-
-/* list_sort comparator to sort sub-lists by length and contents */
-static int
-cmp_list_len_contents_asc(const ListCell *a, const ListCell *b)
-{
-	int			res = cmp_list_len_asc(a, b);
-
-	if (res == 0)
-	{
-		List	   *la = (List *) lfirst(a);
-		List	   *lb = (List *) lfirst(b);
-		ListCell   *lca;
-		ListCell   *lcb;
-
-		forboth(lca, la, lcb, lb)
-		{
-			int			va = lfirst_int(lca);
-			int			vb = lfirst_int(lcb);
-
-			if (va > vb)
-				return 1;
-			if (va < vb)
-				return -1;
-		}
-	}
-
-	return res;
-}
-
-/*
- * Expand a groupingSets clause to a flat list of grouping sets.
- * The returned list is sorted by length, shortest sets first.
- *
- * This is mainly for the planner, but we use it here too to do
- * some consistency checks.
- */
-List *
-expand_grouping_sets(List *groupingSets, bool groupDistinct, int limit)
-{
-	List	   *expanded_groups = NIL;
-	List	   *result = NIL;
-	double		numsets = 1;
-	ListCell   *lc;
-
-	if (groupingSets == NIL)
-		return NIL;
-
-	foreach(lc, groupingSets)
-	{
-		List	   *current_result = NIL;
-		GroupingSet *gs = lfirst(lc);
-
-		current_result = expand_groupingset_node(gs);
-
-		Assert(current_result != NIL);
-
-		numsets *= list_length(current_result);
-
-		if (limit >= 0 && numsets > limit)
-			return NIL;
-
-		expanded_groups = lappend(expanded_groups, current_result);
-	}
-
-	/*
-	 * Do cartesian product between sublists of expanded_groups. While at it,
-	 * remove any duplicate elements from individual grouping sets (we must
-	 * NOT change the number of sets though)
-	 */
-
-	foreach(lc, (List *) linitial(expanded_groups))
-	{
-		result = lappend(result, list_union_int(NIL, (List *) lfirst(lc)));
-	}
-
-	for_each_from(lc, expanded_groups, 1)
-	{
-		List	   *p = lfirst(lc);
-		List	   *new_result = NIL;
-		ListCell   *lc2;
-
-		foreach(lc2, result)
-		{
-			List	   *q = lfirst(lc2);
-			ListCell   *lc3;
-
-			foreach(lc3, p)
-			{
-				new_result = lappend(new_result,
-									 list_union_int(q, (List *) lfirst(lc3)));
-			}
-		}
-		result = new_result;
-	}
-
-	/* Now sort the lists by length and deduplicate if necessary */
-	if (!groupDistinct || list_length(result) < 2)
-		list_sort(result, cmp_list_len_asc);
-	else
-	{
-		ListCell   *cell;
-		List	   *prev;
-
-		/* Sort each groupset individually */
-		foreach(cell, result)
-			list_sort(lfirst(cell), list_int_cmp);
-
-		/* Now sort the list of groupsets by length and contents */
-		list_sort(result, cmp_list_len_contents_asc);
-
-		/* Finally, remove duplicates */
-		prev = linitial(result);
-		for_each_from(cell, result, 1)
-		{
-			if (equal(lfirst(cell), prev))
-				result = foreach_delete_current(result, cell);
-			else
-				prev = lfirst(cell);
-		}
-	}
-
-	return result;
-}
 
 /*
  * get_aggregate_argtypes

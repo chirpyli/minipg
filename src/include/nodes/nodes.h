@@ -136,7 +136,6 @@ typedef enum NodeTag
 	T_Const,
 	T_Param,
 	T_Aggref,
-	T_GroupingFunc,
 	T_SubscriptingRef,
 	T_FuncExpr,
 	T_NamedArgExpr,
@@ -217,7 +216,6 @@ typedef enum NodeTag
 	T_GroupPath,
 	T_UpperUniquePath,
 	T_AggPath,
-	T_GroupingSetsPath,
 	T_MinMaxAggPath,
 	T_LockRowsPath,
 	T_ModifyTablePath,
@@ -236,8 +234,6 @@ typedef enum NodeTag
 	T_PlaceHolderInfo,
 	T_MinMaxAggInfo,
 	T_PlannerParamItem,
-	T_RollupData,
-	T_GroupingSetData,
 
 	/*
 	 * TAGS FOR MEMORY NODES (memnodes.h)
@@ -322,7 +318,6 @@ typedef enum NodeTag
 	T_RangeTblFunction,
 	T_TableSampleClause,
 	T_SortGroupClause,
-	T_GroupingSet,
 	T_ObjectWithArgs,
 	T_LockingClause,
 	T_RowMarkClause,

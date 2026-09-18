@@ -4747,8 +4747,7 @@ examine_simple_variable(PlannerInfo *root, Var *var,
 		 * problematic, but we check that later because there is a possibility
 		 * of learning something even with it.
 		 */
-		if (subquery->groupClause ||
-			subquery->groupingSets)
+		if (subquery->groupClause)
 			return;
 
 		/*

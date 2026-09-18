@@ -716,14 +716,14 @@ transformInsertStmt(ParseState *pstate, InsertStmt *stmt)
 }
 
 /*
- * Prepare an INSERT row for assignment to the target table.
+ * 为将 INSERT 行赋值（指派）到目标表做准备。
  *
- * exprlist: transformed expressions for source values; these might come from
- * a VALUES row, or be Vars referencing a sub-SELECT or VALUES RTE output.
- * stmtcols: original target-columns spec for INSERT (we just test for NIL)
- * icolumns: effective target-columns spec (list of ResTarget)
- * attrnos: integer column numbers (must be same length as icolumns)
- * strip_indirection: if true, remove any field/array assignment nodes
+ * exprlist: 源值经转换后的表达式列表；这些表达式可能来自一个 VALUES 行，
+ *   也可能是引用子 SELECT 或 VALUES 范围表（RTE）输出的 Var。
+ * stmtcols: INSERT 语句中原始的目标列规格（我们仅判断其是否为 NIL）
+ * icolumns: 有效的目标列规格（ResTarget 列表）
+ * attrnos: 整型列号（其长度必须与 icolumns 保持一致）
+ * strip_indirection: 若为 true，则移除所有字段/数组赋值节点
  */
 static List *
 transformInsertRow(ParseState *pstate, List *exprlist,
@@ -866,7 +866,6 @@ transformSelectStmt(ParseState *pstate, SelectStmt *stmt)
 
 	qry->groupClause = transformGroupClause(pstate,
 											stmt->groupClause,
-											&qry->groupingSets,
 											&qry->targetList,
 											qry->sortClause,
 											EXPR_KIND_GROUP_BY,
@@ -926,7 +925,7 @@ transformSelectStmt(ParseState *pstate, SelectStmt *stmt)
 	assign_query_collations(pstate, qry);
 
 	/* this must be done after collations, for reliable comparison of exprs */
-	if (pstate->p_hasAggs || qry->groupClause || qry->groupingSets || qry->havingQual)
+	if (pstate->p_hasAggs || qry->groupClause || qry->havingQual)
 		parseCheckAggregates(pstate, qry);
 
 	return qry;
@@ -1328,7 +1327,7 @@ CheckSelectLocking(Query *qry, LockClauseStrength strength)
 		  translator: %s is a SQL row locking clause such as FOR UPDATE */
 				 errmsg("%s is not allowed with DISTINCT clause",
 						LCS_asString(strength))));
-	if (qry->groupClause != NIL || qry->groupingSets != NIL)
+	if (qry->groupClause != NIL)
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 		/*------

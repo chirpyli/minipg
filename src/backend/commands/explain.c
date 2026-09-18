@@ -73,12 +73,6 @@ static void show_merge_append_keys(MergeAppendState *mstate, List *ancestors,
 								   ExplainState *es);
 static void show_agg_keys(AggState *astate, List *ancestors,
 						  ExplainState *es);
-static void show_grouping_sets(PlanState *planstate, Agg *agg,
-							   List *ancestors, ExplainState *es);
-static void show_grouping_set_keys(PlanState *planstate,
-								   Agg *aggnode, Sort *sortnode,
-								   List *context, bool useprefix,
-								   List *ancestors, ExplainState *es);
 static void show_group_keys(GroupState *gstate, List *ancestors,
 							ExplainState *es);
 static void show_sort_group_keys(PlanState *planstate, const char *qlabel,
@@ -1599,107 +1593,18 @@ show_agg_keys(AggState *astate, List *ancestors,
 {
 	Agg		   *plan = (Agg *) astate->ss.ps.plan;
 
-	if (plan->numCols > 0 || plan->groupingSets)
+	if (plan->numCols > 0)
 	{
 		/* The key columns refer to the tlist of the child plan */
 		ancestors = lcons(plan, ancestors);
 
-		if (plan->groupingSets)
-			show_grouping_sets(outerPlanState(astate), plan, ancestors, es);
-		else
-			show_sort_group_keys(outerPlanState(astate), "Group Key",
-								 plan->numCols, 0, plan->grpColIdx,
-								 NULL, NULL, NULL,
-								 ancestors, es);
+		show_sort_group_keys(outerPlanState(astate), "Group Key",
+							 plan->numCols, 0, plan->grpColIdx,
+							 NULL, NULL, NULL,
+							 ancestors, es);
 
 		ancestors = list_delete_first(ancestors);
 	}
-}
-
-static void
-show_grouping_sets(PlanState *planstate, Agg *agg,
-				   List *ancestors, ExplainState *es)
-{
-	List	   *context;
-	bool		useprefix;
-	ListCell   *lc;
-
-	/* Set up deparsing context */
-	context = set_deparse_context_plan(es->deparse_cxt,
-									   planstate->plan,
-									   ancestors);
-	useprefix = (list_length(es->rtable) > 1 || es->verbose);
-
-	show_grouping_set_keys(planstate, agg, NULL,
-						   context, useprefix, ancestors, es);
-
-	foreach(lc, agg->chain)
-	{
-		Agg		   *aggnode = lfirst(lc);
-		Sort	   *sortnode = (Sort *) aggnode->plan.lefttree;
-
-		show_grouping_set_keys(planstate, aggnode, sortnode,
-							   context, useprefix, ancestors, es);
-	}
-}
-
-static void
-show_grouping_set_keys(PlanState *planstate,
-					   Agg *aggnode, Sort *sortnode,
-					   List *context, bool useprefix,
-					   List *ancestors, ExplainState *es)
-{
-	Plan	   *plan = planstate->plan;
-	char	   *exprstr;
-	ListCell   *lc;
-	List	   *gsets = aggnode->groupingSets;
-	AttrNumber *keycols = aggnode->grpColIdx;
-	const char *keyname;
-
-	if (aggnode->aggstrategy == AGG_HASHED || aggnode->aggstrategy == AGG_MIXED)
-		keyname = "Hash Key";
-	else
-		keyname = "Group Key";
-
-	if (sortnode)
-	{
-		show_sort_group_keys(planstate, "Sort Key",
-							 sortnode->numCols, 0, sortnode->sortColIdx,
-							 sortnode->sortOperators, sortnode->collations,
-							 sortnode->nullsFirst,
-							 ancestors, es);
-		es->indent++;
-	}
-
-	foreach(lc, gsets)
-	{
-		List	   *result = NIL;
-		ListCell   *lc2;
-
-		foreach(lc2, (List *) lfirst(lc))
-		{
-			Index		i = lfirst_int(lc2);
-			AttrNumber	keyresno = keycols[i];
-			TargetEntry *target = get_tle_by_resno(plan->targetlist,
-												   keyresno);
-
-			if (!target)
-				elog(ERROR, "no tlist entry for key %d", keyresno);
-			/* Deparse the expression, showing any top-level cast */
-			exprstr = deparse_expression((Node *) target->expr, context,
-										 useprefix, true);
-
-			result = lappend(result, exprstr);
-		}
-
-		if (!result)
-			ExplainPropertyText(keyname, "()", es);
-		else
-			ExplainPropertyList(keyname, result, es);
-	}
-
-	if (sortnode)
-		es->indent--;
 }
 
 /*

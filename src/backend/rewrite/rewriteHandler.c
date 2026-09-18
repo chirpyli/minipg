@@ -1624,7 +1624,7 @@ view_query_is_auto_updatable(Query *viewquery, bool check_cols)
 	if (viewquery->distinctClause != NIL)
 		return gettext_noop("Views containing DISTINCT are not automatically updatable.");
 
-	if (viewquery->groupClause != NIL || viewquery->groupingSets)
+	if (viewquery->groupClause != NIL)
 		return gettext_noop("Views containing GROUP BY are not automatically updatable.");
 
 	if (viewquery->havingQual != NULL)
@@ -2205,7 +2205,6 @@ RewriteQuery(Query *parsetree, List *rewrite_events, int orig_rt_length,
 {
 	CmdType		event = parsetree->commandType;
 	bool		instead = false;
-	bool		updatableview = false;
 	Query	   *qual_product = NULL;
 	List	   *rewritten = NIL;
 
@@ -2363,7 +2362,6 @@ RewriteQuery(Query *parsetree, List *rewrite_events, int orig_rt_length,
 			 * second time below.
 			 */
 			instead = true;
-			updatableview = true;
 		}
 
 		/*

@@ -215,7 +215,6 @@ typedef enum ExprEvalOp
 	EEOP_SCALARARRAYOP,
 	EEOP_HASHED_SCALARARRAYOP,
 	EEOP_AGGREF,
-	EEOP_GROUPING_FUNC,
 	EEOP_SUBPLAN,
 
 	/* aggregation related nodes */
@@ -536,12 +535,6 @@ typedef struct ExprEvalStep
 			int			aggno;
 		}			aggref;
 
-		/* for EEOP_GROUPING_FUNC */
-		struct
-		{
-			List	   *clauses;	/* integer list of column numbers */
-		}			grouping_func;
-
 		/* for EEOP_SUBPLAN */
 		struct
 		{
@@ -682,7 +675,6 @@ extern void ExecEvalConvertRowtype(ExprState *state, ExprEvalStep *op,
 extern void ExecEvalScalarArrayOp(ExprState *state, ExprEvalStep *op);
 extern void ExecEvalHashedScalarArrayOp(ExprState *state, ExprEvalStep *op,
 										ExprContext *econtext);
-extern void ExecEvalGroupingFunc(ExprState *state, ExprEvalStep *op);
 extern void ExecEvalSubPlan(ExprState *state, ExprEvalStep *op,
 							ExprContext *econtext);
 extern void ExecEvalWholeRowVar(ExprState *state, ExprEvalStep *op,

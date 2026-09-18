@@ -914,7 +914,7 @@ pull_up_simple_subquery(PlannerInfo *root, Node *jtnode, RangeTblEntry *rte,
 	memset(subroot->upper_targets, 0, sizeof(subroot->upper_targets));
 	subroot->processed_tlist = NIL;
 	subroot->update_colnos = NIL;
-	subroot->grouping_map = NULL;
+
 	subroot->minmax_aggs = NIL;
 	subroot->qual_security_level = 0;
 	subroot->hasRecursion = false;
@@ -1048,20 +1048,7 @@ pull_up_simple_subquery(PlannerInfo *root, Node *jtnode, RangeTblEntry *rte,
 		rvcontext.wrap_non_vars = true;
 	}
 
-	/*
-	 * If the parent query uses grouping sets, we need a PlaceHolderVar for
-	 * anything that's not a simple Var.  Again, this ensures that expressions
-	 * retain their separate identity so that they will match grouping set
-	 * columns when appropriate.  (It'd be sufficient to wrap values used in
-	 * grouping set columns, and do so only in non-aggregated portions of the
-	 * tlist and havingQual, but that would require a lot of infrastructure
-	 * that pullup_replace_vars hasn't currently got.)
-	 */
-	if (parse->groupingSets)
-	{
-		rvcontext.need_phvs = true;
-		rvcontext.wrap_non_vars = true;
-	}
+
 
 	/*
 	 * Replace all of the top query's references to the subquery's outputs
@@ -1225,7 +1212,6 @@ is_simple_subquery(PlannerInfo *root, Query *subquery, RangeTblEntry *rte,
 	if (subquery->hasAggs ||
 		subquery->hasTargetSRFs ||
 		subquery->groupClause ||
-		subquery->groupingSets ||
 		subquery->havingQual ||
 		subquery->sortClause ||
 		subquery->distinctClause ||
@@ -1567,15 +1553,7 @@ pull_up_constant_function(PlannerInfo *root, Node *jtnode,
 		rvcontext.wrap_non_vars = true;
 	}
 
-	/*
-	 * If the parent query uses grouping sets, we need a PlaceHolderVar for
-	 * anything that's not a simple Var.
-	 */
-	if (parse->groupingSets)
-	{
-		rvcontext.need_phvs = true;
-		rvcontext.wrap_non_vars = true;
-	}
+
 
 	/*
 	 * Replace all of the top query's references to the RTE's output with

@@ -105,7 +105,6 @@ static Group *create_group_plan(PlannerInfo *root, GroupPath *best_path);
 static Unique *create_upper_unique_plan(PlannerInfo *root, UpperUniquePath *best_path,
 										int flags);
 static Agg *create_agg_plan(PlannerInfo *root, AggPath *best_path);
-static Plan *create_groupingsets_plan(PlannerInfo *root, GroupingSetsPath *best_path);
 static Result *create_minmaxagg_plan(PlannerInfo *root, MinMaxAggPath *best_path);
 static LockRows *create_lockrows_plan(PlannerInfo *root, LockRowsPath *best_path,
 									  int flags);
@@ -244,9 +243,6 @@ static Sort *make_sort_from_pathkeys(Plan *lefttree, List *pathkeys,
 									 Relids relids);
 static IncrementalSort *make_incrementalsort_from_pathkeys(Plan *lefttree,
 														   List *pathkeys, Relids relids, int nPresortedCols);
-static Sort *make_sort_from_groupcols(List *groupcls,
-									  AttrNumber *grpColIdx,
-									  Plan *lefttree);
 static Material *make_material(Plan *lefttree);
 static Memoize *make_memoize(Plan *lefttree, Oid *hashoperators,
 							 Oid *collations, List *param_exprs,
@@ -450,15 +446,9 @@ create_plan_recurse(PlannerInfo *root, Path *best_path, int flags)
 											  (GroupPath *) best_path);
 			break;
 		case T_Agg:
-			if (IsA(best_path, GroupingSetsPath))
-				plan = create_groupingsets_plan(root,
-												(GroupingSetsPath *) best_path);
-			else
-			{
-				Assert(IsA(best_path, AggPath));
-				plan = (Plan *) create_agg_plan(root,
-												(AggPath *) best_path);
-			}
+			Assert(IsA(best_path, AggPath));
+			plan = (Plan *) create_agg_plan(root,
+											(AggPath *) best_path);
 			break;
 		case T_LockRows:
 			plan = (Plan *) create_lockrows_plan(root,
@@ -1578,8 +1568,6 @@ create_unique_plan(PlannerInfo *root, UniquePath *best_path, int flags)
 								 groupColIdx,
 								 groupOperators,
 								 groupCollations,
-								 NIL,
-								 NIL,
 								 best_path->path.rows,
 								 0,
 								 subplan);
@@ -2061,8 +2049,6 @@ create_agg_plan(PlannerInfo *root, AggPath *best_path)
 					extract_grouping_ops(best_path->groupClause),
 					extract_grouping_collations(best_path->groupClause,
 												subplan->targetlist),
-					NIL,
-					NIL,
 					best_path->numGroups,
 					best_path->transitionSpace,
 					subplan);
@@ -2072,203 +2058,6 @@ create_agg_plan(PlannerInfo *root, AggPath *best_path)
 	return plan;
 }
 
-/*
- * Given a groupclause for a collection of grouping sets, produce the
- * corresponding groupColIdx.
- *
- * root->grouping_map maps the tleSortGroupRef to the actual column position in
- * the input tuple. So we get the ref from the entries in the groupclause and
- * look them up there.
- */
-static AttrNumber *
-remap_groupColIdx(PlannerInfo *root, List *groupClause)
-{
-	AttrNumber *grouping_map = root->grouping_map;
-	AttrNumber *new_grpColIdx;
-	ListCell   *lc;
-	int			i;
-
-	Assert(grouping_map);
-
-	new_grpColIdx = palloc0(sizeof(AttrNumber) * list_length(groupClause));
-
-	i = 0;
-	foreach(lc, groupClause)
-	{
-		SortGroupClause *clause = lfirst(lc);
-
-		new_grpColIdx[i++] = grouping_map[clause->tleSortGroupRef];
-	}
-
-	return new_grpColIdx;
-}
-
-/*
- * create_groupingsets_plan
- *	  Create a plan for 'best_path' and (recursively) plans
- *	  for its subpaths.
- *
- *	  What we emit is an Agg plan with some vestigial Agg and Sort nodes
- *	  hanging off the side.  The top Agg implements the last grouping set
- *	  specified in the GroupingSetsPath, and any additional grouping sets
- *	  each give rise to a subsidiary Agg and Sort node in the top Agg's
- *	  "chain" list.  These nodes don't participate in the plan directly,
- *	  but they are a convenient way to represent the required data for
- *	  the extra steps.
- *
- *	  Returns a Plan node.
- */
-static Plan *
-create_groupingsets_plan(PlannerInfo *root, GroupingSetsPath *best_path)
-{
-	Agg		   *plan;
-	Plan	   *subplan;
-	List	   *rollups = best_path->rollups;
-	AttrNumber *grouping_map;
-	int			maxref;
-	List	   *chain;
-	ListCell   *lc;
-
-	/* Shouldn't get here without grouping sets */
-	Assert(root->parse->groupingSets);
-	Assert(rollups != NIL);
-
-	/*
-	 * Agg can project, so no need to be terribly picky about child tlist, but
-	 * we do need grouping columns to be available
-	 */
-	subplan = create_plan_recurse(root, best_path->subpath, CP_LABEL_TLIST);
-
-	/*
-	 * Compute the mapping from tleSortGroupRef to column index in the child's
-	 * tlist.  First, identify max SortGroupRef in groupClause, for array
-	 * sizing.
-	 */
-	maxref = 0;
-	foreach(lc, root->parse->groupClause)
-	{
-		SortGroupClause *gc = (SortGroupClause *) lfirst(lc);
-
-		if (gc->tleSortGroupRef > maxref)
-			maxref = gc->tleSortGroupRef;
-	}
-
-	grouping_map = (AttrNumber *) palloc0((maxref + 1) * sizeof(AttrNumber));
-
-	/* Now look up the column numbers in the child's tlist */
-	foreach(lc, root->parse->groupClause)
-	{
-		SortGroupClause *gc = (SortGroupClause *) lfirst(lc);
-		TargetEntry *tle = get_sortgroupclause_tle(gc, subplan->targetlist);
-
-		grouping_map[gc->tleSortGroupRef] = tle->resno;
-	}
-
-	/*
-	 * During setrefs.c, we'll need the grouping_map to fix up the cols lists
-	 * in GroupingFunc nodes.  Save it for setrefs.c to use.
-	 */
-	Assert(root->grouping_map == NULL);
-	root->grouping_map = grouping_map;
-
-	/*
-	 * Generate the side nodes that describe the other sort and group
-	 * operations besides the top one.  Note that we don't worry about putting
-	 * accurate cost estimates in the side nodes; only the topmost Agg node's
-	 * costs will be shown by EXPLAIN.
-	 */
-	chain = NIL;
-	if (list_length(rollups) > 1)
-	{
-		bool		is_first_sort = ((RollupData *) linitial(rollups))->is_hashed;
-
-		for_each_from(lc, rollups, 1)
-		{
-			RollupData *rollup = lfirst(lc);
-			AttrNumber *new_grpColIdx;
-			Plan	   *sort_plan = NULL;
-			Plan	   *agg_plan;
-			AggStrategy strat;
-
-			new_grpColIdx = remap_groupColIdx(root, rollup->groupClause);
-
-			if (!rollup->is_hashed && !is_first_sort)
-			{
-				sort_plan = (Plan *)
-					make_sort_from_groupcols(rollup->groupClause,
-											 new_grpColIdx,
-											 subplan);
-			}
-
-			if (!rollup->is_hashed)
-				is_first_sort = false;
-
-			if (rollup->is_hashed)
-				strat = AGG_HASHED;
-			else if (list_length(linitial(rollup->gsets)) == 0)
-				strat = AGG_PLAIN;
-			else
-				strat = AGG_SORTED;
-
-			agg_plan = (Plan *) make_agg(NIL,
-										 NIL,
-										 strat,
-										 AGGSPLIT_SIMPLE,
-										 list_length((List *) linitial(rollup->gsets)),
-										 new_grpColIdx,
-										 extract_grouping_ops(rollup->groupClause),
-										 extract_grouping_collations(rollup->groupClause, subplan->targetlist),
-										 rollup->gsets,
-										 NIL,
-										 rollup->numGroups,
-										 best_path->transitionSpace,
-										 sort_plan);
-
-			/*
-			 * Remove stuff we don't need to avoid bloating debug output.
-			 */
-			if (sort_plan)
-			{
-				sort_plan->targetlist = NIL;
-				sort_plan->lefttree = NULL;
-			}
-
-			chain = lappend(chain, agg_plan);
-		}
-	}
-
-	/*
-	 * Now make the real Agg node
-	 */
-	{
-		RollupData *rollup = linitial(rollups);
-		AttrNumber *top_grpColIdx;
-		int			numGroupCols;
-
-		top_grpColIdx = remap_groupColIdx(root, rollup->groupClause);
-
-		numGroupCols = list_length((List *) linitial(rollup->gsets));
-
-		plan = make_agg(build_path_tlist(root, &best_path->path),
-						best_path->qual,
-						best_path->aggstrategy,
-						AGGSPLIT_SIMPLE,
-						numGroupCols,
-						top_grpColIdx,
-						extract_grouping_ops(rollup->groupClause),
-						extract_grouping_collations(rollup->groupClause, subplan->targetlist),
-						rollup->gsets,
-						chain,
-						rollup->numGroups,
-						best_path->transitionSpace,
-						subplan);
-
-		/* Copy cost data from Path to Plan */
-		copy_generic_path_info(&plan->plan, &best_path->path);
-	}
-
-	return (Plan *) plan;
-}
 
 /*
  * create_minmaxagg_plan
@@ -5357,59 +5146,6 @@ make_sort_from_sortclauses(List *sortcls, Plan *lefttree)
 					 collations, nullsFirst);
 }
 
-/*
- * make_sort_from_groupcols
- *	  Create sort plan to sort based on grouping columns
- *
- * 'groupcls' is the list of SortGroupClauses
- * 'grpColIdx' gives the column numbers to use
- *
- * This might look like it could be merged with make_sort_from_sortclauses,
- * but presently we *must* use the grpColIdx[] array to locate sort columns,
- * because the child plan's tlist is not marked with ressortgroupref info
- * appropriate to the grouping node.  So, only the sort ordering info
- * is used from the SortGroupClause entries.
- */
-static Sort *
-make_sort_from_groupcols(List *groupcls,
-						 AttrNumber *grpColIdx,
-						 Plan *lefttree)
-{
-	List	   *sub_tlist = lefttree->targetlist;
-	ListCell   *l;
-	int			numsortkeys;
-	AttrNumber *sortColIdx;
-	Oid		   *sortOperators;
-	Oid		   *collations;
-	bool	   *nullsFirst;
-
-	/* Convert list-ish representation to arrays wanted by executor */
-	numsortkeys = list_length(groupcls);
-	sortColIdx = (AttrNumber *) palloc(numsortkeys * sizeof(AttrNumber));
-	sortOperators = (Oid *) palloc(numsortkeys * sizeof(Oid));
-	collations = (Oid *) palloc(numsortkeys * sizeof(Oid));
-	nullsFirst = (bool *) palloc(numsortkeys * sizeof(bool));
-
-	numsortkeys = 0;
-	foreach(l, groupcls)
-	{
-		SortGroupClause *grpcl = (SortGroupClause *) lfirst(l);
-		TargetEntry *tle = get_tle_by_resno(sub_tlist, grpColIdx[numsortkeys]);
-
-		if (!tle)
-			elog(ERROR, "could not retrieve tle for sort-from-groupcols");
-
-		sortColIdx[numsortkeys] = tle->resno;
-		sortOperators[numsortkeys] = grpcl->sortop;
-		collations[numsortkeys] = exprCollation((Node *) tle->expr);
-		nullsFirst[numsortkeys] = grpcl->nulls_first;
-		numsortkeys++;
-	}
-
-	return make_sort(lefttree, numsortkeys,
-					 sortColIdx, sortOperators,
-					 collations, nullsFirst);
-}
 
 static Material *
 make_material(Plan *lefttree)
@@ -5496,7 +5232,7 @@ Agg *
 make_agg(List *tlist, List *qual,
 		 AggStrategy aggstrategy, AggSplit aggsplit,
 		 int numGroupCols, AttrNumber *grpColIdx, Oid *grpOperators, Oid *grpCollations,
-		 List *groupingSets, List *chain, double dNumGroups,
+		 double dNumGroups,
 		 Size transitionSpace, Plan *lefttree)
 {
 	Agg		   *node = makeNode(Agg);
@@ -5515,8 +5251,6 @@ make_agg(List *tlist, List *qual,
 	node->numGroups = numGroups;
 	node->transitionSpace = transitionSpace;
 	node->aggParams = NULL;		/* SS_finalize_plan() will fill this */
-	node->groupingSets = groupingSets;
-	node->chain = chain;
 
 	plan->qual = qual;
 	plan->targetlist = tlist;

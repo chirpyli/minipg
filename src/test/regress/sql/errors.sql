@@ -39,7 +39,6 @@ select distinct on (foobar) * from pg_database;
 
 -- grouping with FOR UPDATE
 select null from pg_database group by datname for update;
-select null from pg_database group by grouping sets (()) for update;
 
 
 --

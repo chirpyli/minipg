@@ -203,20 +203,6 @@ _equalAggref(const Aggref *a, const Aggref *b)
 	return true;
 }
 
-static bool
-_equalGroupingFunc(const GroupingFunc *a, const GroupingFunc *b)
-{
-	COMPARE_NODE_FIELD(args);
-
-	/*
-	 * We must not compare the refs or cols field
-	 */
-
-	COMPARE_SCALAR_FIELD(agglevelsup);
-	COMPARE_LOCATION_FIELD(location);
-
-	return true;
-}
 
 static bool
 _equalSubscriptingRef(const SubscriptingRef *a, const SubscriptingRef *b)
@@ -797,7 +783,6 @@ _equalQuery(const Query *a, const Query *b)
 	COMPARE_NODE_FIELD(targetList);
 	COMPARE_NODE_FIELD(groupClause);
 	COMPARE_SCALAR_FIELD(groupDistinct);
-	COMPARE_NODE_FIELD(groupingSets);
 	COMPARE_NODE_FIELD(havingQual);
 	COMPARE_NODE_FIELD(distinctClause);
 	COMPARE_NODE_FIELD(sortClause);
@@ -1446,15 +1431,6 @@ _equalSortGroupClause(const SortGroupClause *a, const SortGroupClause *b)
 	return true;
 }
 
-static bool
-_equalGroupingSet(const GroupingSet *a, const GroupingSet *b)
-{
-	COMPARE_SCALAR_FIELD(kind);
-	COMPARE_NODE_FIELD(content);
-	COMPARE_LOCATION_FIELD(location);
-
-	return true;
-}
 
 static bool
 _equalRowMarkClause(const RowMarkClause *a, const RowMarkClause *b)
@@ -1604,9 +1580,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_Aggref:
 			retval = _equalAggref(a, b);
-			break;
-		case T_GroupingFunc:
-			retval = _equalGroupingFunc(a, b);
 			break;
 		case T_SubscriptingRef:
 			retval = _equalSubscriptingRef(a, b);
@@ -1903,9 +1876,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_SortGroupClause:
 			retval = _equalSortGroupClause(a, b);
-			break;
-		case T_GroupingSet:
-			retval = _equalGroupingSet(a, b);
 			break;
 		case T_RowMarkClause:
 			retval = _equalRowMarkClause(a, b);

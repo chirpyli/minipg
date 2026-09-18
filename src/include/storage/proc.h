@@ -98,36 +98,33 @@ typedef enum
 } ProcWaitStatus;
 
 /*
- * Each backend has a PGPROC struct in shared memory.  There is also a list of
- * currently-unused PGPROC structs that will be reallocated to new backends.
+ * 每个后端（backend）在共享内存中都有一个 PGPROC 结构体。此外还有一个当前
+ * 未使用的 PGPROC 结构体链表，这些结构体将被重新分配给新的后端。
  *
- * links: list link for any list the PGPROC is in.  When waiting for a lock,
- * the PGPROC is linked into that lock's waitProcs queue.  A recycled PGPROC
- * is linked into ProcGlobal's freeProcs list.
+ * links：PGPROC 所在任意链表中的链接。当等待某个锁时，该 PGPROC 会被链接到
+ * 该锁的 waitProcs 等待队列中。一个被回收的 PGPROC 会被链接到 ProcGlobal 的
+ * freeProcs 空闲链表中。
  *
- * Note: twophase.c also sets up a dummy PGPROC struct for each currently
- * prepared transaction.  These PGPROCs appear in the ProcArray data structure
- * so that the prepared transactions appear to be still running and are
- * correctly shown as holding locks.  A prepared transaction PGPROC can be
- * distinguished from a real one at need by the fact that it has pid == 0.
- * The semaphore and lock-activity fields in a prepared-xact PGPROC are unused,
- * but its myProcLocks[] lists are valid.
+ * 注：twophase.c 还会为当前每个已准备事务（prepared transaction）建立一个
+ * 虚拟的 PGPROC 结构体。这些 PGPROC 会出现在 ProcArray 数据结构中，以便已准备
+ * 事务看起来仍在运行，并正确地显示为持有着锁。一个已准备事务的 PGPROC 可以
+ * 通过其 pid == 0 这一特征在需要时被区分于真实的 PGPROC。已准备事务 PGPROC
+ * 中的信号量（semaphore）和锁活动相关字段未被使用，但它的 myProcLocks[] 链表
+ * 是有效的。
  *
- * We allow many fields of this struct to be accessed without locks, such as
- * delayChkpt and isBackgroundWorker. However, keep in mind that writing
- * mirrored ones (see below) requires holding ProcArrayLock or XidGenLock in
- * at least shared mode, so that pgxactoff does not change concurrently.
+ * 我们允许在没有锁的情况下访问该结构体的许多字段，例如 delayChkpt 和
+ * isBackgroundWorker。但是请注意，写入那些被镜像的字段（见下文）需要至少以
+ * 共享模式持有 ProcArrayLock 或 XidGenLock，以免 pgxactoff 被并发地修改。
  *
- * Mirrored fields:
+ * 镜像字段（Mirrored fields）：
  *
- * Some fields in PGPROC (see "mirrored in ..." comment) are mirrored into an
- * element of more densely packed ProcGlobal arrays. These arrays are indexed
- * by PGPROC->pgxactoff. Both copies need to be maintained coherently.
+ * PGPROC 中的某些字段（见 "mirrored in ..." 注释）会被镜像到打包得更紧凑的
+ * ProcGlobal 数组的某个元素中。这些数组以 PGPROC->pgxactoff 为索引。两份副本
+ * 需要保持一致性。
  *
- * NB: The pgxactoff indexed value can *never* be accessed without holding
- * locks.
+ * 注意（NB）：以 pgxactoff 为索引的值*绝不*可以在未持有锁的情况下被访问。
  *
- * See PROC_HDR for details.
+ * 详见 PROC_HDR。
  */
 struct PGPROC
 {

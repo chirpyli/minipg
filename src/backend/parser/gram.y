@@ -288,8 +288,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 
 %type <groupclause> group_clause
 %type <list>	group_by_list
-%type <node>	group_by_item empty_grouping_set rollup_clause cube_clause
-%type <node>	grouping_sets_clause
+%type <node>	group_by_item
 
 
 %type <boolean>  opt_restart_seqs
@@ -442,7 +441,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 	FALSE_P FAMILY FETCH FILTER FINALIZE FIRST_P FLOAT_P FOLLOWING FOR
 	FORCE FREEZE FROM FULL
 
-	GENERATED GLOBAL GREATEST GROUP_P GROUPING GROUPS
+	GENERATED GLOBAL GREATEST GROUP_P GROUPS
 
 	HAVING HEADER_P HOUR_P
 
@@ -556,11 +555,6 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
  * appear to cause UNBOUNDED to be treated differently from other unreserved
  * keywords anywhere else in the grammar, but it's definitely risky.  We can
  * blame any funny behavior of UNBOUNDED on the SQL standard, though.
- *
- * To support CUBE and ROLLUP in GROUP BY without reserving them, we give them
- * an explicit priority lower than '(', so that a rule with CUBE '(' will shift
- * rather than reducing a conflicting rule that takes CUBE as a function name.
- * Using the same precedence as IDENT seems right for the reasons given above.
  */
 %nonassoc	UNBOUNDED		/* ideally would have same precedence as IDENT */
 %nonassoc	IDENT RANGE ROWS GROUPS PRECEDING FOLLOWING CUBE ROLLUP
@@ -3271,8 +3265,6 @@ first_or_next: FIRST_P								{ $$ = 0; }
  * explicit row constructors; it's debatable if anyone sanely wants to use them
  * in a group clause, but if they have a reason to, we make it possible.)
  *
- * Each item in the group_clause list is either an expression tree or a
- * GroupingSet node of some type.
  */
 group_clause:
 			GROUP_P BY set_quantifier group_by_list
@@ -3298,44 +3290,6 @@ group_by_list:
 
 group_by_item:
 			a_expr									{ $$ = $1; }
-			| empty_grouping_set					{ $$ = $1; }
-			| cube_clause							{ $$ = $1; }
-			| rollup_clause							{ $$ = $1; }
-			| grouping_sets_clause					{ $$ = $1; }
-		;
-
-empty_grouping_set:
-			'(' ')'
-				{
-					$$ = (Node *) makeGroupingSet(GROUPING_SET_EMPTY, NIL, @1);
-				}
-		;
-
-/*
- * These hacks rely on setting precedence of CUBE and ROLLUP below that of '(',
- * so that they shift in these rules rather than reducing the conflicting
- * unreserved_keyword rule.
- */
-
-rollup_clause:
-			ROLLUP '(' expr_list ')'
-				{
-					$$ = (Node *) makeGroupingSet(GROUPING_SET_ROLLUP, $3, @1);
-				}
-		;
-
-cube_clause:
-			CUBE '(' expr_list ')'
-				{
-					$$ = (Node *) makeGroupingSet(GROUPING_SET_CUBE, $3, @1);
-				}
-		;
-
-grouping_sets_clause:
-			GROUPING SETS '(' group_by_list ')'
-				{
-					$$ = (Node *) makeGroupingSet(GROUPING_SET_SETS, $4, @1);
-				}
 		;
 
 having_clause:
@@ -4790,13 +4744,6 @@ c_expr:		columnref								{ $$ = $1; }
 					n->location = @1;
 					$$ = (Node *)n;
 				}
-			| GROUPING '(' expr_list ')'
-			  {
-				  GroupingFunc *g = makeNode(GroupingFunc);
-				  g->args = $3;
-				  g->location = @1;
-				  $$ = (Node *)g;
-			  }
 		;
 
 func_application: func_name '(' ')'
@@ -5978,7 +5925,6 @@ col_name_keyword:
 			| EXTRACT
 			| FLOAT_P
 			| GREATEST
-			| GROUPING
 			| INT_P
 			| INTEGER
 			| INTERVAL
@@ -6249,7 +6195,6 @@ bare_label_keyword:
 			| GENERATED
 			| GLOBAL
 			| GREATEST
-			| GROUPING
 			| GROUPS
 			| HEADER_P
 			| IDENTITY_P

@@ -1445,31 +1445,7 @@ fix_expr_common(PlannerInfo *root, Node *node)
 				lappend_oid(root->glob->relationOids,
 							DatumGetObjectId(con->constvalue));
 	}
-	else if (IsA(node, GroupingFunc))
-	{
-		GroupingFunc *g = (GroupingFunc *) node;
-		AttrNumber *grouping_map = root->grouping_map;
 
-		/* If there are no grouping sets, we don't need this. */
-
-		Assert(grouping_map || g->cols == NIL);
-
-		if (grouping_map)
-		{
-			ListCell   *lc;
-			List	   *cols = NIL;
-
-			foreach(lc, g->refs)
-			{
-				cols = lappend_int(cols, grouping_map[lfirst_int(lc)]);
-			}
-
-			Assert(!g->cols || equal(cols, g->cols));
-
-			if (!g->cols)
-				g->cols = cols;
-		}
-	}
 }
 
 /*

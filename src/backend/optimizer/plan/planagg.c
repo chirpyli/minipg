@@ -96,7 +96,7 @@ preprocess_minmax_aggregates(PlannerInfo *root)
 	 * implementations of grouping require looking at all the rows anyway, and
 	 * so there's not much point in optimizing MIN/MAX.
 	 */
-	if (parse->groupClause || list_length(parse->groupingSets) > 1)
+	if (parse->groupClause)
 		return;
 
 	/*

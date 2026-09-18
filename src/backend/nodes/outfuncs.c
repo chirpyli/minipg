@@ -699,8 +699,6 @@ _outAgg(StringInfo str, const Agg *node)
 	WRITE_LONG_FIELD(numGroups);
 	WRITE_UINT64_FIELD(transitionSpace);
 	WRITE_BITMAPSET_FIELD(aggParams);
-	WRITE_NODE_FIELD(groupingSets);
-	WRITE_NODE_FIELD(chain);
 }
 
 static void
@@ -962,17 +960,6 @@ _outAggref(StringInfo str, const Aggref *node)
 	WRITE_LOCATION_FIELD(location);
 }
 
-static void
-_outGroupingFunc(StringInfo str, const GroupingFunc *node)
-{
-	WRITE_NODE_TYPE("GROUPINGFUNC");
-
-	WRITE_NODE_FIELD(args);
-	WRITE_NODE_FIELD(refs);
-	WRITE_NODE_FIELD(cols);
-	WRITE_UINT_FIELD(agglevelsup);
-	WRITE_LOCATION_FIELD(location);
-}
 
 static void
 _outSubscriptingRef(StringInfo str, const SubscriptingRef *node)
@@ -1700,41 +1687,8 @@ _outAggPath(StringInfo str, const AggPath *node)
 	WRITE_NODE_FIELD(qual);
 }
 
-static void
-_outRollupData(StringInfo str, const RollupData *node)
-{
-	WRITE_NODE_TYPE("ROLLUP");
 
-	WRITE_NODE_FIELD(groupClause);
-	WRITE_NODE_FIELD(gsets);
-	WRITE_NODE_FIELD(gsets_data);
-	WRITE_FLOAT_FIELD(numGroups, "%.0f");
-	WRITE_BOOL_FIELD(hashable);
-	WRITE_BOOL_FIELD(is_hashed);
-}
 
-static void
-_outGroupingSetData(StringInfo str, const GroupingSetData *node)
-{
-	WRITE_NODE_TYPE("GSDATA");
-
-	WRITE_NODE_FIELD(set);
-	WRITE_FLOAT_FIELD(numGroups, "%.0f");
-}
-
-static void
-_outGroupingSetsPath(StringInfo str, const GroupingSetsPath *node)
-{
-	WRITE_NODE_TYPE("GROUPINGSETSPATH");
-
-	_outPathInfo(str, (const Path *) node);
-
-	WRITE_NODE_FIELD(subpath);
-	WRITE_ENUM_FIELD(aggstrategy, AggStrategy);
-	WRITE_NODE_FIELD(rollups);
-	WRITE_NODE_FIELD(qual);
-	WRITE_UINT64_FIELD(transitionSpace);
-}
 
 static void
 _outMinMaxAggPath(StringInfo str, const MinMaxAggPath *node)
@@ -2410,7 +2364,6 @@ _outQuery(StringInfo str, const Query *node)
 	WRITE_NODE_FIELD(targetList);
 	WRITE_NODE_FIELD(groupClause);
 	WRITE_BOOL_FIELD(groupDistinct);
-	WRITE_NODE_FIELD(groupingSets);
 	WRITE_NODE_FIELD(havingQual);
 	WRITE_NODE_FIELD(distinctClause);
 	WRITE_NODE_FIELD(sortClause);
@@ -2435,15 +2388,6 @@ _outSortGroupClause(StringInfo str, const SortGroupClause *node)
 	WRITE_BOOL_FIELD(hashable);
 }
 
-static void
-_outGroupingSet(StringInfo str, const GroupingSet *node)
-{
-	WRITE_NODE_TYPE("GROUPINGSET");
-
-	WRITE_ENUM_FIELD(kind, GroupingSetKind);
-	WRITE_NODE_FIELD(content);
-	WRITE_LOCATION_FIELD(location);
-}
 
 static void
 _outRowMarkClause(StringInfo str, const RowMarkClause *node)
@@ -3003,9 +2947,6 @@ outNode(StringInfo str, const void *obj)
 			case T_Aggref:
 				_outAggref(str, obj);
 				break;
-			case T_GroupingFunc:
-				_outGroupingFunc(str, obj);
-				break;
 			case T_SubscriptingRef:
 				_outSubscriptingRef(str, obj);
 				break;
@@ -3168,9 +3109,6 @@ outNode(StringInfo str, const void *obj)
 			case T_AggPath:
 				_outAggPath(str, obj);
 				break;
-			case T_GroupingSetsPath:
-				_outGroupingSetsPath(str, obj);
-				break;
 			case T_MinMaxAggPath:
 				_outMinMaxAggPath(str, obj);
 				break;
@@ -3249,12 +3187,6 @@ outNode(StringInfo str, const void *obj)
 			case T_PlannerParamItem:
 				_outPlannerParamItem(str, obj);
 				break;
-			case T_RollupData:
-				_outRollupData(str, obj);
-				break;
-			case T_GroupingSetData:
-				_outGroupingSetData(str, obj);
-				break;
 			case T_CreateStmt:
 				_outCreateStmt(str, obj);
 				break;
@@ -3281,9 +3213,6 @@ outNode(StringInfo str, const void *obj)
 				break;
 			case T_SortGroupClause:
 				_outSortGroupClause(str, obj);
-				break;
-			case T_GroupingSet:
-				_outGroupingSet(str, obj);
 				break;
 			case T_RowMarkClause:
 				_outRowMarkClause(str, obj);

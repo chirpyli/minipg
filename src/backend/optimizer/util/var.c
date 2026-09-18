@@ -549,7 +549,7 @@ locate_var_of_level_walker(Node *node,
  *	  Vars within a PHV's expression are included in the result only
  *	  when PVC_RECURSE_PLACEHOLDERS is specified.
  *
- *	  GroupingFuncs are treated exactly like Aggrefs, and so do not need
+ *	  Aggrefs are handled above, and so do not need
  *	  their own flag bits.
  *
  *	  Upper-level vars (with varlevelsup > 0) should not be seen here,
@@ -608,23 +608,7 @@ pull_var_clause_walker(Node *node, pull_var_clause_context *context)
 		else
 			elog(ERROR, "Aggref found where not expected");
 	}
-	else if (IsA(node, GroupingFunc))
-	{
-		if (((GroupingFunc *) node)->agglevelsup != 0)
-			elog(ERROR, "Upper-level GROUPING found where not expected");
-		if (context->flags & PVC_INCLUDE_AGGREGATES)
-		{
-			context->varlist = lappend(context->varlist, node);
-			/* we do NOT descend into the contained expression */
-			return false;
-		}
-		else if (context->flags & PVC_RECURSE_AGGREGATES)
-		{
-			/* fall through to recurse into the GroupingFunc's arguments */
-		}
-		else
-			elog(ERROR, "GROUPING found where not expected");
-	}
+
 	else if (IsA(node, PlaceHolderVar))
 	{
 		if (((PlaceHolderVar *) node)->phlevelsup != 0)

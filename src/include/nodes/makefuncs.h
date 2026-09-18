@@ -102,8 +102,6 @@ extern DefElem *makeDefElem(char *name, Node *arg, int location);
 extern DefElem *makeDefElemExtended(char *nameSpace, char *name, Node *arg,
 									DefElemAction defaction, int location);
 
-extern GroupingSet *makeGroupingSet(GroupingSetKind kind, List *content, int location);
-
 extern VacuumRelation *makeVacuumRelation(RangeVar *relation, Oid oid, List *va_cols);
 
 #endif							/* MAKEFUNC_H */

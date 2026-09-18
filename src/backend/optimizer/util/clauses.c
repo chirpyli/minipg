@@ -153,7 +153,7 @@ static bool pull_paramids_walker(Node *node, Bitmapset **context);
 
 /*
  * contain_agg_clause
- *	  Recursively search for Aggref/GroupingFunc nodes within a clause.
+ *	  Recursively search for Aggref nodes within a clause.
  *
  *	  Returns true if any aggregate found.
  *
@@ -180,11 +180,7 @@ contain_agg_clause_walker(Node *node, void *context)
 		Assert(((Aggref *) node)->agglevelsup == 0);
 		return true;			/* abort the tree traversal and return true */
 	}
-	if (IsA(node, GroupingFunc))
-	{
-		Assert(((GroupingFunc *) node)->agglevelsup == 0);
-		return true;			/* abort the tree traversal and return true */
-	}
+
 	Assert(!IsA(node, SubLink));
 	return expression_tree_walker(node, contain_agg_clause_walker, context);
 }
@@ -812,14 +808,7 @@ contain_nonstrict_functions_walker(Node *node, void *context)
 		/* an aggregate could return non-null with null input */
 		return true;
 	}
-	else if (IsA(node, GroupingFunc))
-	{
-		/*
-		 * A GroupingFunc doesn't evaluate its arguments, and therefore must
-		 * be treated as nonstrict.
-		 */
-		return true;
-	}
+
 	else if (IsA(node, SubscriptingRef))
 	{
 		SubscriptingRef *sbsref = (SubscriptingRef *) node;
@@ -4127,7 +4116,7 @@ inline_function(Oid funcid, Oid result_type, Oid result_collid,
 		querytree->jointree->fromlist ||
 		querytree->jointree->quals ||
 		querytree->groupClause ||
-		querytree->groupingSets ||
+
 		querytree->havingQual ||
 		querytree->distinctClause ||
 		querytree->sortClause ||

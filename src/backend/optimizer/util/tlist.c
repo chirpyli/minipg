@@ -1105,8 +1105,7 @@ split_pathtarget_walker(Node *node, split_pathtarget_context *context)
 	 */
 	if (IsA(node, Var) ||
 		IsA(node, PlaceHolderVar) ||
-		IsA(node, Aggref) ||
-		IsA(node, GroupingFunc))
+		IsA(node, Aggref))
 	{
 		split_pathtarget_item *item = palloc(sizeof(split_pathtarget_item));
 

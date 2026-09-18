@@ -59,9 +59,6 @@ exprType(const Node *expr)
 		case T_Aggref:
 			type = ((const Aggref *) expr)->aggtype;
 			break;
-		case T_GroupingFunc:
-			type = INT4OID;
-			break;
 		case T_SubscriptingRef:
 			type = ((const SubscriptingRef *) expr)->refrestype;
 			break;
@@ -684,8 +681,6 @@ expression_returns_set_walker(Node *node, void *context)
 	/* Avoid recursion for some cases that parser checks not to return a set */
 	if (IsA(node, Aggref))
 		return false;
-	if (IsA(node, GroupingFunc))
-		return false;
 
 	return expression_tree_walker(node, expression_returns_set_walker,
 								  context);
@@ -724,9 +719,6 @@ exprCollation(const Node *expr)
 			break;
 		case T_Aggref:
 			coll = ((const Aggref *) expr)->aggcollid;
-			break;
-		case T_GroupingFunc:
-			coll = InvalidOid;
 			break;
 		case T_SubscriptingRef:
 			coll = ((const SubscriptingRef *) expr)->refcollid;
@@ -941,9 +933,6 @@ exprSetCollation(Node *expr, Oid collation)
 		case T_Aggref:
 			((Aggref *) expr)->aggcollid = collation;
 			break;
-		case T_GroupingFunc:
-			Assert(!OidIsValid(collation));
-			break;
 		case T_SubscriptingRef:
 			((SubscriptingRef *) expr)->refcollid = collation;
 			break;
@@ -1142,9 +1131,6 @@ exprLocation(const Node *expr)
 		case T_Aggref:
 			/* function name should always be the first thing */
 			loc = ((const Aggref *) expr)->location;
-			break;
-		case T_GroupingFunc:
-			loc = ((const GroupingFunc *) expr)->location;
 			break;
 		case T_SubscriptingRef:
 			/* just use container argument's location */
@@ -1387,9 +1373,6 @@ exprLocation(const Node *expr)
 			break;
 		case T_Constraint:
 			loc = ((const Constraint *) expr)->location;
-			break;
-		case T_GroupingSet:
-			loc = ((const GroupingSet *) expr)->location;
 			break;
 		case T_PlaceHolderVar:
 			/* just use argument's location */
@@ -1712,15 +1695,6 @@ expression_tree_walker(Node *node,
 					return true;
 			}
 			break;
-		case T_GroupingFunc:
-			{
-				GroupingFunc *grouping = (GroupingFunc *) node;
-
-				if (expression_tree_walker((Node *) grouping->args,
-										   walker, context))
-					return true;
-			}
-			break;
 		case T_SubscriptingRef:
 			{
 				SubscriptingRef *sbsref = (SubscriptingRef *) node;
@@ -2012,13 +1986,6 @@ query_tree_walker(Query *query,
 	}
 
 	/*
-	 * groupingSets and rowMarks are not walked:
-	 *
-	 * groupingSets contain only ressortgrouprefs (integers) which are
-	 * meaningless without the corresponding groupClause or tlist.
-	 * Accordingly, any walker that needs to care about them needs to handle
-	 * them itself in its Query processing.
-	 *
 	 * rowMarks is not walked because it contains only rangetable indexes (and
 	 * flags etc.) and therefore should be handled at Query level similarly.
 	 */
@@ -2245,29 +2212,6 @@ expression_tree_mutator(Node *node,
 				MUTATE(newnode->aggorder, aggref->aggorder, List *);
 				MUTATE(newnode->aggdistinct, aggref->aggdistinct, List *);
 				MUTATE(newnode->aggfilter, aggref->aggfilter, Expr *);
-				return (Node *) newnode;
-			}
-			break;
-		case T_GroupingFunc:
-			{
-				GroupingFunc *grouping = (GroupingFunc *) node;
-				GroupingFunc *newnode;
-
-				FLATCOPY(newnode, grouping, GroupingFunc);
-				MUTATE(newnode->args, grouping->args, List *);
-
-				/*
-				 * We assume here that mutating the arguments does not change
-				 * the semantics, i.e. that the arguments are not mutated in a
-				 * way that makes them semantically different from their
-				 * previously matching expressions in the GROUP BY clause.
-				 *
-				 * If a mutator somehow wanted to do this, it would have to
-				 * handle the refs and cols lists itself as appropriate.
-				 */
-				newnode->refs = list_copy(grouping->refs);
-				newnode->cols = list_copy(grouping->cols);
-
 				return (Node *) newnode;
 			}
 			break;
@@ -2744,12 +2688,6 @@ query_tree_mutator(Query *query,
 	}
 
 	/*
-	 * groupingSets and rowMarks are not mutated:
-	 *
-	 * groupingSets contain only ressortgroup refs (integers) which are
-	 * meaningless without the groupClause or tlist. Accordingly, any mutator
-	 * that needs to care about them needs to handle them itself in its Query
-	 * processing.
 	 *
 	 * rowMarks contains only rangetable indexes (and flags etc.) and
 	 * therefore should be handled at Query level similarly.
@@ -2918,8 +2856,6 @@ raw_expression_tree_walker(Node *node,
 			break;
 		case T_RangeVar:
 			return walker(((RangeVar *) node)->alias, context);
-		case T_GroupingFunc:
-			return walker(((GroupingFunc *) node)->args, context);
 		case T_SubLink:
 			{
 				SubLink    *sublink = (SubLink *) node;
@@ -3195,8 +3131,6 @@ raw_expression_tree_walker(Node *node,
 				/* opclass names are deemed uninteresting */
 			}
 			break;
-		case T_GroupingSet:
-			return walker(((GroupingSet *) node)->content, context);
 		case T_LockingClause:
 			return walker(((LockingClause *) node)->lockedRels, context);
 		default:

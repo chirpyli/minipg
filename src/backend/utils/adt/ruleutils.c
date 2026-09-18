@@ -386,8 +386,7 @@ static void get_target_list(List *targetList, deparse_context *context,
 static Node *get_rule_sortgroupclause(Index ref, List *tlist,
 									  bool force_colno,
 									  deparse_context *context);
-static void get_rule_groupingset(GroupingSet *gset, List *targetlist,
-								 bool omit_parens, deparse_context *context);
+
 static void get_rule_orderby(List *orderList, List *targetList,
 							 bool force_colno, deparse_context *context);
 static char *get_variable(Var *var, int levelsup, bool istoplevel,
@@ -3606,7 +3605,7 @@ get_basic_select_query(Query *query, deparse_context *context,
 	}
 
 	/* Add the GROUP BY clause if given */
-	if (query->groupClause != NULL || query->groupingSets != NULL)
+	if (query->groupClause != NULL)
 	{
 		ParseExprKind save_exprkind;
 
@@ -3618,30 +3617,15 @@ get_basic_select_query(Query *query, deparse_context *context,
 		save_exprkind = context->special_exprkind;
 		context->special_exprkind = EXPR_KIND_GROUP_BY;
 
-		if (query->groupingSets == NIL)
+		sep = "";
+		foreach(l, query->groupClause)
 		{
-			sep = "";
-			foreach(l, query->groupClause)
-			{
-				SortGroupClause *grp = (SortGroupClause *) lfirst(l);
+			SortGroupClause *grp = (SortGroupClause *) lfirst(l);
 
-				appendStringInfoString(buf, sep);
-				get_rule_sortgroupclause(grp->tleSortGroupRef, query->targetList,
-										 false, context);
-				sep = ", ";
-			}
-		}
-		else
-		{
-			sep = "";
-			foreach(l, query->groupingSets)
-			{
-				GroupingSet *grp = lfirst(l);
-
-				appendStringInfoString(buf, sep);
-				get_rule_groupingset(grp, query->targetList, true, context);
-				sep = ", ";
-			}
+			appendStringInfoString(buf, sep);
+			get_rule_sortgroupclause(grp->tleSortGroupRef, query->targetList,
+									 false, context);
+			sep = ", ";
 		}
 
 		context->special_exprkind = save_exprkind;
@@ -3858,65 +3842,7 @@ get_rule_sortgroupclause(Index ref, List *tlist, bool force_colno,
 	return expr;
 }
 
-/*
- * Display a GroupingSet
- */
-static void
-get_rule_groupingset(GroupingSet *gset, List *targetlist,
-					 bool omit_parens, deparse_context *context)
-{
-	ListCell   *l;
-	StringInfo	buf = context->buf;
-	bool		omit_child_parens = true;
-	char	   *sep = "";
 
-	switch (gset->kind)
-	{
-		case GROUPING_SET_EMPTY:
-			appendStringInfoString(buf, "()");
-			return;
-
-		case GROUPING_SET_SIMPLE:
-			{
-				if (!omit_parens || list_length(gset->content) != 1)
-					appendStringInfoChar(buf, '(');
-
-				foreach(l, gset->content)
-				{
-					Index		ref = lfirst_int(l);
-
-					appendStringInfoString(buf, sep);
-					get_rule_sortgroupclause(ref, targetlist,
-											 false, context);
-					sep = ", ";
-				}
-
-				if (!omit_parens || list_length(gset->content) != 1)
-					appendStringInfoChar(buf, ')');
-			}
-			return;
-
-		case GROUPING_SET_ROLLUP:
-			appendStringInfoString(buf, "ROLLUP(");
-			break;
-		case GROUPING_SET_CUBE:
-			appendStringInfoString(buf, "CUBE(");
-			break;
-		case GROUPING_SET_SETS:
-			appendStringInfoString(buf, "GROUPING SETS (");
-			omit_child_parens = false;
-			break;
-	}
-
-	foreach(l, gset->content)
-	{
-		appendStringInfoString(buf, sep);
-		get_rule_groupingset(lfirst(l), targetlist, omit_child_parens, context);
-		sep = ", ";
-	}
-
-	appendStringInfoChar(buf, ')');
-}
 
 /*
  * Display an ORDER BY list.
@@ -5108,13 +5034,12 @@ get_parameter(Param *param, deparse_context *context)
 		context->varprefix = true;
 
 		/*
-		 * A Param's expansion is typically a Var, Aggref, GroupingFunc, or
+		 * A Param's expansion is typically a Var or Aggref, or
 		 * upper-level Param, which wouldn't need extra parentheses.
 		 * Otherwise, insert parens to ensure the expression looks atomic.
 		 */
 		need_paren = !(IsA(expr, Var) ||
 					   IsA(expr, Aggref) ||
-					   IsA(expr, GroupingFunc) ||
 					   IsA(expr, Param));
 		if (need_paren)
 			appendStringInfoChar(context->buf, '(');
@@ -5237,7 +5162,6 @@ isSimpleNode(Node *node, Node *parentNode, int prettyFlags)
 		case T_SQLValueFunction:
 		case T_NullIfExpr:
 		case T_Aggref:
-		case T_GroupingFunc:
 		case T_FuncExpr:
 			/* function-like: name(..) or name[..] */
 			return true;
@@ -5349,7 +5273,6 @@ isSimpleNode(Node *node, Node *parentNode, int prettyFlags)
 				case T_MinMaxExpr:	/* own parentheses */
 				case T_NullIfExpr:	/* other separators */
 				case T_Aggref:	/* own parentheses */
-				case T_GroupingFunc:	/* own parentheses */
 				case T_CaseExpr:	/* other separators */
 					return true;
 				default:
@@ -5399,7 +5322,6 @@ isSimpleNode(Node *node, Node *parentNode, int prettyFlags)
 				case T_MinMaxExpr:	/* own parentheses */
 				case T_NullIfExpr:	/* other separators */
 				case T_Aggref:	/* own parentheses */
-				case T_GroupingFunc:	/* own parentheses */
 				case T_CaseExpr:	/* other separators */
 					return true;
 				default:
@@ -5563,15 +5485,7 @@ get_rule_expr(Node *node, deparse_context *context,
 			get_agg_expr((Aggref *) node, context, (Aggref *) node);
 			break;
 
-		case T_GroupingFunc:
-			{
-				GroupingFunc *gexpr = (GroupingFunc *) node;
 
-				appendStringInfoString(buf, "GROUPING(");
-				get_rule_expr((Node *) gexpr->args, context, true);
-				appendStringInfoChar(buf, ')');
-			}
-			break;
 
 
 		case T_SubscriptingRef:
