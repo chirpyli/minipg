@@ -411,7 +411,7 @@ standard_ProcessUtility(PlannedStmt *pstmt,
 						break;
 
 					case TRANS_STMT_COMMIT:
-						if (!EndTransactionBlock(stmt->chain))
+						if (!EndTransactionBlock())
 						{
 							/* report unsuccessful commit in qc */
 							if (qc)
@@ -439,7 +439,7 @@ standard_ProcessUtility(PlannedStmt *pstmt,
 						break;
 
 					case TRANS_STMT_ROLLBACK:
-						UserAbortTransactionBlock(stmt->chain);
+						UserAbortTransactionBlock();
 						break;
 
 					case TRANS_STMT_SAVEPOINT:

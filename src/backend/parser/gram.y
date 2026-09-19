@@ -221,7 +221,6 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 %type <list>	utility_option_list
 %type <node>	utility_option_arg
 %type <defelt>	drop_option
-%type <boolean>	opt_transaction_chain
 
 
 %type <str>		OptSchemaName
@@ -374,7 +373,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 	BEGIN_P BETWEEN BIGINT
 	BOOLEAN_P BOTH BY
 
-	CASCADE CASCADED CASE CAST CHAIN CHAR_P
+	CASCADE CASCADED CASE CAST CHAR_P
 	CHARACTER CHARACTERISTICS CHECK CHECKPOINT
 	CLUSTER COALESCE COLUMN COMMIT
 	COMMITTED COMPRESSION CONCURRENTLY CONFLICT
@@ -1952,12 +1951,11 @@ AlterObjectSchemaStmt:
  *****************************************************************************/
 
 TransactionStmt:
-			ABORT_P opt_transaction opt_transaction_chain
+			ABORT_P opt_transaction
 				{
 					TransactionStmt *n = makeNode(TransactionStmt);
 					n->kind = TRANS_STMT_ROLLBACK;
 					n->options = NIL;
-					n->chain = $3;
 					$$ = (Node *)n;
 				}
 			| START TRANSACTION transaction_mode_list_or_empty
@@ -1967,20 +1965,18 @@ TransactionStmt:
 					n->options = $3;
 					$$ = (Node *)n;
 				}
-			| COMMIT opt_transaction opt_transaction_chain
+			| 			COMMIT opt_transaction
 				{
 					TransactionStmt *n = makeNode(TransactionStmt);
 					n->kind = TRANS_STMT_COMMIT;
 					n->options = NIL;
-					n->chain = $3;
 					$$ = (Node *)n;
 				}
-			| ROLLBACK opt_transaction opt_transaction_chain
+			| ROLLBACK opt_transaction
 				{
 					TransactionStmt *n = makeNode(TransactionStmt);
 					n->kind = TRANS_STMT_ROLLBACK;
 					n->options = NIL;
-					n->chain = $3;
 					$$ = (Node *)n;
 				}
 			| SAVEPOINT ColId
@@ -2049,12 +2045,11 @@ TransactionStmtLegacy:
 					n->options = $3;
 					$$ = (Node *)n;
 				}
-			| END_P opt_transaction opt_transaction_chain
+			| END_P opt_transaction
 				{
 					TransactionStmt *n = makeNode(TransactionStmt);
 					n->kind = TRANS_STMT_COMMIT;
 					n->options = NIL;
-					n->chain = $3;
 					$$ = (Node *)n;
 				}
 		;
@@ -2096,12 +2091,6 @@ transaction_mode_list_or_empty:
 			transaction_mode_list
 			| /* EMPTY */
 					{ $$ = NIL; }
-		;
-
-opt_transaction_chain:
-			AND CHAIN		{ $$ = true; }
-			| AND NO CHAIN	{ $$ = false; }
-			| /* EMPTY */	{ $$ = false; }
 		;
 
 
@@ -4962,7 +4951,6 @@ unreserved_keyword:
 			| BY
 			| CASCADE
 			| CASCADED
-			| CHAIN
 			| CHARACTERISTICS
 			| CHECKPOINT
 			| COMMIT
@@ -5224,7 +5212,6 @@ bare_label_keyword:
 			| CASCADED
 			| CASE
 			| CAST
-			| CHAIN
 			| CHARACTERISTICS
 			| CHECK
 			| CHECKPOINT

@@ -193,7 +193,6 @@ typedef struct TransactionStateData
 	bool		startedInRecovery;	/* did we start in recovery? */
 	bool		didLogXid;		/* has xid been included in WAL record? */
 	int			parallelModeLevel;	/* Enter/ExitParallelMode counter */
-	bool		chain;			/* start a new block after this one */
 	bool		assigned;		/* assigned to top-level XID */
 	struct TransactionStateData *parent;	/* back link to parent */
 } TransactionStateData;
@@ -2749,44 +2748,12 @@ StartTransactionCommand(void)
 
 
 /*
- * Simple system for saving and restoring transaction characteristics
- * (isolation level, read only, deferrable).  We need this for transaction
- * chaining, so that we can set the characteristics of the new transaction to
- * be the same as the previous one.  (We need something like this because the
- * GUC system resets the characteristics at transaction end, so for example
- * just skipping the reset in StartTransaction() won't work.)
- */
-static int	save_XactIsoLevel;
-static bool save_XactReadOnly;
-static bool save_XactDeferrable;
-
-void
-SaveTransactionCharacteristics(void)
-{
-	save_XactIsoLevel = XactIsoLevel;
-	save_XactReadOnly = XactReadOnly;
-	save_XactDeferrable = XactDeferrable;
-}
-
-void
-RestoreTransactionCharacteristics(void)
-{
-	XactIsoLevel = save_XactIsoLevel;
-	XactReadOnly = save_XactReadOnly;
-	XactDeferrable = save_XactDeferrable;
-}
-
-
-/*
  *	CommitTransactionCommand
  */
 void
 CommitTransactionCommand(void)
 {
 	TransactionState s = CurrentTransactionState;
-
-	/* Must save in case we need to restore below */
-	SaveTransactionCharacteristics();
 
 	switch (s->blockState)
 	{
@@ -2839,13 +2806,6 @@ CommitTransactionCommand(void)
 		case TBLOCK_END:
 			CommitTransaction();
 			s->blockState = TBLOCK_DEFAULT;
-			if (s->chain)
-			{
-				StartTransaction();
-				s->blockState = TBLOCK_INPROGRESS;
-				s->chain = false;
-				RestoreTransactionCharacteristics();
-			}
 			break;
 
 			/*
@@ -2865,13 +2825,6 @@ CommitTransactionCommand(void)
 		case TBLOCK_ABORT_END:
 			CleanupTransaction();
 			s->blockState = TBLOCK_DEFAULT;
-			if (s->chain)
-			{
-				StartTransaction();
-				s->blockState = TBLOCK_INPROGRESS;
-				s->chain = false;
-				RestoreTransactionCharacteristics();
-			}
 			break;
 
 			/*
@@ -2883,13 +2836,6 @@ CommitTransactionCommand(void)
 			AbortTransaction();
 			CleanupTransaction();
 			s->blockState = TBLOCK_DEFAULT;
-			if (s->chain)
-			{
-				StartTransaction();
-				s->blockState = TBLOCK_INPROGRESS;
-				s->chain = false;
-				RestoreTransactionCharacteristics();
-			}
 			break;
 
 			/*
@@ -2950,13 +2896,6 @@ CommitTransactionCommand(void)
 				Assert(s->parent == NULL);
 				CommitTransaction();
 				s->blockState = TBLOCK_DEFAULT;
-				if (s->chain)
-				{
-					StartTransaction();
-					s->blockState = TBLOCK_INPROGRESS;
-					s->chain = false;
-					RestoreTransactionCharacteristics();
-				}
 			}
 			else if (s->blockState == TBLOCK_PREPARE)
 			{
@@ -3581,7 +3520,7 @@ PrepareTransactionBlock(const char *gid)
 	bool		result;
 
 	/* Set up to commit the current transaction */
-	result = EndTransactionBlock(false);
+	result = EndTransactionBlock();
 
 	/* If successful, change outer tblock state to PREPARE */
 	if (result)
@@ -3627,7 +3566,7 @@ PrepareTransactionBlock(const char *gid)
  * resource owner, etc while executing inside a Portal.
  */
 bool
-EndTransactionBlock(bool chain)
+EndTransactionBlock(void)
 {
 	TransactionState s = CurrentTransactionState;
 	bool		result = false;
@@ -3644,21 +3583,13 @@ EndTransactionBlock(bool chain)
 			break;
 
 			/*
-			 * We are in an implicit transaction block.  If AND CHAIN was
-			 * specified, error.  Otherwise commit, but issue a warning
-			 * because there was no explicit BEGIN before this.
+			 * We are in an implicit transaction block.  Commit, but issue a
+			 * warning because there was no explicit BEGIN before this.
 			 */
 		case TBLOCK_IMPLICIT_INPROGRESS:
-			if (chain)
-				ereport(ERROR,
-						(errcode(ERRCODE_NO_ACTIVE_SQL_TRANSACTION),
-				/* translator: %s represents an SQL statement name */
-						 errmsg("%s can only be used in transaction blocks",
-								"COMMIT AND CHAIN")));
-			else
-				ereport(WARNING,
-						(errcode(ERRCODE_NO_ACTIVE_SQL_TRANSACTION),
-						 errmsg("there is no transaction in progress")));
+			ereport(WARNING,
+					(errcode(ERRCODE_NO_ACTIVE_SQL_TRANSACTION),
+					 errmsg("there is no transaction in progress")));
 			s->blockState = TBLOCK_END;
 			result = true;
 			break;
@@ -3720,24 +3651,15 @@ EndTransactionBlock(bool chain)
 			break;
 
 			/*
-			 * The user issued COMMIT when not inside a transaction.  For
-			 * COMMIT without CHAIN, issue a WARNING, staying in
-			 * TBLOCK_STARTED state.  The upcoming call to
+			 * The user issued COMMIT when not inside a transaction.  Issue a
+			 * WARNING, staying in TBLOCK_STARTED state.  The upcoming call to
 			 * CommitTransactionCommand() will then close the transaction and
-			 * put us back into the default state.  For COMMIT AND CHAIN,
-			 * error.
+			 * put us back into the default state.
 			 */
 		case TBLOCK_STARTED:
-			if (chain)
-				ereport(ERROR,
-						(errcode(ERRCODE_NO_ACTIVE_SQL_TRANSACTION),
-				/* translator: %s represents an SQL statement name */
-						 errmsg("%s can only be used in transaction blocks",
-								"COMMIT AND CHAIN")));
-			else
-				ereport(WARNING,
-						(errcode(ERRCODE_NO_ACTIVE_SQL_TRANSACTION),
-						 errmsg("there is no transaction in progress")));
+			ereport(WARNING,
+					(errcode(ERRCODE_NO_ACTIVE_SQL_TRANSACTION),
+					 errmsg("there is no transaction in progress")));
 			result = true;
 			break;
 
@@ -3775,8 +3697,6 @@ EndTransactionBlock(bool chain)
 		   s->blockState == TBLOCK_ABORT_END ||
 		   s->blockState == TBLOCK_ABORT_PENDING);
 
-	s->chain = chain;
-
 	return result;
 }
 
@@ -3787,7 +3707,7 @@ EndTransactionBlock(bool chain)
  * As above, we don't actually do anything here except change blockState.
  */
 void
-UserAbortTransactionBlock(bool chain)
+UserAbortTransactionBlock(void)
 {
 	TransactionState s = CurrentTransactionState;
 
@@ -3839,10 +3759,10 @@ UserAbortTransactionBlock(bool chain)
 			break;
 
 			/*
-			 * The user issued ABORT when not inside a transaction.  For
-			 * ROLLBACK without CHAIN, issue a WARNING and go to abort state.
-			 * The upcoming call to CommitTransactionCommand() will then put
-			 * us back into the default state.  For ROLLBACK AND CHAIN, error.
+			 * The user issued ABORT when not inside a transaction.  Issue a
+			 * WARNING and go to abort state.  The upcoming call to
+			 * CommitTransactionCommand() will then put us back into the
+			 * default state.
 			 *
 			 * We do the same thing with ABORT inside an implicit transaction,
 			 * although in this case we might be rolling back actual database
@@ -3851,16 +3771,9 @@ UserAbortTransactionBlock(bool chain)
 			 */
 		case TBLOCK_STARTED:
 		case TBLOCK_IMPLICIT_INPROGRESS:
-			if (chain)
-				ereport(ERROR,
-						(errcode(ERRCODE_NO_ACTIVE_SQL_TRANSACTION),
-				/* translator: %s represents an SQL statement name */
-						 errmsg("%s can only be used in transaction blocks",
-								"ROLLBACK AND CHAIN")));
-			else
-				ereport(WARNING,
-						(errcode(ERRCODE_NO_ACTIVE_SQL_TRANSACTION),
-						 errmsg("there is no transaction in progress")));
+			ereport(WARNING,
+					(errcode(ERRCODE_NO_ACTIVE_SQL_TRANSACTION),
+					 errmsg("there is no transaction in progress")));
 			s->blockState = TBLOCK_ABORT_PENDING;
 			break;
 
@@ -3895,8 +3808,6 @@ UserAbortTransactionBlock(bool chain)
 
 	Assert(s->blockState == TBLOCK_ABORT_END ||
 		   s->blockState == TBLOCK_ABORT_PENDING);
-
-	s->chain = chain;
 }
 
 /*

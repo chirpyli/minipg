@@ -216,7 +216,7 @@ SPI_start_transaction(void)
 }
 
 static void
-_SPI_commit(bool chain)
+_SPI_commit(void)
 {
 	MemoryContext oldcontext = CurrentMemoryContext;
 
@@ -246,10 +246,6 @@ _SPI_commit(bool chain)
 				(errcode(ERRCODE_INVALID_TRANSACTION_TERMINATION),
 				 errmsg("cannot commit while a subtransaction is active")));
 
-	/* XXX this ain't re-entrant enough for my taste */
-	if (chain)
-		SaveTransactionCharacteristics();
-
 	/* Catch any error occurring during the COMMIT */
 	PG_TRY();
 	{
@@ -264,8 +260,6 @@ _SPI_commit(bool chain)
 
 		/* Immediately start a new transaction */
 		StartTransactionCommand();
-		if (chain)
-			RestoreTransactionCharacteristics();
 
 		MemoryContextSwitchTo(oldcontext);
 
@@ -288,8 +282,6 @@ _SPI_commit(bool chain)
 
 		/* ... and start a new one */
 		StartTransactionCommand();
-		if (chain)
-			RestoreTransactionCharacteristics();
 
 		MemoryContextSwitchTo(oldcontext);
 
@@ -304,17 +296,11 @@ _SPI_commit(bool chain)
 void
 SPI_commit(void)
 {
-	_SPI_commit(false);
-}
-
-void
-SPI_commit_and_chain(void)
-{
-	_SPI_commit(true);
+	_SPI_commit();
 }
 
 static void
-_SPI_rollback(bool chain)
+_SPI_rollback(void)
 {
 	MemoryContext oldcontext = CurrentMemoryContext;
 
@@ -330,10 +316,6 @@ _SPI_rollback(bool chain)
 				(errcode(ERRCODE_INVALID_TRANSACTION_TERMINATION),
 				 errmsg("cannot roll back while a subtransaction is active")));
 
-	/* XXX this ain't re-entrant enough for my taste */
-	if (chain)
-		SaveTransactionCharacteristics();
-
 	/* Catch any error occurring during the ROLLBACK */
 	PG_TRY();
 	{
@@ -348,8 +330,6 @@ _SPI_rollback(bool chain)
 
 		/* Immediately start a new transaction */
 		StartTransactionCommand();
-		if (chain)
-			RestoreTransactionCharacteristics();
 
 		MemoryContextSwitchTo(oldcontext);
 
@@ -373,8 +353,6 @@ _SPI_rollback(bool chain)
 
 		/* ... and start a new one */
 		StartTransactionCommand();
-		if (chain)
-			RestoreTransactionCharacteristics();
 
 		MemoryContextSwitchTo(oldcontext);
 
@@ -389,13 +367,7 @@ _SPI_rollback(bool chain)
 void
 SPI_rollback(void)
 {
-	_SPI_rollback(false);
-}
-
-void
-SPI_rollback_and_chain(void)
-{
-	_SPI_rollback(true);
+	_SPI_rollback();
 }
 
 /*
