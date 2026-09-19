@@ -52,19 +52,6 @@ select count(*) from date_tbl
 select count(*) from date_tbl
   where f1 not between '1997-01-01' and '1998-01-01';
 
-explain (costs off)
-select count(*) from date_tbl
-  where f1 between symmetric '1997-01-01' and '1998-01-01';
-select count(*) from date_tbl
-  where f1 between symmetric '1997-01-01' and '1998-01-01';
-
-explain (costs off)
-select count(*) from date_tbl
-  where f1 not between symmetric '1997-01-01' and '1998-01-01';
-select count(*) from date_tbl
-  where f1 not between symmetric '1997-01-01' and '1998-01-01';
-
-
 --
 -- Test parsing of a no-op cast to a type with unspecified typmod
 --

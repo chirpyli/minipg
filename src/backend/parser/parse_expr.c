@@ -172,8 +172,6 @@ transformExprRecurse(ParseState *pstate, Node *expr)
 						break;
 					case AEXPR_BETWEEN:
 					case AEXPR_NOT_BETWEEN:
-					case AEXPR_BETWEEN_SYM:
-					case AEXPR_NOT_BETWEEN_SYM:
 						result = transformAExprBetween(pstate, a);
 						break;
 					default:
@@ -1085,8 +1083,6 @@ transformAExprBetween(ParseState *pstate, A_Expr *a)
 	Node	   *bexpr;
 	Node	   *cexpr;
 	Node	   *result;
-	Node	   *sub1;
-	Node	   *sub2;
 	List	   *args;
 
 	/* Deconstruct A_Expr into three subexprs */
@@ -1126,42 +1122,6 @@ transformAExprBetween(ParseState *pstate, A_Expr *a)
 											   copyObject(aexpr), cexpr,
 											   a->location));
 			result = (Node *) makeBoolExpr(OR_EXPR, args, a->location);
-			break;
-		case AEXPR_BETWEEN_SYM:
-			args = list_make2(makeSimpleA_Expr(AEXPR_OP, ">=",
-											   aexpr, bexpr,
-											   a->location),
-							  makeSimpleA_Expr(AEXPR_OP, "<=",
-											   copyObject(aexpr), cexpr,
-											   a->location));
-			sub1 = (Node *) makeBoolExpr(AND_EXPR, args, a->location);
-			args = list_make2(makeSimpleA_Expr(AEXPR_OP, ">=",
-											   copyObject(aexpr), copyObject(cexpr),
-											   a->location),
-							  makeSimpleA_Expr(AEXPR_OP, "<=",
-											   copyObject(aexpr), copyObject(bexpr),
-											   a->location));
-			sub2 = (Node *) makeBoolExpr(AND_EXPR, args, a->location);
-			args = list_make2(sub1, sub2);
-			result = (Node *) makeBoolExpr(OR_EXPR, args, a->location);
-			break;
-		case AEXPR_NOT_BETWEEN_SYM:
-			args = list_make2(makeSimpleA_Expr(AEXPR_OP, "<",
-											   aexpr, bexpr,
-											   a->location),
-							  makeSimpleA_Expr(AEXPR_OP, ">",
-											   copyObject(aexpr), cexpr,
-											   a->location));
-			sub1 = (Node *) makeBoolExpr(OR_EXPR, args, a->location);
-			args = list_make2(makeSimpleA_Expr(AEXPR_OP, "<",
-											   copyObject(aexpr), copyObject(cexpr),
-											   a->location),
-							  makeSimpleA_Expr(AEXPR_OP, ">",
-											   copyObject(aexpr), copyObject(bexpr),
-											   a->location));
-			sub2 = (Node *) makeBoolExpr(OR_EXPR, args, a->location);
-			args = list_make2(sub1, sub2);
-			result = (Node *) makeBoolExpr(AND_EXPR, args, a->location);
 			break;
 		default:
 			elog(ERROR, "unrecognized A_Expr kind: %d", a->kind);

@@ -2433,14 +2433,6 @@ _outAExpr(StringInfo str, const A_Expr *node)
 			appendStringInfoString(str, " NOT_BETWEEN ");
 			WRITE_NODE_FIELD(name);
 			break;
-		case AEXPR_BETWEEN_SYM:
-			appendStringInfoString(str, " BETWEEN_SYM ");
-			WRITE_NODE_FIELD(name);
-			break;
-		case AEXPR_NOT_BETWEEN_SYM:
-			appendStringInfoString(str, " NOT_BETWEEN_SYM ");
-			WRITE_NODE_FIELD(name);
-			break;
 		default:
 			appendStringInfoString(str, " ??");
 			break;

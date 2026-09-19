@@ -369,7 +369,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 /* ordinary key words in alphabetical order */
 %token <keyword> ABORT_P ADD_P
 	ALL ALTER ANALYSE ANALYZE AND ANY ARRAY AS ASC
-	ASYMMETRIC AT AUTHORIZATION
+	AT AUTHORIZATION
 
 	BEGIN_P BETWEEN BIGINT
 	BOOLEAN_P BOTH BY
@@ -437,7 +437,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 	SERIALIZABLE SERVER SESSION SESSION_USER SET SHOW
 	SMALLINT SNAPSHOT SOME
 	START STATISTICS STORAGE
-	SUBSTRING SYMMETRIC
+	SUBSTRING
 
 	TABLE TABLESAMPLE TEMPLATE THEN
 	TIME TIMESTAMP TO TRAILING TRANSACTION
@@ -3861,36 +3861,20 @@ a_expr:		c_expr									{ $$ = $1; }
 				{
 					$$ = (Node *) makeSimpleA_Expr(AEXPR_NOT_DISTINCT, "=", $1, $6, @2);
 				}
-			| a_expr BETWEEN opt_asymmetric b_expr AND a_expr		%prec BETWEEN
+			| a_expr BETWEEN b_expr AND a_expr		%prec BETWEEN
 				{
 					$$ = (Node *) makeSimpleA_Expr(AEXPR_BETWEEN,
 												   "BETWEEN",
 												   $1,
-												   (Node *) list_make2($4, $6),
+												   (Node *) list_make2($3, $5),
 												   @2);
 				}
-			| a_expr NOT_LA BETWEEN opt_asymmetric b_expr AND a_expr %prec NOT_LA
+			| a_expr NOT_LA BETWEEN b_expr AND a_expr %prec NOT_LA
 				{
 					$$ = (Node *) makeSimpleA_Expr(AEXPR_NOT_BETWEEN,
 												   "NOT BETWEEN",
 												   $1,
-												   (Node *) list_make2($5, $7),
-												   @2);
-				}
-			| a_expr BETWEEN SYMMETRIC b_expr AND a_expr			%prec BETWEEN
-				{
-					$$ = (Node *) makeSimpleA_Expr(AEXPR_BETWEEN_SYM,
-												   "BETWEEN SYMMETRIC",
-												   $1,
 												   (Node *) list_make2($4, $6),
-												   @2);
-				}
-			| a_expr NOT_LA BETWEEN SYMMETRIC b_expr AND a_expr		%prec NOT_LA
-				{
-					$$ = (Node *) makeSimpleA_Expr(AEXPR_NOT_BETWEEN_SYM,
-												   "NOT BETWEEN SYMMETRIC",
-												   $1,
-												   (Node *) list_make2($5, $7),
 												   @2);
 				}
 			| a_expr IN_P in_expr
@@ -4717,10 +4701,6 @@ opt_indirection:
 			| opt_indirection indirection_el		{ $$ = lappend($1, $2); }
 		;
 
-opt_asymmetric: ASYMMETRIC
-			| /*EMPTY*/
-		;
-
 
 /*****************************************************************************
  *
@@ -5182,7 +5162,6 @@ reserved_keyword:
 			| ARRAY
 			| AS
 			| ASC
-			| ASYMMETRIC
 			| BOTH
 			| CASE
 			| CAST
@@ -5226,7 +5205,6 @@ reserved_keyword:
 			| SELECT
 			| SESSION_USER
 			| SOME
-			| SYMMETRIC
 			| TABLE
 			| THEN
 			| TO
@@ -5261,7 +5239,6 @@ bare_label_keyword:
 			| AND
 			| ANY
 			| ASC
-			| ASYMMETRIC
 			| AT
 			| AUTHORIZATION
 			| BEGIN_P
@@ -5396,7 +5373,6 @@ bare_label_keyword:
 			| STATISTICS
 			| STORAGE
 			| SUBSTRING
-			| SYMMETRIC
 			| TABLE
 
 			| TABLESAMPLE
