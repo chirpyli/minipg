@@ -6224,21 +6224,6 @@ get_func_sql_syntax(FuncExpr *expr, deparse_context *context)
 			appendStringInfoChar(buf, ')');
 			return true;
 
-		case F_OVERLAPS_TIMESTAMPTZ_TIMESTAMPTZ_TIMESTAMPTZ_TIMESTAMPTZ:
-		case F_OVERLAPS_TIMESTAMP_TIMESTAMP_TIMESTAMP_TIMESTAMP:
-		case F_OVERLAPS_TIME_TIME_TIME_TIME:
-			/* (x1, x2) OVERLAPS (y1, y2) */
-			appendStringInfoString(buf, "((");
-			get_rule_expr((Node *) linitial(expr->args), context, false);
-			appendStringInfoString(buf, ", ");
-			get_rule_expr((Node *) lsecond(expr->args), context, false);
-			appendStringInfoString(buf, ") OVERLAPS (");
-			get_rule_expr((Node *) lthird(expr->args), context, false);
-			appendStringInfoString(buf, ", ");
-			get_rule_expr((Node *) lfourth(expr->args), context, false);
-			appendStringInfoString(buf, "))");
-			return true;
-
 		case F_EXTRACT_TEXT_DATE:
 		case F_EXTRACT_TEXT_TIME:
 		case F_EXTRACT_TEXT_TIMESTAMP:

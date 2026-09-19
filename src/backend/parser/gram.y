@@ -296,7 +296,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 %type <boolean> opt_ordinality
 %type <list>	func_arg_list func_arg_list_opt
 %type <node>	func_arg_expr
-%type <list>	row array_expr_list
+%type <list>	array_expr_list
 %type <node>	case_expr case_arg when_clause case_default
 %type <list>	when_clause_list
 %type <ival>	sub_type
@@ -420,7 +420,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 
 	OFF ON ONLY OPERATOR OPTION OPTIONS OR
 	ORDER ORDINALITY OUTER_P
-	OVERLAPS OVERLAY
+	OVERLAY
 
 	PLACING
 	POSITION PRECISION PREPARE PREPARED PRIMARY
@@ -3788,23 +3788,6 @@ a_expr:		c_expr									{ $$ = $1; }
 					n->location = @2;
 					$$ = (Node *)n;
 				}
-			| row OVERLAPS row
-				{
-					if (list_length($1) != 2)
-						ereport(ERROR,
-								(errcode(ERRCODE_SYNTAX_ERROR),
-								 errmsg("wrong number of parameters on left side of OVERLAPS expression"),
-								 parser_errposition(@1)));
-					if (list_length($3) != 2)
-						ereport(ERROR,
-								(errcode(ERRCODE_SYNTAX_ERROR),
-								 errmsg("wrong number of parameters on right side of OVERLAPS expression"),
-								 parser_errposition(@3)));
-					$$ = (Node *) makeFuncCall(SystemFuncName("overlaps"),
-											   list_concat($1, $3),
-											   COERCE_SQL_SYNTAX,
-											   @2);
-				}
 			| a_expr IS TRUE_P							%prec IS
 				{
 					BooleanTest *b = makeNode(BooleanTest);
@@ -4375,15 +4358,6 @@ func_expr_common_subexpr:
 /*
  * Supporting nonterminals for expressions.
  */
-
-/*
- * Row production.  In minipg this never builds a RowExpr (row constructors
- * are not supported); it is retained solely as the left and right operand
- * list syntax of the OVERLAPS operator.  Note that the ROW keyword itself
- * is gone, so only the parenthesized forms are accepted.
- */
-row:		'(' expr_list ',' a_expr ')'			{ $$ = lappend($2, $4); }
-		;
 
 sub_type:	ANY										{ $$ = ANY_SUBLINK; }
 			| SOME									{ $$ = ANY_SUBLINK; }
@@ -5141,7 +5115,6 @@ type_func_name_keyword:
 			| LIKE
 			| NATURAL
 			| OUTER_P
-			| OVERLAPS
 			| RIGHT
 			| TABLESAMPLE
 			| VERBOSE

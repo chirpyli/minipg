@@ -183,10 +183,9 @@ WHERE p1.oid != p2.oid AND
     p1.prokind != 'a' AND p2.prokind != 'a' AND
     (p1.proargtypes[2] < p2.proargtypes[2])
 ORDER BY 1, 2;
-         proargtypes         |       proargtypes        
------------------------------+--------------------------
- timestamp without time zone | timestamp with time zone
-(1 row)
+ proargtypes | proargtypes 
+-------------+-------------
+(0 rows)
 
 SELECT DISTINCT p1.proargtypes[3]::regtype, p2.proargtypes[3]::regtype
 FROM pg_proc AS p1, pg_proc AS p2
@@ -196,10 +195,9 @@ WHERE p1.oid != p2.oid AND
     p1.prokind != 'a' AND p2.prokind != 'a' AND
     (p1.proargtypes[3] < p2.proargtypes[3])
 ORDER BY 1, 2;
-         proargtypes         |       proargtypes        
------------------------------+--------------------------
- timestamp without time zone | timestamp with time zone
-(1 row)
+ proargtypes | proargtypes 
+-------------+-------------
+(0 rows)
 
 SELECT DISTINCT p1.proargtypes[4]::regtype, p2.proargtypes[4]::regtype
 FROM pg_proc AS p1, pg_proc AS p2
