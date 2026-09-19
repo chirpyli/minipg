@@ -116,7 +116,7 @@ CREATE TABLE IF NOT EXISTS testcase(
 	id int PRIMARY KEY,
 	balance numeric
 );
-ERROR:  syntax error at or near "numeric"
+ERROR:  type "numeric" does not exist
 LINE 3:  balance numeric
                  ^
 INSERT INTO testcase VALUES (1, 0);
