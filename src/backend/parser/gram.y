@@ -402,7 +402,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 	IF_P ILIKE IN_P INCLUDE
 	INDEX
 	INNER_P INSERT INT_P INTEGER
-	INTERSECT INTERVAL INTO IS ISNULL ISOLATION
+	INTERSECT INTERVAL INTO IS ISOLATION
 
 	JOIN
 
@@ -414,8 +414,8 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 
 	MINUTE_P MONTH_P
 
-	NAMES NATIONAL NATURAL NCHAR NO NONE
-	NOT NOTIFY NOTNULL NULL_P NULLIF
+	NAMES NATURAL NO NONE
+	NOT NOTIFY NULL_P NULLIF
 	NULLS_P
 
 	OFF ON ONLY OPERATOR OPTION OPTIONS OR
@@ -441,7 +441,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 
 	TABLE TABLESAMPLE TEMPLATE THEN
 	TIME TIMESTAMP TO TRAILING TRANSACTION
-	TREAT TRIM TRUE_P
+	TRIM TRUE_P
 	TRUNCATE TYPE_P
 
 	UESCAPE UNCOMMITTED UNION UNIQUE UNKNOWN
@@ -486,7 +486,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 %left		OR
 %left		AND
 %right		NOT
-%nonassoc	IS ISNULL NOTNULL	/* IS sets precedence for IS NULL, etc */
+%nonassoc	IS				/* IS sets precedence for IS NULL, etc */
 %nonassoc	'<' '>' '=' LESS_EQUALS GREATER_EQUALS NOT_EQUALS
 %nonassoc	BETWEEN IN_P LIKE ILIKE NOT_LA
 %nonassoc	ESCAPE			/* ESCAPE must be just above LIKE/ILIKE */
@@ -3557,12 +3557,6 @@ character:	CHARACTER opt_varying
 										{ $$ = $2 ? "varchar": "bpchar"; }
 			| VARCHAR
 										{ $$ = "varchar"; }
-			| NATIONAL CHARACTER opt_varying
-										{ $$ = $3 ? "varchar": "bpchar"; }
-			| NATIONAL CHAR_P opt_varying
-										{ $$ = $3 ? "varchar": "bpchar"; }
-			| NCHAR opt_varying
-										{ $$ = $2 ? "varchar": "bpchar"; }
 		;
 
 opt_varying:
@@ -3777,9 +3771,6 @@ a_expr:		c_expr									{ $$ = $1; }
 			 * Allow two forms described in the standard:
 			 *	a IS NULL
 			 *	a IS NOT NULL
-			 * Allow two SQL extensions
-			 *	a ISNULL
-			 *	a NOTNULL
 			 */
 			| a_expr IS NULL_P							%prec IS
 				{
@@ -3789,23 +3780,7 @@ a_expr:		c_expr									{ $$ = $1; }
 					n->location = @2;
 					$$ = (Node *)n;
 				}
-			| a_expr ISNULL
-				{
-					NullTest *n = makeNode(NullTest);
-					n->arg = (Expr *) $1;
-					n->nulltesttype = IS_NULL;
-					n->location = @2;
-					$$ = (Node *)n;
-				}
 			| a_expr IS NOT NULL_P						%prec IS
-				{
-					NullTest *n = makeNode(NullTest);
-					n->arg = (Expr *) $1;
-					n->nulltesttype = IS_NOT_NULL;
-					n->location = @2;
-					$$ = (Node *)n;
-				}
-			| a_expr NOTNULL
 				{
 					NullTest *n = makeNode(NullTest);
 					n->arg = (Expr *) $1;
@@ -4343,22 +4318,6 @@ func_expr_common_subexpr:
 					 */
 					$$ = (Node *) makeFuncCall(list_make1(makeString("substring")),
 											   $3,
-											   COERCE_EXPLICIT_CALL,
-											   @1);
-				}
-			| TREAT '(' a_expr AS Typename ')'
-				{
-					/* TREAT(expr AS target) converts expr of a particular type to target,
-					 * which is defined to be a subtype of the original expression.
-					 * In SQL99, this is intended for use with structured UDTs,
-					 * but let's make this a generally useful form allowing stronger
-					 * coercions than are handled by implicit casting.
-					 *
-					 * Convert SystemTypeName() to SystemFuncName() even though
-					 * at the moment they result in the same thing.
-					 */
-					$$ = (Node *) makeFuncCall(SystemFuncName(strVal(llast($5->names))),
-											   list_make1($3),
 											   COERCE_EXPLICIT_CALL,
 											   @1);
 				}
@@ -5162,8 +5121,6 @@ col_name_keyword:
 			| INTEGER
 			| INTERVAL
 			| LEAST
-			| NATIONAL
-			| NCHAR
 			| NONE
 			| NULLIF
 			| OVERLAY
@@ -5174,7 +5131,6 @@ col_name_keyword:
 			| SUBSTRING
 			| TIME
 			| TIMESTAMP
-			| TREAT
 			| TRIM
 			| VALUES
 			| VARCHAR
@@ -5200,12 +5156,10 @@ type_func_name_keyword:
 			| ILIKE
 			| INNER_P
 			| IS
-			| ISNULL
 			| JOIN
 			| LEFT
 			| LIKE
 			| NATURAL
-			| NOTNULL
 			| OUTER_P
 			| OVERLAPS
 			| RIGHT
@@ -5391,9 +5345,7 @@ bare_label_keyword:
 			| LOCALTIME
 			| LOCALTIMESTAMP
 			| NAMES
-			| NATIONAL
 			| NATURAL
-			| NCHAR
 			| NO
 			| NONE
 			| NOT
@@ -5454,7 +5406,6 @@ bare_label_keyword:
 			| TIMESTAMP
 			| TRAILING
 			| TRANSACTION
-			| TREAT
 			| TRIM
 			| TRUE_P
 			| TRUNCATE

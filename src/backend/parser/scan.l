@@ -245,9 +245,6 @@ quotecontinue	{whitespace_with_newline}{quote}
  */
 quotecontinuefail	{whitespace}*"-"?
 
-/* National character */
-xnstart			[nN]{quote}
-
 /* Quoted string that allows backslash escapes */
 xestart			[eE]{quote}
 xeinside		[^\\']+
@@ -437,32 +434,6 @@ other			.
 					yyerror("unterminated /* comment");
 				}
 } /* <xc> */
-
-{xnstart}		{
-					/* National character.
-					 * We will pass this along as a normal character string,
-					 * but preceded with an internally-generated "NCHAR".
-					 */
-					int		kwnum;
-
-					SET_YYLLOC();
-					yyless(1);	/* eat only 'n' this time */
-
-					kwnum = ScanKeywordLookup("nchar",
-											  yyextra->keywordlist);
-					if (kwnum >= 0)
-					{
-						yylval->keyword = GetScanKeyword(kwnum,
-														 yyextra->keywordlist);
-						return yyextra->keyword_tokens[kwnum];
-					}
-					else
-					{
-						/* If NCHAR isn't a keyword, just return "n" */
-						yylval->str = pstrdup("n");
-						return IDENT;
-					}
-				}
 
 {xqstart}		{
 					yyextra->warn_on_first_escape = true;

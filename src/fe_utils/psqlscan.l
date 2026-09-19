@@ -204,9 +204,6 @@ xbinside		[^']*
 xhstart			[xX]{quote}
 xhinside		[^']*
 
-/* National character */
-xnstart			[nN]{quote}
-
 /* Quoted string that allows backslash escapes */
 xestart			[eE]{quote}
 xeinside		[^\\']+
@@ -439,11 +436,6 @@ other			.
 					 * to mark it for the input routine as a hex string.
 					 */
 					BEGIN(xh);
-					ECHO;
-				}
-
-{xnstart}		{
-					yyless(1);	/* eat only 'n' this time */
 					ECHO;
 				}
 
