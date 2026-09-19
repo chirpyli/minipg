@@ -206,16 +206,16 @@ help(const char *progname)
 	printf(_("Usage:\n  %s [OPTION]...\n\n"), progname);
 	printf(_("Options:\n"));
 	printf(_("  -B NBUFFERS        number of shared buffers\n"));
+	printf(_("  -c NAME=VALUE      set run-time parameter\n"));
+	printf(_("  -C NAME            print value of run-time parameter, then exit\n"));
 	printf(_("  -d 1-5             debugging level\n"));
 	printf(_("  -D DATADIR         database directory\n"));
 	printf(_("  -e                 use European date input format (DMY)\n"));
 	printf(_("  -F                 turn fsync off\n"));
 	printf(_("  -h HOSTNAME        host name or IP address to listen on\n"));
 	printf(_("  -i                 enable TCP/IP connections\n"));
-	printf(_("  -k DIRECTORY       Unix-domain socket location\n"));
 	printf(_("  -N MAX-CONNECT     maximum number of allowed connections\n"));
 	printf(_("  -p PORT            port number to listen on\n"));
-	printf(_("  -s                 show statistics after each query\n"));
 	printf(_("  -S WORK-MEM        set amount of memory for sorts (in kB)\n"));
 	printf(_("  -V, --version      output version information, then exit\n"));
 	printf(_("  --NAME=VALUE       set run-time parameter\n"));
@@ -226,7 +226,6 @@ help(const char *progname)
 	printf(_("  -n                 do not reinitialize shared memory after abnormal exit\n"));
 	printf(_("  -O                 allow system table structure changes\n"));
 	printf(_("  -P                 disable system indexes\n"));
-	printf(_("  -t pa|pl|ex        show timings after each query\n"));
 	printf(_("  -T                 send SIGSTOP to all backend processes if one dies\n"));
 	printf(_("  -W NUM             wait NUM seconds to allow attach from a debugger\n"));
 
