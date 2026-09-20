@@ -54,7 +54,7 @@ toast_tuple_init(ToastTupleContext *ttc)
 
 		ttc->ttc_attr[i].tai_colflags = 0;
 		ttc->ttc_attr[i].tai_oldexternal = NULL;
-		ttc->ttc_attr[i].tai_compression = att->attcompression;
+		ttc->ttc_attr[i].tai_compression = TOAST_PGLZ_COMPRESSION;
 
 		if (ttc->ttc_oldvalues != NULL)
 		{

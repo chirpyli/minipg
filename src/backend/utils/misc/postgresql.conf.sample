@@ -494,7 +494,6 @@
 					#   error
 #search_path = '"$user", public'	# schema names
 #default_table_access_method = 'heap'
-#default_toast_compression = 'pglz'	# 'pglz' or 'lz4'
 #default_transaction_isolation = 'read committed'
 #default_transaction_read_only = off
 #default_transaction_deferrable = off

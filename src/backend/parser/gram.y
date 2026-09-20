@@ -336,7 +336,6 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 %type <keyword> bare_label_keyword
 
 %type <node>	TableConstraint
-%type <str>		column_compression opt_column_compression
 %type <list>	ColQualList
 %type <node>	ColConstraint ColConstraintElem
 %type <str>		ExistingIndex
@@ -376,11 +375,11 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 	CASCADE CASCADED CASE CAST CHAR_P
 	CHARACTER CHARACTERISTICS CHECK CHECKPOINT
 	CLUSTER COALESCE COLUMN COMMIT
-	COMMITTED COMPRESSION CONCURRENTLY CONFLICT
+	COMMITTED CONCURRENTLY CONFLICT
 	CONNECTION CONSTRAINT
 	CREATE CROSS CURRENT_P
-	CURRENT_CATALOG CURRENT_DATE CURRENT_ROLE CURRENT_SCHEMA
-	CURRENT_TIMESTAMP CURRENT_USER
+	CURRENT_CATALOG CURRENT_DATE CURRENT_SCHEMA
+	CURRENT_TIMESTAMP
 
 	DATA_P DATABASE DAY_P DEFAULT
 	DEFERRABLE DEFINER DELETE_P DESC
@@ -433,7 +432,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 	ROWS
 
 	SAVEPOINT SCHEMA SECOND_P SELECT SEQUENCE SEQUENCES
-	SERIALIZABLE SERVER SESSION SESSION_USER SET SHOW
+	SERIALIZABLE SERVER SESSION SET SHOW
 	SMALLINT SNAPSHOT SOME
 	START STATISTICS STORAGE
 	SUBSTRING
@@ -444,7 +443,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 	TRUNCATE TYPE_P
 
 	UESCAPE UNCOMMITTED UNION UNIQUE UNKNOWN
-	UNLISTEN UPDATE USER USING
+	UNLISTEN UPDATE USING
 
 	VACUUM VALUES VARCHAR VARIADIC VARYING
 	VERBOSE VERSION_P VIEW
@@ -795,29 +794,6 @@ set_rest_more:	/* Generic SET syntaxes: */
 						n->kind = VAR_SET_DEFAULT;
 					$$ = n;
 				}
-			| ROLE NonReservedWord_or_Sconst
-				{
-					VariableSetStmt *n = makeNode(VariableSetStmt);
-					n->kind = VAR_SET_VALUE;
-					n->name = "role";
-					n->args = list_make1(makeStringConst($2, @2));
-					$$ = n;
-				}
-			| SESSION AUTHORIZATION NonReservedWord_or_Sconst
-				{
-					VariableSetStmt *n = makeNode(VariableSetStmt);
-					n->kind = VAR_SET_VALUE;
-					n->name = "session_authorization";
-					n->args = list_make1(makeStringConst($3, @3));
-					$$ = n;
-				}
-			| SESSION AUTHORIZATION DEFAULT
-				{
-					VariableSetStmt *n = makeNode(VariableSetStmt);
-					n->kind = VAR_SET_DEFAULT;
-					n->name = "session_authorization";
-					$$ = n;
-				}
 			/* Special syntaxes invented by PostgreSQL: */
 			| TRANSACTION SNAPSHOT Sconst
 				{
@@ -915,13 +891,6 @@ reset_rest:
 					n->name = "transaction_isolation";
 					$$ = n;
 				}
-			| SESSION AUTHORIZATION
-				{
-					VariableSetStmt *n = makeNode(VariableSetStmt);
-					n->kind = VAR_RESET;
-					n->name = "session_authorization";
-					$$ = n;
-				}
 		;
 
 generic_reset:
@@ -958,12 +927,6 @@ VariableShowStmt:
 				{
 					VariableShowStmt *n = makeNode(VariableShowStmt);
 					n->name = "transaction_isolation";
-					$$ = (Node *) n;
-				}
-			| SHOW SESSION AUTHORIZATION
-				{
-					VariableShowStmt *n = makeNode(VariableShowStmt);
-					n->name = "session_authorization";
 					$$ = (Node *) n;
 				}
 			| SHOW ALL
@@ -1136,16 +1099,7 @@ alter_table_cmds:
 					n->def = (Node *) makeString($6);
 					$$ = (Node *)n;
 				}
-			/* ALTER TABLE <name> ALTER [COLUMN] <colname> SET COMPRESSION <cm> */
-			| ALTER opt_column ColId SET column_compression
-				{
-					AlterTableCmd *n = makeNode(AlterTableCmd);
-					n->subtype = AT_SetCompression;
-					n->name = $3;
-					n->def = (Node *) makeString($5);
-					$$ = (Node *)n;
-				}
-			/* ALTER TABLE <name> ALTER [COLUMN] <c			}
+
 			/* ALTER TABLE <name> DROP [COLUMN] IF EXISTS <colname> [RESTRICT|CASCADE] */
 			| DROP opt_column IF_P EXISTS ColId opt_drop_behavior
 				{
@@ -1268,30 +1222,18 @@ TableElement:
 			| TableConstraint					{ $$ = $1; }
 		;
 
-columnDef:	ColId Typename opt_column_compression ColQualList
+columnDef:	ColId Typename ColQualList
 				{
 					ColumnDef *n = makeNode(ColumnDef);
 					n->colname = $1;
 					n->typeName = $2;
-					n->compression = $3;
 					n->storage = 0;
 					n->raw_default = NULL;
 					n->cooked_default = NULL;
-					n->constraints = $4;
+					n->constraints = $3;
 					n->location = @1;
 					$$ = (Node *)n;
 				}
-		;
-
-
-column_compression:
-			COMPRESSION ColId						{ $$ = $2; }
-			| COMPRESSION DEFAULT					{ $$ = pstrdup("default"); }
-		;
-
-opt_column_compression:
-			column_compression						{ $$ = $1; }
-			| /*EMPTY*/								{ $$ = NULL; }
 		;
 
 ColQualList:
@@ -4191,22 +4133,6 @@ func_expr_common_subexpr:
 				{
 					$$ = makeSQLValueFunction(SVFOP_LOCALTIMESTAMP_N, $3, @1);
 				}
-			| CURRENT_ROLE
-				{
-					$$ = makeSQLValueFunction(SVFOP_CURRENT_ROLE, -1, @1);
-				}
-			| CURRENT_USER
-				{
-					$$ = makeSQLValueFunction(SVFOP_CURRENT_USER, -1, @1);
-				}
-			| SESSION_USER
-				{
-					$$ = makeSQLValueFunction(SVFOP_SESSION_USER, -1, @1);
-				}
-			| USER
-				{
-					$$ = makeSQLValueFunction(SVFOP_USER, -1, @1);
-				}
 			| CURRENT_CATALOG
 				{
 					$$ = makeSQLValueFunction(SVFOP_CURRENT_CATALOG, -1, @1);
@@ -4955,7 +4881,6 @@ unreserved_keyword:
 			| CHECKPOINT
 			| COMMIT
 			| COMMITTED
-			| COMPRESSION
 			| CONFLICT
 			| CONNECTION
 			| CURRENT_P
@@ -5132,9 +5057,7 @@ reserved_keyword:
 			| CREATE
 			| CURRENT_CATALOG
 			| CURRENT_DATE
-			| CURRENT_ROLE
 			| CURRENT_TIMESTAMP
-			| CURRENT_USER
 			| DEFAULT
 			| DEFERRABLE
 			| DESC
@@ -5164,7 +5087,6 @@ reserved_keyword:
 			| PLACING
 			| PRIMARY
 			| SELECT
-			| SESSION_USER
 			| SOME
 			| TABLE
 			| THEN
@@ -5173,7 +5095,6 @@ reserved_keyword:
 			| TRUE_P
 			| UNION
 			| UNIQUE
-			| USER
 			| USING
 			| VARIADIC
 			| WHEN
@@ -5219,7 +5140,6 @@ bare_label_keyword:
 			| COLUMN
 			| COMMIT
 			| COMMITTED
-			| COMPRESSION
 			| CONCURRENTLY
 			| CONFLICT
 			| CONNECTION
@@ -5228,10 +5148,8 @@ bare_label_keyword:
 			| CURRENT_P
 			| CURRENT_CATALOG
 			| CURRENT_DATE
-			| CURRENT_ROLE
 			| CURRENT_SCHEMA
 			| CURRENT_TIMESTAMP
-			| CURRENT_USER
 			| DATA_P
 			| DATABASE
 			| DEFAULT
@@ -5323,7 +5241,6 @@ bare_label_keyword:
 			| SERIALIZABLE
 			| SERVER
 			| SESSION
-			| SESSION_USER
 			| SET
 			| SHOW
 			| SMALLINT
@@ -5352,7 +5269,6 @@ bare_label_keyword:
 			| UNKNOWN
 			| UNLISTEN
 			| UPDATE
-			| USER
 			| USING
 			| VACUUM
 			| VALUES

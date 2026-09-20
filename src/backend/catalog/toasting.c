@@ -201,11 +201,6 @@ create_toast_table(Relation rel, Oid toastOid, Oid toastIndexOid,
 	TupleDescAttr(tupdesc, 1)->attstorage = TYPSTORAGE_PLAIN;
 	TupleDescAttr(tupdesc, 2)->attstorage = TYPSTORAGE_PLAIN;
 
-	/* Toast field should not be compressed */
-	TupleDescAttr(tupdesc, 0)->attcompression = InvalidCompressionMethod;
-	TupleDescAttr(tupdesc, 1)->attcompression = InvalidCompressionMethod;
-	TupleDescAttr(tupdesc, 2)->attcompression = InvalidCompressionMethod;
-
 	/*
 	 * Toast tables always go in pg_toast; temporary relations (which had
 	 * their own per-backend temp-toast-table namespace) are no longer

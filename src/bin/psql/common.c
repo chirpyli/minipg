@@ -1334,16 +1334,10 @@ standard_strings(void)
 const char *
 session_username(void)
 {
-	const char *val;
-
 	if (!pset.db)
 		return NULL;
 
-	val = PQparameterStatus(pset.db, "session_authorization");
-	if (val)
-		return val;
-	else
-		return PQuser(pset.db);
+	return PQuser(pset.db);
 }
 
 

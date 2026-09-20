@@ -454,7 +454,6 @@ typedef struct ColumnDef
 	NodeTag		type;
 	char	   *colname;		/* name of column */
 	TypeName   *typeName;		/* type of column */
-	char	   *compression;	/* compression method for column */
 	char		storage;		/* attstorage setting, or 0 for default */
 	Node	   *raw_default;	/* default value (untransformed parse tree) */
 	Node	   *cooked_default; /* default value (transformed expr tree) */
@@ -1054,7 +1053,6 @@ typedef enum AlterTableType
 	AT_AddColumnToView,			/* implicitly via CREATE OR REPLACE VIEW */
 	AT_SetStatistics,			/* alter column set statistics */
 	AT_SetStorage,				/* alter column set storage */
-	AT_SetCompression,			/* alter column set compression */
 	AT_DropColumn,				/* drop column */
 	AT_DropColumnRecurse,		/* internal to commands/tablecmds.c */
 	AT_AddIndex,				/* add index */

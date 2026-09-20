@@ -106,7 +106,7 @@ index_form_tuple(TupleDesc tupleDescriptor,
 			Datum		cvalue;
 
 			cvalue = toast_compress_datum(untoasted_values[i],
-										  att->attcompression);
+										  InvalidCompressionMethod);
 
 			if (DatumGetPointer(cvalue) != NULL)
 			{

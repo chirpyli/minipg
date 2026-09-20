@@ -301,14 +301,11 @@ static void ATPostAlterTypeParse(Oid oldId, Oid oldRelId,
 								 char *cmd, List **wqueue, LOCKMODE lockmode,
 								 bool rewrite);
 static void TryReuseIndex(Oid oldId, IndexStmt *stmt);
-static ObjectAddress ATExecSetCompression(AlteredTableInfo *tab, Relation rel,
-										  const char *column, Node *newValue, LOCKMODE lockmode);
 
 static void RangeVarCallbackForDropRelation(const RangeVar *rel, Oid relOid,
 											Oid oldRelOid, void *arg);
 static void RangeVarCallbackForAlterRelation(const RangeVar *rv, Oid relid,
 											 Oid oldrelid, void *arg);
-static char GetAttributeCompression(Oid atttypid, char *compression);
 
 
 /* ----------------------------------------------------------------
@@ -339,8 +336,6 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 	Oid			relationId;
 	Relation	rel;
 	TupleDesc	descriptor;
-	ListCell   *listptr;
-	AttrNumber	attnum;
 
 	ObjectAddress address;
 	const char *accessMethod = NULL;
@@ -377,26 +372,6 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 	 * those below.
 	 */
 	descriptor = BuildDescForRelation(stmt->tableElts);
-
-	/*
-	 * Set per-column flags such as compression from the column definitions.
-	 */
-	attnum = 0;
-
-	foreach(listptr, stmt->tableElts)
-	{
-		ColumnDef  *colDef = lfirst(listptr);
-		Form_pg_attribute attr;
-
-		attnum++;
-		attr = TupleDescAttr(descriptor, attnum - 1);
-
-		Assert(colDef->cooked_default == NULL);
-
-		if (colDef->compression)
-			attr->attcompression = GetAttributeCompression(attr->atttypid,
-														   colDef->compression);
-	}
 
 	/*
 	 * Use the default table access method for relation kinds that need one.
@@ -1518,7 +1493,6 @@ AlterTableGetLockLevel(List *cmds)
 				 */
 			case AT_AddIndex:	/* from ADD CONSTRAINT */
 			case AT_AddIndexConstraint:
-			case AT_SetCompression:
 				cmd_lockmode = AccessExclusiveLock;
 				break;
 
@@ -1647,12 +1621,6 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			break;
 		case AT_SetStorage:		/* ALTER COLUMN SET STORAGE */
 			ATSimplePermissions(rel, ATT_TABLE | ATT_FOREIGN_TABLE);
-			/* No command-specific prep needed */
-			pass = AT_PASS_MISC;
-			break;
-		case AT_SetCompression: /* ALTER COLUMN SET COMPRESSION */
-			ATSimplePermissions(rel, ATT_TABLE);
-			/* This command never recurses */
 			/* No command-specific prep needed */
 			pass = AT_PASS_MISC;
 			break;
@@ -1814,10 +1782,6 @@ ATExecCmd(List **wqueue, AlteredTableInfo *tab,
 			break;
 		case AT_SetStorage:		/* ALTER COLUMN SET STORAGE */
 			ATExecSetStorage(rel, cmd->name, cmd->def, lockmode);
-			break;
-		case AT_SetCompression:
-			ATExecSetCompression(tab, rel, cmd->name, cmd->def,
-										   lockmode);
 			break;
 		case AT_DropColumn:		/* DROP COLUMN */
 			ATExecDropColumn(wqueue, rel, cmd->name,
@@ -2849,8 +2813,6 @@ ATExecAddColumn(List **wqueue, AlteredTableInfo *tab, Relation rel,
 	attribute.attbyval = tform->typbyval;
 	attribute.attalign = tform->typalign;
 	attribute.attstorage = tform->typstorage;
-	attribute.attcompression = GetAttributeCompression(typeOid,
-													   colDef->compression);
 
 	attribute.attisdropped = false;
 
@@ -3092,16 +3054,15 @@ ATExecSetStatistics(Relation rel, const char *colName, int16 colNum, Node *newVa
 }
 
 /*
- * Helper function for ATExecSetStorage and ATExecSetCompression
+ * Helper function for ATExecSetStorage
  *
- * Set the attstorage and/or attcompression fields for index columns
+ * Set the attstorage field for index columns
  * associated with the specified table column.
  */
 static void
 SetIndexStorageProperties(Relation rel, Relation attrelation,
 						  AttrNumber attnum,
 						  bool setstorage, char newstorage,
-						  bool setcompression, char newcompression,
 						  LOCKMODE lockmode)
 {
 	ListCell   *lc;
@@ -3138,9 +3099,6 @@ SetIndexStorageProperties(Relation rel, Relation attrelation,
 
 			if (setstorage)
 				attrtuple->attstorage = newstorage;
-
-			if (setcompression)
-				attrtuple->attcompression = newcompression;
 
 			CatalogTupleUpdate(attrelation, &tuple->t_self, tuple);
 
@@ -3235,7 +3193,6 @@ ATExecSetStorage(Relation rel, const char *colName, Node *newValue, LOCKMODE loc
 	 */
 	SetIndexStorageProperties(rel, attrelation, attnum,
 							  true, newstorage,
-							  false, 0,
 							  lockmode);
 
 	table_close(attrelation, RowExclusiveLock);
@@ -4008,7 +3965,6 @@ ATExecAlterColumnType(AlteredTableInfo *tab, Relation rel,
 	attTup->attbyval = tform->typbyval;
 	attTup->attalign = tform->typalign;
 	attTup->attstorage = tform->typstorage;
-	attTup->attcompression = InvalidCompressionMethod;
 
 	ReleaseSysCache(typeTuple);
 
@@ -4389,81 +4345,7 @@ TryReuseIndex(Oid oldId, IndexStmt *stmt)
 	}
 }
 
-/*
- * ALTER TABLE ALTER COLUMN SET COMPRESSION
- *
- * Return value is the address of the modified column
- */
-static ObjectAddress
-ATExecSetCompression(AlteredTableInfo *tab,
-					 Relation rel,
-					 const char *column,
-					 Node *newValue,
-					 LOCKMODE lockmode)
-{
-	Relation	attrel;
-	HeapTuple	tuple;
-	Form_pg_attribute atttableform;
-	AttrNumber	attnum;
-	char	   *compression;
-	char		cmethod;
-	ObjectAddress address;
 
-	Assert(IsA(newValue, String));
-	compression = strVal(newValue);
-
-	attrel = table_open(AttributeRelationId, RowExclusiveLock);
-
-	/* copy the cache entry so we can scribble on it below */
-	tuple = SearchSysCacheCopyAttName(RelationGetRelid(rel), column);
-	if (!HeapTupleIsValid(tuple))
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_COLUMN),
-				 errmsg("column \"%s\" of relation \"%s\" does not exist",
-						column, RelationGetRelationName(rel))));
-
-	/* prevent them from altering a system attribute */
-	atttableform = (Form_pg_attribute) GETSTRUCT(tuple);
-	attnum = atttableform->attnum;
-	if (attnum <= 0)
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot alter system column \"%s\"", column)));
-
-	/*
-	 * Check that column type is compressible, then get the attribute
-	 * compression method code
-	 */
-	cmethod = GetAttributeCompression(atttableform->atttypid, compression);
-
-	/* update pg_attribute entry */
-	atttableform->attcompression = cmethod;
-	CatalogTupleUpdate(attrel, &tuple->t_self, tuple);
-
-	InvokeObjectPostAlterHook(RelationRelationId,
-							  RelationGetRelid(rel),
-							  attnum);
-
-	/*
-	 * Apply the change to indexes as well (only for simple index columns,
-	 * matching behavior of index.c ConstructTupleDescriptor()).
-	 */
-	SetIndexStorageProperties(rel, attrel, attnum,
-							  false, 0,
-							  true, cmethod,
-							  lockmode);
-
-	heap_freetuple(tuple);
-
-	table_close(attrel, RowExclusiveLock);
-
-	/* make changes visible */
-	CommandCounterIncrement();
-
-	ObjectAddressSubSet(address, RelationRelationId,
-						RelationGetRelid(rel), attnum);
-	return address;
-}
 
 
 /*
@@ -4851,41 +4733,5 @@ RangeVarCallbackForAlterRelation(const RangeVar *rv, Oid relid, Oid oldrelid,
 }
 
 
-/*
- * resolve column compression specification to compression method.
- */
-static char
-GetAttributeCompression(Oid atttypid, char *compression)
-{
-	char		cmethod;
 
-	if (compression == NULL || strcmp(compression, "default") == 0)
-		return InvalidCompressionMethod;
-
-	/*
-	 * To specify a nondefault method, the column data type must be toastable.
-	 * Note this says nothing about whether the column's attstorage setting
-	 * permits compression; we intentionally allow attstorage and
-	 * attcompression to be independent.  But with a non-toastable type,
-	 * attstorage could not be set to a value that would permit compression.
-	 *
-	 * We don't actually need to enforce this, since nothing bad would happen
-	 * if attcompression were non-default; it would never be consulted.  But
-	 * it seems more user-friendly to complain about a certainly-useless
-	 * attempt to set the property.
-	 */
-	if (!TypeIsToastable(atttypid))
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("column data type %s does not support compression",
-						format_type_be(atttypid))));
-
-	cmethod = CompressionNameToMethod(compression);
-	if (!CompressionMethodIsValid(cmethod))
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				 errmsg("invalid compression method \"%s\"", compression)));
-
-	return cmethod;
-}
 

@@ -281,8 +281,6 @@ int			i;
 			return false;
 		if (attr1->attstorage != attr2->attstorage)
 			return false;
-		if (attr1->attcompression != attr2->attcompression)
-			return false;
 		if (attr1->attisdropped != attr2->attisdropped)
 			return false;
 		/* variable-length fields are not even present... */
@@ -384,7 +382,6 @@ TupleDescInitEntry(TupleDesc desc,
 	att->attbyval = typeForm->typbyval;
 	att->attalign = typeForm->typalign;
 	att->attstorage = typeForm->typstorage;
-	att->attcompression = InvalidCompressionMethod;
 
 	ReleaseSysCache(tuple);
 }
@@ -443,7 +440,7 @@ TupleDescInitBuiltinEntry(TupleDesc desc,
 			att->attbyval = false;
 			att->attalign = TYPALIGN_INT;
 			att->attstorage = TYPSTORAGE_EXTENDED;
-			att->attcompression = InvalidCompressionMethod;
+	
 			break;
 
 		case BOOLOID:
@@ -451,7 +448,7 @@ TupleDescInitBuiltinEntry(TupleDesc desc,
 			att->attbyval = true;
 			att->attalign = TYPALIGN_CHAR;
 			att->attstorage = TYPSTORAGE_PLAIN;
-			att->attcompression = InvalidCompressionMethod;
+	
 			break;
 
 		case INT4OID:
@@ -459,7 +456,7 @@ TupleDescInitBuiltinEntry(TupleDesc desc,
 			att->attbyval = true;
 			att->attalign = TYPALIGN_INT;
 			att->attstorage = TYPSTORAGE_PLAIN;
-			att->attcompression = InvalidCompressionMethod;
+	
 			break;
 
 		case INT8OID:
@@ -467,7 +464,7 @@ TupleDescInitBuiltinEntry(TupleDesc desc,
 			att->attbyval = FLOAT8PASSBYVAL;
 			att->attalign = TYPALIGN_DOUBLE;
 			att->attstorage = TYPSTORAGE_PLAIN;
-			att->attcompression = InvalidCompressionMethod;
+	
 			break;
 
 		default:

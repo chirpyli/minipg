@@ -125,16 +125,6 @@ CATALOG(pg_attribute,1249,AttributeRelationId) BKI_BOOTSTRAP BKI_ROWTYPE_OID(75,
 	 */
 	char		attstorage;
 
-	/*
-	 * attcompression sets the current compression method of the attribute.
-	 * Typically this is InvalidCompressionMethod ('\0') to specify use of the
-	 * current default setting (see default_toast_compression).  Otherwise,
-	 * 'p' selects pglz compression, while 'l' selects LZ4 compression.
-	 * However, this field is ignored whenever attstorage does not allow
-	 * compression.
-	 */
-	char		attcompression BKI_DEFAULT('\0');
-
 	/* Is dropped (ie, logically invisible) or not */
 	bool		attisdropped BKI_DEFAULT(f);
 

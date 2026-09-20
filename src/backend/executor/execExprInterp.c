@@ -2354,18 +2354,6 @@ ExecEvalSQLValueFunction(ExprState *state, ExprEvalStep *op)
 		case SVFOP_LOCALTIMESTAMP_N:
 			*op->resvalue = TimestampGetDatum(GetSQLLocalTimestamp(svf->typmod));
 			break;
-		case SVFOP_CURRENT_ROLE:
-		case SVFOP_CURRENT_USER:
-		case SVFOP_USER:
-			InitFunctionCallInfoData(*fcinfo, NULL, 0, InvalidOid, NULL, NULL);
-			*op->resvalue = current_user(fcinfo);
-			*op->resnull = fcinfo->isnull;
-			break;
-		case SVFOP_SESSION_USER:
-			InitFunctionCallInfoData(*fcinfo, NULL, 0, InvalidOid, NULL, NULL);
-			*op->resvalue = session_user(fcinfo);
-			*op->resnull = fcinfo->isnull;
-			break;
 		case SVFOP_CURRENT_CATALOG:
 			InitFunctionCallInfoData(*fcinfo, NULL, 0, InvalidOid, NULL, NULL);
 			*op->resvalue = current_database(fcinfo);

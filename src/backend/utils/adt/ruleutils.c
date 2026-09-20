@@ -5720,18 +5720,6 @@ get_rule_expr(Node *node, deparse_context *context,
 						appendStringInfo(buf, "LOCALTIMESTAMP(%d)",
 										 svf->typmod);
 						break;
-					case SVFOP_CURRENT_ROLE:
-						appendStringInfoString(buf, "CURRENT_ROLE");
-						break;
-					case SVFOP_CURRENT_USER:
-						appendStringInfoString(buf, "CURRENT_USER");
-						break;
-					case SVFOP_USER:
-						appendStringInfoString(buf, "USER");
-						break;
-					case SVFOP_SESSION_USER:
-						appendStringInfoString(buf, "SESSION_USER");
-						break;
 					case SVFOP_CURRENT_CATALOG:
 						appendStringInfoString(buf, "CURRENT_CATALOG");
 						break;

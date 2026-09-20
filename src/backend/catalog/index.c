@@ -303,7 +303,6 @@ ConstructTupleDescriptor(Relation heapRelation,
 			to->attbyval = from->attbyval;
 			to->attalign = from->attalign;
 			to->attstorage = from->attstorage;
-			to->attcompression = from->attcompression;
 		}
 		else
 		{
@@ -333,15 +332,6 @@ ConstructTupleDescriptor(Relation heapRelation,
 			to->attbyval = typeTup->typbyval;
 			to->attalign = typeTup->typalign;
 			to->attstorage = typeTup->typstorage;
-
-			/*
-			 * For expression columns, set attcompression invalid, since
-			 * there's no table column from which to copy the value. Whenever
-			 * we actually need to compress a value, we'll use whatever the
-			 * current value of default_toast_compression is at that point in
-			 * time.
-			 */
-			to->attcompression = InvalidCompressionMethod;
 
 			ReleaseSysCache(tuple);
 
@@ -420,8 +410,6 @@ ConstructTupleDescriptor(Relation heapRelation,
 			to->attbyval = typeTup->typbyval;
 			to->attalign = typeTup->typalign;
 			to->attstorage = typeTup->typstorage;
-			/* As above, use the default compression method in this case */
-			to->attcompression = InvalidCompressionMethod;
 
 			ReleaseSysCache(tuple);
 		}

@@ -676,7 +676,6 @@ DefineAttr(char *name, char *type, int attnum)
 		attrtypes[attnum]->attbyval = Ap->am_typ.typbyval;
 		attrtypes[attnum]->attalign = Ap->am_typ.typalign;
 		attrtypes[attnum]->attstorage = Ap->am_typ.typstorage;
-		attrtypes[attnum]->attcompression = InvalidCompressionMethod;
 		/* if an array type, assume 1-dimensional attribute */
 		if (Ap->am_typ.typelem != InvalidOid && Ap->am_typ.typlen < 0)
 			attrtypes[attnum]->attndims = 1;
@@ -690,7 +689,6 @@ DefineAttr(char *name, char *type, int attnum)
 		attrtypes[attnum]->attbyval = TypInfo[typeoid].byval;
 		attrtypes[attnum]->attalign = TypInfo[typeoid].align;
 		attrtypes[attnum]->attstorage = TypInfo[typeoid].storage;
-		attrtypes[attnum]->attcompression = InvalidCompressionMethod;
 		/* if an array type, assume 1-dimensional attribute */
 		if (TypInfo[typeoid].elem != InvalidOid &&
 			attrtypes[attnum]->attlen < 0)

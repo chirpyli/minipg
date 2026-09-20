@@ -1810,10 +1810,6 @@ transformSQLValueFunction(ParseState *pstate, SQLValueFunction *svf)
 			svf->type = TIMESTAMPOID;
 			svf->typmod = anytimestamp_typmod_check(false, svf->typmod);
 			break;
-		case SVFOP_CURRENT_ROLE:
-		case SVFOP_CURRENT_USER:
-		case SVFOP_USER:
-		case SVFOP_SESSION_USER:
 		case SVFOP_CURRENT_CATALOG:
 		case SVFOP_CURRENT_SCHEMA:
 			svf->type = NAMEOID;

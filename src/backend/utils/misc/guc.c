@@ -30,7 +30,6 @@
 
 #include "access/rmgr.h"
 #include "access/tableam.h"
-#include "access/toast_compression.h"
 #include "access/transam.h"
 #include "access/twophase.h"
 #include "access/xact.h"
@@ -388,14 +387,6 @@ static struct config_enum_entry shared_memory_options[] = {
 	{NULL, 0, false}
 };
 
-static struct config_enum_entry default_toast_compression_options[] = {
-	{"pglz", TOAST_PGLZ_COMPRESSION, false},
-#ifdef  USE_LZ4
-	{"lz4", TOAST_LZ4_COMPRESSION, false},
-#endif
-	{NULL, 0, false}
-};
-
 /*
  * Options for enum values stored in other modules
  */
@@ -469,7 +460,6 @@ static char *timezone_string;
 static char *log_timezone_string;
 static char *timezone_abbreviations_string;
 static char *data_directory;
-static char *session_authorization_string;
 static int	max_function_args;
 static int	max_index_keys;
 static int	max_identifier_length;
@@ -485,10 +475,6 @@ static char *recovery_target_xid_string;
 static char *recovery_target_name_string;
 static char *recovery_target_lsn_string;
 static char *restrict_nonsystem_relation_kind_string;
-
-
-/* should be static, but commands/variable.c needs to get at this */
-char	   *role_string;
 
 
 /*
@@ -3047,30 +3033,6 @@ static struct config_string ConfigureNamesString[] =
 	},
 
 	{
-		/* Not for general use --- used by SET ROLE */
-		{"role", PGC_USERSET, UNGROUPED,
-			gettext_noop("Sets the current role."),
-			NULL,
-			GUC_IS_NAME | GUC_NO_SHOW_ALL | GUC_NO_RESET_ALL | GUC_NOT_IN_SAMPLE | GUC_DISALLOW_IN_FILE | GUC_NOT_WHILE_SEC_REST
-		},
-		&role_string,
-		"none",
-		check_role, assign_role, show_role
-	},
-
-	{
-		/* Not for general use --- used by SET SESSION AUTHORIZATION */
-		{"session_authorization", PGC_USERSET, UNGROUPED,
-			gettext_noop("Sets the session user name."),
-			NULL,
-			GUC_IS_NAME | GUC_REPORT | GUC_NO_SHOW_ALL | GUC_NO_RESET_ALL | GUC_NOT_IN_SAMPLE | GUC_DISALLOW_IN_FILE | GUC_NOT_WHILE_SEC_REST
-		},
-		&session_authorization_string,
-		NULL,
-		check_session_authorization, assign_session_authorization, NULL
-	},
-
-	{
 		{"log_destination", PGC_SIGHUP, LOGGING_WHERE,
 			gettext_noop("Sets the destination for server log output."),
 			gettext_noop("Valid value is \"stderr\"."),
@@ -3284,17 +3246,6 @@ static struct config_enum ConfigureNamesEnum[] =
 		},
 		&constraint_exclusion,
 		CONSTRAINT_EXCLUSION_ON, constraint_exclusion_options,
-		NULL, NULL, NULL
-	},
-
-	{
-		{"default_toast_compression", PGC_USERSET, CLIENT_CONN_STATEMENT,
-			gettext_noop("Sets the default compression method for compressible values."),
-			NULL
-		},
-		&default_toast_compression,
-		TOAST_PGLZ_COMPRESSION,
-		default_toast_compression_options,
 		NULL, NULL, NULL
 	},
 
@@ -6268,10 +6219,8 @@ set_config_option(const char *name, const char *value,
 		case PGC_STRING:
 			{
 				struct config_string *conf = (struct config_string *) record;
-				GucContext	orig_context = context;
-				GucSource	orig_source = source;
 
-#define newval (newval_union.stringval)
+				#define newval (newval_union.stringval)
 
 				if (value)
 				{
@@ -6354,41 +6303,6 @@ set_config_option(const char *name, const char *value,
 					conf->gen.source = source;
 					conf->gen.scontext = context;
 
-					/*
-					 * Ugly hack: during SET session_authorization, forcibly
-					 * do SET ROLE NONE with the same context/source/etc, so
-					 * that the effects will have identical lifespan.  This is
-					 * required by the SQL spec, and it's not possible to do
-					 * it within the variable's check hook or assign hook
-					 * because our APIs for those don't pass enough info.
-					 * However, don't do it if is_reload: in that case we
-					 * expect that if "role" isn't supposed to be default, it
-					 * has been or will be set by a separate reload action.
-					 *
-					 * Also, for the call from InitializeSessionUserId with
-					 * source == PGC_S_OVERRIDE, use PGC_S_DYNAMIC_DEFAULT for
-					 * "role"'s source.  (See notes in
-					 * InitializeSessionUserId before changing this.)
-					 *
-					 * A fine point: for RESET session_authorization, we do
-					 * "RESET role" not "SET ROLE NONE" (by passing down NULL
-					 * rather than "none" for the value).  This would have the
-					 * same effects in typical cases, but if the reset value
-					 * of "role" is not "none" it seems better to revert to
-					 * that.
-					 */
-					if (!is_reload &&
-						strcmp(conf->gen.name, "session_authorization") == 0)
-						(void) set_config_option("role",
-												 value ? "none" : NULL,
-												 orig_context,
-												 (orig_source == PGC_S_OVERRIDE)
-												 ? PGC_S_DYNAMIC_DEFAULT
-												 : orig_source,
-												 action,
-												 true,
-												 elevel,
-												 false);
 				}
 
 				if (makeDefault)
