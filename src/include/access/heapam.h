@@ -25,7 +25,6 @@
 #include "storage/bufpage.h"
 #include "storage/dsm.h"
 #include "storage/lockdefs.h"
-#include "storage/shm_toc.h"
 #include "utils/relcache.h"
 #include "utils/snapshot.h"
 
@@ -210,7 +209,6 @@ extern void heap_get_root_tuples(Page page, OffsetNumber *root_offsets);
 struct VacuumParams;
 extern void heap_vacuum_rel(Relation rel,
 							struct VacuumParams *params, BufferAccessStrategy bstrategy);
-extern void parallel_vacuum_main(dsm_segment *seg, shm_toc *toc);
 
 /* in heap/heapam_visibility.c */
 extern bool HeapTupleSatisfiesVisibility(HeapTuple stup, Snapshot snapshot,

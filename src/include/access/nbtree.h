@@ -23,7 +23,6 @@
 #include "catalog/pg_index.h"
 #include "lib/stringinfo.h"
 #include "storage/bufmgr.h"
-#include "storage/shm_toc.h"
 
 /* There's room for a 16-bit vacuum cycle ID in BTPageOpaqueData */
 typedef uint16 BTCycleId;
@@ -1244,6 +1243,5 @@ extern void btadjustmembers(Oid opfamilyoid,
  */
 extern IndexBuildResult *btbuild(Relation heap, Relation index,
 								 struct IndexInfo *indexInfo);
-extern void _bt_parallel_build_main(dsm_segment *seg, shm_toc *toc);
 
 #endif							/* NBTREE_H */

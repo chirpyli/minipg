@@ -225,7 +225,6 @@ typedef struct VacuumParams
 	 * based on the number of indexes.  -1 indicates parallel vacuum is
 	 * disabled.
 	 */
-	int			nworkers;
 } VacuumParams;
 
 /* GUC parameters */

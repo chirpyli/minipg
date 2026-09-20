@@ -21,11 +21,6 @@
 extern HashJoinState *ExecInitHashJoin(HashJoin *node, EState *estate, int eflags);
 extern void ExecEndHashJoin(HashJoinState *node);
 extern void ExecReScanHashJoin(HashJoinState *node);
-extern void ExecHashJoinEstimate(HashJoinState *state, ParallelContext *pcxt);
-extern void ExecHashJoinInitializeDSM(HashJoinState *state, ParallelContext *pcxt);
-extern void ExecHashJoinReInitializeDSM(HashJoinState *state, ParallelContext *pcxt);
-extern void ExecHashJoinInitializeWorker(HashJoinState *state,
-										 ParallelWorkerContext *pwcxt);
 
 extern void ExecHashJoinSaveTuple(MinimalTuple tuple, uint32 hashvalue,
 								  BufFile **fileptr);

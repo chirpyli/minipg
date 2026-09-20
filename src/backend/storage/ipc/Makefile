@@ -9,7 +9,6 @@ top_builddir = ../../../..
 include $(top_builddir)/src/Makefile.global
 
 OBJS = \
-	barrier.o \
 	dsm.o \
 	dsm_impl.o \
 	ipc.o \
@@ -18,8 +17,6 @@ OBJS = \
 	pmsignal.o \
 	procarray.o \
 	procsignal.o \
-	shm_mq.o \
-	shm_toc.o \
 	shmem.o \
 	shmqueue.o \
 	signalfuncs.o \

@@ -14,6 +14,8 @@
  */
 #include "postgres.h"
 
+#include <limits.h>
+
 #include "access/htup_details.h"
 #include "access/table.h"
 #include "catalog/pg_collation.h"

@@ -20,8 +20,6 @@
 /*
  * allpaths.c
  */
-extern PGDLLIMPORT int min_parallel_table_scan_size;
-extern PGDLLIMPORT int min_parallel_index_scan_size;
 
 /* Hook for plugins to get control in set_rel_pathlist() */
 typedef void (*set_rel_pathlist_hook_type) (PlannerInfo *root,
@@ -50,8 +48,6 @@ extern RelOptInfo *make_one_rel(PlannerInfo *root, List *joinlist);
 extern RelOptInfo *standard_join_search(PlannerInfo *root, int levels_needed,
 										List *initial_rels);
 
-extern int	compute_parallel_worker(RelOptInfo *rel, double heap_pages,
-									double index_pages, int max_workers);
 
 #ifdef OPTIMIZER_DEBUG
 extern void debug_print_rel(PlannerInfo *root, RelOptInfo *rel);

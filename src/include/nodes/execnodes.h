@@ -25,7 +25,6 @@
 #include "storage/condition_variable.h"
 #include "utils/hsearch.h"
 #include "utils/queryenvironment.h"
-#include "utils/sharedtuplestore.h"
 #include "utils/snapshot.h"
 #include "utils/sortsupport.h"
 #include "utils/tuplesort.h"
@@ -139,7 +138,7 @@ typedef struct ExprState
  *		AmCache				private cache area for index AM
  *		Context				memory context holding this IndexInfo
  *
- * ii_Concurrent, ii_BrokenHotChain, and ii_ParallelWorkers are used only
+ * ii_Concurrent and ii_BrokenHotChain are used only
  * during index build; they're conventionally zeroed otherwise.
  * ----------------
  */
@@ -161,7 +160,6 @@ typedef struct IndexInfo
 	bool		ii_ReadyForInserts;
 	bool		ii_Concurrent;
 	bool		ii_BrokenHotChain;
-	int			ii_ParallelWorkers;
 	Oid			ii_Am;
 	void	   *ii_AmCache;
 	MemoryContext ii_Context;

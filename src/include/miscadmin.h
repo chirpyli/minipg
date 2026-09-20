@@ -255,7 +255,6 @@ extern PGDLLIMPORT bool allowSystemTableMods;
 extern PGDLLIMPORT int work_mem;
 extern PGDLLIMPORT double hash_mem_multiplier;
 extern PGDLLIMPORT int maintenance_work_mem;
-extern PGDLLIMPORT int max_parallel_maintenance_workers;
 
 extern int	VacuumCostPageHit;
 extern int	VacuumCostPageMiss;

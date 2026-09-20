@@ -19,7 +19,6 @@
 #include "access/tupdesc.h"
 #include "fmgr.h"
 #include "storage/dsm.h"
-#include "utils/dsa.h"
 
 typedef struct TypeCacheEntry
 {
@@ -109,8 +108,6 @@ typedef struct TypeCacheEntry
 /* This value will not equal any valid tupledesc identifier, nor 0 */
 #define INVALID_TUPLEDESC_IDENTIFIER ((uint64) 1)
 
-typedef struct SharedRecordTypmodRegistry SharedRecordTypmodRegistry;
-
 extern TypeCacheEntry *lookup_type_cache(Oid type_id, int flags);
 
 extern TupleDesc lookup_rowtype_tupdesc(Oid type_id, int32 typmod);
@@ -124,11 +121,5 @@ extern void assign_record_type_typmod(TupleDesc tupDesc);
 
 extern uint64 assign_record_type_identifier(Oid type_id, int32 typmod);
 
-extern size_t SharedRecordTypmodRegistryEstimate(void);
-
-extern void SharedRecordTypmodRegistryInit(SharedRecordTypmodRegistry *,
-										   dsm_segment *segment, dsa_area *area);
-
-extern void SharedRecordTypmodRegistryAttach(SharedRecordTypmodRegistry *);
 
 #endif							/* TYPCACHE_H */

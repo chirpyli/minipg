@@ -62,6 +62,7 @@
 #include "storage/freespace.h"
 #include "storage/lmgr.h"
 #include "storage/predicate.h"
+#include "storage/proc.h"
 #include "storage/procarray.h"
 #include "storage/smgr.h"
 #include "storage/spin.h"

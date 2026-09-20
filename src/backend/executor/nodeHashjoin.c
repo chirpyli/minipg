@@ -120,7 +120,6 @@
 #include "miscadmin.h"
 #include "pgstat.h"
 #include "utils/memutils.h"
-#include "utils/sharedtuplestore.h"
 
 
 /*

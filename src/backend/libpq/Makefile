@@ -20,7 +20,6 @@ OBJS = \
 	ifaddr.o \
 	pqcomm.o \
 	pqformat.o \
-	pqmq.o \
 	pqsignal.o
 
 include $(top_srcdir)/src/backend/common.mk

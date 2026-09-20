@@ -122,9 +122,6 @@ ExecVacuum(ParseState *pstate, VacuumStmt *vacstmt, bool isTopLevel)
 	params.index_cleanup = VACOPTVALUE_UNSPECIFIED;
 	params.truncate = VACOPTVALUE_UNSPECIFIED;
 
-	/* By default parallel vacuum is enabled */
-	params.nworkers = 0;
-
 	/* Parse options list */
 	foreach(lc, vacstmt->options)
 	{
@@ -170,38 +167,6 @@ ExecVacuum(ParseState *pstate, VacuumStmt *vacstmt, bool isTopLevel)
 			process_toast = defGetBoolean(opt);
 		else if (strcmp(opt->defname, "truncate") == 0)
 			params.truncate = get_vacoptval_from_boolean(opt);
-		else if (strcmp(opt->defname, "parallel") == 0)
-		{
-			if (opt->arg == NULL)
-			{
-				ereport(ERROR,
-						(errcode(ERRCODE_SYNTAX_ERROR),
-						 errmsg("parallel option requires a value between 0 and %d",
-								MAX_PARALLEL_WORKER_LIMIT),
-						 parser_errposition(pstate, opt->location)));
-			}
-			else
-			{
-				int			nworkers;
-
-				nworkers = defGetInt32(opt);
-				if (nworkers < 0 || nworkers > MAX_PARALLEL_WORKER_LIMIT)
-					ereport(ERROR,
-							(errcode(ERRCODE_SYNTAX_ERROR),
-							 errmsg("parallel workers for vacuum must be between 0 and %d",
-									MAX_PARALLEL_WORKER_LIMIT),
-							 parser_errposition(pstate, opt->location)));
-
-				/*
-				 * Disable parallel vacuum, if user has specified parallel
-				 * degree as zero.
-				 */
-				if (nworkers == 0)
-					params.nworkers = -1;
-				else
-					params.nworkers = nworkers;
-			}
-		}
 		else
 			ereport(ERROR,
 					(errcode(ERRCODE_SYNTAX_ERROR),
@@ -224,11 +189,6 @@ ExecVacuum(ParseState *pstate, VacuumStmt *vacstmt, bool isTopLevel)
 	Assert(params.options & (VACOPT_VACUUM | VACOPT_ANALYZE));
 	Assert((params.options & VACOPT_VACUUM) ||
 		   !(params.options & (VACOPT_FULL | VACOPT_FREEZE)));
-
-	if ((params.options & VACOPT_FULL) && params.nworkers > 0)
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("VACUUM FULL cannot be performed in parallel")));
 
 	/*
 	 * Make sure VACOPT_ANALYZE is specified if any column lists are present.

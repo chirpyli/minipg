@@ -14,7 +14,6 @@
 #ifndef NODEAGG_H
 #define NODEAGG_H
 
-#include "access/parallel.h"
 #include "nodes/execnodes.h"
 
 
@@ -325,9 +324,6 @@ extern void hash_agg_set_limits(double hashentrysize, double input_groups,
 								uint64 *ngroups_limit, int *num_partitions);
 
 /* parallel instrumentation support */
-extern void ExecAggEstimate(AggState *node, ParallelContext *pcxt);
-extern void ExecAggInitializeDSM(AggState *node, ParallelContext *pcxt);
-extern void ExecAggInitializeWorker(AggState *node, ParallelWorkerContext *pwcxt);
 extern void ExecAggRetrieveInstrumentation(AggState *node);
 
 #endif							/* NODEAGG_H */

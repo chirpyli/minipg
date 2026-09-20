@@ -56,6 +56,7 @@
 #include "pgstat.h"
 
 #include "postmaster/interrupt.h"
+#include "postmaster/bgworker.h"
 #include "postmaster/postmaster.h"
 #include "rewrite/rewriteHandler.h"
 #include "storage/bufmgr.h"

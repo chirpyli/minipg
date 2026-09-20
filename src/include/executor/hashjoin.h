@@ -16,7 +16,6 @@
 
 #include "nodes/execnodes.h"
 #include "port/atomics.h"
-#include "storage/barrier.h"
 #include "storage/buffile.h"
 #include "storage/lwlock.h"
 
@@ -67,11 +66,7 @@
 typedef struct HashJoinTupleData
 {
 	/* link to next tuple in same bucket */
-	union
-	{
-		struct HashJoinTupleData *unshared;
-		dsa_pointer shared;
-	}			next;
+	struct HashJoinTupleData *next;
 	uint32		hashvalue;		/* tuple's hash code */
 	/* Tuple data, in MinimalTuple format, follows on a MAXALIGN boundary */
 }			HashJoinTupleData;
@@ -121,11 +116,7 @@ typedef struct HashMemoryChunkData
 	size_t		used;			/* number of buffer bytes already used */
 
 	/* pointer to the next chunk (linked list) */
-	union
-	{
-		struct HashMemoryChunkData *unshared;
-		dsa_pointer shared;
-	}			next;
+	struct HashMemoryChunkData *next;
 
 	/*
 	 * The chunk's tuple buffer starts after the HashMemoryChunkData struct,
@@ -152,13 +143,7 @@ typedef struct HashJoinTableData
 	int			log2_nbuckets_optimal;	/* log2(nbuckets_optimal) */
 
 	/* buckets[i] is head of list of tuples in i'th in-memory bucket */
-	union
-	{
-		/* unshared array is per-batch storage, as are all the tuples */
-		struct HashJoinTupleData **unshared;
-		/* shared array is per-query DSA area, as are all the tuples */
-		dsa_pointer_atomic *shared;
-	}			buckets;
+	struct HashJoinTupleData **buckets;
 
 	bool		keepNulls;		/* true to store unmatchable NULL tuples */
 

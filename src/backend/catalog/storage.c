@@ -19,6 +19,8 @@
 
 #include "postgres.h"
 
+#include "storage/proc.h"
+
 #include "access/parallel.h"
 #include "access/visibilitymap.h"
 #include "access/xact.h"

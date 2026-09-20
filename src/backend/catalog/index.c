@@ -2524,29 +2524,10 @@ index_build(Relation heapRelation,
 	Assert(PointerIsValid(indexRelation->rd_indam->ambuild));
 	Assert(PointerIsValid(indexRelation->rd_indam->ambuildempty));
 
-	/*
-	 * Determine worker process details for parallel CREATE INDEX.  Currently,
-	 * only btree has support for parallel builds.
-	 *
-	 * Note that planner considers parallel safety for us.
-	 */
-	if (parallel && IsNormalProcessingMode() &&
-		indexRelation->rd_rel->relam == BTREE_AM_OID)
-		indexInfo->ii_ParallelWorkers =
-			plan_create_index_workers(RelationGetRelid(heapRelation),
-									  RelationGetRelid(indexRelation));
-
-	if (indexInfo->ii_ParallelWorkers == 0)
-		ereport(DEBUG1,
-				(errmsg_internal("building index \"%s\" on table \"%s\" serially",
-								 RelationGetRelationName(indexRelation),
-								 RelationGetRelationName(heapRelation))));
-	else
-		ereport(DEBUG1,
-				(errmsg_internal("building index \"%s\" on table \"%s\" with request for %d parallel workers",
-								 RelationGetRelationName(indexRelation),
-								 RelationGetRelationName(heapRelation),
-								 indexInfo->ii_ParallelWorkers)));
+	ereport(DEBUG1,
+			(errmsg_internal("building index \"%s\" on table \"%s\" serially",
+							 RelationGetRelationName(indexRelation),
+							 RelationGetRelationName(heapRelation))));
 
 	/*
 	 * Switch to the table owner's userid, so that any index functions are run

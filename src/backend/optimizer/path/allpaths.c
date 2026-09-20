@@ -53,8 +53,6 @@ typedef struct pushdown_safety_info
 } pushdown_safety_info;
 
 /* These parameters are set by GUC */
-int			min_parallel_table_scan_size;
-int			min_parallel_index_scan_size;
 
 /* Hook for plugins to get control in set_rel_pathlist() */
 set_rel_pathlist_hook_type set_rel_pathlist_hook = NULL;
@@ -1770,96 +1768,6 @@ remove_unused_subquery_outputs(Query *subquery, RelOptInfo *rel)
 										   exprTypmod(texpr),
 										   exprCollation(texpr));
 	}
-}
-
-/*
- * Compute the number of parallel workers that should be used to scan a
- * relation.  We compute the parallel workers based on the size of the heap to
- * be scanned and the size of the index to be scanned, then choose a minimum
- * of those.
- *
- * "heap_pages" is the number of pages from the table that we expect to scan, or
- * -1 if we don't expect to scan any.
- *
- * "index_pages" is the number of pages from the index that we expect to scan, or
- * -1 if we don't expect to scan any.
- *
- * "max_workers" is caller's limit on the number of workers.  This typically
- * comes from a GUC.
- */
-int
-compute_parallel_worker(RelOptInfo *rel, double heap_pages, double index_pages,
-						int max_workers)
-{
-	int			parallel_workers = 0;
-
-	/*
-	 * Select a default number of workers.
-	 */
-	{
-		/*
-		 * If the number of pages being scanned is insufficient to justify a
-		 * parallel scan, just return zero ... unless it's an inheritance
-		 * child. In that case, we want to generate a parallel path here
-		 * anyway.  It might not be worthwhile just for this relation, but
-		 * when combined with all of its inheritance siblings it may well pay
-		 * off.
-		 */
-		if (rel->reloptkind == RELOPT_BASEREL &&
-			((heap_pages >= 0 && heap_pages < min_parallel_table_scan_size) ||
-			 (index_pages >= 0 && index_pages < min_parallel_index_scan_size)))
-			return 0;
-
-		if (heap_pages >= 0)
-		{
-			int			heap_parallel_threshold;
-			int			heap_parallel_workers = 1;
-
-			/*
-			 * Select the number of workers based on the log of the size of
-			 * the relation.  This probably needs to be a good deal more
-			 * sophisticated, but we need something here for now.  Note that
-			 * the upper limit of the min_parallel_table_scan_size GUC is
-			 * chosen to prevent overflow here.
-			 */
-			heap_parallel_threshold = Max(min_parallel_table_scan_size, 1);
-			while (heap_pages >= (BlockNumber) (heap_parallel_threshold * 3))
-			{
-				heap_parallel_workers++;
-				heap_parallel_threshold *= 3;
-				if (heap_parallel_threshold > INT_MAX / 3)
-					break;		/* avoid overflow */
-			}
-
-			parallel_workers = heap_parallel_workers;
-		}
-
-		if (index_pages >= 0)
-		{
-			int			index_parallel_workers = 1;
-			int			index_parallel_threshold;
-
-			/* same calculation as for heap_pages above */
-			index_parallel_threshold = Max(min_parallel_index_scan_size, 1);
-			while (index_pages >= (BlockNumber) (index_parallel_threshold * 3))
-			{
-				index_parallel_workers++;
-				index_parallel_threshold *= 3;
-				if (index_parallel_threshold > INT_MAX / 3)
-					break;		/* avoid overflow */
-			}
-
-			if (parallel_workers > 0)
-				parallel_workers = Min(parallel_workers, index_parallel_workers);
-			else
-				parallel_workers = index_parallel_workers;
-		}
-	}
-
-	/* In no case use more than caller supplied maximum number of workers */
-	parallel_workers = Min(parallel_workers, max_workers);
-
-	return parallel_workers;
 }
 
 /*****************************************************************************

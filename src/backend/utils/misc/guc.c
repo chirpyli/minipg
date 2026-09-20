@@ -2372,16 +2372,6 @@ static struct config_int ConfigureNamesInt[] =
 
 
 	{
-		{"max_parallel_maintenance_workers", PGC_USERSET, RESOURCES_ASYNCHRONOUS,
-			gettext_noop("Sets the maximum number of parallel processes per maintenance operation."),
-			NULL
-		},
-		&max_parallel_maintenance_workers,
-		2, 0, 1024,
-		NULL, NULL, NULL
-	},
-
-	{
 		{"max_parallel_workers", PGC_USERSET, RESOURCES_ASYNCHRONOUS,
 			gettext_noop("Sets the maximum number of parallel workers that can be active at one time."),
 			NULL,
@@ -2448,28 +2438,6 @@ static struct config_int ConfigureNamesInt[] =
 		},
 		&effective_cache_size,
 		DEFAULT_EFFECTIVE_CACHE_SIZE, 1, INT_MAX,
-		NULL, NULL, NULL
-	},
-
-	{
-		{"min_parallel_table_scan_size", PGC_USERSET, QUERY_TUNING_COST,
-			gettext_noop("Sets the minimum amount of table data for a parallel scan."),
-			gettext_noop("If the planner estimates that it will read a number of table pages too small to reach this limit, a parallel scan will not be considered."),
-			GUC_UNIT_BLOCKS | GUC_EXPLAIN,
-		},
-		&min_parallel_table_scan_size,
-		(8 * 1024 * 1024) / BLCKSZ, 0, INT_MAX / 3,
-		NULL, NULL, NULL
-	},
-
-	{
-		{"min_parallel_index_scan_size", PGC_USERSET, QUERY_TUNING_COST,
-			gettext_noop("Sets the minimum amount of index data for a parallel scan."),
-			gettext_noop("If the planner estimates that it will read a number of index pages too small to reach this limit, a parallel scan will not be considered."),
-			GUC_UNIT_BLOCKS | GUC_EXPLAIN,
-		},
-		&min_parallel_index_scan_size,
-		(512 * 1024) / BLCKSZ, 0, INT_MAX / 3,
 		NULL, NULL, NULL
 	},
 

@@ -14,6 +14,8 @@
  */
 
 #include "postgres.h"
+
+#include "storage/shmem.h"
 #include "catalog/pg_collation.h"
 
 #include <time.h>

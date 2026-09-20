@@ -3,6 +3,10 @@
  * parallel.h
  *	  Infrastructure for launching parallel workers
  *
+ * 在 minipg 中，并行框架（ParallelContext/DSM/共享消息队列等）已被裁剪。
+ * 这里仅保留"并行模式/并行 worker 环境"所需的最小符号：并行模式的状态
+ * 机（xact.c/SSI）与若干钩子仍会引用它们。
+ *
  * Portions Copyright (c) 1996-2021, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
@@ -10,49 +14,10 @@
  *
  *-------------------------------------------------------------------------
  */
-
 #ifndef PARALLEL_H
 #define PARALLEL_H
 
 #include "access/xlogdefs.h"
-#include "lib/ilist.h"
-#include "postmaster/bgworker.h"
-#include "storage/shm_mq.h"
-#include "storage/shm_toc.h"
-
-typedef void (*parallel_worker_main_type) (dsm_segment *seg, shm_toc *toc);
-
-typedef struct ParallelWorkerInfo
-{
-	BackgroundWorkerHandle *bgwhandle;
-	shm_mq_handle *error_mqh;
-	int32		pid;
-} ParallelWorkerInfo;
-
-typedef struct ParallelContext
-{
-	dlist_node	node;
-	SubTransactionId subid;
-	int			nworkers;		/* Maximum number of workers to launch */
-	int			nworkers_to_launch; /* Actual number of workers to launch */
-	int			nworkers_launched;
-	char	   *library_name;
-	char	   *function_name;
-	ErrorContextCallback *error_context_stack;
-	shm_toc_estimator estimator;
-	dsm_segment *seg;
-	void	   *private_memory;
-	shm_toc    *toc;
-	ParallelWorkerInfo *worker;
-	int			nknown_attached_workers;
-	bool	   *known_attached_workers;
-} ParallelContext;
-
-typedef struct ParallelWorkerContext
-{
-	dsm_segment *seg;
-	shm_toc    *toc;
-} ParallelWorkerContext;
 
 extern volatile bool ParallelMessagePending;
 extern PGDLLIMPORT int ParallelWorkerNumber;
@@ -60,23 +25,19 @@ extern PGDLLIMPORT bool InitializingParallelWorker;
 
 #define		IsParallelWorker()		(ParallelWorkerNumber >= 0)
 
-extern ParallelContext *CreateParallelContext(const char *library_name,
-											  const char *function_name, int nworkers);
-extern void InitializeParallelDSM(ParallelContext *pcxt);
-extern void ReinitializeParallelDSM(ParallelContext *pcxt);
-extern void ReinitializeParallelWorkers(ParallelContext *pcxt, int nworkers_to_launch);
-extern void LaunchParallelWorkers(ParallelContext *pcxt);
-extern void WaitForParallelWorkersToAttach(ParallelContext *pcxt);
-extern void WaitForParallelWorkersToFinish(ParallelContext *pcxt);
-extern void DestroyParallelContext(ParallelContext *pcxt);
+/*
+ * 并行上下文框架已裁剪，因此永远不会有活动的并行上下文。
+ */
 extern bool ParallelContextActive(void);
 
+/* 并行模式钩子：框架裁剪后为空操作，仅保留调用点 */
 extern void HandleParallelMessageInterrupt(void);
 extern void HandleParallelMessages(void);
 extern void AtEOXact_Parallel(bool isCommit);
 extern void AtEOSubXact_Parallel(bool isCommit, SubTransactionId mySubId);
 extern void ParallelWorkerReportLastRecEnd(XLogRecPtr last_xlog_end);
 
+/* 背景 worker 机制的入口（框架裁剪后只会报错） */
 extern void ParallelWorkerMain(Datum main_arg);
 
 #endif							/* PARALLEL_H */

@@ -170,9 +170,6 @@ expand_planner_arrays(PlannerInfo *root, int add_size)
 /*
  * build_simple_rel
  *	  Construct a new RelOptInfo for a base relation or 'other' relation.
- *
- * inhparent 为真时按"继承父表"处理：不估算本表尺寸，也不收集索引信息。
- * 目前仅 plan_create_index_workers() 需要（见该文件内注释）。
  */
 RelOptInfo *
 build_simple_rel(PlannerInfo *root, int relid, RelOptInfo *parent,

@@ -14,7 +14,6 @@ include $(top_builddir)/src/Makefile.global
 
 OBJS = \
 	aset.o \
-	dsa.o \
 	freepage.o \
 	generation.o \
 	mcxt.o \
