@@ -84,8 +84,7 @@ exprType(const Node *expr)
 			{
 				const SubLink *sublink = (const SubLink *) expr;
 
-				if (sublink->subLinkType == EXPR_SUBLINK ||
-					sublink->subLinkType == ARRAY_SUBLINK)
+				if (sublink->subLinkType == EXPR_SUBLINK)
 				{
 					/* get the type of the subselect's first target column */
 					Query	   *qtree = (Query *) sublink->subselect;
@@ -96,15 +95,6 @@ exprType(const Node *expr)
 					tent = linitial_node(TargetEntry, qtree->targetList);
 					Assert(!tent->resjunk);
 					type = exprType((Node *) tent->expr);
-					if (sublink->subLinkType == ARRAY_SUBLINK)
-					{
-						type = get_promoted_array_type(type);
-						if (!OidIsValid(type))
-							ereport(ERROR,
-									(errcode(ERRCODE_UNDEFINED_OBJECT),
-									 errmsg("could not find array type for data type %s",
-											format_type_be(exprType((Node *) tent->expr)))));
-					}
 				}
 				else
 				{
@@ -117,20 +107,10 @@ exprType(const Node *expr)
 			{
 				const SubPlan *subplan = (const SubPlan *) expr;
 
-				if (subplan->subLinkType == EXPR_SUBLINK ||
-					subplan->subLinkType == ARRAY_SUBLINK)
+				if (subplan->subLinkType == EXPR_SUBLINK)
 				{
 					/* get the type of the subselect's first target column */
 					type = subplan->firstColType;
-					if (subplan->subLinkType == ARRAY_SUBLINK)
-					{
-						type = get_promoted_array_type(type);
-						if (!OidIsValid(type))
-							ereport(ERROR,
-									(errcode(ERRCODE_UNDEFINED_OBJECT),
-									 errmsg("could not find array type for data type %s",
-											format_type_be(subplan->firstColType))));
-					}
 				}
 				else
 				{
@@ -251,8 +231,7 @@ exprTypmod(const Node *expr)
 			{
 				const SubLink *sublink = (const SubLink *) expr;
 
-				if (sublink->subLinkType == EXPR_SUBLINK ||
-					sublink->subLinkType == ARRAY_SUBLINK)
+				if (sublink->subLinkType == EXPR_SUBLINK)
 				{
 					/* get the typmod of the subselect's first target column */
 					Query	   *qtree = (Query *) sublink->subselect;
@@ -272,8 +251,7 @@ exprTypmod(const Node *expr)
 			{
 				const SubPlan *subplan = (const SubPlan *) expr;
 
-				if (subplan->subLinkType == EXPR_SUBLINK ||
-					subplan->subLinkType == ARRAY_SUBLINK)
+				if (subplan->subLinkType == EXPR_SUBLINK)
 				{
 					/* get the typmod of the subselect's first target column */
 					/* note we don't need to care if it's an array */
@@ -713,8 +691,7 @@ exprCollation(const Node *expr)
 			{
 				const SubLink *sublink = (const SubLink *) expr;
 
-				if (sublink->subLinkType == EXPR_SUBLINK ||
-					sublink->subLinkType == ARRAY_SUBLINK)
+				if (sublink->subLinkType == EXPR_SUBLINK)
 				{
 					/* get the collation of subselect's first target column */
 					Query	   *qtree = (Query *) sublink->subselect;
@@ -738,8 +715,7 @@ exprCollation(const Node *expr)
 			{
 				const SubPlan *subplan = (const SubPlan *) expr;
 
-				if (subplan->subLinkType == EXPR_SUBLINK ||
-					subplan->subLinkType == ARRAY_SUBLINK)
+				if (subplan->subLinkType == EXPR_SUBLINK)
 				{
 					/* get the collation of subselect's first target column */
 					coll = subplan->firstColCollation;
@@ -915,8 +891,7 @@ exprSetCollation(Node *expr, Oid collation)
 			{
 				SubLink    *sublink = (SubLink *) expr;
 
-				if (sublink->subLinkType == EXPR_SUBLINK ||
-					sublink->subLinkType == ARRAY_SUBLINK)
+				if (sublink->subLinkType == EXPR_SUBLINK)
 				{
 					/* get the collation of subselect's first target column */
 					Query	   *qtree = (Query *) sublink->subselect;
@@ -2906,8 +2881,6 @@ raw_expression_tree_walker(Node *node,
 			{
 				A_Indices  *indices = (A_Indices *) node;
 
-				if (walker(indices->lidx, context))
-					return true;
 				if (walker(indices->uidx, context))
 					return true;
 			}

@@ -272,7 +272,7 @@ describeOneTableDetails(const char *schemaname,
 						  "WHERE c.oid = '%s';",
 						  (verbose ?
 						   "pg_catalog.array_to_string(c.reloptions || "
-						   "array(select 'toast.' || x from pg_catalog.unnest(tc.reloptions) x), ', ')\n"
+						   "(select pg_catalog.array_agg('toast.' || x) from pg_catalog.unnest(tc.reloptions) x), ', ')\n"
 						   : "''"),
 						  oid);
 	}
@@ -288,7 +288,7 @@ describeOneTableDetails(const char *schemaname,
 						  "WHERE c.oid = '%s';",
 						  (verbose ?
 						   "pg_catalog.array_to_string(c.reloptions || "
-						   "array(select 'toast.' || x from pg_catalog.unnest(tc.reloptions) x), ', ')\n"
+						   "(select pg_catalog.array_agg('toast.' || x) from pg_catalog.unnest(tc.reloptions) x), ', ')\n"
 						   : "''"),
 						  oid);
 	}
@@ -304,7 +304,7 @@ describeOneTableDetails(const char *schemaname,
 						  "WHERE c.oid = '%s';",
 						  (verbose ?
 						   "pg_catalog.array_to_string(c.reloptions || "
-						   "array(select 'toast.' || x from pg_catalog.unnest(tc.reloptions) x), ', ')\n"
+						   "(select pg_catalog.array_agg('toast.' || x) from pg_catalog.unnest(tc.reloptions) x), ', ')\n"
 						   : "''"),
 						  oid);
 	}
@@ -320,7 +320,7 @@ describeOneTableDetails(const char *schemaname,
 						  "WHERE c.oid = '%s';",
 						  (verbose ?
 						   "pg_catalog.array_to_string(c.reloptions || "
-						   "array(select 'toast.' || x from pg_catalog.unnest(tc.reloptions) x), ', ')\n"
+						   "(select pg_catalog.array_agg('toast.' || x) from pg_catalog.unnest(tc.reloptions) x), ', ')\n"
 						   : "''"),
 						  oid);
 	}
@@ -336,7 +336,7 @@ describeOneTableDetails(const char *schemaname,
 						  "WHERE c.oid = '%s';",
 						  (verbose ?
 						   "pg_catalog.array_to_string(c.reloptions || "
-						   "array(select 'toast.' || x from pg_catalog.unnest(tc.reloptions) x), ', ')\n"
+						   "(select pg_catalog.array_agg('toast.' || x) from pg_catalog.unnest(tc.reloptions) x), ', ')\n"
 						   : "''"),
 						  oid);
 	}
@@ -351,7 +351,7 @@ describeOneTableDetails(const char *schemaname,
 						  "WHERE c.oid = '%s';",
 						  (verbose ?
 						   "pg_catalog.array_to_string(c.reloptions || "
-						   "array(select 'toast.' || x from pg_catalog.unnest(tc.reloptions) x), ', ')\n"
+						   "(select pg_catalog.array_agg('toast.' || x) from pg_catalog.unnest(tc.reloptions) x), ', ')\n"
 						   : "''"),
 						  oid);
 	}
@@ -366,7 +366,7 @@ describeOneTableDetails(const char *schemaname,
 						  "WHERE c.oid = '%s';",
 						  (verbose ?
 						   "pg_catalog.array_to_string(c.reloptions || "
-						   "array(select 'toast.' || x from pg_catalog.unnest(tc.reloptions) x), ', ')\n"
+						   "(select pg_catalog.array_agg('toast.' || x) from pg_catalog.unnest(tc.reloptions) x), ', ')\n"
 						   : "''"),
 						  oid);
 	}

@@ -95,11 +95,10 @@ static bool finalize_agg_primnode(Node *node, finalize_primnode_context *context
 /*
  * Get the datatype/typmod/collation of the first column of the plan's output.
  *
- * This information is stored for ARRAY_SUBLINK execution and for
- * exprType()/exprTypmod()/exprCollation(), which have no way to get at the
- * plan associated with a SubPlan node.  We really only need the info for
- * EXPR_SUBLINK and ARRAY_SUBLINK subplans, but for consistency we save it
- * always.
+ * This information is stored for exprType()/exprTypmod()/exprCollation(),
+ * which have no way to get at the plan associated with a SubPlan node.  We
+ * really only need the info for EXPR_SUBLINK subplans, but for consistency
+ * we save it always.
  */
 static void
 get_first_col_type(Plan *plan, Oid *coltype, int32 *coltypmod,
@@ -379,26 +378,6 @@ build_subplan(PlannerInfo *root, Plan *plan, PlannerInfo *subroot,
 		Assert(testexpr == NULL);
 		prm = generate_new_exec_param(root,
 									  exprType((Node *) te->expr),
-									  exprTypmod((Node *) te->expr),
-									  exprCollation((Node *) te->expr));
-		splan->setParam = list_make1_int(prm->paramid);
-		isInitPlan = true;
-		result = (Node *) prm;
-	}
-	else if (splan->parParam == NIL && subLinkType == ARRAY_SUBLINK)
-	{
-		TargetEntry *te = linitial(plan->targetlist);
-		Oid			arraytype;
-		Param	   *prm;
-
-		Assert(!te->resjunk);
-		Assert(testexpr == NULL);
-		arraytype = get_promoted_array_type(exprType((Node *) te->expr));
-		if (!OidIsValid(arraytype))
-			elog(ERROR, "could not find array type for datatype %s",
-				 format_type_be(exprType((Node *) te->expr)));
-		prm = generate_new_exec_param(root,
-									  arraytype,
 									  exprTypmod((Node *) te->expr),
 									  exprCollation((Node *) te->expr));
 		splan->setParam = list_make1_int(prm->paramid);

@@ -16,7 +16,7 @@ CREATE TABLE arrtest (
 -- only the 'e' array is 0-based, the others are 1-based.
 --
 
-INSERT INTO arrtest (a[1:5], b[1:1][1:2][1:2], c, d, f, g)
+INSERT INTO arrtest (a, b, c, d, f, g)
    VALUES ('{1,2,3,4,5}', '{{{0,0},{1,2}}}', '{}', '{}', '{}', '{}');
 
 UPDATE arrtest SET e[0] = '1.1';
@@ -26,17 +26,15 @@ UPDATE arrtest SET e[1] = '2.2';
 INSERT INTO arrtest (f)
    VALUES ('{"too long"}');
 
-INSERT INTO arrtest (a, b[1:2][1:2], c, d, e, f, g)
+INSERT INTO arrtest (a, b, c, d, e, f, g)
    VALUES ('{11,12,23}', '{{3,4},{4,5}}', '{"foobar"}',
            '{{"elt1", "elt2"}}', '{"3.4", "6.7"}',
            '{"abc","abcde"}', '{"abc","abcde"}');
 
-INSERT INTO arrtest (a, b[1:2], c, d[1:2])
+INSERT INTO arrtest (a, b, c, d)
    VALUES ('{}', '{3,4}', '{foo,bar}', '{bar,foo}');
 
 INSERT INTO arrtest (b[2]) VALUES(now());  -- error, type mismatch
-
-INSERT INTO arrtest (b[1:2]) VALUES(now());  -- error, type mismatch
 
 SELECT * FROM arrtest;
 
@@ -48,12 +46,6 @@ SELECT arrtest.a[1],
    FROM arrtest;
 
 SELECT a[1], b[1][1][1], c[1], d[1][1], e[0]
-   FROM arrtest;
-
-SELECT a[1:3],
-          b[1:1][1:2][1:2],
-          c[1:2],
-          d[1:1][1:2]
    FROM arrtest;
 
 SELECT array_ndims(a) AS a,array_ndims(b) AS b,array_ndims(c) AS c
@@ -69,29 +61,10 @@ SELECT *
          c = '{"foobar"}'::_name;
 
 UPDATE arrtest
-  SET a[1:2] = '{16,25}'
-  WHERE NOT a = '{}'::_int2;
-
-UPDATE arrtest
-  SET b[1:1][1:1][1:2] = '{113, 117}',
-      b[1:1][1:2][2:2] = '{142, 147}'
-  WHERE array_dims(b) = '[1:1][1:2][1:2]';
-
-UPDATE arrtest
-  SET c[2:2] = '{"new_word"}'
+  SET c[2] = '{"new_word"}'
   WHERE array_dims(c) is not null;
 
 SELECT a,b,c FROM arrtest;
-
-SELECT a[1:3],
-          b[1:1][1:2][1:2],
-          c[1:2],
-          d[1:1][2:2]
-   FROM arrtest;
-
-SELECT b[1:1][2][2],
-       d[1:1][2]
-   FROM arrtest;
 
 INSERT INTO arrtest(a) VALUES('{1,null,3}');
 SELECT a FROM arrtest;
@@ -100,12 +73,6 @@ SELECT a FROM arrtest WHERE a[2] IS NULL;
 DELETE FROM arrtest WHERE a[2] IS NULL AND b IS NULL;
 SELECT a,b,c FROM arrtest;
 
--- test mixed slice/scalar subscripting
-select '{{1,2,3},{4,5,6},{7,8,9}}'::int[];
-select ('{{1,2,3},{4,5,6},{7,8,9}}'::int[])[1:2][2];
-select '[0:2][0:2]={{1,2,3},{4,5,6},{7,8,9}}'::int[];
-select ('[0:2][0:2]={{1,2,3},{4,5,6},{7,8,9}}'::int[])[1:2][2];
-
 --
 -- check subscription corner cases
 --
@@ -113,17 +80,9 @@ select ('[0:2][0:2]={{1,2,3},{4,5,6},{7,8,9}}'::int[])[1:2][2];
 SELECT ('{}'::int[])[1][2][3][4][5][6][7];
 -- NULL index yields NULL when selecting
 SELECT ('{{{1},{2},{3}},{{4},{5},{6}}}'::int[])[1][NULL][1];
-SELECT ('{{{1},{2},{3}},{{4},{5},{6}}}'::int[])[1][NULL:1][1];
-SELECT ('{{{1},{2},{3}},{{4},{5},{6}}}'::int[])[1][1:NULL][1];
 -- NULL index in assignment is an error
 UPDATE arrtest
   SET c[NULL] = '{"can''t assign"}'
-  WHERE array_dims(c) is not null;
-UPDATE arrtest
-  SET c[NULL:1] = '{"can''t assign"}'
-  WHERE array_dims(c) is not null;
-UPDATE arrtest
-  SET c[1:NULL] = '{"can''t assign"}'
   WHERE array_dims(c) is not null;
 -- Un-subscriptable type
 SELECT (now())[1];
@@ -137,21 +96,6 @@ INSERT INTO arrtest_s VALUES ('{1,2,3,4,5}', '{{1,2,3}, {4,5,6}, {7,8,9}}');
 INSERT INTO arrtest_s VALUES ('[0:4]={1,2,3,4,5}', '[0:2][0:2]={{1,2,3}, {4,5,6}, {7,8,9}}');
 
 SELECT * FROM arrtest_s;
-SELECT a[:3], b[:2][:2] FROM arrtest_s;
-SELECT a[2:], b[2:][2:] FROM arrtest_s;
-SELECT a[:], b[:] FROM arrtest_s;
-
--- updates
-UPDATE arrtest_s SET a[:3] = '{11, 12, 13}', b[:2][:2] = '{{11,12}, {14,15}}'
-  WHERE array_lower(a,1) = 1;
-SELECT * FROM arrtest_s;
-UPDATE arrtest_s SET a[3:] = '{23, 24, 25}', b[2:][2:] = '{{25,26}, {28,29}}';
-SELECT * FROM arrtest_s;
-UPDATE arrtest_s SET a[:] = '{11, 12, 13, 14, 15}';
-SELECT * FROM arrtest_s;
-UPDATE arrtest_s SET a[:] = '{23, 24, 25}';  -- fail, too small
-INSERT INTO arrtest_s VALUES(NULL, NULL);
-UPDATE arrtest_s SET a[:] = '{11, 12, 13, 14, 15}';  -- fail, no good with null
 
 -- minipg: point 类型与 POINT_TBL 已随 geometry 类型裁剪而移除，
 -- 定长数组的下标用例整节移除
@@ -172,24 +116,8 @@ update arrtest1 set i[0] = 0, t[0] = 'zero';
 select * from arrtest1;
 update arrtest1 set i[-3] = -3, t[-3] = 'minus-three';
 select * from arrtest1;
-update arrtest1 set i[0:2] = array[10,11,12], t[0:2] = array['ten','eleven','twelve'];
-select * from arrtest1;
-update arrtest1 set i[8:10] = array[18,null,20], t[8:10] = array['p18',null,'p20'];
-select * from arrtest1;
-update arrtest1 set i[11:12] = array[null,22], t[11:12] = array[null,'p22'];
-select * from arrtest1;
-update arrtest1 set i[15:16] = array[null,26], t[15:16] = array[null,'p26'];
-select * from arrtest1;
-update arrtest1 set i[-5:-3] = array[-15,-14,-13], t[-5:-3] = array['m15','m14','m13'];
-select * from arrtest1;
-update arrtest1 set i[-7:-6] = array[-17,null], t[-7:-6] = array['m17',null];
-select * from arrtest1;
-update arrtest1 set i[-12:-10] = array[-22,null,-20], t[-12:-10] = array['m22',null,'m20'];
-select * from arrtest1;
 delete from arrtest1;
 insert into arrtest1 values(array[1,2,null,4], array['one','two',null,'four']);
-select * from arrtest1;
-update arrtest1 set i[0:5] = array[0,1,2,null,4,5], t[0:5] = array['z','p1','p2',null,'p4','p5'];
 select * from arrtest1;
 
 --
@@ -235,8 +163,6 @@ SELECT t.f[1][3][1] AS "131", t.f[2][2][1] AS "221" FROM (
 ) AS t;
 SELECT ARRAY[[[[[['hello'],['world']]]]]];
 SELECT ARRAY[ARRAY['hello'],ARRAY['world']];
-SELECT ARRAY(select f2 from arrtest_f order by f2) AS "ARRAY";
-
 -- with nulls
 SELECT '{1,null,3}'::int[];
 SELECT ARRAY[1,NULL,3];
@@ -263,10 +189,6 @@ SELECT array_positions(ARRAY[1,2,3,4,5,6,1,2,3,4,5,6], 4);
 SELECT array_positions(ARRAY[[1,2],[3,4]], 4);
 SELECT array_positions(ARRAY[1,2,3,4,5,6,1,2,3,4,5,6], NULL);
 SELECT array_positions(ARRAY[1,2,3,NULL,5,6,1,2,3,NULL,5,6], NULL);
-SELECT array_length(array_positions(ARRAY(SELECT 'AAAAAAAAAAAAAAAAAAAAAAAAA'::text || i % 10
-                                          FROM generate_series(1,100) g(i)),
-                                  'AAAAAAAAAAAAAAAAAAAAAAAAA5'), 1);
-
 -- minipg: PL/pgSQL removed. Rewrite as SQL: positions of value 2 in the array.
 SELECT * FROM unnest(ARRAY[1,2,3,2,3,1,2]) WITH ORDINALITY AS t(v, pos)
   WHERE v = 2 ORDER BY pos;
@@ -350,7 +272,7 @@ select null::int = all ('{1,2,3}');
 select 33 = all ('{1,null,3}');
 select 33 = all ('{33,null,33}');
 -- nulls later in the bitmap
-SELECT -1 != ALL(ARRAY(SELECT NULLIF(g.i, 900) FROM generate_series(1,1000) g(i)));
+SELECT -1 != ALL((SELECT array_agg(NULLIF(g.i, 900)) FROM generate_series(1,1000) g(i)));
 
 -- test indexes on arrays
 CREATE TABLE arr_tbl (f1 int[] unique);
@@ -384,9 +306,6 @@ insert into arr_pk_tbl values (1, '{1,2,3}');
 
 insert into arr_pk_tbl values(10, '[-2147483648:-2147483647]={1,2}');
 update arr_pk_tbl set f1[2147483647] = 42 where pk = 10;
-update arr_pk_tbl set f1[2147483646:2147483647] = array[4,2] where pk = 10;
-insert into arr_pk_tbl(pk, f1[0:2147483647]) values (2, '{}');
-insert into arr_pk_tbl(pk, f1[-2147483648:2147483647]) values (2, '{}');
 
 -- minipg: PL/pgSQL removed. The original DO block exercised the expanded-array
 -- subscript-store code path; that plpgsql-only subtest is dropped.
@@ -581,18 +500,6 @@ select array_replace(array[1,2,NULL,4,NULL],NULL,5);
 select array_replace(array['A','B','DD','B'],'B','CC');
 select array_replace(array[1,NULL,3],NULL,NULL);
 select array_replace(array['AB',NULL,'CDE'],NULL,'12');
-
--- array(select array-value ...)
-select array(select array[i,i/2] from generate_series(1,5) i);
-select array(select array['Hello', i::text] from generate_series(9,11) i);
-
--- int2vector and oidvector should be treated as scalar types for this purpose
-select pg_typeof(array(select '11 22 33'::int2vector from generate_series(1,5)));
-select array(select '11 22 33'::int2vector from generate_series(1,5));
-select unnest(array(select '11 22 33'::int2vector from generate_series(1,5)));
-select pg_typeof(array(select '11 22 33'::oidvector from generate_series(1,5)));
-select array(select '11 22 33'::oidvector from generate_series(1,5));
-select unnest(array(select '11 22 33'::oidvector from generate_series(1,5)));
 
 -- array[] should do the same
 select pg_typeof(array['11 22 33'::int2vector]);

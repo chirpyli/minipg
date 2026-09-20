@@ -286,7 +286,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 %type <node>	columnDef
 %type <defelt>	def_elem
 %type <node>	def_arg columnElem where_clause where_or_current_clause
-				a_expr b_expr c_expr AexprConst indirection_el opt_slice_bound
+				a_expr b_expr c_expr AexprConst indirection_el
 				columnref in_expr having_clause func_table array_expr
 %type <list>	rowsfrom_item rowsfrom_list opt_col_def_list
 %type <boolean> opt_ordinality
@@ -3738,16 +3738,6 @@ c_expr:		columnref								{ $$ = $1; }
 					n->location = @1;
 					$$ = (Node *)n;
 				}
-			| ARRAY select_with_parens
-				{
-					SubLink *n = makeNode(SubLink);
-					n->subLinkType = ARRAY_SUBLINK;
-					n->testexpr = NULL;
-					n->operName = NIL;
-					n->subselect = $2;
-					n->location = @1;
-					$$ = (Node *)n;
-				}
 			| ARRAY array_expr
 				{
 					A_ArrayExpr *n = castNode(A_ArrayExpr, $2);
@@ -4062,24 +4052,9 @@ indirection_el:
 			| '[' a_expr ']'
 				{
 					A_Indices *ai = makeNode(A_Indices);
-					ai->is_slice = false;
-					ai->lidx = NULL;
 					ai->uidx = $2;
 					$$ = (Node *) ai;
 				}
-			| '[' opt_slice_bound ':' opt_slice_bound ']'
-				{
-					A_Indices *ai = makeNode(A_Indices);
-					ai->is_slice = true;
-					ai->lidx = $2;
-					ai->uidx = $4;
-					$$ = (Node *) ai;
-				}
-		;
-
-opt_slice_bound:
-			a_expr									{ $$ = $1; }
-			| /*EMPTY*/								{ $$ = NULL; }
 		;
 
 indirection:

@@ -255,8 +255,6 @@ transformContainerSubscripts(ParseState *pstate,
 	SubscriptingRef *sbsref;
 	const SubscriptRoutines *sbsroutines;
 	Oid			elementType;
-	bool		isSlice = false;
-	ListCell   *idx;
 
 	/*
 	 * Determine the actual container type, smashing any domain.  In the
@@ -279,24 +277,6 @@ transformContainerSubscripts(ParseState *pstate,
 				 parser_errposition(pstate, exprLocation(containerBase))));
 
 	/*
-	 * Detect whether any of the indirection items are slice specifiers.
-	 *
-	 * A list containing only simple subscripts refers to a single container
-	 * element.  If any of the items are slice specifiers (lower:upper), then
-	 * the subscript expression means a container slice operation.
-	 */
-	foreach(idx, indirection)
-	{
-		A_Indices  *ai = lfirst_node(A_Indices, idx);
-
-		if (ai->is_slice)
-		{
-			isSlice = true;
-			break;
-		}
-	}
-
-	/*
 	 * Ready to build the SubscriptingRef node.
 	 */
 	sbsref = makeNode(SubscriptingRef);
@@ -306,7 +286,7 @@ transformContainerSubscripts(ParseState *pstate,
 	/* refrestype is to be set by container-specific logic */
 	sbsref->reftypmod = containerTypMod;
 	/* refcollid will be set by parse_collate.c */
-	/* refupperindexpr, reflowerindexpr are to be set by container logic */
+	/* refupperindexpr is to be set by container logic */
 	sbsref->refexpr = (Expr *) containerBase;
 	sbsref->refassgnexpr = NULL;	/* caller will fill if it's an assignment */
 
@@ -315,7 +295,7 @@ transformContainerSubscripts(ParseState *pstate,
 	 * determine the subscripting result type.
 	 */
 	sbsroutines->transform(sbsref, indirection, pstate,
-						   isSlice, isAssignment);
+						   isAssignment);
 
 	/*
 	 * Verify we got a valid type (this defends, for example, against someone

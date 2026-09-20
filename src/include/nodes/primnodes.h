@@ -493,7 +493,6 @@ typedef struct BoolExpr
  *	ALL_SUBLINK			(lefthand) op ALL (SELECT ...)
  *	ANY_SUBLINK			(lefthand) op ANY (SELECT ...)
  *	EXPR_SUBLINK		(SELECT with single targetlist item ...)
- *	ARRAY_SUBLINK		ARRAY(SELECT with single targetlist item ...)
  *	CTE_SUBLINK			WITH query (never actually part of an expression)
  * For ALL and ANY, the lefthand is an expression of the same type as the
  * subselect's single targetlist column.  In minipg, row constructors are not
@@ -503,8 +502,6 @@ typedef struct BoolExpr
  * ALL and ANY require the combining operator to deliver a boolean result.
  * ALL and ANY combine the per-row results using AND and OR semantics
  * respectively.
- * ARRAY requires just one target column, and creates an array of the target
- * column's type using any number of rows resulting from the subselect.
  *
  * SubLink is classed as an Expr node, but it is not actually executable;
  * it must be replaced in the expression tree by a SubPlan node during
@@ -518,7 +515,7 @@ typedef struct BoolExpr
  * output columns of the subselect.  And subselect is transformed to a Query.
  * This is the representation seen in saved rules and in the rewriter.
  *
- * In EXISTS, EXPR, and ARRAY SubLinks, testexpr and operName are unused and
+ * In EXISTS and EXPR SubLinks, testexpr and operName are unused and
  * are always null.
  *
  * The CTE_SUBLINK case never occurs in actual SubLink nodes, but it is used
@@ -529,8 +526,7 @@ typedef enum SubLinkType
 	EXISTS_SUBLINK,
 	ALL_SUBLINK,
 	ANY_SUBLINK,
-	EXPR_SUBLINK,
-	ARRAY_SUBLINK
+	EXPR_SUBLINK
 } SubLinkType;
 
 

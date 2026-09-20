@@ -212,12 +212,6 @@ ExecScanSubPlan(SubPlanState *node,
 	bool		found = false;	/* true if got at least one subplan tuple */
 	ListCell   *pvar;
 	ListCell   *l;
-	ArrayBuildStateAny *astate = NULL;
-
-	/* Initialize ArrayBuildStateAny in caller's context, if needed */
-	if (subLinkType == ARRAY_SUBLINK)
-		astate = initArrayResultAny(subplan->firstColType,
-									CurrentMemoryContext, true);
 
 	/*
 	 * We are probably in a short-lived expression-evaluation context. Switch
@@ -250,10 +244,10 @@ ExecScanSubPlan(SubPlanState *node,
 	ExecReScan(planstate);
 
 	/*
-	 * For all sublink types except EXPR_SUBLINK and ARRAY_SUBLINK, the result
-	 * is boolean as are the results of the combining operators. We combine
-	 * results across tuples (if the subplan produces more than one) using OR
-	 * semantics for ANY_SUBLINK or AND semantics for ALL_SUBLINK.
+	 * For all sublink types except EXPR_SUBLINK, the result is boolean as are
+	 * the results of the combining operators. We combine results across
+	 * tuples (if the subplan produces more than one) using OR semantics for
+	 * ANY_SUBLINK or AND semantics for ALL_SUBLINK.
 	 * NULL results from the combining operators are handled according to the
 	 * usual SQL semantics for OR and AND.  The result for no input tuples is
 	 * FALSE for ANY_SUBLINK, TRUE for ALL_SUBLINK.
@@ -262,11 +256,6 @@ ExecScanSubPlan(SubPlanState *node,
 	 * tuple, else an error is raised.  If zero tuples are produced, we return
 	 * NULL.  Assuming we get a tuple, we just use its first column (there can
 	 * be only one non-junk column in this case).
-	 *
-	 * For ARRAY_SUBLINK we allow the subplan to produce any number of tuples,
-	 * and form an array of the first column's values.  Note in particular
-	 * that we produce a zero-element array if no tuples are produced (this is
-	 * a change from pre-8.3 behavior of returning NULL).
 	 */
 	result = BoolGetDatum(subLinkType == ALL_SUBLINK);
 	*isNull = false;
@@ -311,21 +300,6 @@ ExecScanSubPlan(SubPlanState *node,
 
 			result = heap_getattr(node->curTuple, 1, tdesc, isNull);
 			/* keep scanning subplan to make sure there's only one tuple */
-			continue;
-		}
-
-		if (subLinkType == ARRAY_SUBLINK)
-		{
-			Datum		dvalue;
-			bool		disnull;
-
-			found = true;
-			/* stash away current value */
-			Assert(subplan->firstColType == TupleDescAttr(tdesc, 0)->atttypid);
-			dvalue = slot_getattr(slot, 1, &disnull);
-			astate = accumArrayResultAny(astate, dvalue, disnull,
-										 subplan->firstColType, oldcontext);
-			/* keep scanning subplan to collect all values */
 			continue;
 		}
 
@@ -380,12 +354,7 @@ ExecScanSubPlan(SubPlanState *node,
 
 	MemoryContextSwitchTo(oldcontext);
 
-	if (subLinkType == ARRAY_SUBLINK)
-	{
-		/* We return the result in the caller's context */
-		result = makeArrayResultAny(astate, oldcontext, true);
-	}
-	else if (!found)
+	if (!found)
 	{
 		/*
 		 * deal with empty subplan result.  result/isNull were previously
@@ -758,7 +727,6 @@ ExecInitSubPlan(SubPlan *subplan, PlanState *parent)
 	 * initialize my state
 	 */
 	sstate->curTuple = NULL;
-	sstate->curArray = PointerGetDatum(NULL);
 	sstate->projLeft = NULL;
 	sstate->projRight = NULL;
 	sstate->hashtable = NULL;
@@ -1007,7 +975,6 @@ ExecSetParamPlan(SubPlanState *node, ExprContext *econtext)
 	TupleTableSlot *slot;
 	ListCell   *l;
 	bool		found = false;
-	ArrayBuildStateAny *astate = NULL;
 
 	if (subLinkType == ANY_SUBLINK ||
 		subLinkType == ALL_SUBLINK)
@@ -1020,11 +987,6 @@ ExecSetParamPlan(SubPlanState *node, ExprContext *econtext)
 	 * impossible to get here in backward scan, so make it work anyway.
 	 */
 	estate->es_direction = ForwardScanDirection;
-
-	/* Initialize ArrayBuildStateAny in caller's context, if needed */
-	if (subLinkType == ARRAY_SUBLINK)
-		astate = initArrayResultAny(subplan->firstColType,
-									CurrentMemoryContext, true);
 
 	/*
 	 * Must switch to per-query memory context.
@@ -1053,21 +1015,6 @@ ExecSetParamPlan(SubPlanState *node, ExprContext *econtext)
 			prm->isnull = false;
 			found = true;
 			break;
-		}
-
-		if (subLinkType == ARRAY_SUBLINK)
-		{
-			Datum		dvalue;
-			bool		disnull;
-
-			found = true;
-			/* stash away current value */
-			Assert(subplan->firstColType == TupleDescAttr(tdesc, 0)->atttypid);
-			dvalue = slot_getattr(slot, 1, &disnull);
-			astate = accumArrayResultAny(astate, dvalue, disnull,
-										 subplan->firstColType, oldcontext);
-			/* keep scanning subplan to collect all values */
-			continue;
 		}
 
 		if (found &&
@@ -1103,27 +1050,7 @@ ExecSetParamPlan(SubPlanState *node, ExprContext *econtext)
 		}
 	}
 
-	if (subLinkType == ARRAY_SUBLINK)
-	{
-		/* There can be only one setParam... */
-		int			paramid = linitial_int(subplan->setParam);
-		ParamExecData *prm = &(econtext->ecxt_param_exec_vals[paramid]);
-
-		/*
-		 * We build the result array in query context so it won't disappear;
-		 * to avoid leaking memory across repeated calls, we have to remember
-		 * the latest value, much as for curTuple above.
-		 */
-		if (node->curArray != PointerGetDatum(NULL))
-			pfree(DatumGetPointer(node->curArray));
-		node->curArray = makeArrayResultAny(astate,
-											econtext->ecxt_per_query_memory,
-											true);
-		prm->execPlan = NULL;
-		prm->value = node->curArray;
-		prm->isnull = false;
-	}
-	else if (!found)
+	if (!found)
 	{
 		if (subLinkType == EXISTS_SUBLINK)
 		{

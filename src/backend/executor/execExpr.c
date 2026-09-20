@@ -2412,7 +2412,6 @@ ExecInitSubscriptingRef(ExprEvalStep *scratch, SubscriptingRef *sbsref,
 {
 	bool		isAssignment = (sbsref->refassgnexpr != NULL);
 	int			nupper = list_length(sbsref->refupperindexpr);
-	int			nlower = list_length(sbsref->reflowerindexpr);
 	const SubscriptRoutines *sbsroutines;
 	SubscriptingRefState *sbsrefstate;
 	SubscriptExecSteps methods;
@@ -2434,27 +2433,20 @@ ExecInitSubscriptingRef(ExprEvalStep *scratch, SubscriptingRef *sbsref,
 
 	/* Allocate sbsrefstate, with enough space for per-subscript arrays too */
 	sbsrefstate = palloc0(MAXALIGN(sizeof(SubscriptingRefState)) +
-						  (nupper + nlower) * (sizeof(Datum) +
-											   2 * sizeof(bool)));
+						  nupper * (sizeof(Datum) +
+									2 * sizeof(bool)));
 
 	/* Fill constant fields of SubscriptingRefState */
 	sbsrefstate->isassignment = isAssignment;
 	sbsrefstate->numupper = nupper;
-	sbsrefstate->numlower = nlower;
 	/* Set up per-subscript arrays */
 	ptr = ((char *) sbsrefstate) + MAXALIGN(sizeof(SubscriptingRefState));
 	sbsrefstate->upperindex = (Datum *) ptr;
 	ptr += nupper * sizeof(Datum);
-	sbsrefstate->lowerindex = (Datum *) ptr;
-	ptr += nlower * sizeof(Datum);
 	sbsrefstate->upperprovided = (bool *) ptr;
 	ptr += nupper * sizeof(bool);
-	sbsrefstate->lowerprovided = (bool *) ptr;
-	ptr += nlower * sizeof(bool);
 	sbsrefstate->upperindexnull = (bool *) ptr;
-	ptr += nupper * sizeof(bool);
-	sbsrefstate->lowerindexnull = (bool *) ptr;
-	/* ptr += nlower * sizeof(bool); */
+	/* ptr += nupper * sizeof(bool); */
 
 	/*
 	 * Let the container-type-specific code have a chance.  It must fill the
@@ -2493,45 +2485,15 @@ ExecInitSubscriptingRef(ExprEvalStep *scratch, SubscriptingRef *sbsref,
 	{
 		Expr	   *e = (Expr *) lfirst(lc);
 
-		/* When slicing, individual subscript bounds can be omitted */
-		if (!e)
-		{
-			sbsrefstate->upperprovided[i] = false;
-			sbsrefstate->upperindexnull[i] = true;
-		}
-		else
-		{
-			sbsrefstate->upperprovided[i] = true;
-			/* Each subscript is evaluated into appropriate array entry */
-			ExecInitExprRec(e, state,
-							&sbsrefstate->upperindex[i],
-							&sbsrefstate->upperindexnull[i]);
-		}
+		sbsrefstate->upperprovided[i] = true;
+		/* Each subscript is evaluated into appropriate array entry */
+		ExecInitExprRec(e, state,
+						&sbsrefstate->upperindex[i],
+						&sbsrefstate->upperindexnull[i]);
 		i++;
 	}
 
-	/* Evaluate lower subscripts similarly */
-	i = 0;
-	foreach(lc, sbsref->reflowerindexpr)
-	{
-		Expr	   *e = (Expr *) lfirst(lc);
 
-		/* When slicing, individual subscript bounds can be omitted */
-		if (!e)
-		{
-			sbsrefstate->lowerprovided[i] = false;
-			sbsrefstate->lowerindexnull[i] = true;
-		}
-		else
-		{
-			sbsrefstate->lowerprovided[i] = true;
-			/* Each subscript is evaluated into appropriate array entry */
-			ExecInitExprRec(e, state,
-							&sbsrefstate->lowerindex[i],
-							&sbsrefstate->lowerindexnull[i]);
-		}
-		i++;
-	}
 
 	/* SBSREF_SUBSCRIPTS checks and converts all the subscripts at once */
 	if (methods.sbs_check_subscripts)

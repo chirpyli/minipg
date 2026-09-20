@@ -1380,8 +1380,7 @@ transformSubLink(ParseState *pstate, SubLink *sublink)
 		sublink->testexpr = NULL;
 		sublink->operName = NIL;
 	}
-	else if (sublink->subLinkType == EXPR_SUBLINK ||
-			 sublink->subLinkType == ARRAY_SUBLINK)
+	else if (sublink->subLinkType == EXPR_SUBLINK)
 	{
 		/*
 		 * Make sure the subselect delivers a single column (ignoring resjunk

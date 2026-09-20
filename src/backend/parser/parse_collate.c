@@ -382,8 +382,8 @@ assign_collations_walker(Node *node, assign_collations_context *context)
 				/*
 				 * We get here when we're invoked on the Query belonging to a
 				 * SubLink.  Act as though the Query returns its first output
-				 * column, which indeed is what it does for EXPR_SUBLINK and
-				 * ARRAY_SUBLINK cases.  In the cases where the SubLink
+				 * column, which indeed is what it does for the EXPR_SUBLINK
+				 * case.  In the cases where the SubLink
 				 * returns boolean, this info will be ignored.  Special case:
 				 * in EXISTS, the Query might return no columns, in which case
 				 * we need do nothing.

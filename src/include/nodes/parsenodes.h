@@ -296,9 +296,7 @@ typedef struct A_Star
 typedef struct A_Indices
 {
 	NodeTag		type;
-	bool		is_slice;		/* true if slice (i.e., colon present) */
-	Node	   *lidx;			/* slice lower bound, if any */
-	Node	   *uidx;			/* subscript, or slice upper bound if any */
+	Node	   *uidx;			/* subscript */
 } A_Indices;
 
 /*

@@ -587,12 +587,6 @@ typedef struct SubscriptingRefState
 	Datum	   *upperindex;
 	bool	   *upperindexnull;
 
-	/* similarly for lower indexes, if any */
-	int			numlower;
-	bool	   *lowerprovided;
-	Datum	   *lowerindex;
-	bool	   *lowerindexnull;
-
 	/* for assignment, new value to assign is evaluated into here */
 	Datum		replacevalue;
 	bool		replacenull;

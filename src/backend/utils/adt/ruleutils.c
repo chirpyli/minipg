@@ -6496,10 +6496,7 @@ get_sublink_expr(SubLink *sublink, deparse_context *context)
 	char	   *opname = NULL;
 	bool		need_paren;
 
-	if (sublink->subLinkType == ARRAY_SUBLINK)
-		appendStringInfoString(buf, "ARRAY(");
-	else
-		appendStringInfoChar(buf, '(');
+	appendStringInfoChar(buf, '(');
 
 	/*
 	 * Note that we print the name of only the first operator, when there are
@@ -6567,7 +6564,6 @@ get_sublink_expr(SubLink *sublink, deparse_context *context)
 			break;
 
 		case EXPR_SUBLINK:
-		case ARRAY_SUBLINK:
 			need_paren = false;
 			break;
 

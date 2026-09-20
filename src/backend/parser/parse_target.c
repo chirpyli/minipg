@@ -42,12 +42,12 @@ static Node *transformAssignmentSubscripts(ParseState *pstate,
 										   int32 targetTypMod,
 										   Oid targetCollation,
 										   List *subscripts,
-										   bool isSlice,
 										   List *indirection,
 										   ListCell *next_indirection,
 										   Node *rhs,
 										   CoercionContext ccontext,
 										   int location);
+
 static List *ExpandColumnRefStar(ParseState *pstate, ColumnRef *cref,
 								 bool make_target_entry);
 static List *ExpandAllTables(ParseState *pstate, int location);
@@ -591,7 +591,6 @@ transformAssignmentIndirection(ParseState *pstate,
 {
 	Node	   *result;
 	List	   *subscripts = NIL;
-	bool		isSlice = false;
 	ListCell   *i;
 
 	if (indirection_cell && !basenode)
@@ -623,8 +622,6 @@ transformAssignmentIndirection(ParseState *pstate,
 		if (IsA(n, A_Indices))
 		{
 			subscripts = lappend(subscripts, n);
-			if (((A_Indices *) n)->is_slice)
-				isSlice = true;
 		}
 		else if (IsA(n, A_Star))
 		{
@@ -657,7 +654,6 @@ transformAssignmentIndirection(ParseState *pstate,
 													 targetTypMod,
 													 targetCollation,
 													 subscripts,
-													 isSlice,
 													 indirection,
 													 i,
 													 rhs,
@@ -747,7 +743,6 @@ transformAssignmentIndirection(ParseState *pstate,
 											 targetTypMod,
 											 targetCollation,
 											 subscripts,
-											 isSlice,
 											 indirection,
 											 NULL,
 											 rhs,
@@ -801,7 +796,6 @@ transformAssignmentSubscripts(ParseState *pstate,
 							  int32 targetTypMod,
 							  Oid targetCollation,
 							  List *subscripts,
-							  bool isSlice,
 							  List *indirection,
 							  ListCell *next_indirection,
 							  Node *rhs,
@@ -1663,9 +1657,6 @@ FigureColnameInternal(Node *node, char **name)
 			{
 				case EXISTS_SUBLINK:
 					*name = "exists";
-					return 2;
-				case ARRAY_SUBLINK:
-					*name = "array";
 					return 2;
 				case EXPR_SUBLINK:
 					{

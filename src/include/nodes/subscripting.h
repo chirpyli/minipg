@@ -63,12 +63,7 @@ struct SubscriptExecSteps;
  * are still in raw form.  The transform method is responsible for doing
  * parse analysis of each subscript expression (using transformExpr),
  * coercing the subscripts to whatever type it needs, and building the
- * refupperindexpr and reflowerindexpr lists from those results.  The
- * reflowerindexpr list must be empty for an element operation, or the
- * same length as refupperindexpr for a slice operation.  Insert NULLs
- * (that is, an empty parse tree, not a null Const node) for any omitted
- * subscripts in a slice operation.  (Of course, if the transform method
- * does not care to support slicing, it can just throw an error if isSlice.)
+ * refupperindexpr list from those results.
  * See array_subscript_transform() for sample code.
  *
  * The transform method is also responsible for identifying the result type
@@ -76,9 +71,8 @@ struct SubscriptExecSteps;
  * describe the container type (this will be a base type not a domain), and
  * refelemtype is set to the container type's pg_type.typelem value.  The
  * transform method must set refrestype and reftypmod to describe the result
- * of subscripting.  For arrays, refrestype is set to refelemtype for an
- * element operation or refcontainertype for a slice, while reftypmod stays
- * the same in either case; but other types might use other rules.  The
+ * of subscripting.  For arrays, refrestype is set to refelemtype, while
+ * reftypmod stays the same; but other types might use other rules.  The
  * transform method should ignore refcollid, as that's determined later on
  * during parsing.
  *
@@ -87,7 +81,7 @@ struct SubscriptExecSteps;
  * fetch, too.  (The isAssignment parameter is typically only useful if the
  * transform method wishes to throw an error for not supporting assignment.)
  * To complete processing of an assignment, the core parser will coerce the
- * element/slice source expression to the returned refrestype and reftypmod
+ * element source expression to the returned refrestype and reftypmod
  * before putting it into refassgnexpr.  It will then set refrestype and
  * reftypmod to again describe the container type, since that's what an
  * assignment must return.
@@ -95,7 +89,6 @@ struct SubscriptExecSteps;
 typedef void (*SubscriptTransform) (SubscriptingRef *sbsref,
 									List *indirection,
 									struct ParseState *pstate,
-									bool isSlice,
 									bool isAssignment);
 
 /*
