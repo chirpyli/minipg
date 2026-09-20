@@ -328,16 +328,8 @@ select 'foo'::text = any(array['abc','def','foo']::text[]) c1,
        'foo'::text = any((select array['abc','def','foo']::text[])::text[]) c2;
 select pg_get_viewdef('tt19v', true);
 
--- check display of assorted RTE_FUNCTION expressions
-
-create view tt20v as
-select * from
-  coalesce(1,2) as c,
--- minipg: COLLATION FOR 已随 COLLATE 一并裁剪
-  current_date as d,
-  cast(1+2 as int4) as i4,
-  cast(1+2 as int8) as i8;
-select pg_get_viewdef('tt20v', true);
+-- minipg: function-in-FROM 已裁剪，原 "assorted RTE_FUNCTION expressions"
+-- （FROM COALESCE(...)/CURRENT_DATE/CAST(...) 作为表函数）用例移除
 
 -- reverse-listing of various special functions
 

@@ -276,9 +276,6 @@ JumbleRangeTable(JumbleState *jstate, List *rtable)
 			case RTE_JOIN:
 				APP_JUMB(rte->jointype);
 				break;
-			case RTE_FUNCTION:
-				JumbleExpr(jstate, (Node *) rte->functions);
-				break;
 			case RTE_VALUES:
 				JumbleExpr(jstate, (Node *) rte->values_lists);
 				break;
@@ -603,13 +600,6 @@ JumbleExpr(JumbleState *jstate, Node *node)
 			}
 			break;
 
-		case T_RangeTblFunction:
-			{
-				RangeTblFunction *rtfunc = (RangeTblFunction *) node;
-
-				JumbleExpr(jstate, rtfunc->funcexpr);
-			}
-			break;
 		default:
 			/* Only a warning, since we can stumble along anyway */
 			elog(WARNING, "unrecognized node type: %d",

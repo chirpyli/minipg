@@ -605,7 +605,6 @@ ExplainPreScanNode(PlanState *planstate, Bitmapset **rels_used)
 		case T_TidScan:
 		case T_TidRangeScan:
 		case T_SubqueryScan:
-		case T_FunctionScan:
 		case T_ValuesScan:
 		case T_NamedTuplestoreScan:
 			*rels_used = bms_add_member(*rels_used,
@@ -746,9 +745,6 @@ ExplainNode(PlanState *planstate, List *ancestors,
 		case T_SubqueryScan:
 			pname = "Subquery Scan";
 			break;
-		case T_FunctionScan:
-			pname = "Function Scan";
-			break;
 		case T_ValuesScan:
 			pname = "Values Scan";
 			break;
@@ -834,7 +830,6 @@ ExplainNode(PlanState *planstate, List *ancestors,
 		case T_TidScan:
 		case T_TidRangeScan:
 		case T_SubqueryScan:
-		case T_FunctionScan:
 		case T_ValuesScan:
 			ExplainScanTarget((Scan *) plan, es);
 			break;
@@ -1126,28 +1121,6 @@ ExplainNode(PlanState *planstate, List *ancestors,
 										   nworkers, es);
 				}
 			}
-			break;
-		case T_FunctionScan:
-			if (es->verbose)
-			{
-				List	   *fexprs = NIL;
-				ListCell   *lc;
-
-				foreach(lc, ((FunctionScan *) plan)->functions)
-				{
-					RangeTblFunction *rtfunc = (RangeTblFunction *) lfirst(lc);
-
-					fexprs = lappend(fexprs, rtfunc->funcexpr);
-				}
-				/* We rely on show_expression to insert commas as needed */
-				show_expression((Node *) fexprs,
-								"Function Call", planstate, ancestors,
-								es->verbose, es);
-			}
-			show_scan_qual(plan->qual, "Filter", planstate, ancestors, es);
-			if (plan->qual)
-				show_instrumentation_count("Rows Removed by Filter", 1,
-										   planstate, es);
 			break;
 		case T_TidScan:
 			{
@@ -2517,36 +2490,6 @@ ExplainTargetRel(Plan *plan, Index rti, ExplainState *es)
 			objectname = get_rel_name(rte->relid);
 			if (es->verbose)
 				namespace = get_namespace_name(get_rel_namespace(rte->relid));
-			break;
-		case T_FunctionScan:
-			{
-				FunctionScan *fscan = (FunctionScan *) plan;
-
-				/* Assert it's on a RangeFunction */
-				Assert(rte->rtekind == RTE_FUNCTION);
-
-				/*
-				 * If the expression is still a function call of a single
-				 * function, we can get the real name of the function.
-				 * Otherwise, punt.  (Even if it was a single function call
-				 * originally, the optimizer could have simplified it away.)
-				 */
-				if (list_length(fscan->functions) == 1)
-				{
-					RangeTblFunction *rtfunc = (RangeTblFunction *) linitial(fscan->functions);
-
-					if (IsA(rtfunc->funcexpr, FuncExpr))
-					{
-						FuncExpr   *funcexpr = (FuncExpr *) rtfunc->funcexpr;
-						Oid			funcid = funcexpr->funcid;
-
-						objectname = get_func_name(funcid);
-						if (es->verbose)
-							namespace =
-								get_namespace_name(get_func_namespace(funcid));
-					}
-				}
-			}
 			break;
 		case T_ValuesScan:
 			Assert(rte->rtekind == RTE_VALUES);

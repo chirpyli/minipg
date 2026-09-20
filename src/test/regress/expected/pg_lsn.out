@@ -125,31 +125,36 @@ LINE 1: SELECT '0/16AE7F7'::pg_lsn - 'NaN'::int8;
 -- Check btree and hash opclasses
 EXPLAIN (COSTS OFF)
 SELECT DISTINCT (i || '/' || j)::pg_lsn f
-  FROM generate_series(1, 10) i,
-       generate_series(1, 10) j,
-       generate_series(1, 5) k
+  FROM (SELECT generate_series(1, 10) AS i) AS _gsi,
+       (SELECT generate_series(1, 10) AS j) AS _gsj,
+       (SELECT generate_series(1, 5) AS k) AS _gsk
   WHERE i <= 10 AND j > 0 AND j <= 10
   ORDER BY f;
-                                QUERY PLAN                                
---------------------------------------------------------------------------
+                                   QUERY PLAN                                   
+--------------------------------------------------------------------------------
  Sort
-   Sort Key: (((((i.i)::text || '/'::text) || (j.j)::text))::pg_lsn)
+   Sort Key: (((((_gsi.i)::text || '/'::text) || (_gsj.j)::text))::pg_lsn)
    ->  HashAggregate
-         Group Key: ((((i.i)::text || '/'::text) || (j.j)::text))::pg_lsn
+         Group Key: ((((_gsi.i)::text || '/'::text) || (_gsj.j)::text))::pg_lsn
          ->  Nested Loop
-               ->  Function Scan on generate_series k
+               ->  ProjectSet
+                     ->  Result
                ->  Materialize
                      ->  Nested Loop
-                           ->  Function Scan on generate_series j
-                                 Filter: ((j > 0) AND (j <= 10))
-                           ->  Function Scan on generate_series i
-                                 Filter: (i <= 10)
-(12 rows)
+                           ->  Subquery Scan on _gsj
+                                 Filter: ((_gsj.j > 0) AND (_gsj.j <= 10))
+                                 ->  ProjectSet
+                                       ->  Result
+                           ->  Subquery Scan on _gsi
+                                 Filter: (_gsi.i <= 10)
+                                 ->  ProjectSet
+                                       ->  Result
+(17 rows)
 
 SELECT DISTINCT (i || '/' || j)::pg_lsn f
-  FROM generate_series(1, 10) i,
-       generate_series(1, 10) j,
-       generate_series(1, 5) k
+  FROM (SELECT generate_series(1, 10) AS i) AS _gsi,
+       (SELECT generate_series(1, 10) AS j) AS _gsj,
+       (SELECT generate_series(1, 5) AS k) AS _gsk
   WHERE i <= 10 AND j > 0 AND j <= 10
   ORDER BY f;
    f   

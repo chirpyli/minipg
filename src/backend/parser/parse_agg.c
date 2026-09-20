@@ -294,13 +294,6 @@ check_agglevels_and_constraints(ParseState *pstate, Node *expr)
 				err = _("grouping operations are not allowed in FROM clause of their own query level");
 
 			break;
-		case EXPR_KIND_FROM_FUNCTION:
-			if (isAgg)
-				err = _("aggregate functions are not allowed in functions in FROM");
-			else
-				err = _("grouping operations are not allowed in functions in FROM");
-
-			break;
 		case EXPR_KIND_WHERE:
 			errkind = true;
 			break;

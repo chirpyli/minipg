@@ -21,7 +21,6 @@
 #include "executor/nodeBitmapHeapscan.h"
 #include "executor/nodeBitmapIndexscan.h"
 #include "executor/nodeBitmapOr.h"
-#include "executor/nodeFunctionscan.h"
 #include "executor/nodeGather.h"
 #include "executor/nodeGatherMerge.h"
 #include "executor/nodeGroup.h"
@@ -51,9 +50,6 @@
 #include "nodes/pathnodes.h"
 #include "utils/rel.h"
 #include "utils/syscache.h"
-
-static bool IndexSupportsBackwardScan(Oid indexid);
-
 
 /*
  * ExecReScan
@@ -188,10 +184,6 @@ ExecReScan(PlanState *node)
 
 		case T_SubqueryScanState:
 			ExecReScanSubqueryScan((SubqueryScanState *) node);
-			break;
-
-		case T_FunctionScanState:
-			ExecReScanFunctionScan((FunctionScanState *) node);
 			break;
 
 		case T_ValuesScanState:
@@ -477,9 +469,9 @@ ExecSupportsBackwardScan(Plan *node)
 				return true;
 			}
 
+		default:
+			return false;
 	}
-
-	return false;
 }
 
 /*
@@ -496,7 +488,6 @@ ExecMaterializesOutput(NodeTag plantype)
 	switch (plantype)
 	{
 		case T_Material:
-		case T_FunctionScan:
 		case T_NamedTuplestoreScan:
 		case T_Sort:
 			return true;

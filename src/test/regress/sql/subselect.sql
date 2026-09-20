@@ -91,7 +91,7 @@ from int8_tbl group by q1 order by q1;
 -- Unspecified-type literals in output columns should resolve as text
 
 SELECT *, pg_typeof(f1) FROM
-  (SELECT 'foo' AS f1 FROM generate_series(1,3)) ss ORDER BY 1;
+  (SELECT 'foo' AS f1 FROM (SELECT generate_series(1,3) AS g) AS _gs) ss ORDER BY 1;
 
 -- ... unless there's context to suggest differently
 
@@ -373,9 +373,9 @@ select * from outer_text where f2 not in (select c2 from inner_text);
 --
 
 explain (verbose, costs off)
-select 'foo'::text in (select 'bar'::name from generate_series(1,2));
+select 'foo'::text in (select 'bar'::name from (SELECT generate_series(1,2) AS g) AS _gs);
 
-select 'foo'::text in (select 'bar'::name from generate_series(1,2));
+select 'foo'::text in (select 'bar'::name from (SELECT generate_series(1,2) AS g) AS _gs);
 
 -- minipg: ROW 行构造器已裁剪，"don't try to hash nested records" 用例移除
 
@@ -383,7 +383,7 @@ select 'foo'::text in (select 'bar'::name from generate_series(1,2));
 -- Test case for premature memory release during hashing of subplan output
 --
 
-select '1'::text in (select '1'::name from generate_series(1,2));
+select '1'::text in (select '1'::name from (SELECT generate_series(1,2) AS g) AS _gs);
 
 --
 -- Test resolution of hashed vs non-hashed implementation of EXISTS subplan
@@ -468,7 +468,7 @@ select exists(select * from nocolumns);
 -- Check behavior with a SubPlan in VALUES (bug #14924)
 --
 select val.x
-  from generate_series(1,10) as s(i),
+  from (SELECT generate_series(1,10) AS i) AS s,
   lateral (
     values ((select s.i + 1)), (s.i + 101)
   ) as val(x)

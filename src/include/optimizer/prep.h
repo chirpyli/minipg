@@ -23,7 +23,6 @@
  */
 extern void replace_empty_jointree(Query *parse);
 extern void pull_up_sublinks(PlannerInfo *root);
-extern void preprocess_function_rtes(PlannerInfo *root);
 extern void pull_up_subqueries(PlannerInfo *root);
 extern void reduce_outer_joins(PlannerInfo *root);
 extern void remove_useless_result_rtes(PlannerInfo *root);

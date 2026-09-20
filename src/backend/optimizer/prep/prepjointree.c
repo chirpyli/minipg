@@ -6,7 +6,6 @@
  * NOTE: the intended sequence for invoking these operations is
  *		replace_empty_jointree
  *		pull_up_sublinks
- *		preprocess_function_rtes
  *		pull_up_subqueries
  *		do expression preprocessing (including flattening JOIN alias vars)
  *		reduce_outer_joins
@@ -81,10 +80,6 @@ static bool is_simple_subquery(PlannerInfo *root, Query *subquery,
 static Node *pull_up_simple_values(PlannerInfo *root, Node *jtnode,
 								   RangeTblEntry *rte);
 static bool is_simple_values(PlannerInfo *root, RangeTblEntry *rte);
-static Node *pull_up_constant_function(PlannerInfo *root, Node *jtnode,
-									   RangeTblEntry *rte,
-									   JoinExpr *lowest_nulling_outer_join,
-									   AppendRelInfo *containing_appendrel);
 static bool is_safe_append_member(Query *subquery);
 static bool jointree_contains_lateral_outer_refs(PlannerInfo *root,
 												 Node *jtnode, bool restricted,
@@ -599,71 +594,6 @@ pull_up_sublinks_qual_recurse(PlannerInfo *root, Node *node,
 }
 
 /*
- * preprocess_function_rtes
- *		Constant-simplify any FUNCTION RTEs in the FROM clause, and then
- *		attempt to "inline" any that are set-returning functions.
- *
- * If an RTE_FUNCTION rtable entry invokes a set-returning function that
- * contains just a simple SELECT, we can convert the rtable entry to an
- * RTE_SUBQUERY entry exposing the SELECT directly.  This is especially
- * useful if the subquery can then be "pulled up" for further optimization,
- * but we do it even if not, to reduce executor overhead.
- *
- * This has to be done before we have started to do any optimization of
- * subqueries, else any such steps wouldn't get applied to subqueries
- * obtained via inlining.  However, we do it after pull_up_sublinks
- * so that we can inline any functions used in SubLink subselects.
- *
- * The reason for applying const-simplification at this stage is that
- * (a) we'd need to do it anyway to inline a SRF, and (b) by doing it now,
- * we can be sure that pull_up_constant_function() will see constants
- * if there are constants to be seen.  This approach also guarantees
- * that every FUNCTION RTE has been const-simplified, allowing planner.c's
- * preprocess_expression() to skip doing it again.
- *
- * Like most of the planner, this feels free to scribble on its input data
- * structure.
- */
-void
-preprocess_function_rtes(PlannerInfo *root)
-{
-	ListCell   *rt;
-
-	foreach(rt, root->parse->rtable)
-	{
-		RangeTblEntry *rte = (RangeTblEntry *) lfirst(rt);
-
-		if (rte->rtekind == RTE_FUNCTION)
-		{
-			Query	   *funcquery;
-
-			/* Apply const-simplification */
-			rte->functions = (List *)
-				eval_const_expressions(root, (Node *) rte->functions);
-
-			/* Check safety of expansion, and expand if possible */
-			funcquery = inline_set_returning_function(root, rte);
-			if (funcquery)
-			{
-				/* Successful expansion, convert the RTE to a subquery */
-				rte->rtekind = RTE_SUBQUERY;
-				rte->subquery = funcquery;
-				rte->security_barrier = false;
-
-				/*
-				 * Clear fields that should not be set in a subquery RTE.
-				 * However, we leave rte->functions filled in for the moment,
-				 * in case makeWholeRowVar needs to consult it.  We'll clear
-				 * it in setrefs.c (see add_rte_to_flat_rtable) so that this
-				 * abuse of the data structure doesn't escape the planner.
-				 */
-				rte->funcordinality = false;
-			}
-		}
-	}
-}
-
-/*
  * pull_up_subqueries
  *		Look for subqueries in the rangetable that can be pulled up into
  *		the parent query.  If the subquery has no special features like
@@ -765,14 +695,6 @@ pull_up_subqueries_recurse(PlannerInfo *root, Node *jtnode,
 			containing_appendrel == NULL &&
 			is_simple_values(root, rte))
 			return pull_up_simple_values(root, jtnode, rte);
-
-		/*
-		 * Or perhaps it's a FUNCTION RTE that we could inline?
-		 */
-		if (rte->rtekind == RTE_FUNCTION)
-			return pull_up_constant_function(root, jtnode, rte,
-											 lowest_nulling_outer_join,
-											 containing_appendrel);
 
 		/* Otherwise, do nothing at this node. */
 	}
@@ -934,12 +856,6 @@ pull_up_simple_subquery(PlannerInfo *root, Node *jtnode, RangeTblEntry *rte,
 		pull_up_sublinks(subroot);
 
 	/*
-	 * Similarly, preprocess its function RTEs to inline any set-returning
-	 * functions in its rangetable.
-	 */
-	preprocess_function_rtes(subroot);
-
-	/*
 	 * Recursively pull up the subquery's subqueries, so that
 	 * pull_up_subqueries' processing is complete for its jointree and
 	 * rangetable.
@@ -1077,7 +993,6 @@ pull_up_simple_subquery(PlannerInfo *root, Node *jtnode, RangeTblEntry *rte,
 					/* plain relations cannot contain lateral references */
 					break;
 				case RTE_SUBQUERY:
-				case RTE_FUNCTION:
 				case RTE_VALUES:
 					child_rte->lateral = true;
 					break;
@@ -1435,141 +1350,6 @@ is_simple_values(PlannerInfo *root, RangeTblEntry *rte)
 }
 
 /*
- * pull_up_constant_function
- *		Pull up an RTE_FUNCTION expression that was simplified to a constant.
- *
- * jtnode is a RangeTblRef that has been identified as a FUNCTION RTE by
- * pull_up_subqueries.  If its expression is just a Const, hoist that value
- * up into the parent query, and replace the RTE_FUNCTION with RTE_RESULT.
- *
- * In principle we could pull up any immutable expression, but we don't.
- * That might result in multiple evaluations of the expression, which could
- * be costly if it's not just a Const.  Also, the main value of this is
- * to let the constant participate in further const-folding, and of course
- * that won't happen for a non-Const.
- *
- * The pulled-up value might need to be wrapped in a PlaceHolderVar if the
- * RTE is below an outer join or is part of an appendrel; the extra
- * parameters show whether that's needed.
- */
-static Node *
-pull_up_constant_function(PlannerInfo *root, Node *jtnode,
-						  RangeTblEntry *rte,
-						  JoinExpr *lowest_nulling_outer_join,
-						  AppendRelInfo *containing_appendrel)
-{
-	Query	   *parse = root->parse;
-	RangeTblFunction *rtf;
-	TypeFuncClass functypclass;
-	Oid			funcrettype;
-	TupleDesc	tupdesc;
-	pullup_replace_vars_context rvcontext;
-
-	/* Fail if the RTE has ORDINALITY - we don't implement that here. */
-	if (rte->funcordinality)
-		return jtnode;
-
-	/* Fail if RTE isn't a single, simple Const expr */
-	if (list_length(rte->functions) != 1)
-		return jtnode;
-	rtf = linitial_node(RangeTblFunction, rte->functions);
-	if (!IsA(rtf->funcexpr, Const))
-		return jtnode;
-
-	/*
-	 * If the function's result is not a scalar, we punt.  In principle we
-	 * could break the composite constant value apart into per-column
-	 * constants, but for now it seems not worth the work.
-	 */
-	if (rtf->funccolcount != 1)
-		return jtnode;			/* definitely composite */
-
-	/* If it has a coldeflist, it certainly returns RECORD */
-	if (rtf->funccolnames != NIL)
-		return jtnode;			/* must be a one-column RECORD type */
-
-	functypclass = get_expr_result_type(rtf->funcexpr,
-										&funcrettype,
-										&tupdesc);
-	if (functypclass != TYPEFUNC_SCALAR)
-		return jtnode;			/* must be a one-column composite type */
-
-	/* Create context for applying pullup_replace_vars */
-	rvcontext.root = root;
-	rvcontext.targetlist = list_make1(makeTargetEntry((Expr *) rtf->funcexpr,
-													  1,	/* resno */
-													  NULL, /* resname */
-													  false));	/* resjunk */
-	rvcontext.target_rte = rte;
-
-	/*
-	 * Since this function was reduced to a Const, it doesn't contain any
-	 * lateral references, even if it's marked as LATERAL.  This means we
-	 * don't need to fill relids.
-	 */
-	rvcontext.relids = NULL;
-
-	rvcontext.outer_hasSubLinks = &parse->hasSubLinks;
-	rvcontext.varno = ((RangeTblRef *) jtnode)->rtindex;
-	/* these flags will be set below, if needed */
-	rvcontext.need_phvs = false;
-	rvcontext.wrap_non_vars = false;
-	/* initialize cache array with indexes 0 .. length(tlist) */
-	rvcontext.rv_cache = palloc0((list_length(rvcontext.targetlist) + 1) *
-								 sizeof(Node *));
-
-	/*
-	 * If we are under an outer join then non-nullable items and lateral
-	 * references may have to be turned into PlaceHolderVars.
-	 */
-	if (lowest_nulling_outer_join != NULL)
-		rvcontext.need_phvs = true;
-
-	/*
-	 * If we are dealing with an appendrel member then anything that's not a
-	 * simple Var has to be turned into a PlaceHolderVar.  (See comments in
-	 * pull_up_simple_subquery().)
-	 */
-	if (containing_appendrel != NULL)
-	{
-		rvcontext.need_phvs = true;
-		rvcontext.wrap_non_vars = true;
-	}
-
-
-
-	/*
-	 * Replace all of the top query's references to the RTE's output with
-	 * copies of the funcexpr, being careful not to replace any of the
-	 * jointree structure.
-	 */
-	perform_pullup_replace_vars(root, &rvcontext,
-								lowest_nulling_outer_join,
-								containing_appendrel);
-
-	/*
-	 * We don't need to bother with changing PlaceHolderVars in the parent
-	 * query.  Their references to the RT index are still good for now, and
-	 * will get removed later if we're able to drop the RTE_RESULT.
-	 */
-
-	/*
-	 * Convert the RTE to be RTE_RESULT type, signifying that we don't need to
-	 * scan it anymore, and zero out RTE_FUNCTION-specific fields.  Also make
-	 * sure the RTE is not marked LATERAL, since elsewhere we don't expect
-	 * RTE_RESULTs to be LATERAL.
-	 */
-	rte->rtekind = RTE_RESULT;
-	rte->functions = NIL;
-	rte->lateral = false;
-
-	/*
-	 * We can reuse the RangeTblRef node.
-	 */
-	return jtnode;
-}
-
-/*
  * is_simple_union_all
  *	  Check a subquery to see if it's a simple UNION ALL.
  *
@@ -1808,11 +1588,6 @@ replace_vars_in_jointree(Node *jtnode,
 						rte->subquery =
 							pullup_replace_vars_subquery(rte->subquery,
 														 context);
-						break;
-					case RTE_FUNCTION:
-						rte->functions = (List *)
-							pullup_replace_vars((Node *) rte->functions,
-												context);
 						break;
 					case RTE_VALUES:
 						rte->values_lists = (List *)

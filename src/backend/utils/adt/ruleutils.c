@@ -404,8 +404,6 @@ static void get_rule_expr_toplevel(Node *node, deparse_context *context,
 								   bool showimplicit);
 static void get_rule_list_toplevel(List *lst, deparse_context *context,
 								   bool showimplicit);
-static void get_rule_expr_funccall(Node *node, deparse_context *context,
-								   bool showimplicit);
 static bool looks_like_function(Node *node);
 static void get_oper_expr(OpExpr *expr, deparse_context *context);
 static void get_func_expr(FuncExpr *expr, deparse_context *context,
@@ -431,9 +429,6 @@ static void get_rte_alias(RangeTblEntry *rte, int varno, bool use_as,
 						  deparse_context *context);
 static void get_column_alias_list(deparse_columns *colinfo,
 								  deparse_context *context);
-static void get_from_clause_coldeflist(RangeTblFunction *rtfunc,
-									   deparse_columns *colinfo,
-									   deparse_context *context);
 static void get_opclass_name(Oid opclass, Oid actual_datatype,
 							 StringInfo buf);
 static Node *processIndirection(Node *node, deparse_context *context);
@@ -2101,28 +2096,11 @@ set_relation_column_names(deparse_namespace *dpns, RangeTblEntry *rte,
 		ListCell   *lc;
 
 		/*
-		 * Functions returning composites have the annoying property that some
-		 * of the composite type's columns might have been dropped since the
-		 * query was parsed.  If possible, use expandRTE() to handle that
-		 * case, since it has the tedious logic needed to find out about
-		 * dropped columns.  However, if we're explaining a plan, then we
-		 * don't have rte->functions because the planner thinks that won't be
-		 * needed later, and that breaks expandRTE().  So in that case we have
-		 * to rely on rte->eref, which may lead us to report a dropped
-		 * column's old name; that seems close enough for EXPLAIN's purposes.
-		 *
-		 * For non-RELATION, non-FUNCTION RTEs, we can just look at rte->eref,
+		 * For non-RELATION RTEs, we can just look at rte->eref,
 		 * which should be sufficiently up-to-date: no other RTE types can
 		 * have columns get dropped from under them after parsing.
 		 */
-		if (rte->rtekind == RTE_FUNCTION && rte->functions != NIL)
-		{
-			/* Since we're not creating Vars, rtindex etc. don't matter */
-			expandRTE(rte, 1, 0, -1, true /* include dropped */ ,
-					  &colnames, NULL);
-		}
-		else
-			colnames = rte->eref->colnames;
+		colnames = rte->eref->colnames;
 
 		ncolumns = list_length(colnames);
 		real_colnames = (char **) palloc(ncolumns * sizeof(char *));
@@ -2222,18 +2200,14 @@ set_relation_column_names(deparse_namespace *dpns, RangeTblEntry *rte,
 
 	/*
 	 * For a relation RTE, we need only print the alias column names if any
-	 * are different from the underlying "real" names.  For a function RTE,
-	 * always emit a complete column alias list; this is to protect against
-	 * possible instability of the default column names (eg, from altering
-	 * parameter names).  For tablefunc RTEs, we never print aliases, because
-	 * the column names are part of the clause itself.  For other RTE types,
+	 * are different from the underlying "real" names.  For tablefunc RTEs, we
+	 * never print aliases, because the column names are part of the clause
+	 * itself.  For other RTE types,
 	 * print if we changed anything OR if there were user-written column
 	 * aliases (since the latter would be part of the underlying "reality").
 	 */
 	if (rte->rtekind == RTE_RELATION)
 		colinfo->printaliases = changed_any;
-	else if (rte->rtekind == RTE_FUNCTION)
-		colinfo->printaliases = true;
 	else if (rte->alias && rte->alias->colnames != NIL)
 		colinfo->printaliases = true;
 	else
@@ -4438,13 +4412,6 @@ get_name_for_var_field(Var *var, int fieldno,
 											  context);
 			/* else fall through to inspect the expression */
 			break;
-		case RTE_FUNCTION:
-
-			/*
-			 * We couldn't get here unless a function is declared with one of
-			 * its result columns as RECORD, which is not allowed.
-			 */
-			break;
 	}
 
 	/*
@@ -5828,37 +5795,6 @@ get_rule_list_toplevel(List *lst, deparse_context *context,
 }
 
 /*
- * get_rule_expr_funccall		- Parse back a function-call expression
- *
- * Same as get_rule_expr(), except that we guarantee that the output will
- * look like a function call, or like one of the things the grammar treats as
- * equivalent to a function call (see the func_expr_windowless production).
- * This is needed in places where the grammar uses func_expr_windowless and
- * you can't substitute a parenthesized a_expr.  If what we have isn't going
- * to look like a function call, wrap it in a dummy CAST() expression, which
- * will satisfy the grammar --- and, indeed, is likely what the user wrote to
- * produce such a thing.
- */
-static void
-get_rule_expr_funccall(Node *node, deparse_context *context,
-					   bool showimplicit)
-{
-	if (looks_like_function(node))
-		get_rule_expr(node, context, showimplicit);
-	else
-	{
-		StringInfo	buf = context->buf;
-
-		appendStringInfoString(buf, "CAST(");
-		/* no point in showing any top-level implicit cast */
-		get_rule_expr(node, context, false);
-		appendStringInfo(buf, " AS %s)",
-						 format_type_with_typemod(exprType(node),
-												  exprTypmod(node)));
-	}
-}
-
-/*
  * Helper function to identify node types that satisfy func_expr_windowless.
  * If in doubt, "false" is always a safe answer.
  */
@@ -6698,7 +6634,6 @@ get_from_clause_item(Node *jtnode, Query *query, deparse_context *context)
 		int			varno = ((RangeTblRef *) jtnode)->rtindex;
 		RangeTblEntry *rte = rt_fetch(varno, query->rtable);
 		deparse_columns *colinfo = deparse_columns_fetch(varno, dpns);
-		RangeTblFunction *rtfunc1 = NULL;
 
 		if (rte->lateral)
 			appendStringInfoString(buf, "LATERAL ");
@@ -6721,99 +6656,6 @@ get_from_clause_item(Node *jtnode, Query *query, deparse_context *context)
 							  context->indentLevel);
 				appendStringInfoChar(buf, ')');
 				break;
-			case RTE_FUNCTION:
-				/* Function RTE */
-				rtfunc1 = (RangeTblFunction *) linitial(rte->functions);
-
-				/*
-				 * Omit ROWS FROM() syntax for just one function, unless it
-				 * has both a coldeflist and WITH ORDINALITY. If it has both,
-				 * we must use ROWS FROM() syntax to avoid ambiguity about
-				 * whether the coldeflist includes the ordinality column.
-				 */
-				if (list_length(rte->functions) == 1 &&
-					(rtfunc1->funccolnames == NIL || !rte->funcordinality))
-				{
-					get_rule_expr_funccall(rtfunc1->funcexpr, context, true);
-					/* we'll print the coldeflist below, if it has one */
-				}
-				else
-				{
-					bool		all_unnest;
-					ListCell   *lc;
-
-					/*
-					 * If all the function calls in the list are to unnest,
-					 * and none need a coldeflist, then collapse the list
-					 * back down to UNNEST(args).
-					 *
-					 * XXX This is pretty ugly, since it makes not-terribly-
-					 * future-proof assumptions about what the parser would do
-					 * with the output; but the alternative is to emit our
-					 * nonstandard ROWS FROM() notation for what might have
-					 * been a perfectly spec-compliant multi-argument
-					 * UNNEST().
-					 */
-					all_unnest = true;
-					foreach(lc, rte->functions)
-					{
-						RangeTblFunction *rtfunc = (RangeTblFunction *) lfirst(lc);
-
-						if (!IsA(rtfunc->funcexpr, FuncExpr) ||
-							((FuncExpr *) rtfunc->funcexpr)->funcid != F_UNNEST ||
-							rtfunc->funccolnames != NIL)
-						{
-							all_unnest = false;
-							break;
-						}
-					}
-
-					if (all_unnest)
-					{
-						List	   *allargs = NIL;
-
-						foreach(lc, rte->functions)
-						{
-							RangeTblFunction *rtfunc = (RangeTblFunction *) lfirst(lc);
-							List	   *args = ((FuncExpr *) rtfunc->funcexpr)->args;
-
-							allargs = list_concat(allargs, args);
-						}
-
-						appendStringInfoString(buf, "UNNEST(");
-						get_rule_expr((Node *) allargs, context, true);
-						appendStringInfoChar(buf, ')');
-					}
-					else
-					{
-						int			funcno = 0;
-
-						appendStringInfoString(buf, "ROWS FROM(");
-						foreach(lc, rte->functions)
-						{
-							RangeTblFunction *rtfunc = (RangeTblFunction *) lfirst(lc);
-
-							if (funcno > 0)
-								appendStringInfoString(buf, ", ");
-							get_rule_expr_funccall(rtfunc->funcexpr, context, true);
-							if (rtfunc->funccolnames != NIL)
-							{
-								/* Reconstruct the column definition list */
-								appendStringInfoString(buf, " AS ");
-								get_from_clause_coldeflist(rtfunc,
-														   NULL,
-														   context);
-							}
-							funcno++;
-						}
-						appendStringInfoChar(buf, ')');
-					}
-					/* prevent printing duplicate coldeflist below */
-					rtfunc1 = NULL;
-				}
-				if (rte->funcordinality)
-					appendStringInfoString(buf, " WITH ORDINALITY");
-				break;
 			case RTE_VALUES:
 				/* Values list RTE */
 				appendStringInfoChar(buf, '(');
@@ -6828,17 +6670,8 @@ get_from_clause_item(Node *jtnode, Query *query, deparse_context *context)
 		/* Print the relation alias, if needed */
 		get_rte_alias(rte, varno, false, context);
 
-		/* Print the column definitions or aliases, if needed */
-		if (rtfunc1 && rtfunc1->funccolnames != NIL)
-		{
-			/* Reconstruct the columndef list, which is also the aliases */
-			get_from_clause_coldeflist(rtfunc1, colinfo, context);
-		}
-		else
-		{
-			/* Else print column aliases as needed */
-			get_column_alias_list(colinfo, context);
-		}
+		/* Print column aliases as needed */
+		get_column_alias_list(colinfo, context);
 
 	}
 	else if (IsA(jtnode, JoinExpr))
@@ -6995,16 +6828,6 @@ get_rte_alias(RangeTblEntry *rte, int varno, bool use_as,
 		if (strcmp(refname, get_relation_name(rte->relid)) != 0)
 			printalias = true;
 	}
-	else if (rte->rtekind == RTE_FUNCTION)
-	{
-		/*
-		 * For a function RTE, always print alias.  This covers possible
-		 * renaming of the function and/or instability of the FigureColname
-		 * rules for things that aren't simple functions.  Note we'd need to
-		 * force it anyway for the columndef list case.
-		 */
-		printalias = true;
-	}
 	else if (rte->rtekind == RTE_SUBQUERY ||
 			 rte->rtekind == RTE_VALUES)
 	{
@@ -7051,65 +6874,6 @@ get_column_alias_list(deparse_columns *colinfo, deparse_context *context)
 		appendStringInfoChar(buf, ')');
 }
 
-/*
- * get_from_clause_coldeflist - reproduce FROM clause coldeflist
- *
- * When printing a top-level coldeflist (which is syntactically also the
- * relation's column alias list), use column names from colinfo.  But when
- * printing a coldeflist embedded inside ROWS FROM(), we prefer to use the
- * original coldeflist's names, which are available in rtfunc->funccolnames.
- * Pass NULL for colinfo to select the latter behavior.
- *
- * The coldeflist is appended immediately (no space) to buf.  Caller is
- * responsible for ensuring that an alias or AS is present before it.
- */
-static void
-get_from_clause_coldeflist(RangeTblFunction *rtfunc,
-						   deparse_columns *colinfo,
-						   deparse_context *context)
-{
-	StringInfo	buf = context->buf;
-	ListCell   *l1;
-	ListCell   *l2;
-	ListCell   *l3;
-	ListCell   *l4;
-	int			i;
-
-	appendStringInfoChar(buf, '(');
-
-	i = 0;
-	forfour(l1, rtfunc->funccoltypes,
-			l2, rtfunc->funccoltypmods,
-			l3, rtfunc->funccolcollations,
-			l4, rtfunc->funccolnames)
-	{
-		Oid			atttypid = lfirst_oid(l1);
-		int32		atttypmod = lfirst_int(l2);
-		Oid			attcollation = lfirst_oid(l3);
-		char	   *attname;
-
-		if (colinfo)
-			attname = colinfo->colnames[i];
-		else
-			attname = strVal(lfirst(l4));
-
-		Assert(attname);		/* shouldn't be any dropped columns here */
-
-		if (i > 0)
-			appendStringInfoString(buf, ", ");
-		appendStringInfo(buf, "%s %s",
-						 quote_identifier(attname),
-						 format_type_with_typemod(atttypid, atttypmod));
-		if (OidIsValid(attcollation) &&
-			attcollation != get_typcollation(atttypid))
-			appendStringInfo(buf, " COLLATE %s",
-							 generate_collation_name(attcollation));
-
-		i++;
-	}
-
-	appendStringInfoChar(buf, ')');
-}
 
 /*
  * get_opclass_name			- fetch name of an index operator class

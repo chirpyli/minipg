@@ -57,13 +57,13 @@ SET work_mem='64kB';
 SET enable_hashagg=FALSE;
 
 EXPLAIN (costs off)
-SELECT DISTINCT g%1000 FROM generate_series(0,9999) g;
+SELECT DISTINCT g%1000 FROM (SELECT generate_series(0,9999) AS g) AS _gs;
 
 CREATE TABLE distinct_group_1 AS
-SELECT DISTINCT g%1000 FROM generate_series(0,9999) g;
+SELECT DISTINCT g%1000 FROM (SELECT generate_series(0,9999) AS g) AS _gs;
 
 CREATE TABLE distinct_group_2 AS
-SELECT DISTINCT (g%1000)::text FROM generate_series(0,9999) g;
+SELECT DISTINCT (g%1000)::text FROM (SELECT generate_series(0,9999) AS g) AS _gs;
 
 SET enable_hashagg=TRUE;
 
@@ -72,13 +72,13 @@ SET enable_hashagg=TRUE;
 SET enable_sort=FALSE;
 
 EXPLAIN (costs off)
-SELECT DISTINCT g%1000 FROM generate_series(0,9999) g;
+SELECT DISTINCT g%1000 FROM (SELECT generate_series(0,9999) AS g) AS _gs;
 
 CREATE TABLE distinct_hash_1 AS
-SELECT DISTINCT g%1000 FROM generate_series(0,9999) g;
+SELECT DISTINCT g%1000 FROM (SELECT generate_series(0,9999) AS g) AS _gs;
 
 CREATE TABLE distinct_hash_2 AS
-SELECT DISTINCT (g%1000)::text FROM generate_series(0,9999) g;
+SELECT DISTINCT (g%1000)::text FROM (SELECT generate_series(0,9999) AS g) AS _gs;
 
 SET enable_sort=TRUE;
 

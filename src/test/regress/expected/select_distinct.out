@@ -94,22 +94,24 @@ SET work_mem='64kB';
 -- Produce results with sorting.
 SET enable_hashagg=FALSE;
 EXPLAIN (costs off)
-SELECT DISTINCT g%1000 FROM generate_series(0,9999) g;
-                   QUERY PLAN                   
-------------------------------------------------
+SELECT DISTINCT g%1000 FROM (SELECT generate_series(0,9999) AS g) AS _gs;
+             QUERY PLAN             
+------------------------------------
  Unique
    ->  Sort
-         Sort Key: ((g % 1000))
-         ->  Function Scan on generate_series g
-(4 rows)
+         Sort Key: ((_gs.g % 1000))
+         ->  Subquery Scan on _gs
+               ->  ProjectSet
+                     ->  Result
+(6 rows)
 
 CREATE TABLE distinct_group_1 AS
-SELECT DISTINCT g%1000 FROM generate_series(0,9999) g;
+SELECT DISTINCT g%1000 FROM (SELECT generate_series(0,9999) AS g) AS _gs;
 ERROR:  syntax error at or near "AS"
 LINE 1: CREATE TABLE distinct_group_1 AS
                                       ^
 CREATE TABLE distinct_group_2 AS
-SELECT DISTINCT (g%1000)::text FROM generate_series(0,9999) g;
+SELECT DISTINCT (g%1000)::text FROM (SELECT generate_series(0,9999) AS g) AS _gs;
 ERROR:  syntax error at or near "AS"
 LINE 1: CREATE TABLE distinct_group_2 AS
                                       ^
@@ -117,21 +119,23 @@ SET enable_hashagg=TRUE;
 -- Produce results with hash aggregation.
 SET enable_sort=FALSE;
 EXPLAIN (costs off)
-SELECT DISTINCT g%1000 FROM generate_series(0,9999) g;
-                QUERY PLAN                
-------------------------------------------
+SELECT DISTINCT g%1000 FROM (SELECT generate_series(0,9999) AS g) AS _gs;
+         QUERY PLAN          
+-----------------------------
  HashAggregate
-   Group Key: (g % 1000)
-   ->  Function Scan on generate_series g
-(3 rows)
+   Group Key: (_gs.g % 1000)
+   ->  Subquery Scan on _gs
+         ->  ProjectSet
+               ->  Result
+(5 rows)
 
 CREATE TABLE distinct_hash_1 AS
-SELECT DISTINCT g%1000 FROM generate_series(0,9999) g;
+SELECT DISTINCT g%1000 FROM (SELECT generate_series(0,9999) AS g) AS _gs;
 ERROR:  syntax error at or near "AS"
 LINE 1: CREATE TABLE distinct_hash_1 AS
                                      ^
 CREATE TABLE distinct_hash_2 AS
-SELECT DISTINCT (g%1000)::text FROM generate_series(0,9999) g;
+SELECT DISTINCT (g%1000)::text FROM (SELECT generate_series(0,9999) AS g) AS _gs;
 ERROR:  syntax error at or near "AS"
 LINE 1: CREATE TABLE distinct_hash_2 AS
                                      ^

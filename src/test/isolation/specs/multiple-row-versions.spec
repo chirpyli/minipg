@@ -10,7 +10,7 @@ setup
 {
  CREATE TABLE t (id int, txt text);
  INSERT INTO t (id)
-   SELECT x FROM (SELECT * FROM generate_series(1, 1000000)) a(x);
+   SELECT x FROM (SELECT generate_series(1, 1000000) AS x) AS a;
  ALTER TABLE t ADD PRIMARY KEY (id);
 }
 

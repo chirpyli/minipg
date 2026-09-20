@@ -315,11 +315,11 @@ SELECT make_timestamp(-44, 3, 15, 12, 30, 15);
 select make_timestamp(0, 7, 15, 12, 30, 15);
 
 -- generate_series for timestamp
-select * from generate_series('2020-01-01 00:00'::timestamp,
+select * from (SELECT generate_series('2020-01-01 00:00'::timestamp,
                               '2020-01-02 03:00'::timestamp,
-                              '1 hour'::interval);
+                              '1 hour'::interval) AS generate_series) AS _gs;
 -- minipg: LIMIT 已裁剪；无限 generate_series 无 LIMIT 时无法终止，用例移除
 -- errors
-select * from generate_series('2020-01-01 00:00'::timestamp,
+select * from (SELECT generate_series('2020-01-01 00:00'::timestamp,
                               '2020-01-02 03:00'::timestamp,
-                              '0 hour'::interval);
+                              '0 hour'::interval) AS generate_series) AS _gs;

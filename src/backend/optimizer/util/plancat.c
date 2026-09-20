@@ -731,9 +731,9 @@ relation_excluded_by_constraints(PlannerInfo *root,
  * For now, we don't apply the physical-tlist optimization when there are
  * dropped cols.
  *
- * We also support building a "physical" tlist for subqueries, functions,
+ * We also support building a "physical" tlist for subqueries,
  * values lists, and CTEs, since the same optimization can
- * occur in SubqueryScan, FunctionScan, ValuesScan, CteScan,
+ * occur in SubqueryScan, ValuesScan, CteScan,
  * NamedTuplestoreScan, and WorkTableScan nodes.
  */
 List *
@@ -806,7 +806,6 @@ build_physical_tlist(PlannerInfo *root, RelOptInfo *rel)
 			}
 			break;
 
-		case RTE_FUNCTION:
 		case RTE_VALUES:
 		case RTE_NAMEDTUPLESTORE:
 		case RTE_RESULT:

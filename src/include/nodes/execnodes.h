@@ -1464,36 +1464,6 @@ typedef struct SubqueryScanState
 } SubqueryScanState;
 
 /* ----------------
- *	 FunctionScanState information
- *
- *		Function nodes are used to scan the results of a
- *		function appearing in FROM (typically a function returning set).
- *
- *		eflags				node's capability flags
- *		ordinality			is this scan WITH ORDINALITY?
- *		simple				true if we have 1 function and no ordinality
- *		ordinal				current ordinal column value
- *		nfuncs				number of functions being executed
- *		funcstates			per-function execution states (private in
- *							nodeFunctionscan.c)
- *		argcontext			memory context to evaluate function arguments in
- * ----------------
- */
-struct FunctionScanPerFuncState;
-
-typedef struct FunctionScanState
-{
-	ScanState	ss;				/* its first field is NodeTag */
-	int			eflags;
-	bool		ordinality;
-	bool		simple;
-	int64		ordinal;
-	int			nfuncs;
-	struct FunctionScanPerFuncState *funcstates;	/* array of length nfuncs */
-	MemoryContext argcontext;
-} FunctionScanState;
-
-/* ----------------
  *	 ValuesScanState information
  *
  *		ValuesScan nodes are used to scan the results of a VALUES list

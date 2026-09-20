@@ -89,8 +89,6 @@ static void accumulate_append_subpath(Path *path,
 static void set_dummy_rel_pathlist(RelOptInfo *rel);
 static void set_subquery_pathlist(PlannerInfo *root, RelOptInfo *rel,
 								  Index rti, RangeTblEntry *rte);
-static void set_function_pathlist(PlannerInfo *root, RelOptInfo *rel,
-								  RangeTblEntry *rte);
 static void set_values_pathlist(PlannerInfo *root, RelOptInfo *rel,
 								RangeTblEntry *rte);
 static void set_namedtuplestore_pathlist(PlannerInfo *root, RelOptInfo *rel,
@@ -357,9 +355,6 @@ set_rel_size(PlannerInfo *root, RelOptInfo *rel,
 				 */
 				set_subquery_pathlist(root, rel, rti, rte);
 				break;
-			case RTE_FUNCTION:
-				set_function_size_estimates(root, rel);
-				break;
 			case RTE_VALUES:
 				set_values_size_estimates(root, rel);
 				break;
@@ -404,10 +399,6 @@ set_rel_pathlist(PlannerInfo *root, RelOptInfo *rel,
 			break;
 			case RTE_SUBQUERY:
 				/* Subquery --- fully handled during set_rel_size */
-				break;
-			case RTE_FUNCTION:
-				/* RangeFunction */
-				set_function_pathlist(root, rel, rte);
 				break;
 			case RTE_VALUES:
 				/* Values list */
@@ -530,12 +521,6 @@ set_rel_consider_parallel(PlannerInfo *root, RelOptInfo *rel,
 			/* Shouldn't happen; we're only considering baserels here. */
 			Assert(false);
 			return;
-
-		case RTE_FUNCTION:
-			/* Check for parallel-restricted functions. */
-			if (!is_parallel_safe(root, (Node *) rte->functions))
-				return;
-			break;
 
 		case RTE_VALUES:
 			/* Check for parallel-restricted functions. */
@@ -1509,74 +1494,6 @@ set_subquery_pathlist(PlannerInfo *root, RelOptInfo *rel,
 													  required_outer));
 		}
 	}
-}
-
-/*
- * set_function_pathlist
- *		Build the (single) access path for a function RTE
- */
-static void
-set_function_pathlist(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte)
-{
-	Relids		required_outer;
-	List	   *pathkeys = NIL;
-
-	/*
-	 * We don't support pushing join clauses into the quals of a function
-	 * scan, but it could still have required parameterization due to LATERAL
-	 * refs in the function expression.
-	 */
-	required_outer = rel->lateral_relids;
-
-	/*
-	 * The result is considered unordered unless ORDINALITY was used, in which
-	 * case it is ordered by the ordinal column (the last one).  See if we
-	 * care, by checking for uses of that Var in equivalence classes.
-	 */
-	if (rte->funcordinality)
-	{
-		AttrNumber	ordattno = rel->max_attr;
-		Var		   *var = NULL;
-		ListCell   *lc;
-
-		/*
-		 * Is there a Var for it in rel's targetlist?  If not, the query did
-		 * not reference the ordinality column, or at least not in any way
-		 * that would be interesting for sorting.
-		 */
-		foreach(lc, rel->reltarget->exprs)
-		{
-			Var		   *node = (Var *) lfirst(lc);
-
-			/* checking varno/varlevelsup is just paranoia */
-			if (IsA(node, Var) &&
-				node->varattno == ordattno &&
-				node->varno == rel->relid &&
-				node->varlevelsup == 0)
-			{
-				var = node;
-				break;
-			}
-		}
-
-		/*
-		 * Try to build pathkeys for this Var with int8 sorting.  We tell
-		 * build_expression_pathkey not to build any new equivalence class; if
-		 * the Var isn't already mentioned in some EC, it means that nothing
-		 * cares about the ordering.
-		 */
-		if (var)
-			pathkeys = build_expression_pathkey(root,
-												(Expr *) var,
-												NULL,	/* below outer joins */
-												Int8LessOperator,
-												rel->relids,
-												false);
-	}
-
-	/* Generate appropriate path */
-	add_path(rel, create_functionscan_path(root, rel,
-										   pathkeys, required_outer));
 }
 
 /*
@@ -2728,9 +2645,6 @@ print_path(PlannerInfo *root, Path *path, int indent)
 			{
 				case T_SeqScan:
 					ptype = "SeqScan";
-					break;
-				case T_FunctionScan:
-					ptype = "FunctionScan";
 					break;
 				case T_ValuesScan:
 					ptype = "ValuesScan";

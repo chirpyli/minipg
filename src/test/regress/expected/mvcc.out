@@ -26,7 +26,7 @@ while :i < 100
 ERROR:  syntax error at or near "while"
 LINE 1: while 0 < 100
         ^
-    INSERT INTO clean_aborted_self SELECT g.i, 'rolling back in a sec' FROM generate_series(1, 100) g(i);
+    INSERT INTO clean_aborted_self SELECT g.i, 'rolling back in a sec' FROM (SELECT generate_series(1, 100) AS i) AS g;
 ERROR:  current transaction is aborted, commands ignored until end of transaction block
     ROLLBACK;
     \set i :i + 1

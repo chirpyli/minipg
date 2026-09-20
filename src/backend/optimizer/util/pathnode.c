@@ -1965,33 +1965,6 @@ create_subqueryscan_path(PlannerInfo *root, RelOptInfo *rel, Path *subpath,
 }
 
 /*
- * create_functionscan_path
- *	  Creates a path corresponding to a sequential scan of a function,
- *	  returning the pathnode.
- */
-Path *
-create_functionscan_path(PlannerInfo *root, RelOptInfo *rel,
-						 List *pathkeys, Relids required_outer)
-{
-	Path	   *pathnode = makeNode(Path);
-
-	pathnode->pathtype = T_FunctionScan;
-	pathnode->parent = rel;
-	pathnode->pathtarget = rel->reltarget;
-	pathnode->param_info = get_baserel_parampathinfo(root, rel,
-													 required_outer);
-	pathnode->parallel_aware = false;
-	pathnode->parallel_safe = rel->consider_parallel;
-	pathnode->parallel_workers = 0;
-	pathnode->pathkeys = pathkeys;
-
-	cost_functionscan(pathnode, root, rel, pathnode->param_info);
-
-	return pathnode;
-}
-
-
-/*
  * create_valuesscan_path
  *	  Creates a path corresponding to a scan of a VALUES list,
  *	  returning the pathnode.

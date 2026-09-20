@@ -109,48 +109,50 @@ CREATE VIEW pg_stats AS
          LEFT JOIN pg_namespace n ON (n.oid = c.relnamespace)
     WHERE NOT attisdropped;
 
+-- minipg: function-in-FROM removed; call the set-returning function in a
+-- subquery targetlist and expand the resulting row instead.
+
 CREATE VIEW pg_locks AS
-    SELECT * FROM pg_lock_status() AS L;
+    SELECT L.* FROM (SELECT (pg_lock_status()).* ) AS L;
 
 CREATE VIEW pg_available_extensions AS
     SELECT E.name, E.default_version, X.extversion AS installed_version,
            E.comment
-      FROM pg_available_extensions() AS E
+      FROM (SELECT (pg_available_extensions()).* ) AS E
            LEFT JOIN pg_extension AS X ON E.name = X.extname;
 
 CREATE VIEW pg_available_extension_versions AS
     SELECT E.name, E.version, (X.extname IS NOT NULL) AS installed,
            E.superuser, E.trusted, E.relocatable,
            E.schema, E.requires, E.comment
-      FROM pg_available_extension_versions() AS E
+      FROM (SELECT (pg_available_extension_versions()).* ) AS E
            LEFT JOIN pg_extension AS X
              ON E.name = X.extname AND E.version = X.extversion;
 
 CREATE VIEW pg_prepared_xacts AS
     SELECT P.transaction, P.gid, P.prepared,
            'postgres'::name AS owner, D.datname AS database
-    FROM pg_prepared_xact() AS P
+    FROM (SELECT (pg_prepared_xact()).* ) AS P
          LEFT JOIN pg_database D ON P.dbid = D.oid;
 
 CREATE VIEW pg_settings AS
-    SELECT * FROM pg_show_all_settings() AS A;
-
+    SELECT * FROM (SELECT (pg_show_all_settings()).* ) AS A;
 
 
 CREATE VIEW pg_file_settings AS
-   SELECT * FROM pg_show_all_file_settings() AS A;
+   SELECT * FROM (SELECT (pg_show_all_file_settings()).* ) AS A;
 
 
 CREATE VIEW pg_config AS
-    SELECT * FROM pg_config();
+    SELECT * FROM (SELECT (pg_config()).* ) AS C;
 
 
 CREATE VIEW pg_shmem_allocations AS
-    SELECT * FROM pg_get_shmem_allocations();
+    SELECT * FROM (SELECT (pg_get_shmem_allocations()).* ) AS S;
 
 
 CREATE VIEW pg_backend_memory_contexts AS
-    SELECT * FROM pg_get_backend_memory_contexts();
+    SELECT * FROM (SELECT (pg_get_backend_memory_contexts()).* ) AS B;
 
 
 -- Statistics views
@@ -338,7 +340,7 @@ CREATE VIEW pg_stat_activity AS
             S.query_id,
             S.query,
             S.backend_type
-    FROM pg_stat_get_activity(NULL) AS S
+    FROM (SELECT (pg_stat_get_activity(NULL)).* ) AS S
         LEFT JOIN pg_database AS D ON (S.datid = D.oid);
 
 CREATE VIEW pg_stat_slru AS
@@ -352,7 +354,7 @@ CREATE VIEW pg_stat_slru AS
             s.flushes,
             s.truncates,
             s.stats_reset
-    FROM pg_stat_get_slru() s;
+    FROM (SELECT (pg_stat_get_slru()).* ) s;
 
 CREATE VIEW pg_stat_database AS
     SELECT
@@ -431,7 +433,7 @@ CREATE VIEW pg_stat_archiver AS
         s.last_failed_wal,
         s.last_failed_time,
         s.stats_reset
-    FROM pg_stat_get_archiver() s;
+    FROM (SELECT (pg_stat_get_archiver()).* ) s;
 
 CREATE VIEW pg_stat_bgwriter AS
     SELECT
@@ -458,7 +460,7 @@ CREATE VIEW pg_stat_wal AS
         w.wal_write_time,
         w.wal_sync_time,
         w.stats_reset
-    FROM pg_stat_get_wal() w;
+    FROM (SELECT (pg_stat_get_wal()).* ) w;
 
 CREATE VIEW pg_stat_progress_analyze AS
     SELECT
@@ -478,7 +480,7 @@ CREATE VIEW pg_stat_progress_analyze AS
         S.param6 AS child_tables_total,
         S.param7 AS child_tables_done,
         CAST(S.param8 AS oid) AS current_child_table_relid
-    FROM pg_stat_get_progress_info('ANALYZE') AS S
+    FROM (SELECT (pg_stat_get_progress_info('ANALYZE')).* ) AS S
         LEFT JOIN pg_database D ON S.datid = D.oid;
 
 CREATE VIEW pg_stat_progress_vacuum AS
@@ -496,7 +498,7 @@ CREATE VIEW pg_stat_progress_vacuum AS
         S.param2 AS heap_blks_total, S.param3 AS heap_blks_scanned,
         S.param4 AS heap_blks_vacuumed, S.param5 AS index_vacuum_count,
         S.param6 AS max_dead_tuples, S.param7 AS num_dead_tuples
-    FROM pg_stat_get_progress_info('VACUUM') AS S
+    FROM (SELECT (pg_stat_get_progress_info('VACUUM')).* ) AS S
         LEFT JOIN pg_database D ON S.datid = D.oid;
 
 CREATE VIEW pg_stat_progress_cluster AS
@@ -523,7 +525,7 @@ CREATE VIEW pg_stat_progress_cluster AS
         S.param6 AS heap_blks_total,
         S.param7 AS heap_blks_scanned,
         S.param8 AS index_rebuild_count
-    FROM pg_stat_get_progress_info('CLUSTER') AS S
+    FROM (SELECT (pg_stat_get_progress_info('CLUSTER')).* ) AS S
         LEFT JOIN pg_database D ON S.datid = D.oid;
 
 CREATE VIEW pg_stat_progress_create_index AS
@@ -552,7 +554,7 @@ CREATE VIEW pg_stat_progress_create_index AS
         S.param17 AS blocks_done,
         S.param12 AS tuples_total,
         S.param13 AS tuples_done
-    FROM pg_stat_get_progress_info('CREATE INDEX') AS S
+    FROM (SELECT (pg_stat_get_progress_info('CREATE INDEX')).* ) AS S
         LEFT JOIN pg_database D ON S.datid = D.oid;
 
 CREATE VIEW pg_stat_progress_basebackup AS
@@ -569,4 +571,4 @@ CREATE VIEW pg_stat_progress_basebackup AS
         S.param3 AS backup_streamed,
         S.param4 AS tablespaces_total,
         S.param5 AS tablespaces_streamed
-    FROM pg_stat_get_progress_info('BASEBACKUP') AS S;
+    FROM (SELECT (pg_stat_get_progress_info('BASEBACKUP')).* ) AS S;

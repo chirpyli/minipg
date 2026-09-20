@@ -276,10 +276,6 @@ print_rt(const List *rtable)
 				printf("%d\t%s\t[join]",
 					   i, rte->eref->aliasname);
 				break;
-			case RTE_FUNCTION:
-				printf("%d\t%s\t[rangefunction]",
-					   i, rte->eref->aliasname);
-				break;
 		case RTE_VALUES:
 			printf("%d\t%s\t[values list]",
 				   i, rte->eref->aliasname);

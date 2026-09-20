@@ -13,13 +13,13 @@ setup
  create table hash_tbl(id int4, p integer);
  create index hash_idx on hash_tbl using hash(p);
  insert into hash_tbl (id, p)
- select g, 10 from generate_series(1, 10) g;
+ select g, 10 from (SELECT generate_series(1, 10) AS g) AS _gs;
  insert into hash_tbl (id, p)
- select g, 20 from generate_series(11, 20) g;
+ select g, 20 from (SELECT generate_series(11, 20) AS g) AS _gs;
  insert into hash_tbl (id, p)
- select g, 30 from generate_series(21, 30) g;
+ select g, 30 from (SELECT generate_series(21, 30) AS g) AS _gs;
  insert into hash_tbl (id, p)
- select g, 40 from generate_series(31, 40) g;
+ select g, 40 from (SELECT generate_series(31, 40) AS g) AS _gs;
 }
 
 teardown
@@ -37,10 +37,10 @@ setup
 }
 step rxy1	{ select sum(p) from hash_tbl where p=20; }
 step wx1	{ insert into hash_tbl (id, p)
-			  select g, 30 from generate_series(41, 50) g; }
+			  select g, 30 from (SELECT generate_series(41, 50) AS g) AS _gs; }
 step rxy3	{ select sum(p) from hash_tbl where p=20; }
 step wx3	{ insert into hash_tbl (id, p)
-			  select g, 50 from generate_series(41, 50) g; }
+			  select g, 50 from (SELECT generate_series(41, 50) AS g) AS _gs; }
 step c1		{ commit; }
 
 
@@ -54,10 +54,10 @@ setup
 }
 step rxy2	{ select sum(p) from hash_tbl where p=30; }
 step wy2	{ insert into hash_tbl (id, p)
-			  select g, 20 from generate_series(51, 60) g; }
+			  select g, 20 from (SELECT generate_series(51, 60) AS g) AS _gs; }
 step rxy4	{ select sum(p) from hash_tbl where p=30; }
 step wy4	{ insert into hash_tbl (id, p)
-			  select g, 60 from generate_series(51, 60) g; }
+			  select g, 60 from (SELECT generate_series(51, 60) AS g) AS _gs; }
 step c2		{ commit; }
 
 

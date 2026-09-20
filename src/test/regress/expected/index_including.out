@@ -9,7 +9,7 @@ CREATE TABLE tbl_include_reg (c1 int, c2 int, c3 int, c4 box);
 ERROR:  type "box" does not exist
 LINE 8: ...EATE TABLE tbl_include_reg (c1 int, c2 int, c3 int, c4 box);
                                                                   ^
-INSERT INTO tbl_include_reg SELECT x, 2*x, 3*x, box('4,4,4,4') FROM generate_series(1,10) AS x;
+INSERT INTO tbl_include_reg SELECT x, 2*x, 3*x, box('4,4,4,4') FROM (SELECT generate_series(1,10) AS x) AS _gs;
 ERROR:  relation "tbl_include_reg" does not exist
 LINE 1: INSERT INTO tbl_include_reg SELECT x, 2*x, 3*x, box('4,4,4,4...
                     ^
@@ -30,7 +30,7 @@ CREATE TABLE tbl_include_unique1 (c1 int, c2 int, c3 int, c4 box);
 ERROR:  type "box" does not exist
 LINE 1: ... TABLE tbl_include_unique1 (c1 int, c2 int, c3 int, c4 box);
                                                                   ^
-INSERT INTO tbl_include_unique1 SELECT x, 2*x, 3*x, box('4,4,4,4') FROM generate_series(1,10) AS x;
+INSERT INTO tbl_include_unique1 SELECT x, 2*x, 3*x, box('4,4,4,4') FROM (SELECT generate_series(1,10) AS x) AS _gs;
 ERROR:  relation "tbl_include_unique1" does not exist
 LINE 1: INSERT INTO tbl_include_unique1 SELECT x, 2*x, 3*x, box('4,4...
                     ^
@@ -51,7 +51,7 @@ CREATE TABLE tbl_include_unique2 (c1 int, c2 int, c3 int, c4 box);
 ERROR:  type "box" does not exist
 LINE 1: ... TABLE tbl_include_unique2 (c1 int, c2 int, c3 int, c4 box);
                                                                   ^
-INSERT INTO tbl_include_unique2 SELECT 1, 2, 3*x, box('4,4,4,4') FROM generate_series(1,10) AS x;
+INSERT INTO tbl_include_unique2 SELECT 1, 2, 3*x, box('4,4,4,4') FROM (SELECT generate_series(1,10) AS x) AS _gs;
 ERROR:  relation "tbl_include_unique2" does not exist
 LINE 1: INSERT INTO tbl_include_unique2 SELECT 1, 2, 3*x, box('4,4,4...
                     ^
@@ -64,7 +64,7 @@ CREATE TABLE tbl_include_pk (c1 int, c2 int, c3 int, c4 box);
 ERROR:  type "box" does not exist
 LINE 1: ...REATE TABLE tbl_include_pk (c1 int, c2 int, c3 int, c4 box);
                                                                   ^
-INSERT INTO tbl_include_pk SELECT 1, 2*x, 3*x, box('4,4,4,4') FROM generate_series(1,10) AS x;
+INSERT INTO tbl_include_pk SELECT 1, 2*x, 3*x, box('4,4,4,4') FROM (SELECT generate_series(1,10) AS x) AS _gs;
 ERROR:  relation "tbl_include_pk" does not exist
 LINE 1: INSERT INTO tbl_include_pk SELECT 1, 2*x, 3*x, box('4,4,4,4'...
                     ^
@@ -80,7 +80,7 @@ CREATE TABLE tbl_include_box (c1 int, c2 int, c3 int, c4 box);
 ERROR:  type "box" does not exist
 LINE 1: ...EATE TABLE tbl_include_box (c1 int, c2 int, c3 int, c4 box);
                                                                   ^
-INSERT INTO tbl_include_box SELECT 1, 2*x, 3*x, box('4,4,4,4') FROM generate_series(1,10) AS x;
+INSERT INTO tbl_include_box SELECT 1, 2*x, 3*x, box('4,4,4,4') FROM (SELECT generate_series(1,10) AS x) AS _gs;
 ERROR:  relation "tbl_include_box" does not exist
 LINE 1: INSERT INTO tbl_include_box SELECT 1, 2*x, 3*x, box('4,4,4,4...
                     ^
@@ -99,7 +99,7 @@ CREATE TABLE tbl_include_box_pk (c1 int, c2 int, c3 int, c4 box);
 ERROR:  type "box" does not exist
 LINE 1: ...E TABLE tbl_include_box_pk (c1 int, c2 int, c3 int, c4 box);
                                                                   ^
-INSERT INTO tbl_include_box_pk SELECT 1, 2, 3*x, box('4,4,4,4') FROM generate_series(1,10) AS x;
+INSERT INTO tbl_include_box_pk SELECT 1, 2, 3*x, box('4,4,4,4') FROM (SELECT generate_series(1,10) AS x) AS _gs;
 ERROR:  relation "tbl_include_box_pk" does not exist
 LINE 1: INSERT INTO tbl_include_box_pk SELECT 1, 2, 3*x, box('4,4,4,...
                     ^
@@ -122,9 +122,9 @@ ERROR:  relation "tbl" does not exist
 LINE 1: ...nname, conkey FROM pg_constraint WHERE conrelid = 'tbl'::reg...
                                                              ^
 -- ensure that constraint works
-INSERT INTO tbl SELECT 1, 2, 3*x, box('4,4,4,4') FROM generate_series(1,10) AS x;
+INSERT INTO tbl SELECT 1, 2, 3*x, box('4,4,4,4') FROM (SELECT generate_series(1,10) AS x) AS _gs;
 ERROR:  relation "tbl" does not exist
-LINE 1: INSERT INTO tbl SELECT 1, 2, 3*x, box('4,4,4,4') FROM genera...
+LINE 1: INSERT INTO tbl SELECT 1, 2, 3*x, box('4,4,4,4') FROM (SELEC...
                     ^
 DROP TABLE tbl;
 ERROR:  table "tbl" does not exist
@@ -142,17 +142,17 @@ ERROR:  relation "tbl" does not exist
 LINE 1: ...nname, conkey FROM pg_constraint WHERE conrelid = 'tbl'::reg...
                                                              ^
 -- ensure that constraint works
-INSERT INTO tbl SELECT 1, 2, 3*x, box('4,4,4,4') FROM generate_series(1,10) AS x;
+INSERT INTO tbl SELECT 1, 2, 3*x, box('4,4,4,4') FROM (SELECT generate_series(1,10) AS x) AS _gs;
 ERROR:  relation "tbl" does not exist
-LINE 1: INSERT INTO tbl SELECT 1, 2, 3*x, box('4,4,4,4') FROM genera...
+LINE 1: INSERT INTO tbl SELECT 1, 2, 3*x, box('4,4,4,4') FROM (SELEC...
                     ^
-INSERT INTO tbl SELECT 1, NULL, 3*x, box('4,4,4,4') FROM generate_series(1,10) AS x;
+INSERT INTO tbl SELECT 1, NULL, 3*x, box('4,4,4,4') FROM (SELECT generate_series(1,10) AS x) AS _gs;
 ERROR:  relation "tbl" does not exist
-LINE 1: INSERT INTO tbl SELECT 1, NULL, 3*x, box('4,4,4,4') FROM gen...
+LINE 1: INSERT INTO tbl SELECT 1, NULL, 3*x, box('4,4,4,4') FROM (SE...
                     ^
-INSERT INTO tbl SELECT x, 2*x, NULL, NULL FROM generate_series(1,300) AS x;
+INSERT INTO tbl SELECT x, 2*x, NULL, NULL FROM (SELECT generate_series(1,300) AS x) AS _gs;
 ERROR:  relation "tbl" does not exist
-LINE 1: INSERT INTO tbl SELECT x, 2*x, NULL, NULL FROM generate_seri...
+LINE 1: INSERT INTO tbl SELECT x, 2*x, NULL, NULL FROM (SELECT gener...
                     ^
 DROP TABLE tbl;
 ERROR:  table "tbl" does not exist
@@ -171,9 +171,9 @@ ERROR:  relation "tbl" does not exist
 LINE 1: ...nname, conkey FROM pg_constraint WHERE conrelid = 'tbl'::reg...
                                                              ^
 -- ensure that constraint works
-INSERT INTO tbl SELECT 1, 2, 3*x, box('4,4,4,4') FROM generate_series(1,10) AS x;
+INSERT INTO tbl SELECT 1, 2, 3*x, box('4,4,4,4') FROM (SELECT generate_series(1,10) AS x) AS _gs;
 ERROR:  relation "tbl" does not exist
-LINE 1: INSERT INTO tbl SELECT 1, 2, 3*x, box('4,4,4,4') FROM genera...
+LINE 1: INSERT INTO tbl SELECT 1, 2, 3*x, box('4,4,4,4') FROM (SELEC...
                     ^
 DROP TABLE tbl;
 ERROR:  table "tbl" does not exist
@@ -191,17 +191,17 @@ ERROR:  relation "tbl" does not exist
 LINE 1: ...nname, conkey FROM pg_constraint WHERE conrelid = 'tbl'::reg...
                                                              ^
 -- ensure that constraint works
-INSERT INTO tbl SELECT 1, 2, 3*x, box('4,4,4,4') FROM generate_series(1,10) AS x;
+INSERT INTO tbl SELECT 1, 2, 3*x, box('4,4,4,4') FROM (SELECT generate_series(1,10) AS x) AS _gs;
 ERROR:  relation "tbl" does not exist
-LINE 1: INSERT INTO tbl SELECT 1, 2, 3*x, box('4,4,4,4') FROM genera...
+LINE 1: INSERT INTO tbl SELECT 1, 2, 3*x, box('4,4,4,4') FROM (SELEC...
                     ^
-INSERT INTO tbl SELECT 1, NULL, 3*x, box('4,4,4,4') FROM generate_series(1,10) AS x;
+INSERT INTO tbl SELECT 1, NULL, 3*x, box('4,4,4,4') FROM (SELECT generate_series(1,10) AS x) AS _gs;
 ERROR:  relation "tbl" does not exist
-LINE 1: INSERT INTO tbl SELECT 1, NULL, 3*x, box('4,4,4,4') FROM gen...
+LINE 1: INSERT INTO tbl SELECT 1, NULL, 3*x, box('4,4,4,4') FROM (SE...
                     ^
-INSERT INTO tbl SELECT x, 2*x, NULL, NULL FROM generate_series(1,10) AS x;
+INSERT INTO tbl SELECT x, 2*x, NULL, NULL FROM (SELECT generate_series(1,10) AS x) AS _gs;
 ERROR:  relation "tbl" does not exist
-LINE 1: INSERT INTO tbl SELECT x, 2*x, NULL, NULL FROM generate_seri...
+LINE 1: INSERT INTO tbl SELECT x, 2*x, NULL, NULL FROM (SELECT gener...
                     ^
 DROP TABLE tbl;
 ERROR:  table "tbl" does not exist
@@ -300,9 +300,9 @@ CREATE TABLE tbl (c1 int,c2 int, c3 int, c4 box, UNIQUE(c1, c2) INCLUDE(c3,c4));
 ERROR:  type "box" does not exist
 LINE 4: CREATE TABLE tbl (c1 int,c2 int, c3 int, c4 box, UNIQUE(c1, ...
                                                     ^
-INSERT INTO tbl SELECT x, 2*x, 3*x, box('4,4,4,4') FROM generate_series(1,1000) AS x;
+INSERT INTO tbl SELECT x, 2*x, 3*x, box('4,4,4,4') FROM (SELECT generate_series(1,1000) AS x) AS _gs;
 ERROR:  relation "tbl" does not exist
-LINE 1: INSERT INTO tbl SELECT x, 2*x, 3*x, box('4,4,4,4') FROM gene...
+LINE 1: INSERT INTO tbl SELECT x, 2*x, 3*x, box('4,4,4,4') FROM (SEL...
                     ^
 CREATE UNIQUE INDEX CONCURRENTLY on tbl (c1, c2) INCLUDE (c3, c4);
 ERROR:  relation "tbl" does not exist
@@ -371,9 +371,9 @@ CREATE TABLE tbl (c1 int, c2 int, c3 int, c4 box);
 ERROR:  type "box" does not exist
 LINE 4: CREATE TABLE tbl (c1 int, c2 int, c3 int, c4 box);
                                                      ^
-INSERT INTO tbl SELECT x, 2*x, 3*x, box('4,4,4,4') FROM generate_series(1,10) AS x;
+INSERT INTO tbl SELECT x, 2*x, 3*x, box('4,4,4,4') FROM (SELECT generate_series(1,10) AS x) AS _gs;
 ERROR:  relation "tbl" does not exist
-LINE 1: INSERT INTO tbl SELECT x, 2*x, 3*x, box('4,4,4,4') FROM gene...
+LINE 1: INSERT INTO tbl SELECT x, 2*x, 3*x, box('4,4,4,4') FROM (SEL...
                     ^
 CREATE UNIQUE INDEX tbl_idx_unique ON tbl using btree(c1, c2) INCLUDE (c3,c4);
 ERROR:  relation "tbl" does not exist
@@ -407,9 +407,9 @@ CREATE TABLE tbl (c1 int,c2 int, c3 int, c4 box, UNIQUE(c1, c2) INCLUDE(c3,c4));
 ERROR:  type "box" does not exist
 LINE 4: CREATE TABLE tbl (c1 int,c2 int, c3 int, c4 box, UNIQUE(c1, ...
                                                     ^
-INSERT INTO tbl SELECT x, 2*x, 3*x, box('4,4,4,4') FROM generate_series(1,10) AS x;
+INSERT INTO tbl SELECT x, 2*x, 3*x, box('4,4,4,4') FROM (SELECT generate_series(1,10) AS x) AS _gs;
 ERROR:  relation "tbl" does not exist
-LINE 1: INSERT INTO tbl SELECT x, 2*x, 3*x, box('4,4,4,4') FROM gene...
+LINE 1: INSERT INTO tbl SELECT x, 2*x, 3*x, box('4,4,4,4') FROM (SEL...
                     ^
 ALTER TABLE tbl ALTER c1 TYPE bigint;
 ERROR:  relation "tbl" does not exist

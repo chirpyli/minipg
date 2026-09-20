@@ -42,7 +42,6 @@ typedef enum ParseExprKind
 	EXPR_KIND_JOIN_ON,			/* JOIN ON */
 	EXPR_KIND_JOIN_USING,		/* JOIN USING */
 	EXPR_KIND_FROM_SUBSELECT,	/* sub-SELECT in FROM clause */
-	EXPR_KIND_FROM_FUNCTION,	/* function in FROM clause */
 	EXPR_KIND_WHERE,			/* WHERE */
 	EXPR_KIND_HAVING,			/* HAVING */
 	EXPR_KIND_SELECT_TARGET,	/* SELECT target list item */

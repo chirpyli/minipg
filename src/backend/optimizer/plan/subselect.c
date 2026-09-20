@@ -1674,7 +1674,7 @@ SS_attach_initplans(PlannerInfo *root, Plan *plan)
  * SS_finalize_plan - do final parameter processing for a completed Plan.
  *
  * This recursively computes the extParam and allParam sets for every Plan
- * node in the given plan tree.  (Oh, and RangeTblFunction.funcparams too.)
+ * node in the given plan tree.
  *
  * We assume that SS_finalize_plan has already been run on any initplans or
  * subplans the plan tree could reference.
@@ -1877,39 +1877,6 @@ finalize_plan(PlannerInfo *root, Plan *plan,
 			}
 			break;
 
-		case T_FunctionScan:
-			{
-				FunctionScan *fscan = (FunctionScan *) plan;
-				ListCell   *lc;
-
-				/*
-				 * Call finalize_primnode independently on each function
-				 * expression, so that we can record which params are
-				 * referenced in each, in order to decide which need
-				 * re-evaluating during rescan.
-				 */
-				foreach(lc, fscan->functions)
-				{
-					RangeTblFunction *rtfunc = (RangeTblFunction *) lfirst(lc);
-					finalize_primnode_context funccontext;
-
-					funccontext = context;
-					funccontext.paramids = NULL;
-
-					finalize_primnode(rtfunc->funcexpr, &funccontext);
-
-					/* remember results for execution */
-					rtfunc->funcparams = funccontext.paramids;
-
-					/* add the function's params to the overall set */
-					context.paramids = bms_add_members(context.paramids,
-													   funccontext.paramids);
-				}
-
-				context.paramids = bms_add_members(context.paramids,
-												   scan_params);
-			}
-			break;
 
 
 		case T_ValuesScan:

@@ -1809,8 +1809,6 @@ expression_tree_walker(Node *node,
 			break;
 		case T_PlaceHolderInfo:
 			return walker(((PlaceHolderInfo *) node)->ph_var, context);
-		case T_RangeTblFunction:
-			return walker(((RangeTblFunction *) node)->funcexpr, context);
 		default:
 			elog(ERROR, "unrecognized node type: %d",
 				 (int) nodeTag(node));
@@ -1922,7 +1920,9 @@ range_table_entry_walker(RangeTblEntry *rte,
 
 	switch (rte->rtekind)
 	{
-
+		case RTE_RELATION:
+			/* nothing to do */
+			break;
 		case RTE_SUBQUERY:
 			if (!(flags & QTW_IGNORE_RT_SUBQUERIES))
 				if (walker(rte->subquery, context))
@@ -1932,10 +1932,6 @@ range_table_entry_walker(RangeTblEntry *rte,
 			if (!(flags & QTW_IGNORE_JOINALIASES))
 				if (walker(rte->joinaliasvars, context))
 					return true;
-			break;
-		case RTE_FUNCTION:
-			if (walker(rte->functions, context))
-				return true;
 			break;
 		case RTE_VALUES:
 			if (walker(rte->values_lists, context))
@@ -2458,17 +2454,6 @@ expression_tree_mutator(Node *node,
 				return (Node *) newnode;
 			}
 			break;
-		case T_RangeTblFunction:
-			{
-				RangeTblFunction *rtfunc = (RangeTblFunction *) node;
-				RangeTblFunction *newnode;
-
-				FLATCOPY(newnode, rtfunc, RangeTblFunction);
-				MUTATE(newnode->funcexpr, rtfunc->funcexpr, Node *);
-				/* Assume we need not copy the coldef info lists */
-				return (Node *) newnode;
-			}
-			break;
 		default:
 			elog(ERROR, "unrecognized node type: %d",
 				 (int) nodeTag(node));
@@ -2581,9 +2566,6 @@ range_table_mutator(List *rtable,
 					/* else, copy join aliases as-is */
 					newrte->joinaliasvars = copyObject(rte->joinaliasvars);
 				}
-				break;
-			case RTE_FUNCTION:
-				MUTATE(newrte->functions, rte->functions, List *);
 				break;
 			case RTE_VALUES:
 				MUTATE(newrte->values_lists, rte->values_lists, List *);
@@ -2896,18 +2878,6 @@ raw_expression_tree_walker(Node *node,
 				if (walker(rs->subquery, context))
 					return true;
 				if (walker(rs->alias, context))
-					return true;
-			}
-			break;
-		case T_RangeFunction:
-			{
-				RangeFunction *rf = (RangeFunction *) node;
-
-				if (walker(rf->functions, context))
-					return true;
-				if (walker(rf->alias, context))
-					return true;
-				if (walker(rf->coldeflist, context))
 					return true;
 			}
 			break;

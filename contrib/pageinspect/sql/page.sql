@@ -23,40 +23,41 @@ SELECT octet_length(get_raw_page('test1', 'xxx', 0));
 
 SELECT get_raw_page('test1', 0) = get_raw_page('test1', 'main', 0);
 
-SELECT pagesize, version FROM page_header(get_raw_page('test1', 0));
+-- minipg: function-in-FROM 已裁剪，改为在子查询目标列中调用集返回函数并展开记录
+SELECT pagesize, version FROM (SELECT (page_header(get_raw_page('test1', 0))).* ) AS _gs;
 
 SELECT tuple_data_split('test1'::regclass, t_data, t_infomask, t_infomask2, t_bits)
-    FROM heap_page_items(get_raw_page('test1', 0));
+    FROM (SELECT (heap_page_items(get_raw_page('test1', 0))).* ) AS _gs;
 
-SELECT * FROM fsm_page_contents(get_raw_page('test1', 'fsm', 0));
+SELECT fsm_page_contents(get_raw_page('test1', 'fsm', 0)) AS fsm_page_contents;
 
 -- If we freeze the only tuple on test1, the infomask should
 -- always be the same in all test runs.
 VACUUM (FREEZE, DISABLE_PAGE_SKIPPING) test1;
 
 SELECT t_infomask, t_infomask2, raw_flags, combined_flags
-FROM heap_page_items(get_raw_page('test1', 0)),
-     LATERAL heap_tuple_infomask_flags(t_infomask, t_infomask2);
+FROM (SELECT (heap_page_items(get_raw_page('test1', 0))).* ) AS _hpi,
+     LATERAL (SELECT (heap_tuple_infomask_flags(_hpi.t_infomask, _hpi.t_infomask2)).* ) AS _htif;
 
 -- tests for decoding of combined flags
 -- HEAP_XMAX_SHR_LOCK = (HEAP_XMAX_EXCL_LOCK | HEAP_XMAX_KEYSHR_LOCK)
-SELECT * FROM heap_tuple_infomask_flags(80::int, 0);
+SELECT * FROM (SELECT (heap_tuple_infomask_flags(80::int, 0)).* ) AS _gs;
 -- HEAP_XMIN_FROZEN = (HEAP_XMIN_COMMITTED | HEAP_XMIN_INVALID)
-SELECT * FROM heap_tuple_infomask_flags(768::int, 0);
+SELECT * FROM (SELECT (heap_tuple_infomask_flags(768::int, 0)).* ) AS _gs;
 -- HEAP_MOVED = (HEAP_MOVED_IN | HEAP_MOVED_OFF)
-SELECT * FROM heap_tuple_infomask_flags(49152::int, 0);
-SELECT * FROM heap_tuple_infomask_flags(49152::int, 0);
+SELECT * FROM (SELECT (heap_tuple_infomask_flags(49152::int, 0)).* ) AS _gs;
+SELECT * FROM (SELECT (heap_tuple_infomask_flags(49152::int, 0)).* ) AS _gs;
 
 -- test all flags of t_infomask and t_infomask2
 SELECT unnest(raw_flags)
-  FROM heap_tuple_infomask_flags(65535::int, 65535::int) ORDER BY 1;
+  FROM (SELECT (heap_tuple_infomask_flags(65535::int, 65535::int)).* ) AS _gs ORDER BY 1;
 SELECT unnest(combined_flags)
-  FROM heap_tuple_infomask_flags(65535::int, 65535::int) ORDER BY 1;
+  FROM (SELECT (heap_tuple_infomask_flags(65535::int, 65535::int)).* ) AS _gs ORDER BY 1;
 
 -- no flags at all
-SELECT * FROM heap_tuple_infomask_flags(0, 0);
+SELECT * FROM (SELECT (heap_tuple_infomask_flags(0, 0)).* ) AS _gs;
 -- no combined flags
-SELECT * FROM heap_tuple_infomask_flags(16::int, 0);
+SELECT * FROM (SELECT (heap_tuple_infomask_flags(16::int, 0)).* ) AS _gs;
 
 DROP TABLE test1;
 
@@ -66,20 +67,20 @@ DROP TABLE test1;
 -- check null bitmap alignment for table whose number of attributes is multiple of 8
 create table test8 (f1 int, f2 int, f3 int, f4 int, f5 int, f6 int, f7 int, f8 int);
 insert into test8(f1, f8) values (2130706559::int, 0);
-select t_bits, t_data from heap_page_items(get_raw_page('test8', 0));
+select t_bits, t_data from (SELECT (heap_page_items(get_raw_page('test8', 0))).* ) AS _gs;
 select tuple_data_split('test8'::regclass, t_data, t_infomask, t_infomask2, t_bits)
-    from heap_page_items(get_raw_page('test8', 0));
+    from (SELECT (heap_page_items(get_raw_page('test8', 0))).* ) AS _gs;
 drop table test8;
 
 -- Failure with incorrect page size
 -- Suppress the DETAIL message, to allow the tests to work across various
 -- page sizes.
 \set VERBOSITY terse
-SELECT fsm_page_contents('aaa'::bytea);
-SELECT page_header('ccc'::bytea);
+SELECT fsm_page_contents('aaa'::bytea) AS fsm_page_contents;
+SELECT * FROM (SELECT (page_header('ccc'::bytea)).* ) AS _gs;
 \set VERBOSITY default
 
 -- Tests with all-zero pages.
 SHOW block_size \gset
-SELECT fsm_page_contents(decode(repeat('00', :block_size), 'hex'));
-SELECT page_header(decode(repeat('00', :block_size), 'hex'));
+SELECT fsm_page_contents(decode(repeat('00', :block_size), 'hex')) AS fsm_page_contents;
+SELECT * FROM (SELECT (page_header(decode(repeat('00', :block_size), 'hex'))).* ) AS _gs;

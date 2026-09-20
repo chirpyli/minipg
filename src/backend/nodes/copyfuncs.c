@@ -568,29 +568,6 @@ _copySubqueryScan(const SubqueryScan *from)
 }
 
 /*
- * _copyFunctionScan
- */
-static FunctionScan *
-_copyFunctionScan(const FunctionScan *from)
-{
-	FunctionScan *newnode = makeNode(FunctionScan);
-
-	/*
-	 * copy node superclass fields
-	 */
-	CopyScanFields((const Scan *) from, (Scan *) newnode);
-
-	/*
-	 * copy remainder of node
-	 */
-	COPY_NODE_FIELD(functions);
-	COPY_SCALAR_FIELD(funcordinality);
-
-	return newnode;
-}
-
-
-/*
  * _copyValuesScan
  */
 static ValuesScan *
@@ -1825,8 +1802,6 @@ _copyRangeTblEntry(const RangeTblEntry *from)
 	COPY_NODE_FIELD(joinleftcols);
 	COPY_NODE_FIELD(joinrightcols);
 	COPY_NODE_FIELD(join_using_alias);
-	COPY_NODE_FIELD(functions);
-	COPY_SCALAR_FIELD(funcordinality);
 	COPY_NODE_FIELD(values_lists);
 	COPY_NODE_FIELD(coltypes);
 	COPY_NODE_FIELD(coltypmods);
@@ -1844,24 +1819,6 @@ _copyRangeTblEntry(const RangeTblEntry *from)
 
 	return newnode;
 }
-
-static RangeTblFunction *
-_copyRangeTblFunction(const RangeTblFunction *from)
-{
-	RangeTblFunction *newnode = makeNode(RangeTblFunction);
-
-	COPY_NODE_FIELD(funcexpr);
-	COPY_SCALAR_FIELD(funccolcount);
-	COPY_NODE_FIELD(funccolnames);
-	COPY_NODE_FIELD(funccoltypes);
-	COPY_NODE_FIELD(funccoltypmods);
-	COPY_NODE_FIELD(funccolcollations);
-	COPY_BITMAPSET_FIELD(funcparams);
-
-	return newnode;
-}
-
-
 
 static SortGroupClause *
 _copySortGroupClause(const SortGroupClause *from)
@@ -2055,20 +2012,6 @@ _copyRangeSubselect(const RangeSubselect *from)
 	return newnode;
 }
 
-static RangeFunction *
-_copyRangeFunction(const RangeFunction *from)
-{
-	RangeFunction *newnode = makeNode(RangeFunction);
-
-	COPY_SCALAR_FIELD(lateral);
-	COPY_SCALAR_FIELD(ordinality);
-	COPY_SCALAR_FIELD(is_rowsfrom);
-	COPY_NODE_FIELD(functions);
-	COPY_NODE_FIELD(alias);
-	COPY_NODE_FIELD(coldeflist);
-
-	return newnode;
-}
 
 
 
@@ -2633,9 +2576,6 @@ copyObjectImpl(const void *from)
 		case T_SubqueryScan:
 			retval = _copySubqueryScan(from);
 			break;
-		case T_FunctionScan:
-			retval = _copyFunctionScan(from);
-			break;
 		case T_ValuesScan:
 			retval = _copyValuesScan(from);
 			break;
@@ -2966,9 +2906,6 @@ copyObjectImpl(const void *from)
 		case T_RangeSubselect:
 			retval = _copyRangeSubselect(from);
 			break;
-		case T_RangeFunction:
-			retval = _copyRangeFunction(from);
-			break;
 		case T_TypeName:
 			retval = _copyTypeName(from);
 			break;
@@ -2987,9 +2924,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_RangeTblEntry:
 			retval = _copyRangeTblEntry(from);
-			break;
-		case T_RangeTblFunction:
-			retval = _copyRangeTblFunction(from);
 			break;
 		case T_SortGroupClause:
 			retval = _copySortGroupClause(from);

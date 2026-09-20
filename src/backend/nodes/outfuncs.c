@@ -592,18 +592,6 @@ _outSubqueryScan(StringInfo str, const SubqueryScan *node)
 }
 
 static void
-_outFunctionScan(StringInfo str, const FunctionScan *node)
-{
-	WRITE_NODE_TYPE("FUNCTIONSCAN");
-
-	_outScanInfo(str, (const Scan *) node);
-
-	WRITE_NODE_FIELD(functions);
-	WRITE_BOOL_FIELD(funcordinality);
-}
-
-
-static void
 _outValuesScan(StringInfo str, const ValuesScan *node)
 {
 	WRITE_NODE_TYPE("VALUESSCAN");
@@ -2282,10 +2270,6 @@ _outRangeTblEntry(StringInfo str, const RangeTblEntry *node)
 			WRITE_NODE_FIELD(joinrightcols);
 			WRITE_NODE_FIELD(join_using_alias);
 			break;
-		case RTE_FUNCTION:
-			WRITE_NODE_FIELD(functions);
-			WRITE_BOOL_FIELD(funcordinality);
-			break;
 		case RTE_VALUES:
 			WRITE_NODE_FIELD(values_lists);
 			WRITE_NODE_FIELD(coltypes);
@@ -2315,22 +2299,6 @@ _outRangeTblEntry(StringInfo str, const RangeTblEntry *node)
 	WRITE_BITMAPSET_FIELD(updatedCols);
 	WRITE_BITMAPSET_FIELD(extraUpdatedCols);
 }
-
-static void
-_outRangeTblFunction(StringInfo str, const RangeTblFunction *node)
-{
-	WRITE_NODE_TYPE("RANGETBLFUNCTION");
-
-	WRITE_NODE_FIELD(funcexpr);
-	WRITE_INT_FIELD(funccolcount);
-	WRITE_NODE_FIELD(funccolnames);
-	WRITE_NODE_FIELD(funccoltypes);
-	WRITE_NODE_FIELD(funccoltypmods);
-	WRITE_NODE_FIELD(funccolcollations);
-	WRITE_BITMAPSET_FIELD(funcparams);
-}
-
-
 
 static void
 _outAExpr(StringInfo str, const A_Expr *node)
@@ -2527,18 +2495,6 @@ _outRangeSubselect(StringInfo str, const RangeSubselect *node)
 	WRITE_NODE_FIELD(alias);
 }
 
-static void
-_outRangeFunction(StringInfo str, const RangeFunction *node)
-{
-	WRITE_NODE_TYPE("RANGEFUNCTION");
-
-	WRITE_BOOL_FIELD(lateral);
-	WRITE_BOOL_FIELD(ordinality);
-	WRITE_BOOL_FIELD(is_rowsfrom);
-	WRITE_NODE_FIELD(functions);
-	WRITE_NODE_FIELD(alias);
-	WRITE_NODE_FIELD(coldeflist);
-}
 
 
 
@@ -2671,9 +2627,6 @@ outNode(StringInfo str, const void *obj)
 				break;
 			case T_SubqueryScan:
 				_outSubqueryScan(str, obj);
-				break;
-			case T_FunctionScan:
-				_outFunctionScan(str, obj);
 				break;
 			case T_ValuesScan:
 				_outValuesScan(str, obj);
@@ -2996,9 +2949,6 @@ outNode(StringInfo str, const void *obj)
 			case T_RangeTblEntry:
 				_outRangeTblEntry(str, obj);
 				break;
-			case T_RangeTblFunction:
-				_outRangeTblFunction(str, obj);
-				break;
 			case T_A_Expr:
 				_outAExpr(str, obj);
 				break;
@@ -3034,9 +2984,6 @@ outNode(StringInfo str, const void *obj)
 				break;
 			case T_RangeSubselect:
 				_outRangeSubselect(str, obj);
-				break;
-			case T_RangeFunction:
-				_outRangeFunction(str, obj);
 				break;
 			case T_Constraint:
 				_outConstraint(str, obj);

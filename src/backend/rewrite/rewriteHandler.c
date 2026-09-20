@@ -418,10 +418,6 @@ rewriteRuleAction(Query *parsetree,
 
 			switch (rte->rtekind)
 			{
-				case RTE_FUNCTION:
-					sub_action->hasSubLinks =
-						checkExprHasSubLink((Node *) rte->functions);
-					break;
 				case RTE_VALUES:
 					sub_action->hasSubLinks =
 						checkExprHasSubLink((Node *) rte->values_lists);
@@ -960,7 +956,7 @@ ApplyRetrieveRule(Query *parsetree,
 			 * referencing the original RTE.  This will later get expanded
 			 * into a RowExpr computing all the OLD values of the view row.
 			 */
-			var = makeWholeRowVar(rte, rt_index, 0, false);
+			var = makeWholeRowVar(rte, rt_index, 0);
 			tle = makeTargetEntry((Expr *) var,
 								  list_length(parsetree->targetList) + 1,
 								  pstrdup("wholerow"),

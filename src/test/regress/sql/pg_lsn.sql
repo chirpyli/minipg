@@ -42,15 +42,15 @@ SELECT '0/16AE7F7'::pg_lsn - 'NaN'::int8;
 -- Check btree and hash opclasses
 EXPLAIN (COSTS OFF)
 SELECT DISTINCT (i || '/' || j)::pg_lsn f
-  FROM generate_series(1, 10) i,
-       generate_series(1, 10) j,
-       generate_series(1, 5) k
+  FROM (SELECT generate_series(1, 10) AS i) AS _gsi,
+       (SELECT generate_series(1, 10) AS j) AS _gsj,
+       (SELECT generate_series(1, 5) AS k) AS _gsk
   WHERE i <= 10 AND j > 0 AND j <= 10
   ORDER BY f;
 
 SELECT DISTINCT (i || '/' || j)::pg_lsn f
-  FROM generate_series(1, 10) i,
-       generate_series(1, 10) j,
-       generate_series(1, 5) k
+  FROM (SELECT generate_series(1, 10) AS i) AS _gsi,
+       (SELECT generate_series(1, 10) AS j) AS _gsj,
+       (SELECT generate_series(1, 5) AS k) AS _gsk
   WHERE i <= 10 AND j > 0 AND j <= 10
   ORDER BY f;

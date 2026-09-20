@@ -84,8 +84,6 @@ extern void cost_tidrangescan(Path *path, PlannerInfo *root,
 							  ParamPathInfo *param_info);
 extern void cost_subqueryscan(SubqueryScanPath *path, PlannerInfo *root,
 							  RelOptInfo *baserel, ParamPathInfo *param_info);
-extern void cost_functionscan(Path *path, PlannerInfo *root,
-							  RelOptInfo *baserel, ParamPathInfo *param_info);
 extern void cost_valuesscan(Path *path, PlannerInfo *root,
 						RelOptInfo *baserel, ParamPathInfo *param_info);
 extern void cost_namedtuplestorescan(Path *path, PlannerInfo *root,
@@ -180,7 +178,6 @@ extern void set_joinrel_size_estimates(PlannerInfo *root, RelOptInfo *rel,
 									   SpecialJoinInfo *sjinfo,
 									   List *restrictlist);
 extern void set_subquery_size_estimates(PlannerInfo *root, RelOptInfo *rel);
-extern void set_function_size_estimates(PlannerInfo *root, RelOptInfo *rel);
 extern void set_values_size_estimates(PlannerInfo *root, RelOptInfo *rel);
 extern void set_namedtuplestore_size_estimates(PlannerInfo *root, RelOptInfo *rel);
 extern void set_result_size_estimates(PlannerInfo *root, RelOptInfo *rel);

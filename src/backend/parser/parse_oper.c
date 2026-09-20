@@ -662,15 +662,10 @@ op_error(ParseState *pstate, List *op, char oprkind,
  *
  * Transform operator expression ensuring type compatibility.
  * This is where some type conversion happens.
- *
- * last_srf should be a copy of pstate->p_last_srf from just before we
- * started transforming the operator's arguments; this is used for nested-SRF
- * detection.  If the caller will throw an error anyway for a set-returning
- * expression, it's okay to cheat and just pass pstate->p_last_srf.
  */
 Expr *
 make_op(ParseState *pstate, List *opname, Node *ltree, Node *rtree,
-		Node *last_srf, int location)
+		int location)
 {
 	Oid			ltypeId,
 				rtypeId;
@@ -765,7 +760,7 @@ make_op(ParseState *pstate, List *opname, Node *ltree, Node *rtree,
 	/* if it returns a set, check that's OK */
 	if (result->opretset)
 	{
-		check_srf_call_placement(pstate, last_srf, location);
+		check_srf_call_placement(pstate, location);
 		/* ... and remember it for error checks at higher levels */
 		pstate->p_last_srf = (Node *) result;
 	}

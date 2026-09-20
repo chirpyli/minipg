@@ -295,7 +295,6 @@ unknown_attribute(ParseState *pstate, Node *relref, const char *attname,
 static Node *
 transformIndirection(ParseState *pstate, A_Indirection *ind)
 {
-	Node	   *last_srf = pstate->p_last_srf;
 	Node	   *result = transformExprRecurse(pstate, ind->arg);
 	List	   *subscripts = NIL;
 	int			location = exprLocation(result);
@@ -338,7 +337,6 @@ transformIndirection(ParseState *pstate, A_Indirection *ind)
 			newresult = ParseFuncOrColumn(pstate,
 										  list_make1(n),
 										  list_make1(result),
-										  last_srf,
 										  NULL,
 										  location);
 			if (newresult == NULL)
@@ -396,7 +394,6 @@ transformColumnRef(ParseState *pstate, ColumnRef *cref)
 		case EXPR_KIND_JOIN_ON:
 		case EXPR_KIND_JOIN_USING:
 		case EXPR_KIND_FROM_SUBSELECT:
-		case EXPR_KIND_FROM_FUNCTION:
 		case EXPR_KIND_WHERE:
 		case EXPR_KIND_HAVING:
 		case EXPR_KIND_SELECT_TARGET:
@@ -535,7 +532,6 @@ transformColumnRef(ParseState *pstate, ColumnRef *cref)
 					node = ParseFuncOrColumn(pstate,
 											 list_make1(makeString(colname)),
 											 list_make1(node),
-											 pstate->p_last_srf,
 											 NULL,
 											 cref->location);
 				}
@@ -584,7 +580,6 @@ transformColumnRef(ParseState *pstate, ColumnRef *cref)
 					node = ParseFuncOrColumn(pstate,
 											 list_make1(makeString(colname)),
 											 list_make1(node),
-											 pstate->p_last_srf,
 											 NULL,
 											 cref->location);
 				}
@@ -646,7 +641,6 @@ transformColumnRef(ParseState *pstate, ColumnRef *cref)
 					node = ParseFuncOrColumn(pstate,
 											 list_make1(makeString(colname)),
 											 list_make1(node),
-											 pstate->p_last_srf,
 											 NULL,
 											 cref->location);
 				}
@@ -787,8 +781,6 @@ transformAExprOp(ParseState *pstate, A_Expr *a)
 	else
 	{
 		/* Ordinary scalar operator */
-		Node	   *last_srf = pstate->p_last_srf;
-
 		lexpr = transformExprRecurse(pstate, lexpr);
 		rexpr = transformExprRecurse(pstate, rexpr);
 
@@ -796,7 +788,6 @@ transformAExprOp(ParseState *pstate, A_Expr *a)
 								  a->name,
 								  lexpr,
 								  rexpr,
-								  last_srf,
 								  a->location);
 	}
 
@@ -842,7 +833,6 @@ transformAExprNullIf(ParseState *pstate, A_Expr *a)
 								a->name,
 								lexpr,
 								rexpr,
-								pstate->p_last_srf,
 								a->location);
 
 	/*
@@ -1002,7 +992,6 @@ transformAExprIn(ParseState *pstate, A_Expr *a)
 							   a->name,
 							   copyObject(lexpr),
 							   rexpr,
-							   pstate->p_last_srf,
 							   a->location);
 
 		cmp = coerce_to_boolean(pstate, cmp, "IN");
@@ -1112,7 +1101,6 @@ transformBoolExpr(ParseState *pstate, BoolExpr *a)
 static Node *
 transformFuncCall(ParseState *pstate, FuncCall *fn)
 {
-	Node	   *last_srf = pstate->p_last_srf;
 	List	   *targs;
 	ListCell   *args;
 
@@ -1148,7 +1136,6 @@ transformFuncCall(ParseState *pstate, FuncCall *fn)
 	return ParseFuncOrColumn(pstate,
 							 fn->funcname,
 							 targs,
-							 last_srf,
 							 fn,
 							 fn->location);
 }
@@ -1317,7 +1304,6 @@ transformSubLink(ParseState *pstate, SubLink *sublink)
 		case EXPR_KIND_JOIN_ON:
 		case EXPR_KIND_JOIN_USING:
 		case EXPR_KIND_FROM_SUBSELECT:
-		case EXPR_KIND_FROM_FUNCTION:
 		case EXPR_KIND_WHERE:
 		case EXPR_KIND_HAVING:
 		case EXPR_KIND_SELECT_TARGET:
@@ -1454,7 +1440,6 @@ transformSubLink(ParseState *pstate, SubLink *sublink)
 											 sublink->operName,
 											 lefthand,
 											 (Node *) rparam,
-											 pstate->p_last_srf,
 											 sublink->location);
 	}
 
@@ -1733,7 +1718,7 @@ transformWholeRowRef(ParseState *pstate, ParseNamespaceItem *nsitem,
 		Var		   *result;
 
 		result = makeWholeRowVar(nsitem->p_rte, nsitem->p_rtindex,
-								 sublevels_up, true);
+								 sublevels_up);
 
 		/* location is not filled in by makeWholeRowVar */
 		result->location = location;
@@ -1852,8 +1837,6 @@ ParseExprKindName(ParseExprKind exprKind)
 			return "JOIN/USING";
 		case EXPR_KIND_FROM_SUBSELECT:
 			return "sub-SELECT in FROM";
-		case EXPR_KIND_FROM_FUNCTION:
-			return "function in FROM";
 		case EXPR_KIND_WHERE:
 			return "WHERE";
 		case EXPR_KIND_HAVING:

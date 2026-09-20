@@ -166,9 +166,9 @@ SELECT h.seqno AS f20000
 -- Cause some overflow insert and splits.
 --
 CREATE TABLE hash_split_heap (keycol INT);
-INSERT INTO hash_split_heap SELECT 1 FROM generate_series(1, 500) a;
+INSERT INTO hash_split_heap SELECT 1 FROM (SELECT generate_series(1, 500) AS a) AS _gs;
 CREATE INDEX hash_split_index on hash_split_heap USING HASH (keycol);
-INSERT INTO hash_split_heap SELECT 1 FROM generate_series(1, 5000) a;
+INSERT INTO hash_split_heap SELECT 1 FROM (SELECT generate_series(1, 5000) AS a) AS _gs;
 
 -- minipg: cursors removed.  The original test performed a backward scan
 -- over the hash index via a DECLARE/MOVE BACKWARD cursor; backward index
@@ -176,7 +176,7 @@ INSERT INTO hash_split_heap SELECT 1 FROM generate_series(1, 5000) a;
 
 -- DELETE, INSERT, VACUUM.
 DELETE FROM hash_split_heap WHERE keycol = 1;
-INSERT INTO hash_split_heap SELECT a/2 FROM generate_series(1, 25000) a;
+INSERT INTO hash_split_heap SELECT a/2 FROM (SELECT generate_series(1, 25000) AS a) AS _gs;
 
 VACUUM hash_split_heap;
 

@@ -14,8 +14,7 @@ SELECT generate_series(1, 2), generate_series(1,4);
 -- srf, with SRF argument
 SELECT generate_series(1, generate_series(1, 3));
 
--- but we've traditionally rejected the same in FROM
-SELECT * FROM generate_series(1, generate_series(1, 3));
+-- minipg: function-in-FROM 已裁剪，原 "rejected the same in FROM" 用例移除
 
 -- srf, with two SRF arguments
 SELECT generate_series(generate_series(1,3), generate_series(2, 4));
@@ -104,8 +103,8 @@ VALUES(1, generate_series(1,2));
 -- We allow tSRFs that are not at top level
 SELECT int4mul(generate_series(1,2), 10);
 
--- but SRFs in function RTEs must be at top level (annoying restriction)
-SELECT * FROM int4mul(generate_series(1,2), 10);
+-- minipg: function-in-FROM 已裁剪，原 "SRFs in function RTEs must be at top
+-- level" 用例移除
 
 -- minipg: LIMIT/OFFSET 已裁剪，SRF 与 LIMIT/OFFSET 交互的用例整节移除
 

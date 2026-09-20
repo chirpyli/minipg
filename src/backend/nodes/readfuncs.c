@@ -980,10 +980,6 @@ _readRangeTblEntry(void)
 			READ_NODE_FIELD(joinrightcols);
 			READ_NODE_FIELD(join_using_alias);
 			break;
-		case RTE_FUNCTION:
-			READ_NODE_FIELD(functions);
-			READ_BOOL_FIELD(funcordinality);
-			break;
 		case RTE_VALUES:
 			READ_NODE_FIELD(values_lists);
 			READ_NODE_FIELD(coltypes);
@@ -1013,25 +1009,6 @@ _readRangeTblEntry(void)
 	READ_BITMAPSET_FIELD(insertedCols);
 	READ_BITMAPSET_FIELD(updatedCols);
 	READ_BITMAPSET_FIELD(extraUpdatedCols);
-
-	READ_DONE();
-}
-
-/*
- * _readRangeTblFunction
- */
-static RangeTblFunction *
-_readRangeTblFunction(void)
-{
-	READ_LOCALS(RangeTblFunction);
-
-	READ_NODE_FIELD(funcexpr);
-	READ_INT_FIELD(funccolcount);
-	READ_NODE_FIELD(funccolnames);
-	READ_NODE_FIELD(funccoltypes);
-	READ_NODE_FIELD(funccoltypmods);
-	READ_NODE_FIELD(funccolcollations);
-	READ_BITMAPSET_FIELD(funcparams);
 
 	READ_DONE();
 }
@@ -1406,22 +1383,6 @@ _readSubqueryScan(void)
 	ReadCommonScan(&local_node->scan);
 
 	READ_NODE_FIELD(subplan);
-
-	READ_DONE();
-}
-
-/*
- * _readFunctionScan
- */
-static FunctionScan *
-_readFunctionScan(void)
-{
-	READ_LOCALS(FunctionScan);
-
-	ReadCommonScan(&local_node->scan);
-
-	READ_NODE_FIELD(functions);
-	READ_BOOL_FIELD(funcordinality);
 
 	READ_DONE();
 }
@@ -1934,8 +1895,6 @@ parseNodeString(void)
 		return_value = _readAppendRelInfo();
 	else if (MATCH("RTE", 3))
 		return_value = _readRangeTblEntry();
-	else if (MATCH("RANGETBLFUNCTION", 16))
-		return_value = _readRangeTblFunction();
 	else if (MATCH("DEFELEM", 7))
 		return_value = _readDefElem();
 	else if (MATCH("PLANNEDSTMT", 11))
@@ -1974,8 +1933,6 @@ parseNodeString(void)
 		return_value = _readTidRangeScan();
 	else if (MATCH("SUBQUERYSCAN", 12))
 		return_value = _readSubqueryScan();
-	else if (MATCH("FUNCTIONSCAN", 12))
-		return_value = _readFunctionScan();
 	else if (MATCH("VALUESSCAN", 10))
 		return_value = _readValuesScan();
 	else if (MATCH("NAMEDTUPLESTORESCAN", 19))

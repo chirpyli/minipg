@@ -30,8 +30,7 @@ typedef enum
 
 
 extern Node *ParseFuncOrColumn(ParseState *pstate, List *funcname, List *fargs,
-							   Node *last_srf, FuncCall *fn,
-							   int location);
+							   FuncCall *fn, int location);
 
 extern FuncDetailCode func_get_detail(List *funcname,
 									  List *fargs, List *fargnames,
@@ -65,7 +64,6 @@ extern Oid	LookupFuncName(List *funcname, int nargs, const Oid *argtypes,
 extern Oid	LookupFuncWithArgs(ObjectType objtype, ObjectWithArgs *func,
 							   bool missing_ok);
 
-extern void check_srf_call_placement(ParseState *pstate, Node *last_srf,
-									 int location);
+extern void check_srf_call_placement(ParseState *pstate, int location);
 
 #endif							/* PARSE_FUNC_H */

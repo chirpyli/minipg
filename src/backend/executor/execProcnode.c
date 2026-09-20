@@ -79,7 +79,6 @@
 #include "executor/nodeBitmapHeapscan.h"
 #include "executor/nodeBitmapIndexscan.h"
 #include "executor/nodeBitmapOr.h"
-#include "executor/nodeFunctionscan.h"
 #include "executor/nodeGather.h"
 #include "executor/nodeGatherMerge.h"
 #include "executor/nodeGroup.h"
@@ -229,11 +228,6 @@ ExecInitNode(Plan *node, EState *estate, int eflags)
 
 		case T_SubqueryScan:
 			result = (PlanState *) ExecInitSubqueryScan((SubqueryScan *) node,
-														estate, eflags);
-			break;
-
-		case T_FunctionScan:
-			result = (PlanState *) ExecInitFunctionScan((FunctionScan *) node,
 														estate, eflags);
 			break;
 
@@ -587,10 +581,6 @@ ExecEndNode(PlanState *node)
 
 		case T_SubqueryScanState:
 			ExecEndSubqueryScan((SubqueryScanState *) node);
-			break;
-
-		case T_FunctionScanState:
-			ExecEndFunctionScan((FunctionScanState *) node);
 			break;
 
 		case T_ValuesScanState:

@@ -394,7 +394,8 @@ SELECT array_positions(ARRAY[1,2,3,NULL,5,6,1,2,3,NULL,5,6], NULL);
 (1 row)
 
 -- minipg: PL/pgSQL removed. Rewrite as SQL: positions of value 2 in the array.
-SELECT * FROM unnest(ARRAY[1,2,3,2,3,1,2]) WITH ORDINALITY AS t(v, pos)
+-- minipg: function-in-FROM removed; enumerate the array with a VALUES list.
+SELECT v, pos FROM (VALUES (1,1), (2,2), (3,3), (2,4), (3,5), (1,6), (2,7)) AS t(v, pos)
   WHERE v = 2 ORDER BY pos;
  v | pos 
 ---+-----
@@ -760,9 +761,9 @@ select 33 = all ('{33,null,33}');
 (1 row)
 
 -- nulls later in the bitmap
-SELECT -1 != ALL((SELECT array_agg(NULLIF(g.i, 900)) FROM generate_series(1,1000) g(i)));
+SELECT -1 != ALL((SELECT array_agg(NULLIF(g.i, 900)) FROM (SELECT generate_series(1,1000) AS i) AS g));
 ERROR:  operator does not exist: integer <> integer[]
-LINE 1: SELECT -1 != ALL((SELECT array_agg(NULLIF(g.i, 900)) FROM ge...
+LINE 1: SELECT -1 != ALL((SELECT array_agg(NULLIF(g.i, 900)) FROM (S...
                   ^
 HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
 -- test indexes on arrays
@@ -1167,7 +1168,7 @@ select string_to_array('1,2,3,4,*,6', ',', '*');
  {1,2,3,4,NULL,6}
 (1 row)
 
-select v, v is null as "is null" from string_to_table('1|2|3', '|') g(v);
+select v, v is null as "is null" from (SELECT string_to_table('1|2|3', '|') AS v) AS g;
  v | is null 
 ---+---------
  1 | f
@@ -1175,7 +1176,7 @@ select v, v is null as "is null" from string_to_table('1|2|3', '|') g(v);
  3 | f
 (3 rows)
 
-select v, v is null as "is null" from string_to_table('1|2|3|', '|') g(v);
+select v, v is null as "is null" from (SELECT string_to_table('1|2|3|', '|') AS v) AS g;
  v | is null 
 ---+---------
  1 | f
@@ -1184,7 +1185,7 @@ select v, v is null as "is null" from string_to_table('1|2|3|', '|') g(v);
    | f
 (4 rows)
 
-select v, v is null as "is null" from string_to_table('1||2|3||', '||') g(v);
+select v, v is null as "is null" from (SELECT string_to_table('1||2|3||', '||') AS v) AS g;
   v  | is null 
 -----+---------
  1   | f
@@ -1192,18 +1193,18 @@ select v, v is null as "is null" from string_to_table('1||2|3||', '||') g(v);
      | f
 (3 rows)
 
-select v, v is null as "is null" from string_to_table('1|2|3', '') g(v);
+select v, v is null as "is null" from (SELECT string_to_table('1|2|3', '') AS v) AS g;
    v   | is null 
 -------+---------
  1|2|3 | f
 (1 row)
 
-select v, v is null as "is null" from string_to_table('', '|') g(v);
+select v, v is null as "is null" from (SELECT string_to_table('', '|') AS v) AS g;
  v | is null 
 ---+---------
 (0 rows)
 
-select v, v is null as "is null" from string_to_table('1|2|3', NULL) g(v);
+select v, v is null as "is null" from (SELECT string_to_table('1|2|3', NULL) AS v) AS g;
  v | is null 
 ---+---------
  1 | f
@@ -1213,36 +1214,36 @@ select v, v is null as "is null" from string_to_table('1|2|3', NULL) g(v);
  3 | f
 (5 rows)
 
-select v, v is null as "is null" from string_to_table(NULL, '|') g(v);
+select v, v is null as "is null" from (SELECT string_to_table(NULL, '|') AS v) AS g;
  v | is null 
 ---+---------
 (0 rows)
 
-select v, v is null as "is null" from string_to_table('abc', '') g(v);
+select v, v is null as "is null" from (SELECT string_to_table('abc', '') AS v) AS g;
   v  | is null 
 -----+---------
  abc | f
 (1 row)
 
-select v, v is null as "is null" from string_to_table('abc', '', 'abc') g(v);
+select v, v is null as "is null" from (SELECT string_to_table('abc', '', 'abc') AS v) AS g;
  v | is null 
 ---+---------
    | t
 (1 row)
 
-select v, v is null as "is null" from string_to_table('abc', ',') g(v);
+select v, v is null as "is null" from (SELECT string_to_table('abc', ',') AS v) AS g;
   v  | is null 
 -----+---------
  abc | f
 (1 row)
 
-select v, v is null as "is null" from string_to_table('abc', ',', 'abc') g(v);
+select v, v is null as "is null" from (SELECT string_to_table('abc', ',', 'abc') AS v) AS g;
  v | is null 
 ---+---------
    | t
 (1 row)
 
-select v, v is null as "is null" from string_to_table('1,2,3,4,,6', ',') g(v);
+select v, v is null as "is null" from (SELECT string_to_table('1,2,3,4,,6', ',') AS v) AS g;
  v | is null 
 ---+---------
  1 | f
@@ -1253,7 +1254,7 @@ select v, v is null as "is null" from string_to_table('1,2,3,4,,6', ',') g(v);
  6 | f
 (6 rows)
 
-select v, v is null as "is null" from string_to_table('1,2,3,4,,6', ',', '') g(v);
+select v, v is null as "is null" from (SELECT string_to_table('1,2,3,4,,6', ',', '') AS v) AS g;
  v | is null 
 ---+---------
  1 | f
@@ -1264,7 +1265,7 @@ select v, v is null as "is null" from string_to_table('1,2,3,4,,6', ',', '') g(v
  6 | f
 (6 rows)
 
-select v, v is null as "is null" from string_to_table('1,2,3,4,*,6', ',', '*') g(v);
+select v, v is null as "is null" from (SELECT string_to_table('1,2,3,4,*,6', ',', '*') AS v) AS g;
  v | is null 
 ---+---------
  1 | f
@@ -1423,7 +1424,7 @@ select array_agg(ar)
 (1 row)
 
 select array_agg(distinct ar order by ar desc)
-  from (select array[i / 2] from generate_series(1,10) a(i)) b(ar);
+  from (select array[i / 2] from (SELECT generate_series(1,10) AS i) AS a) b(ar);
          array_agg         
 ---------------------------
  {{5},{4},{3},{2},{1},{0}}
@@ -1431,34 +1432,34 @@ select array_agg(distinct ar order by ar desc)
 
 select array_agg(ar)
   from (select array_agg(array[i, i+1, i-1])
-        from generate_series(1,2) a(i)) b(ar);
+        from (SELECT generate_series(1,2) AS i) AS a) b(ar);
       array_agg      
 ---------------------
  {{{1,2,0},{2,3,1}}}
 (1 row)
 
-select array_agg(array[i+1.2, i+1.3, i+1.4]) from generate_series(1,3) g(i);
+select array_agg(array[i+1.2, i+1.3, i+1.4]) from (SELECT generate_series(1,3) AS i) AS g;
                   array_agg                  
 ---------------------------------------------
  {{2.2,2.3,2.4},{3.2,3.3,3.4},{4.2,4.3,4.4}}
 (1 row)
 
-select array_agg(array['Hello', i::text]) from generate_series(9,11) g(i);
+select array_agg(array['Hello', i::text]) from (SELECT generate_series(9,11) AS i) AS g;
              array_agg             
 -----------------------------------
  {{Hello,9},{Hello,10},{Hello,11}}
 (1 row)
 
-select array_agg(array[i, nullif(i, 3), i+1]) from generate_series(1,4) g(i);
+select array_agg(array[i, nullif(i, 3), i+1]) from (SELECT generate_series(1,4) AS i) AS g;
               array_agg               
 --------------------------------------
  {{1,1,2},{2,2,3},{3,NULL,4},{4,4,5}}
 (1 row)
 
 -- errors
-select array_agg('{}'::int[]) from generate_series(1,2);
+select array_agg('{}'::int[]) from (SELECT generate_series(1,2) AS g) AS _gs;
 ERROR:  cannot accumulate empty arrays
-select array_agg(null::int[]) from generate_series(1,2);
+select array_agg(null::int[]) from (SELECT generate_series(1,2) AS g) AS _gs;
 ERROR:  cannot accumulate null arrays
 select array_agg(ar)
   from (values ('{1,2}'::int[]), ('{3}'::int[])) v(ar);
@@ -1471,7 +1472,7 @@ select unnest(array[1,2,3]);
       3
 (3 rows)
 
-select * from unnest(array[1,2,3]);
+select unnest(array[1,2,3]) as unnest;
  unnest 
 --------
       1
@@ -1784,7 +1785,7 @@ FROM (VALUES
 SELECT
     op,
     width_bucket(op, ARRAY[1, 3, 5, 10]) AS wb_1
-FROM generate_series(0,11) as op;
+FROM (SELECT generate_series(0,11) AS op) AS _gs;
  op | wb_1 
 ----+------
   0 |    0

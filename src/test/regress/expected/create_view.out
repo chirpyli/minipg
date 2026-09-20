@@ -906,27 +906,8 @@ select pg_get_viewdef('tt19v', true);
      'foo'::text = ANY ((( SELECT ARRAY['abc'::text, 'def'::text, 'foo'::text] AS "array"))::text[]) AS c2;
 (1 row)
 
--- check display of assorted RTE_FUNCTION expressions
-create view tt20v as
-select * from
-  coalesce(1,2) as c,
--- minipg: COLLATION FOR 已随 COLLATE 一并裁剪
-  current_date as d,
-  cast(1+2 as int4) as i4,
-  cast(1+2 as int8) as i8;
-select pg_get_viewdef('tt20v', true);
-               pg_get_viewdef                
----------------------------------------------
-  SELECT c.c,                               +
-     d.d,                                   +
-     i4.i4,                                 +
-     i8.i8                                  +
-    FROM COALESCE(1, 2) c(c),               +
-     CURRENT_DATE d(d),                     +
-     CAST(1 + 2 AS integer) i4(i4),         +
-     CAST((1 + 2)::bigint AS bigint) i8(i8);
-(1 row)
-
+-- minipg: function-in-FROM 已裁剪，原 "assorted RTE_FUNCTION expressions"
+-- （FROM COALESCE(...)/CURRENT_DATE/CAST(...) 作为表函数）用例移除
 -- reverse-listing of various special functions
 -- minipg: interval 类型已裁剪，AT TIME ZONE / OVERLAPS 相关列移除
 create view tt201v as
@@ -1052,7 +1033,7 @@ select viewname from pg_views where viewname = 'tt27v'; -- Ok to access a system
 reset restrict_nonsystem_relation_kind;
 -- clean up all the random objects we made above
 DROP SCHEMA testviewschm2 CASCADE;
-NOTICE:  drop cascades to 52 other objects
+NOTICE:  drop cascades to 51 other objects
 DETAIL:  drop cascades to table tbl1
 drop cascades to table tbl2
 drop cascades to table tbl3
@@ -1097,7 +1078,6 @@ drop cascades to table tt12
 drop cascades to table tt13
 drop cascades to view vv6
 drop cascades to view tt19v
-drop cascades to view tt20v
 drop cascades to view tt201v
 drop cascades to view tt21v
 drop cascades to view tt22v

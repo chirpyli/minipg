@@ -125,8 +125,6 @@ static TidRangeScan *create_tidrangescan_plan(PlannerInfo *root,
 static SubqueryScan *create_subqueryscan_plan(PlannerInfo *root,
 											  SubqueryScanPath *best_path,
 											  List *tlist, List *scan_clauses);
-static FunctionScan *create_functionscan_plan(PlannerInfo *root, Path *best_path,
-											  List *tlist, List *scan_clauses);
 static ValuesScan *create_valuesscan_plan(PlannerInfo *root, Path *best_path,
 										  List *tlist, List *scan_clauses);
 static NamedTuplestoreScan *create_namedtuplestorescan_plan(PlannerInfo *root,
@@ -179,8 +177,6 @@ static SubqueryScan *make_subqueryscan(List *qptlist,
 									   List *qpqual,
 									   Index scanrelid,
 									   Plan *subplan);
-static FunctionScan *make_functionscan(List *qptlist, List *qpqual,
-									   Index scanrelid, List *functions, bool funcordinality);
 static ValuesScan *make_valuesscan(List *qptlist, List *qpqual,
 								   Index scanrelid, List *values_lists);
 static NamedTuplestoreScan *make_namedtuplestorescan(List *qptlist, List *qpqual,
@@ -341,7 +337,6 @@ create_plan_recurse(PlannerInfo *root, Path *best_path, int flags)
 		case T_TidScan:
 		case T_TidRangeScan:
 		case T_SubqueryScan:
-		case T_FunctionScan:
 		case T_ValuesScan:
 		case T_NamedTuplestoreScan:
 			plan = create_scan_plan(root, best_path, flags);
@@ -608,14 +603,6 @@ create_scan_plan(PlannerInfo *root, Path *best_path, int flags)
 													 scan_clauses);
 			break;
 
-		case T_FunctionScan:
-			plan = (Plan *) create_functionscan_plan(root,
-													 best_path,
-													 tlist,
-													 scan_clauses);
-			break;
-
-
 		case T_ValuesScan:
 			plan = (Plan *) create_valuesscan_plan(root,
 												   best_path,
@@ -715,12 +702,11 @@ use_physical_tlist(PlannerInfo *root, Path *path, int flags)
 		return false;
 
 	/*
-	 * We can do this for real relation scans, subquery scans, function scans,
+	 * We can do this for real relation scans, subquery scans,
 	 * tablefunc scans, values scans, and CTE scans (but not for, eg, joins).
 	 */
 	if (rel->rtekind != RTE_RELATION &&
 		rel->rtekind != RTE_SUBQUERY &&
-		rel->rtekind != RTE_FUNCTION &&
 		rel->rtekind != RTE_VALUES)
 		return false;
 
@@ -2854,50 +2840,6 @@ create_subqueryscan_plan(PlannerInfo *root, SubqueryScanPath *best_path,
 }
 
 /*
- * create_functionscan_plan
- *	 Returns a functionscan plan for the base relation scanned by 'best_path'
- *	 with restriction clauses 'scan_clauses' and targetlist 'tlist'.
- */
-static FunctionScan *
-create_functionscan_plan(PlannerInfo *root, Path *best_path,
-						 List *tlist, List *scan_clauses)
-{
-	FunctionScan *scan_plan;
-	Index		scan_relid = best_path->parent->relid;
-	RangeTblEntry *rte;
-	List	   *functions;
-
-	/* it should be a function base rel... */
-	Assert(scan_relid > 0);
-	rte = planner_rt_fetch(scan_relid, root);
-	Assert(rte->rtekind == RTE_FUNCTION);
-	functions = rte->functions;
-
-	/* Sort clauses into best execution order */
-	scan_clauses = order_qual_clauses(root, scan_clauses);
-
-	/* Reduce RestrictInfo list to bare expressions; ignore pseudoconstants */
-	scan_clauses = extract_actual_clauses(scan_clauses, false);
-
-	/* Replace any outer-relation variables with nestloop params */
-	if (best_path->param_info)
-	{
-		scan_clauses = (List *)
-			replace_nestloop_params(root, (Node *) scan_clauses);
-		/* The function expressions could contain nestloop params, too */
-		functions = (List *) replace_nestloop_params(root, (Node *) functions);
-	}
-
-	scan_plan = make_functionscan(tlist, scan_clauses, scan_relid,
-								  functions, rte->funcordinality);
-
-	copy_generic_path_info(&scan_plan->scan.plan, best_path);
-
-	return scan_plan;
-}
-
-
-/*
  * create_valuesscan_plan
  *	 Returns a valuesscan plan for the base relation scanned by 'best_path'
  *	 with restriction clauses 'scan_clauses' and targetlist 'tlist'.
@@ -4329,28 +4271,6 @@ make_subqueryscan(List *qptlist,
 
 	return node;
 }
-
-static FunctionScan *
-make_functionscan(List *qptlist,
-				  List *qpqual,
-				  Index scanrelid,
-				  List *functions,
-				  bool funcordinality)
-{
-	FunctionScan *node = makeNode(FunctionScan);
-	Plan	   *plan = &node->scan.plan;
-
-	plan->targetlist = qptlist;
-	plan->qual = qpqual;
-	plan->lefttree = NULL;
-	plan->righttree = NULL;
-	node->scan.scanrelid = scanrelid;
-	node->functions = functions;
-	node->funcordinality = funcordinality;
-
-	return node;
-}
-
 
 static ValuesScan *
 make_valuesscan(List *qptlist,

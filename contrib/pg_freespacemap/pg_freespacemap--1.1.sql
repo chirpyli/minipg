@@ -15,7 +15,7 @@ CREATE FUNCTION
 RETURNS SETOF RECORD
 AS $$
   SELECT blkno, pg_freespace($1, blkno) AS avail
-  FROM generate_series(0, pg_relation_size($1) / current_setting('block_size')::bigint - 1) AS blkno;
+  FROM (SELECT generate_series(0, pg_relation_size($1) / current_setting('block_size')::bigint - 1) AS blkno) AS _gs;
 $$
 LANGUAGE SQL PARALLEL SAFE;
 

@@ -53,13 +53,6 @@ extern ParseNamespaceItem *addRangeTableEntryForSubquery(ParseState *pstate,
 														 Alias *alias,
 														 bool lateral,
 														 bool inFromCl);
-extern ParseNamespaceItem *addRangeTableEntryForFunction(ParseState *pstate,
-														 List *funcnames,
-														 List *funcexprs,
-														 List *coldeflists,
-														 RangeFunction *rangefunc,
-														 bool lateral,
-														 bool inFromCl);
 extern ParseNamespaceItem *addRangeTableEntryForValues(ParseState *pstate,
 													   List *exprs,
 													   List *coltypes,

@@ -102,7 +102,7 @@ select reverse('abcde');
  edcba
 (1 row)
 
-select i, left('ahoj', i), right('ahoj', i) from generate_series(-5, 5) t(i) order by i;
+select i, left('ahoj', i), right('ahoj', i) from (SELECT generate_series(-5, 5) AS i) AS t order by i;
  i  | left | right 
 ----+------+-------
  -5 |      | 

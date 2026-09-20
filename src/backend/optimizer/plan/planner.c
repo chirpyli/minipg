@@ -71,13 +71,11 @@ create_upper_paths_hook_type create_upper_paths_hook = NULL;
 /* Expression kind codes for preprocess_expression */
 #define EXPRKIND_QUAL				0
 #define EXPRKIND_TARGET				1
-#define EXPRKIND_RTFUNC				2
-#define EXPRKIND_RTFUNC_LATERAL		3
-#define EXPRKIND_VALUES				4
-#define EXPRKIND_VALUES_LATERAL		5
-#define EXPRKIND_LIMIT				6
-#define EXPRKIND_APPINFO			7
-#define EXPRKIND_PHV				8
+#define EXPRKIND_VALUES				2
+#define EXPRKIND_VALUES_LATERAL		3
+#define EXPRKIND_LIMIT				4
+#define EXPRKIND_APPINFO			5
+#define EXPRKIND_PHV				6
 #define EXPRKIND_TABLEFUNC			11
 #define EXPRKIND_TABLEFUNC_LATERAL	12
 
@@ -482,14 +480,6 @@ subquery_planner(PlannerGlobal *glob, Query *parse,
 		pull_up_sublinks(root);
 
 	/*
-	 * Scan the rangetable for function RTEs, do const-simplification on them,
-	 * and then inline them if possible (producing subqueries that might get
-	 * pulled up next).  Recursion issues here are handled in the same way as
-	 * for SubLinks.
-	 */
-	preprocess_function_rtes(root);
-
-	/*
 	 * Check to see if any subqueries in the jointree can be merged into this
 	 * query.
 	 */
@@ -604,13 +594,6 @@ subquery_planner(PlannerGlobal *glob, Query *parse,
 				rte->subquery = (Query *)
 					flatten_join_alias_vars(root->parse,
 											(Node *) rte->subquery);
-		}
-		else if (rte->rtekind == RTE_FUNCTION)
-		{
-			/* Preprocess the function expression(s) fully */
-			kind = rte->lateral ? EXPRKIND_RTFUNC_LATERAL : EXPRKIND_RTFUNC;
-			rte->functions = (List *)
-				preprocess_expression(root, (Node *) rte->functions, kind);
 		}
 		else if (rte->rtekind == RTE_VALUES)
 		{
@@ -774,21 +757,16 @@ preprocess_expression(PlannerInfo *root, Node *expr, int kind)
 	 * we may extract from the joinaliasvars lists have not been preprocessed.
 	 * For example, if we did this after sublink processing, sublinks expanded
 	 * out from join aliases would not get processed.  But we can skip this in
-	 * non-lateral RTE functions and VALUES lists, since they can't contain
+	 * non-lateral VALUES lists, since they can't contain
 	 * any Vars of the current query level.
 	 */
 	if (root->hasJoinRTEs &&
-		!(kind == EXPRKIND_RTFUNC ||
-		  kind == EXPRKIND_VALUES ||
+		!(kind == EXPRKIND_VALUES ||
 		  kind == EXPRKIND_TABLEFUNC))
 		expr = flatten_join_alias_vars(root->parse, expr);
 
 	/*
-	 * Simplify constant expressions.  For function RTEs, this was already
-	 * done by preprocess_function_rtes.  (But note we must do it again for
-	 * EXPRKIND_RTFUNC_LATERAL, because those might by now contain
-	 * un-simplified subexpressions inserted by flattening of subqueries or
-	 * join alias variables.)
+	 * Simplify constant expressions.
 	 *
 	 * Note: an essential effect of this is to convert named-argument function
 	 * calls to positional notation and insert the current actual values of
@@ -802,8 +780,7 @@ preprocess_expression(PlannerInfo *root, Node *expr, int kind)
 	 * careful to maintain AND/OR flatness --- that is, do not generate a tree
 	 * with AND directly under AND, nor OR directly under OR.
 	 */
-	if (kind != EXPRKIND_RTFUNC)
-		expr = eval_const_expressions(root, expr);
+	expr = eval_const_expressions(root, expr);
 
 	/*
 	 * If it's a qual or havingQual, canonicalize it.

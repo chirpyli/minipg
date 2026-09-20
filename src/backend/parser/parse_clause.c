@@ -63,8 +63,6 @@ static Node *transformJoinOnClause(ParseState *pstate, JoinExpr *j,
 static ParseNamespaceItem *transformTableEntry(ParseState *pstate, RangeVar *r);
 static ParseNamespaceItem *transformRangeSubselect(ParseState *pstate,
 												   RangeSubselect *r);
-static ParseNamespaceItem *transformRangeFunction(ParseState *pstate,
-												  RangeFunction *r);
 static ParseNamespaceItem *getNSItemForSpecialRelationTypes(ParseState *pstate,
 															RangeVar *rv);
 static Node *transformFromClauseItem(ParseState *pstate, Node *n,
@@ -101,7 +99,7 @@ transformFromClause(ParseState *pstate, List *frmList)
 
 	/*
 	 * The grammar will have produced a list of RangeVars, RangeSubselects,
-	 * RangeFunctions, and/or JoinExprs. Transform each one (possibly adding
+	 * and/or JoinExprs. Transform each one (possibly adding
 	 * entries to the rtable), check for duplicate refnames, and then add it
 	 * to the joinlist and namespace.
 	 *
@@ -429,222 +427,6 @@ transformRangeSubselect(ParseState *pstate, RangeSubselect *r)
 
 
 /*
- * transformRangeFunction --- transform a function call appearing in FROM
- */
-static ParseNamespaceItem *
-transformRangeFunction(ParseState *pstate, RangeFunction *r)
-{
-	List	   *funcexprs = NIL;
-	List	   *funcnames = NIL;
-	List	   *coldeflists = NIL;
-	bool		is_lateral;
-	ListCell   *lc;
-
-	/*
-	 * We make lateral_only names of this level visible, whether or not the
-	 * RangeFunction is explicitly marked LATERAL.  This is needed for SQL
-	 * spec compliance in the case of UNNEST(), and seems useful on
-	 * convenience grounds for all functions in FROM.
-	 *
-	 * (LATERAL can't nest within a single pstate level, so we don't need
-	 * save/restore logic here.)
-	 */
-	Assert(!pstate->p_lateral_active);
-	pstate->p_lateral_active = true;
-
-	/*
-	 * Transform the raw expressions.
-	 *
-	 * While transforming, also save function names for possible use as alias
-	 * and column names.  We use the same transformation rules as for a SELECT
-	 * output expression.  For a FuncCall node, the result will be the
-	 * function name, but it is possible for the grammar to hand back other
-	 * node types.
-	 *
-	 * We have to get this info now, because FigureColname only works on raw
-	 * parsetrees.  Actually deciding what to do with the names is left up to
-	 * addRangeTableEntryForFunction.
-	 *
-	 * Likewise, collect column definition lists if there were any.  But
-	 * complain if we find one here and the RangeFunction has one too.
-	 */
-	foreach(lc, r->functions)
-	{
-		List	   *pair = (List *) lfirst(lc);
-		Node	   *fexpr;
-		List	   *coldeflist;
-		Node	   *newfexpr;
-		Node	   *last_srf;
-
-		/* Disassemble the function-call/column-def-list pairs */
-		Assert(list_length(pair) == 2);
-		fexpr = (Node *) linitial(pair);
-		coldeflist = (List *) lsecond(pair);
-
-		/*
-		 * If we find a function call unnest() with more than one argument and
-		 * no special decoration, transform it into separate unnest() calls on
-		 * each argument.  This is a kluge, for sure, but it's less nasty than
-		 * other ways of implementing the SQL-standard UNNEST() syntax.
-		 *
-		 * If there is any decoration (including a coldeflist), we don't
-		 * transform, which probably means a no-such-function error later.  We
-		 * could alternatively throw an error right now, but that doesn't seem
-		 * tremendously helpful.  If someone is using any such decoration,
-		 * then they're not using the SQL-standard syntax, and they're more
-		 * likely expecting an un-tweaked function call.
-		 *
-		 * Note: the transformation changes a non-schema-qualified unnest()
-		 * function name into schema-qualified pg_catalog.unnest().  This
-		 * choice is also a bit debatable, but it seems reasonable to force
-		 * use of built-in unnest() when we make this transformation.
-		 */
-		if (IsA(fexpr, FuncCall))
-		{
-			FuncCall   *fc = (FuncCall *) fexpr;
-
-			if (list_length(fc->funcname) == 1 &&
-				strcmp(strVal(linitial(fc->funcname)), "unnest") == 0 &&
-				list_length(fc->args) > 1 &&
-				fc->agg_order == NIL &&
-				!fc->agg_star &&
-				!fc->agg_distinct &&
-				coldeflist == NIL)
-			{
-				ListCell   *lc;
-
-				foreach(lc, fc->args)
-				{
-					Node	   *arg = (Node *) lfirst(lc);
-					FuncCall   *newfc;
-
-					last_srf = pstate->p_last_srf;
-
-					newfc = makeFuncCall(SystemFuncName("unnest"),
-										 list_make1(arg),
-										 COERCE_EXPLICIT_CALL,
-										 fc->location);
-
-					newfexpr = transformExpr(pstate, (Node *) newfc,
-											 EXPR_KIND_FROM_FUNCTION);
-
-					/* nodeFunctionscan.c requires SRFs to be at top level */
-					if (pstate->p_last_srf != last_srf &&
-						pstate->p_last_srf != newfexpr)
-						ereport(ERROR,
-								(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-								 errmsg("set-returning functions must appear at top level of FROM"),
-								 parser_errposition(pstate,
-													exprLocation(pstate->p_last_srf))));
-
-					funcexprs = lappend(funcexprs, newfexpr);
-
-					funcnames = lappend(funcnames,
-										FigureColname((Node *) newfc));
-
-					/* coldeflist is empty, so no error is possible */
-
-					coldeflists = lappend(coldeflists, coldeflist);
-				}
-				continue;		/* done with this function item */
-			}
-		}
-
-		/* normal case ... */
-		last_srf = pstate->p_last_srf;
-
-		newfexpr = transformExpr(pstate, fexpr,
-								 EXPR_KIND_FROM_FUNCTION);
-
-		/* nodeFunctionscan.c requires SRFs to be at top level */
-		if (pstate->p_last_srf != last_srf &&
-			pstate->p_last_srf != newfexpr)
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("set-returning functions must appear at top level of FROM"),
-					 parser_errposition(pstate,
-										exprLocation(pstate->p_last_srf))));
-
-		funcexprs = lappend(funcexprs, newfexpr);
-
-		funcnames = lappend(funcnames,
-							FigureColname(fexpr));
-
-		if (coldeflist && r->coldeflist)
-			ereport(ERROR,
-					(errcode(ERRCODE_SYNTAX_ERROR),
-					 errmsg("multiple column definition lists are not allowed for the same function"),
-					 parser_errposition(pstate,
-										exprLocation((Node *) r->coldeflist))));
-
-		coldeflists = lappend(coldeflists, coldeflist);
-	}
-
-	pstate->p_lateral_active = false;
-
-	/*
-	 * We must assign collations now so that the RTE exposes correct collation
-	 * info for Vars created from it.
-	 */
-	assign_list_collations(pstate, funcexprs);
-
-	/*
-	 * Install the top-level coldeflist if there was one (we already checked
-	 * that there was no conflicting per-function coldeflist).
-	 *
-	 * We only allow this when there's a single function (even after UNNEST
-	 * expansion) and no WITH ORDINALITY.  The reason for the latter
-	 * restriction is that it's not real clear whether the ordinality column
-	 * should be in the coldeflist, and users are too likely to make mistakes
-	 * in one direction or the other.  Putting the coldeflist inside ROWS
-	 * FROM() is much clearer in this case.
-	 */
-	if (r->coldeflist)
-	{
-		if (list_length(funcexprs) != 1)
-		{
-			if (r->is_rowsfrom)
-				ereport(ERROR,
-						(errcode(ERRCODE_SYNTAX_ERROR),
-						 errmsg("ROWS FROM() with multiple functions cannot have a column definition list"),
-						 errhint("Put a separate column definition list for each function inside ROWS FROM()."),
-						 parser_errposition(pstate,
-											exprLocation((Node *) r->coldeflist))));
-			else
-				ereport(ERROR,
-						(errcode(ERRCODE_SYNTAX_ERROR),
-						 errmsg("UNNEST() with multiple arguments cannot have a column definition list"),
-						 errhint("Use separate UNNEST() calls inside ROWS FROM(), and attach a column definition list to each one."),
-						 parser_errposition(pstate,
-											exprLocation((Node *) r->coldeflist))));
-		}
-		if (r->ordinality)
-			ereport(ERROR,
-					(errcode(ERRCODE_SYNTAX_ERROR),
-					 errmsg("WITH ORDINALITY cannot be used with a column definition list"),
-					 errhint("Put the column definition list inside ROWS FROM()."),
-					 parser_errposition(pstate,
-										exprLocation((Node *) r->coldeflist))));
-
-		coldeflists = list_make1(r->coldeflist);
-	}
-
-	/*
-	 * Mark the RTE as LATERAL if the user said LATERAL explicitly, or if
-	 * there are any lateral cross-references in it.
-	 */
-	is_lateral = r->lateral || contain_vars_of_level((Node *) funcexprs, 0);
-
-	/*
-	 * OK, build an RTE and nsitem for the function.
-	 */
-	return addRangeTableEntryForFunction(pstate,
-										 funcnames, funcexprs, coldeflists,
-										 r, is_lateral, true);
-}
-
-
-/*
  * getNSItemForSpecialRelationTypes
  *
  * If given RangeVar refers to an EphemeralNamedRelation,
@@ -719,19 +501,6 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 		ParseNamespaceItem *nsitem;
 
 		nsitem = transformRangeSubselect(pstate, (RangeSubselect *) n);
-		*top_nsitem = nsitem;
-		*namespace = list_make1(nsitem);
-		rtr = makeNode(RangeTblRef);
-		rtr->rtindex = nsitem->p_rtindex;
-		return (Node *) rtr;
-	}
-	else if (IsA(n, RangeFunction))
-	{
-		/* function is like a plain relation */
-		RangeTblRef *rtr;
-		ParseNamespaceItem *nsitem;
-
-		nsitem = transformRangeFunction(pstate, (RangeFunction *) n);
 		*top_nsitem = nsitem;
 		*namespace = list_make1(nsitem);
 		rtr = makeNode(RangeTblRef);

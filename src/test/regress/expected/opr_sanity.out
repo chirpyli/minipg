@@ -393,9 +393,9 @@ WHERE proargmodes IS NOT NULL AND proargnames IS NOT NULL AND
 SELECT p1.oid, p1.proname, p1.proargtypes, p1.proallargtypes, p1.proargmodes
 FROM pg_proc as p1
 WHERE proallargtypes IS NOT NULL AND
-  (SELECT COALESCE(array_agg(u), '{}'::oid[]) FROM unnest(proargtypes) u) <>
+  (SELECT COALESCE(array_agg(u), '{}'::oid[]) FROM (SELECT unnest(proargtypes) AS u) AS _gsu) <>
   (SELECT COALESCE(array_agg(proallargtypes[i]), '{}'::oid[])
-        FROM generate_series(1, array_length(proallargtypes, 1)) g(i)
+        FROM (SELECT generate_series(1, array_length(proallargtypes, 1)) AS i) AS g
         WHERE proargmodes IS NULL OR proargmodes[i] IN ('i', 'b', 'v'));
  oid | proname | proargtypes | proallargtypes | proargmodes 
 -----+---------+-------------+----------------+-------------

@@ -194,11 +194,10 @@ base_yylex(YYSTYPE *lvalp, YYLTYPE *llocp, core_yyscan_t yyscanner)
 			break;
 
 		case WITH:
-			/* Replace WITH by WITH_LA if it's followed by TIME or ORDINALITY */
+			/* Replace WITH by WITH_LA if it's followed by TIME */
 			switch (next_token)
 			{
 				case TIME:
-				case ORDINALITY:
 					cur_token = WITH_LA;
 					break;
 			}

@@ -726,8 +726,9 @@ sub _backup_fs
 
 	if ($hot)
 	{
+		# minipg: function-in-FROM 已裁剪，直接调用函数
 		my $stdout = $self->safe_psql('postgres',
-			"SELECT * FROM pg_start_backup('$backup_name');");
+			"SELECT pg_start_backup('$backup_name');");
 		print "# pg_start_backup: $stdout\n";
 	}
 
@@ -746,7 +747,7 @@ sub _backup_fs
 		# is enabled; otherwise the caller will have to copy the remaining
 		# segments.
 		my $stdout =
-		  $self->safe_psql('postgres', 'SELECT * FROM pg_stop_backup();');
+		  $self->safe_psql('postgres', 'SELECT pg_stop_backup();');
 		print "# pg_stop_backup: $stdout\n";
 	}
 

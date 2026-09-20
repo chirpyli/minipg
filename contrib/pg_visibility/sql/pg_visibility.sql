@@ -8,13 +8,13 @@ BEGIN;
 CREATE TABLE droppedtest (c int);
 SELECT 'droppedtest'::regclass::oid AS oid \gset
 SAVEPOINT q; DROP TABLE droppedtest; RELEASE q;
-SAVEPOINT q; SELECT * FROM pg_visibility_map(:oid); ROLLBACK TO q;
+SAVEPOINT q; SELECT * FROM (SELECT (pg_visibility_map(:oid)).* ) AS _gs; ROLLBACK TO q;
 -- ERROR:  could not open relation with OID 16xxx
 SAVEPOINT q; SELECT 1; ROLLBACK TO q;
 SAVEPOINT q; SELECT 1; ROLLBACK TO q;
 SELECT pg_relation_size(:oid), pg_relation_filepath(:oid),
   true AS has_table_privilege;
-SELECT * FROM pg_visibility_map(:oid);
+SELECT * FROM (SELECT (pg_visibility_map(:oid)).* ) AS _gs;
 -- ERROR:  could not open relation with OID 16xxx
 ROLLBACK;
 \set VERBOSITY default
@@ -39,18 +39,18 @@ create table regular_table (a int, b text);
 alter table regular_table alter column b set storage external;
 insert into regular_table values (1, repeat('one', 1000)), (2, repeat('two', 1000));
 vacuum (disable_page_skipping) regular_table;
-select count(*) > 0 from pg_visibility('regular_table');
-select count(*) > 0 from pg_visibility((select reltoastrelid from pg_class where relname = 'regular_table'));
+select count(*) > 0 from (SELECT (pg_visibility('regular_table')).* ) AS _gs;
+select count(*) > 0 from (SELECT (pg_visibility((select reltoastrelid from pg_class where relname = 'regular_table'))).* ) AS _gs;
 truncate regular_table;
-select count(*) > 0 from pg_visibility('regular_table');
-select count(*) > 0 from pg_visibility((select reltoastrelid from pg_class where relname = 'regular_table'));
+select count(*) > 0 from (SELECT (pg_visibility('regular_table')).* ) AS _gs;
+select count(*) > 0 from (SELECT (pg_visibility((select reltoastrelid from pg_class where relname = 'regular_table'))).* ) AS _gs;
 
 create materialized view matview_visibility_test as select * from regular_table;
 vacuum (disable_page_skipping) matview_visibility_test;
-select count(*) > 0 from pg_visibility('matview_visibility_test');
+select count(*) > 0 from (SELECT (pg_visibility('matview_visibility_test')).* ) AS _gs;
 insert into regular_table values (1), (2);
 refresh materialized view matview_visibility_test;
-select count(*) > 0 from pg_visibility('matview_visibility_test');
+select count(*) > 0 from (SELECT (pg_visibility('matview_visibility_test')).* ) AS _gs;
 
 -- 分区功能已在 minipg 中裁剪，不再测试分区子表的可见性映射。
 

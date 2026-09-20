@@ -381,32 +381,6 @@ typedef struct RangeSubselect
 	Alias	   *alias;			/* table alias & optional column aliases */
 } RangeSubselect;
 
-/*
- * RangeFunction - function call appearing in a FROM clause
- *
- * functions is a List because we use this to represent the construct
- * ROWS FROM(func1(...), func2(...), ...).  Each element of this list is a
- * two-element sublist, the first element being the untransformed function
- * call tree, and the second element being a possibly-empty list of ColumnDef
- * nodes representing any columndef list attached to that function within the
- * ROWS FROM() syntax.
- *
- * alias and coldeflist represent any alias and/or columndef list attached
- * at the top level.  (We disallow coldeflist appearing both here and
- * per-function, but that's checked in parse analysis, not by the grammar.)
- */
-typedef struct RangeFunction
-{
-	NodeTag		type;
-	bool		lateral;		/* does it have LATERAL prefix? */
-	bool		ordinality;		/* does it have WITH ORDINALITY suffix? */
-	bool		is_rowsfrom;	/* is result of ROWS FROM() syntax? */
-	List	   *functions;		/* per-function information, see above */
-	Alias	   *alias;			/* table alias & optional column aliases */
-	List	   *coldeflist;		/* list of ColumnDef nodes to describe result
-								 * of function returning RECORD */
-} RangeFunction;
-
 
 
 /*
@@ -513,8 +487,6 @@ typedef struct DefElem
  *	  dropped columns.  Note however that a stored rule may have nonempty
  *	  colnames for columns dropped since the rule was created (and for that
  *	  matter the colnames might be out of date due to column renamings).
- *	  The same comments apply to FUNCTION RTEs when a function's return type
- *	  is a named composite type.
  *
  *	  In JOIN RTEs, the colnames in both alias and eref are one-to-one with
  *	  joinaliasvars entries.  A JOIN RTE will omit columns of its inputs when
@@ -556,7 +528,6 @@ typedef enum RTEKind
 	RTE_RELATION,				/* ordinary relation reference */
 	RTE_SUBQUERY,				/* subquery in FROM */
 	RTE_JOIN,					/* join */
-	RTE_FUNCTION,				/* function in FROM */
 	RTE_VALUES,					/* VALUES (<exprlist>), (<exprlist>), ... */
 	RTE_NAMEDTUPLESTORE,		/* tuplestore, e.g. for AFTER triggers */
 	RTE_RESULT					/* RTE represents an empty FROM clause; such
@@ -660,17 +631,6 @@ typedef struct RangeTblEntry
 	Alias	   *join_using_alias;
 
 	/*
-	 * Fields valid for a function RTE (else NIL/zero):
-	 *
-	 * When funcordinality is true, the eref->colnames list includes an alias
-	 * for the ordinality column.  The ordinality column is otherwise
-	 * implicit, and must be accounted for "by hand" in places such as
-	 * expandRTE().
-	 */
-	List	   *functions;		/* list of RangeTblFunction nodes */
-	bool		funcordinality; /* is this called WITH ORDINALITY? */
-
-	/*
 	 * Fields valid for a values RTE (else NIL):
 	 */
 	List	   *values_lists;	/* list of expression lists */
@@ -704,46 +664,13 @@ typedef struct RangeTblEntry
 	 */
 	Alias	   *alias;			/* user-written alias clause, if any */
 	Alias	   *eref;			/* expanded reference names */
-	bool		lateral;		/* subquery, function, or values is LATERAL? */
+	bool		lateral;		/* subquery or values is LATERAL? */
 	bool		inFromCl;		/* present in FROM clause? */
 	Bitmapset  *selectedCols;	/* columns needing SELECT permission */
 	Bitmapset  *insertedCols;	/* columns needing INSERT permission */
 	Bitmapset  *updatedCols;	/* columns needing UPDATE permission */
 	Bitmapset  *extraUpdatedCols;	/* generated columns being updated */
 } RangeTblEntry;
-
-/*
- * RangeTblFunction -
- *	  RangeTblEntry subsidiary data for one function in a FUNCTION RTE.
- *
- * If the function had a column definition list (required for an
- * otherwise-unspecified RECORD result), funccolnames lists the names given
- * in the definition list, funccoltypes lists their declared column types,
- * funccoltypmods lists their typmods, funccolcollations their collations.
- * Otherwise, those fields are NIL.
- *
- * Notice we don't attempt to store info about the results of functions
- * returning named composite types, because those can change from time to
- * time.  We do however remember how many columns we thought the type had
- * (including dropped columns!), so that we can successfully ignore any
- * columns added after the query was parsed.
- */
-typedef struct RangeTblFunction
-{
-	NodeTag		type;
-
-	Node	   *funcexpr;		/* expression tree for func call */
-	int			funccolcount;	/* number of columns it contributes to RTE */
-	/* These fields record the contents of a column definition list, if any: */
-	List	   *funccolnames;	/* column names (list of String) */
-	List	   *funccoltypes;	/* OID list of column type OIDs */
-	List	   *funccoltypmods; /* integer list of column typmods */
-	List	   *funccolcollations;	/* OID list of column collation OIDs */
-	/* This is set during planning for use by the executor: */
-	Bitmapset  *funcparams;		/* PARAM_EXEC Param IDs affecting this func */
-} RangeTblFunction;
-
-
 
 /*
  * SortGroupClause -

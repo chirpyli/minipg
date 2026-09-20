@@ -363,7 +363,6 @@ RelOptInfo      - a relation or joined relations
   A plain Path node can represent several simple plans, per its pathtype:
     T_SeqScan   - sequential scan
     T_SampleScan - tablesample scan
-    T_FunctionScan - function-in-FROM scan
     T_TableFuncScan - table function scan
     T_ValuesScan - VALUES scan
     T_CteScan   - CTE (WITH) scan

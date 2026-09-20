@@ -201,7 +201,7 @@ from int8_tbl group by q1 order by q1;
 
 -- Unspecified-type literals in output columns should resolve as text
 SELECT *, pg_typeof(f1) FROM
-  (SELECT 'foo' AS f1 FROM generate_series(1,3)) ss ORDER BY 1;
+  (SELECT 'foo' AS f1 FROM (SELECT generate_series(1,3) AS g) AS _gs) ss ORDER BY 1;
  f1  | pg_typeof 
 -----+-----------
  foo | text
@@ -584,18 +584,20 @@ select * from outer_text where f2 not in (select c2 from inner_text);
 -- inner-side values must be done with appropriate operator
 --
 explain (verbose, costs off)
-select 'foo'::text in (select 'bar'::name from generate_series(1,2));
-                     QUERY PLAN                      
------------------------------------------------------
+select 'foo'::text in (select 'bar'::name from (SELECT generate_series(1,2) AS g) AS _gs);
+                  QUERY PLAN                   
+-----------------------------------------------
  Result
    Output: (hashed SubPlan 1)
    SubPlan 1
-     ->  Function Scan on pg_catalog.generate_series
+     ->  Subquery Scan on _gs
            Output: 'bar'::name
-           Function Call: generate_series(1, 2)
-(6 rows)
+           ->  ProjectSet
+                 Output: generate_series(1, 2)
+                 ->  Result
+(8 rows)
 
-select 'foo'::text in (select 'bar'::name from generate_series(1,2));
+select 'foo'::text in (select 'bar'::name from (SELECT generate_series(1,2) AS g) AS _gs);
  ?column? 
 ----------
  f
@@ -605,7 +607,7 @@ select 'foo'::text in (select 'bar'::name from generate_series(1,2));
 --
 -- Test case for premature memory release during hashing of subplan output
 --
-select '1'::text in (select '1'::name from generate_series(1,2));
+select '1'::text in (select '1'::name from (SELECT generate_series(1,2) AS g) AS _gs);
  ?column? 
 ----------
  t
@@ -805,7 +807,7 @@ select exists(select * from nocolumns);
 -- Check behavior with a SubPlan in VALUES (bug #14924)
 --
 select val.x
-  from generate_series(1,10) as s(i),
+  from (SELECT generate_series(1,10) AS i) AS s,
   lateral (
     values ((select s.i + 1)), (s.i + 101)
   ) as val(x)

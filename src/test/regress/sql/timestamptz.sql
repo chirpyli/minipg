@@ -350,14 +350,14 @@ SELECT make_timestamptz(2014, 12, 10, 10, 10, 10, 'PST8PDT,M3.2.0,M11.1.0');
 RESET TimeZone;
 
 -- generate_series for timestamptz
-select * from generate_series('2020-01-01 00:00'::timestamptz,
+select * from (SELECT generate_series('2020-01-01 00:00'::timestamptz,
                               '2020-01-02 03:00'::timestamptz,
-                              '1 hour'::interval);
+                              '1 hour'::interval) AS generate_series) AS _gs;
 -- minipg: LIMIT 已裁剪；无限 generate_series 无 LIMIT 时无法终止，用例移除
 -- errors
-select * from generate_series('2020-01-01 00:00'::timestamptz,
+select * from (SELECT generate_series('2020-01-01 00:00'::timestamptz,
                               '2020-01-02 03:00'::timestamptz,
-                              '0 hour'::interval);
+                              '0 hour'::interval) AS generate_series) AS _gs;
 
 --
 -- Test behavior with fixed-offset timezones.

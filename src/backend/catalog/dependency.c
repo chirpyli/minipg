@@ -1881,16 +1881,14 @@ find_expr_references_walker(Node *node,
 		 * subquery's rtable, and ensure we add refs for any type-coercion
 		 * functions used in join alias lists.
 		 *
-		 * Note: query_tree_walker takes care of recursing into RTE_FUNCTION
-		 * RTEs, subqueries, etc, so no need to do that here.  But we must
+		 * Note: query_tree_walker takes care of recursing into subqueries,
+		 * etc, so no need to do that here.  But we must
 		 * tell it not to visit join alias lists, or we'll add refs for join
 		 * input columns whether or not they are actually used in our query.
 		 *
 		 * Note: we don't need to worry about collations mentioned in
 		 * RTE_VALUES or RTE_CTE RTEs, because those must just duplicate
-		 * collations referenced in other parts of the Query.  We do have to
-		 * worry about collations mentioned in RTE_FUNCTION, but we take care
-		 * of those when we recurse to the RangeTblFunction node(s).
+		 * collations referenced in other parts of the Query.
 		 */
 		foreach(lc, query->rtable)
 		{
@@ -1981,30 +1979,6 @@ find_expr_references_walker(Node *node,
 								   QTW_EXAMINE_SORTGROUP);
 		context->rtables = list_delete_first(context->rtables);
 		return result;
-	}
-	else if (IsA(node, RangeTblFunction))
-	{
-		RangeTblFunction *rtfunc = (RangeTblFunction *) node;
-		ListCell   *ct;
-
-		/*
-		 * Add refs for any datatypes and collations used in a column
-		 * definition list for a RECORD function.  (For other cases, it should
-		 * be enough to depend on the function itself.)
-		 */
-		foreach(ct, rtfunc->funccoltypes)
-		{
-			add_object_address(OCLASS_TYPE, lfirst_oid(ct), 0,
-							   context->addrs);
-		}
-		foreach(ct, rtfunc->funccolcollations)
-		{
-			Oid			collid = lfirst_oid(ct);
-
-			if (OidIsValid(collid) && collid != DEFAULT_COLLATION_OID)
-				add_object_address(OCLASS_COLLATION, collid, 0,
-								   context->addrs);
-		}
 	}
 	return expression_tree_walker(node, find_expr_references_walker,
 								  (void *) context);

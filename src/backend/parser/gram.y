@@ -255,7 +255,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 				set_clause_list set_clause
 				def_list indirection opt_indirection
 				transaction_mode_list_or_empty
-				TableFuncElementList opt_type_modifiers
+				opt_type_modifiers
 				using_clause
 			relation_expr_list
 			vacuum_relation_list opt_vacuum_relation_list
@@ -282,14 +282,12 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 
 %type <typnam>	func_type
 
-%type <node>	TableElement ConstraintElem TableFuncElement
+%type <node>	TableElement ConstraintElem
 %type <node>	columnDef
 %type <defelt>	def_elem
 %type <node>	def_arg columnElem where_clause where_or_current_clause
 				a_expr b_expr c_expr AexprConst indirection_el
-				columnref in_expr having_clause func_table array_expr
-%type <list>	rowsfrom_item rowsfrom_list opt_col_def_list
-%type <boolean> opt_ordinality
+				columnref in_expr having_clause array_expr
 %type <list>	func_arg_list
 %type <node>	func_arg_expr
 %type <list>	array_expr_list
@@ -298,7 +296,6 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 %type <ival>	sub_type
 %type <value>	NumericOnly
 %type <alias>	alias_clause opt_alias_clause opt_alias_clause_for_join_using
-%type <list>	func_alias_clause
 %type <sortby>	sortby
 %type <ielem>	index_elem index_elem_options
 %type <node>	table_ref
@@ -405,7 +402,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 	NULLS_P
 
 	ON ONLY OPERATOR OR
-	ORDER ORDINALITY OUTER_P
+	ORDER OUTER_P
 
 	PRECISION PREPARE PREPARED PRIMARY
 
@@ -415,7 +412,6 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 	READ REAL
 	RELEASE REPEATABLE REPLACE
 	RESET RESTRICT RIGHT ROLLBACK
-	ROWS
 
 	SAVEPOINT SCHEMA SELECT
 	SERIALIZABLE SESSION SET SHOW
@@ -474,11 +470,8 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
  * there are some other unreserved keywords that need precedence assignments.
  * If those keywords have the same precedence as IDENT then they clearly act
  * the same as non-keywords, reducing the risk of unwanted precedence effects.
- *
- * We need to do this for ROWS to support the ROWS FROM syntax
- * (see comment there).
  */
-%nonassoc	IDENT ROWS
+%nonassoc	IDENT
 %left		Op OPERATOR		/* multi-character ops and user-defined operators */
 %left		'+' '-'
 %left		'*' '/' '%'
@@ -2735,21 +2728,6 @@ table_ref:	relation_expr opt_alias_clause
 					$1->alias = $2;
 					$$ = (Node *) $1;
 				}
-			| func_table func_alias_clause
-				{
-					RangeFunction *n = (RangeFunction *) $1;
-					n->alias = linitial($2);
-					n->coldeflist = lsecond($2);
-					$$ = (Node *) n;
-				}
-			| LATERAL_P func_table func_alias_clause
-				{
-					RangeFunction *n = (RangeFunction *) $2;
-					n->lateral = true;
-					n->alias = linitial($3);
-					n->coldeflist = lsecond($3);
-					$$ = (Node *) n;
-				}
 			| select_with_parens opt_alias_clause
 				{
 					RangeSubselect *n = makeNode(RangeSubselect);
@@ -2939,37 +2917,6 @@ opt_alias_clause_for_join_using:
 			| /*EMPTY*/								{ $$ = NULL; }
 		;
 
-/*
- * func_alias_clause can include both an Alias and a coldeflist, so we make it
- * return a 2-element list that gets disassembled by calling production.
- */
-func_alias_clause:
-			alias_clause
-				{
-					$$ = list_make2($1, NIL);
-				}
-			| AS '(' TableFuncElementList ')'
-				{
-					$$ = list_make2(NULL, $3);
-				}
-			| AS ColId '(' TableFuncElementList ')'
-				{
-					Alias *a = makeNode(Alias);
-					a->aliasname = $2;
-					$$ = list_make2(a, $4);
-				}
-			| ColId '(' TableFuncElementList ')'
-				{
-					Alias *a = makeNode(Alias);
-					a->aliasname = $1;
-					$$ = list_make2(a, $3);
-				}
-			| /*EMPTY*/
-				{
-					$$ = list_make2(NULL, NIL);
-				}
-		;
-
 join_type:	FULL opt_outer							{ $$ = JOIN_FULL; }
 			| LEFT opt_outer						{ $$ = JOIN_LEFT; }
 			| RIGHT opt_outer						{ $$ = JOIN_RIGHT; }
@@ -3050,58 +2997,6 @@ relation_expr_opt_alias: relation_expr					%prec UMINUS
 
 
 
-/*
- * func_table represents a function invocation in a FROM list. It can be
- * a plain function call, like "foo(...)", or a ROWS FROM expression with
- * one or more function calls, "ROWS FROM (foo(...), bar(...))",
- * optionally with WITH ORDINALITY attached.
- * In the ROWS FROM syntax, a column definition list can be given for each
- * function, for example:
- *     ROWS FROM (foo() AS (foo_res_a text, foo_res_b text),
- *                bar() AS (bar_res_a text, bar_res_b text))
- * It's also possible to attach a column definition list to the RangeFunction
- * as a whole, but that's handled by the table_ref production.
- */
-func_table: func_expr_windowless opt_ordinality
-				{
-					RangeFunction *n = makeNode(RangeFunction);
-					n->lateral = false;
-					n->ordinality = $2;
-					n->is_rowsfrom = false;
-					n->functions = list_make1(list_make2($1, NIL));
-					/* alias and coldeflist are set by table_ref production */
-					$$ = (Node *) n;
-				}
-			| ROWS FROM '(' rowsfrom_list ')' opt_ordinality
-				{
-					RangeFunction *n = makeNode(RangeFunction);
-					n->lateral = false;
-					n->ordinality = $6;
-					n->is_rowsfrom = true;
-					n->functions = $4;
-					/* alias and coldeflist are set by table_ref production */
-					$$ = (Node *) n;
-				}
-		;
-
-rowsfrom_item: func_expr_windowless opt_col_def_list
-				{ $$ = list_make2($1, $2); }
-		;
-
-rowsfrom_list:
-			rowsfrom_item						{ $$ = list_make1($1); }
-			| rowsfrom_list ',' rowsfrom_item	{ $$ = lappend($1, $3); }
-		;
-
-opt_col_def_list: AS '(' TableFuncElementList ')'	{ $$ = $3; }
-			| /*EMPTY*/								{ $$ = NIL; }
-		;
-
-opt_ordinality: WITH_LA ORDINALITY					{ $$ = true; }
-			| /*EMPTY*/								{ $$ = false; }
-		;
-
-
 where_clause:
 			WHERE a_expr							{ $$ = $2; }
 			| /*EMPTY*/								{ $$ = NULL; }
@@ -3112,32 +3007,6 @@ where_or_current_clause:
 			WHERE a_expr							{ $$ = $2; }
 			| /*EMPTY*/								{ $$ = NULL; }
 	;
-
-
-TableFuncElementList:
-			TableFuncElement
-				{
-					$$ = list_make1($1);
-				}
-			| TableFuncElementList ',' TableFuncElement
-				{
-					$$ = lappend($1, $3);
-				}
-		;
-
-TableFuncElement:	ColId Typename
-				{
-					ColumnDef *n = makeNode(ColumnDef);
-					n->colname = $1;
-					n->typeName = $2;
-					n->storage = 0;
-					n->raw_default = NULL;
-					n->cooked_default = NULL;
-					n->constraints = NIL;
-					n->location = @1;
-					$$ = (Node *)n;
-				}
-		;
 
 
 /*****************************************************************************
@@ -4352,7 +4221,6 @@ unreserved_keyword:
 			| NAMES
 			| NULLS_P
 			| OPERATOR
-			| ORDINALITY
 			| PREPARE
 			| PREPARED
 			| READ
@@ -4362,7 +4230,6 @@ unreserved_keyword:
 			| RESET
 			| RESTRICT
 			| ROLLBACK
-			| ROWS
 			| SAVEPOINT
 			| SCHEMA
 			| SERIALIZABLE
@@ -4593,7 +4460,6 @@ bare_label_keyword:
 			| ONLY
 			| OPERATOR
 			| OR
-			| ORDINALITY
 			| OUTER_P
 			| PREPARE
 			| PREPARED
@@ -4608,7 +4474,6 @@ bare_label_keyword:
 			| RESTRICT
 			| RIGHT
 			| ROLLBACK
-			| ROWS
 			| SAVEPOINT
 			| SCHEMA
 			| SELECT

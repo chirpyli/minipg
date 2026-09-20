@@ -350,7 +350,7 @@ the locked rows.  For ordinary relations this can be implemented relatively
 cheaply by including the row TID in the join outputs and re-fetching that
 TID.  (The re-fetch is expensive, but we're trying to optimize the normal
 case where no re-test is needed.)  We have also to consider non-table
-relations, such as a ValuesScan or FunctionScan.  For these, since there
+relations, such as a ValuesScan.  For these, since there
 is no equivalent of TID, the only practical solution seems to be to include
 the entire row value in the join output row.
 

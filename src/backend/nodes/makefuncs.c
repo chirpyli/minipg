@@ -120,24 +120,16 @@ makeVarFromTargetEntry(Index varno,
  * tuple.  (Use of zero here is unclean, since it could easily be confused
  * with error cases, but it's not worth changing now.)  The vartype indicates
  * a rowtype; either a named composite type, or a domain over a named
- * composite type (only possible if the RTE is a function returning that),
- * or RECORD.  This function encapsulates the logic for determining the
- * correct rowtype OID to use.
- *
- * If allowScalar is true, then for the case where the RTE is a single function
- * returning a non-composite result type, we produce a normal Var referencing
- * the function's result directly, instead of the single-column composite
- * value that the whole-row notation might otherwise suggest.
+ * composite type, or RECORD.  This function encapsulates the logic for
+ * determining the correct rowtype OID to use.
  */
 Var *
 makeWholeRowVar(RangeTblEntry *rte,
 				Index varno,
-				Index varlevelsup,
-				bool allowScalar)
+				Index varlevelsup)
 {
 	Var		   *result;
 	Oid			toid;
-	Node	   *fexpr;
 
 	switch (rte->rtekind)
 	{
@@ -162,7 +154,7 @@ makeWholeRowVar(RangeTblEntry *rte,
 			/*
 			 * For a standard subquery, the Var should be of RECORD type.
 			 * However, if we're looking at a subquery that was expanded from
-			 * a view or SRF (only possible during planning), we must use the
+			 * a view (only possible during planning), we must use the
 			 * appropriate rowtype, so that the resulting Var has the same
 			 * type that we would have produced from the original RTE.
 			 */
@@ -176,21 +168,6 @@ makeWholeRowVar(RangeTblEntry *rte,
 							 errmsg("relation \"%s\" does not have a composite type",
 									get_rel_name(rte->relid))));
 			}
-			else if (rte->functions)
-			{
-				/*
-				 * Subquery was expanded from a set-returning function.  That
-				 * would not have happened if there's more than one function
-				 * or ordinality was requested.  We also needn't worry about
-				 * the allowScalar case, since the planner doesn't use that.
-				 * Otherwise this must match the RTE_FUNCTION code below.
-				 */
-				Assert(!allowScalar);
-				fexpr = ((RangeTblFunction *) linitial(rte->functions))->funcexpr;
-				toid = exprType(fexpr);
-				if (!type_is_rowtype(toid))
-					toid = RECORDOID;
-			}
 			else
 			{
 				/* Normal subquery-in-FROM */
@@ -202,59 +179,6 @@ makeWholeRowVar(RangeTblEntry *rte,
 							 -1,
 							 InvalidOid,
 							 varlevelsup);
-			break;
-
-		case RTE_FUNCTION:
-
-			/*
-			 * If there's more than one function, or ordinality is requested,
-			 * force a RECORD result, since there's certainly more than one
-			 * column involved and it can't be a known named type.
-			 */
-			if (rte->funcordinality || list_length(rte->functions) != 1)
-			{
-				/* always produces an anonymous RECORD result */
-				result = makeVar(varno,
-								 InvalidAttrNumber,
-								 RECORDOID,
-								 -1,
-								 InvalidOid,
-								 varlevelsup);
-				break;
-			}
-
-			fexpr = ((RangeTblFunction *) linitial(rte->functions))->funcexpr;
-			toid = exprType(fexpr);
-			if (type_is_rowtype(toid))
-			{
-				/* func returns composite; same as relation case */
-				result = makeVar(varno,
-								 InvalidAttrNumber,
-								 toid,
-								 -1,
-								 InvalidOid,
-								 varlevelsup);
-			}
-			else if (allowScalar)
-			{
-				/* func returns scalar; just return its output as-is */
-				result = makeVar(varno,
-								 1,
-								 toid,
-								 -1,
-								 exprCollation(fexpr),
-								 varlevelsup);
-			}
-			else
-			{
-				/* func returns scalar, but we want a composite result */
-				result = makeVar(varno,
-								 InvalidAttrNumber,
-								 RECORDOID,
-								 -1,
-								 InvalidOid,
-								 varlevelsup);
-			}
 			break;
 
 		default:

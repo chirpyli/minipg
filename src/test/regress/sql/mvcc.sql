@@ -27,7 +27,7 @@ SELECT pg_relation_size('clean_aborted_self_key') AS clean_aborted_self_key_befo
 \set i 0
 while :i < 100
     BEGIN;
-    INSERT INTO clean_aborted_self SELECT g.i, 'rolling back in a sec' FROM generate_series(1, 100) g(i);
+    INSERT INTO clean_aborted_self SELECT g.i, 'rolling back in a sec' FROM (SELECT generate_series(1, 100) AS i) AS g;
     ROLLBACK;
     \set i :i + 1
 endwhile

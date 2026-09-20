@@ -341,7 +341,6 @@ markTargetListOrigin(ParseState *pstate, TargetEntry *tle,
 			}
 			break;
 		case RTE_JOIN:
-		case RTE_FUNCTION:
 		case RTE_VALUES:
 		case RTE_NAMEDTUPLESTORE:
 		case RTE_RESULT:
@@ -1511,13 +1510,6 @@ expandRecordVariable(ParseState *pstate, Var *var, int levelsup)
 			if (IsA(expr, Var))
 				return expandRecordVariable(pstate, (Var *) expr, netlevelsup);
 			/* else fall through to inspect the expression */
-			break;
-		case RTE_FUNCTION:
-
-			/*
-			 * We couldn't get here unless a function is declared with one of
-			 * its result columns as RECORD, which is not allowed.
-			 */
 			break;
 	}
 

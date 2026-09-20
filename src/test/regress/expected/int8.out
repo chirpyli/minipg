@@ -599,7 +599,7 @@ SELECT q1, q1 << 2 AS "shl", q1 >> 3 AS "shr" FROM INT8_TBL;
 (5 rows)
 
 -- generate_series
-SELECT * FROM generate_series('+4567890123456789'::int8, '+4567890123456799'::int8);
+SELECT * FROM (SELECT generate_series('+4567890123456789'::int8, '+4567890123456799'::int8) AS generate_series) AS _gs;
  generate_series  
 ------------------
  4567890123456789
@@ -615,9 +615,9 @@ SELECT * FROM generate_series('+4567890123456789'::int8, '+4567890123456799'::in
  4567890123456799
 (11 rows)
 
-SELECT * FROM generate_series('+4567890123456789'::int8, '+4567890123456799'::int8, 0);
+SELECT * FROM (SELECT generate_series('+4567890123456789'::int8, '+4567890123456799'::int8, 0) AS generate_series) AS _gs;
 ERROR:  step size cannot equal zero
-SELECT * FROM generate_series('+4567890123456789'::int8, '+4567890123456799'::int8, 2);
+SELECT * FROM (SELECT generate_series('+4567890123456789'::int8, '+4567890123456799'::int8, 2) AS generate_series) AS _gs;
  generate_series  
 ------------------
  4567890123456789

@@ -4,22 +4,23 @@ CREATE INDEX test1_a_idx ON test1 USING btree (a);
 
 \x
 
-SELECT * FROM bt_metap('test1_a_idx');
+-- minipg: function-in-FROM 已裁剪，改为在子查询目标列中调用集返回函数并展开记录
+SELECT * FROM (SELECT (bt_metap('test1_a_idx')).* ) AS _gs;
 
-SELECT * FROM bt_page_stats('test1_a_idx', -1);
-SELECT * FROM bt_page_stats('test1_a_idx', 0);
-SELECT * FROM bt_page_stats('test1_a_idx', 1);
-SELECT * FROM bt_page_stats('test1_a_idx', 2);
+SELECT * FROM (SELECT (bt_page_stats('test1_a_idx', -1)).* ) AS _gs;
+SELECT * FROM (SELECT (bt_page_stats('test1_a_idx', 0)).* ) AS _gs;
+SELECT * FROM (SELECT (bt_page_stats('test1_a_idx', 1)).* ) AS _gs;
+SELECT * FROM (SELECT (bt_page_stats('test1_a_idx', 2)).* ) AS _gs;
 
-SELECT * FROM bt_page_items('test1_a_idx', -1);
-SELECT * FROM bt_page_items('test1_a_idx', 0);
-SELECT * FROM bt_page_items('test1_a_idx', 1);
-SELECT * FROM bt_page_items('test1_a_idx', 2);
+SELECT * FROM (SELECT (bt_page_items('test1_a_idx', -1)).* ) AS _gs;
+SELECT * FROM (SELECT (bt_page_items('test1_a_idx', 0)).* ) AS _gs;
+SELECT * FROM (SELECT (bt_page_items('test1_a_idx', 1)).* ) AS _gs;
+SELECT * FROM (SELECT (bt_page_items('test1_a_idx', 2)).* ) AS _gs;
 
-SELECT * FROM bt_page_items(get_raw_page('test1_a_idx', -1));
-SELECT * FROM bt_page_items(get_raw_page('test1_a_idx', 0));
-SELECT * FROM bt_page_items(get_raw_page('test1_a_idx', 1));
-SELECT * FROM bt_page_items(get_raw_page('test1_a_idx', 2));
+SELECT * FROM (SELECT (bt_page_items(get_raw_page('test1_a_idx', -1))).* ) AS _gs;
+SELECT * FROM (SELECT (bt_page_items(get_raw_page('test1_a_idx', 0))).* ) AS _gs;
+SELECT * FROM (SELECT (bt_page_items(get_raw_page('test1_a_idx', 1))).* ) AS _gs;
+SELECT * FROM (SELECT (bt_page_items(get_raw_page('test1_a_idx', 2))).* ) AS _gs;
 
 -- Failure when using a non-btree index.
 CREATE INDEX test1_a_hash ON test1 USING hash(a);
@@ -33,13 +34,13 @@ SELECT bt_page_items(get_raw_page('test1_a_hash', 0));
 -- page sizes and architectures.
 \set VERBOSITY terse
 -- invalid page size
-SELECT bt_page_items('aaa'::bytea);
+SELECT * FROM (SELECT (bt_page_items('aaa'::bytea)).* ) AS _gs;
 -- invalid special area size
-SELECT bt_page_items(get_raw_page('test1', 0));
+SELECT * FROM (SELECT (bt_page_items(get_raw_page('test1', 0))).* ) AS _gs;
 \set VERBOSITY default
 
 -- Tests with all-zero pages.
 SHOW block_size \gset
-SELECT bt_page_items(decode(repeat('00', :block_size), 'hex'));
+SELECT * FROM (SELECT (bt_page_items(decode(repeat('00', :block_size), 'hex'))).* ) AS _gs;
 
 DROP TABLE test1;

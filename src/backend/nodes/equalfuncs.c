@@ -1167,18 +1167,6 @@ _equalRangeSubselect(const RangeSubselect *a, const RangeSubselect *b)
 	return true;
 }
 
-static bool
-_equalRangeFunction(const RangeFunction *a, const RangeFunction *b)
-{
-	COMPARE_SCALAR_FIELD(lateral);
-	COMPARE_SCALAR_FIELD(ordinality);
-	COMPARE_SCALAR_FIELD(is_rowsfrom);
-	COMPARE_NODE_FIELD(functions);
-	COMPARE_NODE_FIELD(alias);
-	COMPARE_NODE_FIELD(coldeflist);
-
-	return true;
-}
 
 
 
@@ -1259,8 +1247,6 @@ _equalRangeTblEntry(const RangeTblEntry *a, const RangeTblEntry *b)
 	COMPARE_NODE_FIELD(joinleftcols);
 	COMPARE_NODE_FIELD(joinrightcols);
 	COMPARE_NODE_FIELD(join_using_alias);
-	COMPARE_NODE_FIELD(functions);
-	COMPARE_SCALAR_FIELD(funcordinality);
 	COMPARE_NODE_FIELD(values_lists);
 	COMPARE_NODE_FIELD(coltypes);
 	COMPARE_NODE_FIELD(coltypmods);
@@ -1279,19 +1265,6 @@ _equalRangeTblEntry(const RangeTblEntry *a, const RangeTblEntry *b)
 	return true;
 }
 
-static bool
-_equalRangeTblFunction(const RangeTblFunction *a, const RangeTblFunction *b)
-{
-	COMPARE_NODE_FIELD(funcexpr);
-	COMPARE_SCALAR_FIELD(funccolcount);
-	COMPARE_NODE_FIELD(funccolnames);
-	COMPARE_NODE_FIELD(funccoltypes);
-	COMPARE_NODE_FIELD(funccoltypmods);
-	COMPARE_NODE_FIELD(funccolcollations);
-	COMPARE_BITMAPSET_FIELD(funcparams);
-
-	return true;
-}
 
 
 
@@ -1691,9 +1664,6 @@ equal(const void *a, const void *b)
 		case T_RangeSubselect:
 			retval = _equalRangeSubselect(a, b);
 			break;
-		case T_RangeFunction:
-			retval = _equalRangeFunction(a, b);
-			break;
 		case T_TypeName:
 			retval = _equalTypeName(a, b);
 			break;
@@ -1711,9 +1681,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_RangeTblEntry:
 			retval = _equalRangeTblEntry(a, b);
-			break;
-		case T_RangeTblFunction:
-			retval = _equalRangeTblFunction(a, b);
 			break;
 		case T_SortGroupClause:
 			retval = _equalSortGroupClause(a, b);

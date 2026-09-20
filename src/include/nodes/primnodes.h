@@ -1107,8 +1107,8 @@ typedef struct TargetEntry
  * rows.)  If all joins are inner joins then all the qual positions are
  * semantically interchangeable.
  *
- * NOTE: in the raw output of gram.y, a join tree contains RangeVar,
- * RangeSubselect, and RangeFunction nodes, which are all replaced by
+ * NOTE: in the raw output of gram.y, a join tree contains RangeVar and
+ * RangeSubselect nodes, which are both replaced by
  * RangeTblRef nodes during the parse analysis phase.  Also, the top-level
  * FromExpr is added during parse analysis; the grammar regards FROM and
  * WHERE as separate.
