@@ -14,8 +14,8 @@ setup
   INSERT INTO taby SELECT generate_series(1,10000);
   ALTER TABLE taby ADD PRIMARY KEY (id);
 }
-setup { VACUUM FREEZE ANALYZE tabx; }
-setup { VACUUM FREEZE ANALYZE taby; }
+setup { VACUUM (FREEZE, ANALYZE) tabx; }
+setup { VACUUM (FREEZE, ANALYZE) taby; }
 
 teardown
 {

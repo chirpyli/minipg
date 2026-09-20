@@ -1,7 +1,7 @@
 Parsed test spec with 3 sessions
 
 starting permutation: cachefill3 cir1 cic2 ddl3 read1
-step cachefill3: TABLE newly_indexed;
+step cachefill3: SELECT * FROM newly_indexed;
 c
 -
 (0 rows)

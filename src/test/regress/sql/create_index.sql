@@ -201,9 +201,9 @@ BEGIN;
 CREATE INDEX std_index on concur_heap(f2);
 COMMIT;
 
-VACUUM FULL concur_heap;
+VACUUM (FULL) concur_heap;
 DELETE FROM concur_heap WHERE f1 = 'b';
-VACUUM FULL concur_heap;
+VACUUM (FULL) concur_heap;
 \d concur_heap
 \d concur_heap
 

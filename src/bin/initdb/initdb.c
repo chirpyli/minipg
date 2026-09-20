@@ -1141,7 +1141,7 @@ static void
 vacuum_db(FILE *cmdfd)
 {
 	/* Run analyze before VACUUM so the statistics are frozen. */
-	PG_CMD_PUTS("ANALYZE;\n\nVACUUM FREEZE;\n\n");
+	PG_CMD_PUTS("ANALYZE;\n\nVACUUM (FREEZE);\n\n");
 }
 
 /*

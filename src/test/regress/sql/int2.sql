@@ -31,7 +31,7 @@ SELECT * FROM INT2_TBL;
 
 SELECT * FROM INT2_TBL AS f(a, b);
 
-SELECT * FROM (TABLE int2_tbl) AS s (a, b);
+SELECT * FROM (SELECT * FROM int2_tbl) AS s (a, b);
 
 SELECT i.* FROM INT2_TBL i WHERE i.f1 <> int2 '0';
 

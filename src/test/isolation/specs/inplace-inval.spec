@@ -23,7 +23,7 @@ session s2
 step cic2	{ CREATE INDEX i2 ON newly_indexed (c); }
 
 session s3
-step cachefill3	{ TABLE newly_indexed; }
+step cachefill3	{ SELECT * FROM newly_indexed; }
 step ddl3		{ ALTER TABLE newly_indexed ADD extra int; }
 
 

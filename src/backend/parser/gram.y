@@ -238,7 +238,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 %type <str>		all_Op MathOp
 
 
-%type <str>		iso_level opt_encoding
+%type <str>		iso_level
 %type <node>	vacuum_relation
 
 %type <list>	parse_toplevel stmtmulti
@@ -268,8 +268,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 %type <node>	join_qual
 %type <jtype>	join_type
 
-%type <boolean> opt_unique opt_concurrently opt_verbose opt_full
-%type <boolean> opt_freeze opt_analyze
+%type <boolean> opt_unique opt_concurrently opt_verbose
 
 %type <ival>	opt_set_data
 %type <objtype>	object_type_any_name
@@ -355,7 +354,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 
 /* ordinary key words in alphabetical order */
 %token <keyword> ABORT_P ADD_P
-	ALL ALTER ANALYSE ANALYZE AND ANY ARRAY AS ASC
+	ALL ALTER ANALYZE AND ANY ARRAY AS ASC
 
 	BEGIN_P BETWEEN BIGINT
 	BOOLEAN_P BY
@@ -379,7 +378,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 	EXTENSION
 
 	FALSE_P FIRST_P FLOAT_P FOR
-	FORCE FREEZE FROM FULL
+	FORCE FROM FULL
 
 	GROUP_P
 
@@ -397,7 +396,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 	LAST_P LATERAL_P
 	LEFT LEVEL LIKE LIMIT LOCAL
 
-	NAMES NONE
+	NONE
 	NOT NULL_P NULLIF
 	NULLS_P
 
@@ -746,25 +745,6 @@ set_rest_more:	/* Generic SET syntaxes: */
 						n->kind = VAR_SET_DEFAULT;
 					$$ = n;
 				}
-			| SCHEMA Sconst
-				{
-					VariableSetStmt *n = makeNode(VariableSetStmt);
-					n->kind = VAR_SET_VALUE;
-					n->name = "search_path";
-					n->args = list_make1(makeStringConst($2, @2));
-					$$ = n;
-				}
-			| NAMES opt_encoding
-				{
-					VariableSetStmt *n = makeNode(VariableSetStmt);
-					n->kind = VAR_SET_VALUE;
-					n->name = "client_encoding";
-					if ($2 != NULL)
-						n->args = list_make1(makeStringConst($2, @2));
-					else
-						n->kind = VAR_SET_DEFAULT;
-					$$ = n;
-				}
 			/* Special syntaxes invented by PostgreSQL: */
 			| TRANSACTION SNAPSHOT Sconst
 				{
@@ -829,12 +809,6 @@ zone_value:
 			| NumericOnly							{ $$ = makeAConst($1, @1); }
 			| DEFAULT								{ $$ = NULL; }
 			| LOCAL									{ $$ = NULL; }
-		;
-
-opt_encoding:
-			Sconst									{ $$ = $1; }
-			| DEFAULT								{ $$ = NULL; }
-			| /*EMPTY*/								{ $$ = NULL; }
 		;
 
 NonReservedWord_or_Sconst:
@@ -2148,25 +2122,13 @@ drop_option:
  *
  *****************************************************************************/
 
-VacuumStmt: VACUUM opt_full opt_freeze opt_verbose opt_analyze opt_vacuum_relation_list
+VacuumStmt: VACUUM opt_vacuum_relation_list
 				{
 					VacuumStmt *n = makeNode(VacuumStmt);
 					n->options = NIL;
-					if ($2)
-						n->options = lappend(n->options,
-											 makeDefElem("full", NULL, @2));
-					if ($3)
-						n->options = lappend(n->options,
-											 makeDefElem("freeze", NULL, @3));
-					if ($4)
-						n->options = lappend(n->options,
-											 makeDefElem("verbose", NULL, @4));
-					if ($5)
-						n->options = lappend(n->options,
-											 makeDefElem("analyze", NULL, @5));
-					n->rels = $6;
+					n->rels = $2;
 					n->is_vacuumcmd = true;
-					$$ = (Node *)n;
+					$$ = (Node *) n;
 				}
 			| VACUUM '(' utility_option_list ')' opt_vacuum_relation_list
 				{
@@ -2178,16 +2140,13 @@ VacuumStmt: VACUUM opt_full opt_freeze opt_verbose opt_analyze opt_vacuum_relati
 				}
 		;
 
-AnalyzeStmt: analyze_keyword opt_verbose opt_vacuum_relation_list
+AnalyzeStmt: analyze_keyword opt_vacuum_relation_list
 				{
 					VacuumStmt *n = makeNode(VacuumStmt);
 					n->options = NIL;
-					if ($2)
-						n->options = lappend(n->options,
-											 makeDefElem("verbose", NULL, @2));
-					n->rels = $3;
+					n->rels = $2;
 					n->is_vacuumcmd = false;
-					$$ = (Node *)n;
+					$$ = (Node *) n;
 				}
 			| analyze_keyword '(' utility_option_list ')' opt_vacuum_relation_list
 				{
@@ -2212,7 +2171,6 @@ utility_option_list:
 
 analyze_keyword:
 			ANALYZE
-			| ANALYSE /* British */
 		;
 
 utility_option_elem:
@@ -2233,21 +2191,8 @@ utility_option_arg:
 			| /* EMPTY */							{ $$ = NULL; }
 		;
 
-opt_analyze:
-			analyze_keyword							{ $$ = true; }
-			| /*EMPTY*/								{ $$ = false; }
-		;
-
 opt_verbose:
 			VERBOSE									{ $$ = true; }
-			| /*EMPTY*/								{ $$ = false; }
-		;
-
-opt_full:	FULL									{ $$ = true; }
-			| /*EMPTY*/								{ $$ = false; }
-		;
-
-opt_freeze: FREEZE									{ $$ = true; }
 			| /*EMPTY*/								{ $$ = false; }
 		;
 
@@ -2578,25 +2523,6 @@ simple_select:
 					$$ = (Node *)n;
 				}
 			| values_clause							{ $$ = $1; }
-			| TABLE relation_expr
-				{
-					/* same as SELECT * FROM relation_expr */
-					ColumnRef *cr = makeNode(ColumnRef);
-					ResTarget *rt = makeNode(ResTarget);
-					SelectStmt *n = makeNode(SelectStmt);
-
-					cr->fields = list_make1(makeNode(A_Star));
-					cr->location = -1;
-
-					rt->name = NULL;
-					rt->indirection = NIL;
-					rt->val = (Node *)cr;
-					rt->location = -1;
-
-					n->targetList = list_make1(rt);
-					n->fromClause = list_make1($2);
-					$$ = (Node *)n;
-				}
 		;
 
 /*
@@ -4218,7 +4144,6 @@ unreserved_keyword:
 			| LAST_P
 			| LEVEL
 			| LOCAL
-			| NAMES
 			| NULLS_P
 			| OPERATOR
 			| PREPARE
@@ -4303,7 +4228,6 @@ col_name_keyword:
 type_func_name_keyword:
 			  CONCURRENTLY
 			| CROSS
-			| FREEZE
 			| FULL
 			| INNER_P
 			| IS
@@ -4323,7 +4247,6 @@ type_func_name_keyword:
  */
 reserved_keyword:
 			  ALL
-			| ANALYSE
 			| ANALYZE
 			| AND
 			| ANY
@@ -4386,7 +4309,6 @@ bare_label_keyword:
 			| ADD_P
 			| ALL
 			| ALTER
-			| ANALYSE
 			| ANALYZE
 			| AND
 			| ANY
@@ -4431,7 +4353,6 @@ bare_label_keyword:
 			| FIRST_P
 			| FLOAT_P
 			| FORCE
-			| FREEZE
 			| FULL
 			| IF_P
 			| IN_P
@@ -4451,7 +4372,6 @@ bare_label_keyword:
 			| LEVEL
 			| LIKE
 			| LOCAL
-			| NAMES
 			| NONE
 			| NOT
 			| NULL_P
