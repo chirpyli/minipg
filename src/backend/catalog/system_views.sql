@@ -424,17 +424,6 @@ CREATE VIEW pg_stat_xact_user_functions AS
     WHERE P.prolang != 12  -- fast check to eliminate built-in functions
           AND pg_stat_get_xact_function_calls(P.oid) IS NOT NULL;
 
-CREATE VIEW pg_stat_archiver AS
-    SELECT
-        s.archived_count,
-        s.last_archived_wal,
-        s.last_archived_time,
-        s.failed_count,
-        s.last_failed_wal,
-        s.last_failed_time,
-        s.stats_reset
-    FROM (SELECT (pg_stat_get_archiver()).* ) s;
-
 CREATE VIEW pg_stat_bgwriter AS
     SELECT
         pg_stat_get_bgwriter_timed_checkpoints() AS checkpoints_timed,
@@ -557,18 +546,3 @@ CREATE VIEW pg_stat_progress_create_index AS
     FROM (SELECT (pg_stat_get_progress_info('CREATE INDEX')).* ) AS S
         LEFT JOIN pg_database D ON S.datid = D.oid;
 
-CREATE VIEW pg_stat_progress_basebackup AS
-    SELECT
-        S.pid AS pid,
-        CASE S.param1 WHEN 0 THEN 'initializing'
-                      WHEN 1 THEN 'waiting for checkpoint to finish'
-                      WHEN 2 THEN 'estimating backup size'
-                      WHEN 3 THEN 'streaming database files'
-                      WHEN 4 THEN 'waiting for wal archiving to finish'
-                      WHEN 5 THEN 'transferring wal files'
-                      END AS phase,
-        CASE S.param2 WHEN -1 THEN NULL ELSE S.param2 END AS backup_total,
-        S.param3 AS backup_streamed,
-        S.param4 AS tablespaces_total,
-        S.param5 AS tablespaces_streamed
-    FROM (SELECT (pg_stat_get_progress_info('BASEBACKUP')).* ) AS S;

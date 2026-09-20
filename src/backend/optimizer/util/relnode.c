@@ -271,10 +271,9 @@ build_simple_rel(PlannerInfo *root, int relid, RelOptInfo *parent,
 			break;
 		case RTE_SUBQUERY:
 		case RTE_VALUES:
-		case RTE_NAMEDTUPLESTORE:
 
 			/*
-			 * Subquery, tablefunc, values list, or ENR --- set
+			 * Subquery or values list --- set
 			 * up attr range and arrays
 			 *
 			 * Note: 0 is included in range to support whole-row Vars

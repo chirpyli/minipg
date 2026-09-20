@@ -29,10 +29,8 @@
 #include "executor/nodeIndexscan.h"
 #include "executor/nodeMaterial.h"
 #include "executor/nodeMemoize.h"
-#include "executor/nodeMergeAppend.h"
 #include "executor/nodeMergejoin.h"
 #include "executor/nodeModifyTable.h"
-#include "executor/nodeNamedtuplestorescan.h"
 #include "executor/nodeNestloop.h"
 #include "executor/nodeProjectSet.h"
 #include "executor/nodeResult.h"
@@ -129,12 +127,6 @@ ExecReScan(PlanState *node)
 			ExecReScanAppend((AppendState *) node);
 			break;
 
-		case T_MergeAppendState:
-			ExecReScanMergeAppend((MergeAppendState *) node);
-			break;
-
-			break;
-
 		case T_BitmapAndState:
 			ExecReScanBitmapAnd((BitmapAndState *) node);
 			break;
@@ -181,10 +173,6 @@ ExecReScan(PlanState *node)
 			ExecReScanValuesScan((ValuesScanState *) node);
 			break;
 
-			break;
-
-		case T_NamedTuplestoreScanState:
-			ExecReScanNamedTuplestoreScan((NamedTuplestoreScanState *) node);
 			break;
 
 		case T_NestLoopState:
@@ -395,21 +383,6 @@ ExecSupportsMarkRestore(Path *pathnode)
 				return false;
 			}
 
-		case T_MergeAppend:
-			{
-				MergeAppendPath *mapath = castNode(MergeAppendPath, pathnode);
-
-				/*
-				 * Like the Append case above, single-subpath MergeAppends
-				 * won't be in the final plan, so just return the child's
-				 * mark/restore ability.
-				 */
-				if (list_length(mapath->subpaths) == 1)
-					return ExecSupportsMarkRestore((Path *) linitial(mapath->subpaths));
-				/* Otherwise, MergeAppend can't handle it */
-				return false;
-			}
-
 		default:
 			break;
 	}
@@ -471,7 +444,6 @@ ExecMaterializesOutput(NodeTag plantype)
 	switch (plantype)
 	{
 		case T_Material:
-		case T_NamedTuplestoreScan:
 		case T_Sort:
 			return true;
 

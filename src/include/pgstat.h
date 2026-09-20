@@ -63,7 +63,6 @@ typedef enum StatMsgType
 	PGSTAT_MTYPE_AUTOVAC_START,
 	PGSTAT_MTYPE_VACUUM,
 	PGSTAT_MTYPE_ANALYZE,
-	PGSTAT_MTYPE_ARCHIVER,
 	PGSTAT_MTYPE_BGWRITER,
 	PGSTAT_MTYPE_WAL,
 	PGSTAT_MTYPE_SLRU,
@@ -127,7 +126,6 @@ typedef struct PgStat_TableCounts
 /* Possible targets for resetting cluster-wide shared values */
 typedef enum PgStat_Shared_Reset_Target
 {
-	RESET_ARCHIVER,
 	RESET_BGWRITER,
 	RESET_WAL
 } PgStat_Shared_Reset_Target;
@@ -415,18 +413,6 @@ typedef struct PgStat_MsgAnalyze
 
 
 /* ----------
- * PgStat_MsgArchiver			Sent by the archiver to update statistics.
- * ----------
- */
-typedef struct PgStat_MsgArchiver
-{
-	PgStat_MsgHdr m_hdr;
-	bool		m_failed;		/* Failed attempt */
-	char		m_xlog[MAX_XFN_CHARS + 1];
-	TimestampTz m_timestamp;
-} PgStat_MsgArchiver;
-
-/* ----------
  * PgStat_MsgBgWriter			Sent by the bgwriter to update statistics.
  * ----------
  */
@@ -631,7 +617,6 @@ typedef union PgStat_Msg
 	PgStat_MsgAutovacStart msg_autovacuum_start;
 	PgStat_MsgVacuum msg_vacuum;
 	PgStat_MsgAnalyze msg_analyze;
-	PgStat_MsgArchiver msg_archiver;
 	PgStat_MsgBgWriter msg_bgwriter;
 	PgStat_MsgWal msg_wal;
 	PgStat_MsgSLRU msg_slru;
@@ -653,7 +638,7 @@ typedef union PgStat_Msg
  * ------------------------------------------------------------
  */
 
-#define PGSTAT_FILE_FORMAT_ID	0x01A5BCA2
+#define PGSTAT_FILE_FORMAT_ID	0x01A5BCA3
 
 /* ----------
  * PgStat_StatDBEntry			The collector's data per database
@@ -753,22 +738,6 @@ typedef struct PgStat_StatFuncEntry
 	PgStat_Counter f_self_time;
 } PgStat_StatFuncEntry;
 
-
-/*
- * Archiver statistics kept in the stats collector
- */
-typedef struct PgStat_ArchiverStats
-{
-	PgStat_Counter archived_count;	/* archival successes */
-	char		last_archived_wal[MAX_XFN_CHARS + 1];	/* last WAL file
-														 * archived */
-	TimestampTz last_archived_timestamp;	/* last archival success time */
-	PgStat_Counter failed_count;	/* failed archival attempts */
-	char		last_failed_wal[MAX_XFN_CHARS + 1]; /* WAL file involved in
-													 * last failure */
-	TimestampTz last_failed_timestamp;	/* last archival failure time */
-	TimestampTz stat_reset_timestamp;
-} PgStat_ArchiverStats;
 
 /*
  * Global statistics kept in the stats collector
@@ -989,7 +958,6 @@ extern void pgstat_twophase_postcommit(TransactionId xid, uint16 info,
 extern void pgstat_twophase_postabort(TransactionId xid, uint16 info,
 									  void *recdata, uint32 len);
 
-extern void pgstat_send_archiver(const char *xlog, bool failed);
 extern void pgstat_send_bgwriter(void);
 extern void pgstat_send_wal(bool force);
 
@@ -1001,7 +969,6 @@ extern void pgstat_send_wal(bool force);
 extern PgStat_StatDBEntry *pgstat_fetch_stat_dbentry(Oid dbid);
 extern PgStat_StatTabEntry *pgstat_fetch_stat_tabentry(Oid relid);
 extern PgStat_StatFuncEntry *pgstat_fetch_stat_funcentry(Oid funcid);
-extern PgStat_ArchiverStats *pgstat_fetch_stat_archiver(void);
 extern PgStat_GlobalStats *pgstat_fetch_global(void);
 extern PgStat_WalStats *pgstat_fetch_stat_wal(void);
 extern PgStat_SLRUStats *pgstat_fetch_slru(void);

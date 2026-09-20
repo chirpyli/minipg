@@ -24,7 +24,6 @@
 #include "nodes/tidbitmap.h"
 #include "storage/condition_variable.h"
 #include "utils/hsearch.h"
-#include "utils/queryenvironment.h"
 #include "utils/snapshot.h"
 #include "utils/sortsupport.h"
 #include "utils/tuplesort.h"
@@ -459,7 +458,7 @@ typedef struct EState
 	ParamListInfo es_param_list_info;	/* values of external params */
 	ParamExecData *es_param_exec_vals;	/* values of internal params */
 
-	QueryEnvironment *es_queryEnv;	/* query environment */
+
 
 	/* Other working state: */
 	MemoryContext es_query_cxt; /* per-query context in which EState lives */
@@ -1070,31 +1069,6 @@ struct AppendState
 };
 
 /* ----------------
- *	 MergeAppendState information
- *
- *		nplans			how many plans are in the array
- *		nkeys			number of sort key columns
- *		sortkeys		sort keys in SortSupport representation
- *		slots			current output tuple of each subplan
- *		heap			heap of active tuples
- *		initialized		true if we have fetched first tuple from each subplan
- *		valid_subplans	valid mergeplans indexes to scan.
- * ----------------
- */
-typedef struct MergeAppendState
-{
-	PlanState	ps;				/* its first field is NodeTag */
-	PlanState **mergeplans;		/* array of PlanStates for my inputs */
-	int			ms_nplans;
-	int			ms_nkeys;
-	SortSupport ms_sortkeys;	/* array of length ms_nkeys */
-	TupleTableSlot **ms_slots;	/* array of length ms_nplans */
-	struct binaryheap *ms_heap; /* binary heap of slot indices */
-	bool		ms_initialized; /* are subplans started? */
-	Bitmapset  *ms_valid_subplans;
-} MergeAppendState;
-
-/* ----------------
  *	 BitmapAndState information
  * ----------------
  */
@@ -1424,24 +1398,6 @@ typedef struct ValuesScanState
 	int			array_len;
 	int			curr_idx;
 } ValuesScanState;
-
-/* ----------------
- *	 NamedTuplestoreScanState information
- *
- *		NamedTuplestoreScan nodes are used to scan a Tuplestore created and
- *		named prior to execution of the query.  An example is a transition
- *		table for an AFTER trigger.
- *
- * Multiple NamedTuplestoreScan nodes can read out from the same Tuplestore.
- * ----------------
- */
-typedef struct NamedTuplestoreScanState
-{
-	ScanState	ss;				/* its first field is NodeTag */
-	int			readptr;		/* index of my tuplestore read pointer */
-	TupleDesc	tupdesc;		/* format of the tuples in the tuplestore */
-	Tuplestorestate *relation;	/* the rows */
-} NamedTuplestoreScanState;
 
 /* ----------------------------------------------------------------
  *				 Join State Information
@@ -1827,7 +1783,7 @@ typedef struct AggState
 	AggStatePerGroup *pergroups;	/* grouping set indexed array of per-group
 									 * pointers */
 	HeapTuple	grp_firstTuple; /* copy of first tuple of current group */
-	/* these fields are used in AGG_HASHED and AGG_MIXED modes: */
+	/* these fields are used in AGG_HASHED mode: */
 	bool		table_filled;	/* hash table filled yet? */
 	int			num_hashes;
 	MemoryContext hash_metacxt; /* memory for hash table itself */

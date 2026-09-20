@@ -64,11 +64,6 @@ extern AppendPath *create_append_path(PlannerInfo *root, RelOptInfo *rel,
 									  List *subpaths,
 									  List *pathkeys, Relids required_outer,
 									  double rows);
-extern MergeAppendPath *create_merge_append_path(PlannerInfo *root,
-												 RelOptInfo *rel,
-												 List *subpaths,
-												 List *pathkeys,
-												 Relids required_outer);
 extern GroupResultPath *create_group_result_path(PlannerInfo *root,
 												 RelOptInfo *rel,
 												 PathTarget *target,
@@ -89,8 +84,6 @@ extern SubqueryScanPath *create_subqueryscan_path(PlannerInfo *root,
 												  List *pathkeys, Relids required_outer);
 extern Path *create_valuesscan_path(PlannerInfo *root, RelOptInfo *rel,
 									Relids required_outer);
-extern Path *create_namedtuplestorescan_path(PlannerInfo *root, RelOptInfo *rel,
-											Relids required_outer);
 extern Path *create_resultscan_path(PlannerInfo *root, RelOptInfo *rel,
 									Relids required_outer);
 

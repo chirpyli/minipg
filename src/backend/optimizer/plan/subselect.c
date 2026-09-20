@@ -1855,11 +1855,6 @@ finalize_plan(PlannerInfo *root, Plan *plan,
 			break;
 
 
-
-		case T_NamedTuplestoreScan:
-			context.paramids = bms_add_members(context.paramids, scan_params);
-			break;
-
 		case T_ModifyTable:
 			{
 				ModifyTable *mtplan = (ModifyTable *) plan;
@@ -1878,22 +1873,6 @@ finalize_plan(PlannerInfo *root, Plan *plan,
 				ListCell   *l;
 
 				foreach(l, ((Append *) plan)->appendplans)
-				{
-					context.paramids =
-						bms_add_members(context.paramids,
-										finalize_plan(root,
-													  (Plan *) lfirst(l),
-													  valid_params,
-													  scan_params));
-				}
-			}
-			break;
-
-		case T_MergeAppend:
-			{
-				ListCell   *l;
-
-				foreach(l, ((MergeAppend *) plan)->mergeplans)
 				{
 					context.paramids =
 						bms_add_members(context.paramids,

@@ -66,8 +66,6 @@ typedef struct _SPI_plan *SPIPlanPtr;
 #define SPI_ERROR_NOATTRIBUTE	(-9)
 #define SPI_ERROR_NOOUTFUNC		(-10)
 #define SPI_ERROR_TYPUNKNOWN	(-11)
-#define SPI_ERROR_REL_DUPLICATE (-12)
-#define SPI_ERROR_REL_NOT_FOUND (-13)
 
 #define SPI_OK_CONNECT			1
 #define SPI_OK_FINISH			2
@@ -79,8 +77,6 @@ typedef struct _SPI_plan *SPIPlanPtr;
 #define SPI_OK_DELETE			8
 #define SPI_OK_UPDATE			9
 #define SPI_OK_REWRITTEN		14
-#define SPI_OK_REL_REGISTER		15
-#define SPI_OK_REL_UNREGISTER	16
 
 #define SPI_OPT_NONATOMIC		(1 << 0)
 
@@ -154,8 +150,6 @@ extern Datum SPI_datumTransfer(Datum value, bool typByVal, int typLen);
 extern void SPI_freetuple(HeapTuple pointer);
 extern void SPI_freetuptable(SPITupleTable *tuptable);
 
-extern int	SPI_register_relation(EphemeralNamedRelation enr);
-extern int	SPI_unregister_relation(const char *name);
 
 extern void SPI_start_transaction(void);
 extern void SPI_commit(void);

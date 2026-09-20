@@ -82,8 +82,6 @@ extern void cost_subqueryscan(SubqueryScanPath *path, PlannerInfo *root,
 							  RelOptInfo *baserel, ParamPathInfo *param_info);
 extern void cost_valuesscan(Path *path, PlannerInfo *root,
 						RelOptInfo *baserel, ParamPathInfo *param_info);
-extern void cost_namedtuplestorescan(Path *path, PlannerInfo *root,
-									 RelOptInfo *baserel, ParamPathInfo *param_info);
 extern void cost_resultscan(Path *path, PlannerInfo *root,
 							RelOptInfo *baserel, ParamPathInfo *param_info);
 extern void cost_recursive_union(Path *runion, Path *nrterm, Path *rterm);
@@ -95,10 +93,6 @@ extern void cost_incremental_sort(Path *path,
 								  Cost input_startup_cost, Cost input_total_cost,
 								  double input_tuples, int width, Cost comparison_cost, int sort_mem);
 extern void cost_append(AppendPath *path);
-extern void cost_merge_append(Path *path, PlannerInfo *root,
-							  List *pathkeys, int n_streams,
-							  Cost input_startup_cost, Cost input_total_cost,
-							  double tuples);
 extern void cost_material(Path *path,
 						  Cost input_startup_cost, Cost input_total_cost,
 						  double tuples, int width);
@@ -168,7 +162,6 @@ extern void set_joinrel_size_estimates(PlannerInfo *root, RelOptInfo *rel,
 									   List *restrictlist);
 extern void set_subquery_size_estimates(PlannerInfo *root, RelOptInfo *rel);
 extern void set_values_size_estimates(PlannerInfo *root, RelOptInfo *rel);
-extern void set_namedtuplestore_size_estimates(PlannerInfo *root, RelOptInfo *rel);
 extern void set_result_size_estimates(PlannerInfo *root, RelOptInfo *rel);
 extern PathTarget *set_pathtarget_cost_width(PlannerInfo *root, PathTarget *target);
 extern double compute_bitmap_pages(PlannerInfo *root, RelOptInfo *baserel,

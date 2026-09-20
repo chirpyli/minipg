@@ -80,8 +80,7 @@ static Query *transformExplainStmt(ParseState *pstate,
  */
 Query *
 parse_analyze(RawStmt *parseTree, const char *sourceText,
-			  Oid *paramTypes, int numParams,
-			  QueryEnvironment *queryEnv)
+			  Oid *paramTypes, int numParams)
 {
 	ParseState *pstate = make_parsestate(NULL);
 	Query	   *query;
@@ -92,8 +91,6 @@ parse_analyze(RawStmt *parseTree, const char *sourceText,
 
 	if (numParams > 0)
 		parse_fixed_parameters(pstate, paramTypes, numParams);
-
-	pstate->p_queryEnv = queryEnv;
 
 	query = transformTopLevelStmt(pstate, parseTree);
 

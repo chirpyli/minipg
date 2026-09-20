@@ -33,7 +33,6 @@ typedef struct AlterTableUtilityContext
 	const char *queryString;	/* its query string */
 	Oid			relid;			/* OID of ALTER's target table */
 	ParamListInfo params;		/* any parameters available to ALTER TABLE */
-	QueryEnvironment *queryEnv; /* execution environment for ALTER TABLE */
 } AlterTableUtilityContext;
 
 /*
@@ -70,12 +69,10 @@ typedef struct AlterTableUtilityContext
 extern void ProcessUtility(PlannedStmt *pstmt, const char *queryString,
 						   bool readOnlyTree,
 						   ProcessUtilityContext context, ParamListInfo params,
-						   QueryEnvironment *queryEnv,
 						   DestReceiver *dest, QueryCompletion *qc);
 extern void standard_ProcessUtility(PlannedStmt *pstmt, const char *queryString,
 									bool readOnlyTree,
 									ProcessUtilityContext context, ParamListInfo params,
-									QueryEnvironment *queryEnv,
 									DestReceiver *dest, QueryCompletion *qc);
 
 extern void ProcessUtilityForAlterTable(Node *stmt,

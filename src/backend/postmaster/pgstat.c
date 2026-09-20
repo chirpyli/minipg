@@ -268,7 +268,6 @@ static HTAB *pgStatDBHash = NULL;
  * Contains statistics that are not collected per database
  * or per table.
  */
-static PgStat_ArchiverStats archiverStats;
 static PgStat_GlobalStats globalStats;
 static PgStat_WalStats walStats;
 static PgStat_SLRUStats slruStats[SLRU_NUM_ELEMENTS];
@@ -332,7 +331,6 @@ static void pgstat_recv_resetslrucounter(PgStat_MsgResetslrucounter *msg, int le
 static void pgstat_recv_autovac(PgStat_MsgAutovacStart *msg, int len);
 static void pgstat_recv_vacuum(PgStat_MsgVacuum *msg, int len);
 static void pgstat_recv_analyze(PgStat_MsgAnalyze *msg, int len);
-static void pgstat_recv_archiver(PgStat_MsgArchiver *msg, int len);
 static void pgstat_recv_bgwriter(PgStat_MsgBgWriter *msg, int len);
 static void pgstat_recv_wal(PgStat_MsgWal *msg, int len);
 static void pgstat_recv_slru(PgStat_MsgSLRU *msg, int len);
@@ -1362,9 +1360,7 @@ pgstat_reset_shared_counters(const char *target)
 	if (pgStatSock == PGINVALID_SOCKET)
 		return;
 
-	if (strcmp(target, "archiver") == 0)
-		msg.m_resettarget = RESET_ARCHIVER;
-	else if (strcmp(target, "bgwriter") == 0)
+	if (strcmp(target, "bgwriter") == 0)
 		msg.m_resettarget = RESET_BGWRITER;
 	else if (strcmp(target, "wal") == 0)
 		msg.m_resettarget = RESET_WAL;
@@ -1372,7 +1368,7 @@ pgstat_reset_shared_counters(const char *target)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("unrecognized reset target: \"%s\"", target),
-				 errhint("Target must be \"archiver\", \"bgwriter\", or \"wal\".")));
+				 errhint("Target must be \"bgwriter\" or \"wal\".")));
 
 	pgstat_setheader(&msg.m_hdr, PGSTAT_MTYPE_RESETSHAREDCOUNTER);
 	pgstat_send(&msg, sizeof(msg));
@@ -2568,23 +2564,6 @@ pgstat_fetch_stat_funcentry(Oid func_id)
 
 /*
  * ---------
- * pgstat_fetch_stat_archiver() -
- *
- *	Support function for the SQL-callable pgstat* functions. Returns
- *	a pointer to the archiver statistics struct.
- * ---------
- */
-PgStat_ArchiverStats *
-pgstat_fetch_stat_archiver(void)
-{
-	backend_read_statsfile();
-
-	return &archiverStats;
-}
-
-
-/*
- * ---------
  * pgstat_fetch_global() -
  *
  *	Support function for the SQL-callable pgstat* functions. Returns
@@ -2720,28 +2699,6 @@ pgstat_send(void *msg, int len)
 	if (rc < 0)
 		elog(LOG, "could not send to statistics collector: %m");
 #endif
-}
-
-/* ----------
- * pgstat_send_archiver() -
- *
- *	Tell the collector about the WAL file that we successfully
- *	archived or failed to archive.
- * ----------
- */
-void
-pgstat_send_archiver(const char *xlog, bool failed)
-{
-	PgStat_MsgArchiver msg;
-
-	/*
-	 * Prepare and send the message
-	 */
-	pgstat_setheader(&msg.m_hdr, PGSTAT_MTYPE_ARCHIVER);
-	msg.m_failed = failed;
-	strlcpy(msg.m_xlog, xlog, sizeof(msg.m_xlog));
-	msg.m_timestamp = GetCurrentTimestamp();
-	pgstat_send(&msg, sizeof(msg));
 }
 
 /* ----------
@@ -3087,10 +3044,6 @@ PgstatCollectorMain(int argc, char *argv[])
 					pgstat_recv_analyze(&msg.msg_analyze, len);
 					break;
 
-				case PGSTAT_MTYPE_ARCHIVER:
-					pgstat_recv_archiver(&msg.msg_archiver, len);
-					break;
-
 				case PGSTAT_MTYPE_BGWRITER:
 					pgstat_recv_bgwriter(&msg.msg_bgwriter, len);
 					break;
@@ -3350,12 +3303,6 @@ pgstat_write_statsfiles(bool permanent, bool allDbs)
 	 * Write global stats struct
 	 */
 	rc = fwrite(&globalStats, sizeof(globalStats), 1, fpout);
-	(void) rc;					/* we'll check for error with ferror */
-
-	/*
-	 * Write archiver stats struct
-	 */
-	rc = fwrite(&archiverStats, sizeof(archiverStats), 1, fpout);
 	(void) rc;					/* we'll check for error with ferror */
 
 	/*
@@ -3622,11 +3569,10 @@ pgstat_read_statsfiles(Oid onlydb, bool permanent, bool deep)
 						 HASH_ELEM | HASH_BLOBS | HASH_CONTEXT);
 
 	/*
-	 * Clear out global, archiver, WAL and SLRU statistics so they start from
+	 * Clear out global, WAL and SLRU statistics so they start from
 	 * zero in case we can't load an existing statsfile.
 	 */
 	memset(&globalStats, 0, sizeof(globalStats));
-	memset(&archiverStats, 0, sizeof(archiverStats));
 	memset(&walStats, 0, sizeof(walStats));
 	memset(&slruStats, 0, sizeof(slruStats));
 
@@ -3635,7 +3581,6 @@ pgstat_read_statsfiles(Oid onlydb, bool permanent, bool deep)
 	 * existing statsfile).
 	 */
 	globalStats.stat_reset_timestamp = GetCurrentTimestamp();
-	archiverStats.stat_reset_timestamp = globalStats.stat_reset_timestamp;
 	walStats.stat_reset_timestamp = globalStats.stat_reset_timestamp;
 
 	/*
@@ -3694,17 +3639,6 @@ pgstat_read_statsfiles(Oid onlydb, bool permanent, bool deep)
 	 */
 	if (pgStatRunningInCollector)
 		globalStats.stats_timestamp = 0;
-
-	/*
-	 * Read archiver stats struct
-	 */
-	if (fread(&archiverStats, 1, sizeof(archiverStats), fpin) != sizeof(archiverStats))
-	{
-		ereport(pgStatRunningInCollector ? LOG : WARNING,
-				(errmsg("corrupted statistics file \"%s\"", statfile)));
-		memset(&archiverStats, 0, sizeof(archiverStats));
-		goto done;
-	}
 
 	/*
 	 * Read WAL stats struct
@@ -4025,7 +3959,6 @@ pgstat_read_db_statsfile_timestamp(Oid databaseid, bool permanent,
 {
 	PgStat_StatDBEntry dbentry;
 	PgStat_GlobalStats myGlobalStats;
-	PgStat_ArchiverStats myArchiverStats;
 	PgStat_WalStats myWalStats;
 	PgStat_SLRUStats mySLRUStats[SLRU_NUM_ELEMENTS];
 	FILE	   *fpin;
@@ -4063,18 +3996,6 @@ pgstat_read_db_statsfile_timestamp(Oid databaseid, bool permanent,
 	 */
 	if (fread(&myGlobalStats, 1, sizeof(myGlobalStats),
 			  fpin) != sizeof(myGlobalStats))
-	{
-		ereport(pgStatRunningInCollector ? LOG : WARNING,
-				(errmsg("corrupted statistics file \"%s\"", statfile)));
-		FreeFile(fpin);
-		return false;
-	}
-
-	/*
-	 * Read archiver stats struct
-	 */
-	if (fread(&myArchiverStats, 1, sizeof(myArchiverStats),
-			  fpin) != sizeof(myArchiverStats))
 	{
 		ereport(pgStatRunningInCollector ? LOG : WARNING,
 				(errmsg("corrupted statistics file \"%s\"", statfile)));
@@ -4664,12 +4585,6 @@ pgstat_recv_resetsharedcounter(PgStat_MsgResetsharedcounter *msg, int len)
 		memset(&globalStats, 0, sizeof(globalStats));
 		globalStats.stat_reset_timestamp = GetCurrentTimestamp();
 	}
-	else if (msg->m_resettarget == RESET_ARCHIVER)
-	{
-		/* Reset the archiver statistics for the cluster. */
-		memset(&archiverStats, 0, sizeof(archiverStats));
-		archiverStats.stat_reset_timestamp = GetCurrentTimestamp();
-	}
 	else if (msg->m_resettarget == RESET_WAL)
 	{
 		/* Reset the WAL statistics for the cluster. */
@@ -4842,33 +4757,6 @@ pgstat_recv_analyze(PgStat_MsgAnalyze *msg, int len)
 	}
 }
 
-
-/* ----------
- * pgstat_recv_archiver() -
- *
- *	Process a ARCHIVER message.
- * ----------
- */
-static void
-pgstat_recv_archiver(PgStat_MsgArchiver *msg, int len)
-{
-	if (msg->m_failed)
-	{
-		/* Failed archival attempt */
-		++archiverStats.failed_count;
-		memcpy(archiverStats.last_failed_wal, msg->m_xlog,
-			   sizeof(archiverStats.last_failed_wal));
-		archiverStats.last_failed_timestamp = msg->m_timestamp;
-	}
-	else
-	{
-		/* Successful archival operation */
-		++archiverStats.archived_count;
-		memcpy(archiverStats.last_archived_wal, msg->m_xlog,
-			   sizeof(archiverStats.last_archived_wal));
-		archiverStats.last_archived_timestamp = msg->m_timestamp;
-	}
-}
 
 /* ----------
  * pgstat_recv_bgwriter() -

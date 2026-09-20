@@ -162,7 +162,6 @@ standard_ExecutorStart(QueryDesc *queryDesc, int eflags)
 	/*
 	 * Fill in the query environment, if any, from queryDesc.
 	 */
-	estate->es_queryEnv = queryDesc->queryEnv;
 
 	/*
 	 * If non-read-only query, set the command ID to mark output tuples with
@@ -1530,7 +1529,6 @@ EvalPlanQualStart(EPQState *epqstate, Plan *planTree)
 	rcestate->es_range_table = parentestate->es_range_table;
 	rcestate->es_range_table_size = parentestate->es_range_table_size;
 	rcestate->es_relations = parentestate->es_relations;
-	rcestate->es_queryEnv = parentestate->es_queryEnv;
 	rcestate->es_rowmarks = parentestate->es_rowmarks;
 	rcestate->es_plannedstmt = parentestate->es_plannedstmt;
 	rcestate->es_junkFilter = parentestate->es_junkFilter;

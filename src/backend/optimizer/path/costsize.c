@@ -98,7 +98,7 @@
 #define LOG2(x)  (log(x) / 0.693147180559945)
 
 /*
- * Append and MergeAppend nodes are less expensive than some other operations
+ * Append nodes are less expensive than some other operations
  * which use cpu_tuple_cost; instead of adding a separate GUC, estimate the
  * per-tuple cost as cpu_tuple_cost multiplied by this value.
  */
@@ -1173,43 +1173,6 @@ cost_valuesscan(Path *path, PlannerInfo *root,
 }
 
 /*
- * cost_namedtuplestorescan
- *	  Determines and returns the cost of scanning a named tuplestore.
- */
-void
-cost_namedtuplestorescan(Path *path, PlannerInfo *root,
-						 RelOptInfo *baserel, ParamPathInfo *param_info)
-{
-	Cost		startup_cost = 0;
-	Cost		run_cost = 0;
-	QualCost	qpqual_cost;
-	Cost		cpu_per_tuple;
-
-	/* Should only be applied to base relations that are Tuplestores */
-	Assert(baserel->relid > 0);
-	Assert(baserel->rtekind == RTE_NAMEDTUPLESTORE);
-
-	/* Mark the path with the correct row estimate */
-	if (param_info)
-		path->rows = param_info->ppi_rows;
-	else
-		path->rows = baserel->rows;
-
-	/* Charge one CPU tuple cost per row for tuplestore manipulation */
-	cpu_per_tuple = cpu_tuple_cost;
-
-	/* Add scanning CPU costs */
-	get_restriction_qual_cost(root, baserel, param_info, &qpqual_cost);
-
-	startup_cost += qpqual_cost.startup;
-	cpu_per_tuple += cpu_tuple_cost + qpqual_cost.per_tuple;
-	run_cost += cpu_per_tuple * baserel->tuples;
-
-	path->startup_cost = startup_cost;
-	path->total_cost = startup_cost + run_cost;
-}
-
-/*
  * cost_resultscan
  *	  Determines and returns the cost of scanning an RTE_RESULT relation.
  */
@@ -1591,67 +1554,6 @@ cost_append(AppendPath *apath)
 }
 
 /*
- * cost_merge_append
- *	  Determines and returns the cost of a MergeAppend node.
- *
- * MergeAppend merges several pre-sorted input streams, using a heap that
- * at any given instant holds the next tuple from each stream.  If there
- * are N streams, we need about N*log2(N) tuple comparisons to construct
- * the heap at startup, and then for each output tuple, about log2(N)
- * comparisons to replace the top entry.
- *
- * (The effective value of N will drop once some of the input streams are
- * exhausted, but it seems unlikely to be worth trying to account for that.)
- *
- * The heap is never spilled to disk, since we assume N is not very large.
- * So this is much simpler than cost_sort.
- *
- * As in cost_sort, we charge two operator evals per tuple comparison.
- *
- * 'pathkeys' is a list of sort keys
- * 'n_streams' is the number of input streams
- * 'input_startup_cost' is the sum of the input streams' startup costs
- * 'input_total_cost' is the sum of the input streams' total costs
- * 'tuples' is the number of tuples in all the streams
- */
-void
-cost_merge_append(Path *path, PlannerInfo *root,
-				  List *pathkeys, int n_streams,
-				  Cost input_startup_cost, Cost input_total_cost,
-				  double tuples)
-{
-	Cost		startup_cost = 0;
-	Cost		run_cost = 0;
-	Cost		comparison_cost;
-	double		N;
-	double		logN;
-
-	/*
-	 * Avoid log(0)...
-	 */
-	N = (n_streams < 2) ? 2.0 : (double) n_streams;
-	logN = LOG2(N);
-
-	/* Assumed cost per tuple comparison */
-	comparison_cost = 2.0 * cpu_operator_cost;
-
-	/* Heap creation cost */
-	startup_cost += comparison_cost * N * logN;
-
-	/* Per-tuple heap maintenance cost */
-	run_cost += tuples * comparison_cost * logN;
-
-	/*
-	 * Although MergeAppend does not do any selection or projection, it's not
-	 * free; add a small per-tuple overhead.
-	 */
-	run_cost += cpu_tuple_cost * APPEND_CPU_COST_MULTIPLIER * tuples;
-
-	path->startup_cost = startup_cost + input_startup_cost;
-	path->total_cost = startup_cost + run_cost + input_total_cost;
-}
-
-/*
  * cost_material
  *	  Determines and returns the cost of materializing a relation, including
  *	  the cost of reading the input data.
@@ -1912,16 +1814,11 @@ cost_agg(Path *path, PlannerInfo *root,
 		total_cost = startup_cost + cpu_tuple_cost;
 		output_tuples = 1;
 	}
-	else if (aggstrategy == AGG_SORTED || aggstrategy == AGG_MIXED)
+	else if (aggstrategy == AGG_SORTED)
 	{
 		/* Here we are able to deliver output on-the-fly */
 		startup_cost = input_startup_cost;
 		total_cost = input_total_cost;
-		if (aggstrategy == AGG_MIXED && !enable_hashagg)
-		{
-			startup_cost += disable_cost;
-			total_cost += disable_cost;
-		}
 		/* calcs phrased this way to match HASHED case, see note above */
 		total_cost += aggcosts->transCost.startup;
 		total_cost += aggcosts->transCost.per_tuple * input_tuples;
@@ -1963,7 +1860,7 @@ cost_agg(Path *path, PlannerInfo *root,
 	 * Accrue writes (spilled tuples) to startup_cost and to total_cost;
 	 * accrue reads only to total_cost.
 	 */
-	if (aggstrategy == AGG_HASHED || aggstrategy == AGG_MIXED)
+	if (aggstrategy == AGG_HASHED)
 	{
 		double		pages;
 		double		pages_written = 0.0;
@@ -4478,38 +4375,6 @@ set_values_size_estimates(PlannerInfo *root, RelOptInfo *rel)
  * We set the same fields as set_baserel_size_estimates.
  */
 
-/*
- * set_namedtuplestore_size_estimates
- *		Set the size estimates for a base relation that is a tuplestore reference.
- *
- * The rel's targetlist and restrictinfo list must have been constructed
- * already.
- *
- * We set the same fields as set_baserel_size_estimates.
- */
-void
-set_namedtuplestore_size_estimates(PlannerInfo *root, RelOptInfo *rel)
-{
-	RangeTblEntry *rte;
-
-	/* Should only be applied to base relations that are tuplestore references */
-	Assert(rel->relid > 0);
-	rte = planner_rt_fetch(rel->relid, root);
-	Assert(rte->rtekind == RTE_NAMEDTUPLESTORE);
-
-	/*
-	 * Use the estimate provided by the code which is generating the named
-	 * tuplestore.  In some cases, the actual number might be available; in
-	 * others the same plan will be re-used, so a "typical" value might be
-	 * estimated and used.
-	 */
-	rel->tuples = rte->enrtuples;
-	if (rel->tuples < 0)
-		rel->tuples = 1000;
-
-	/* Now estimate number of output rows, etc */
-	set_baserel_size_estimates(root, rel);
-}
 
 /*
  * set_result_size_estimates

@@ -63,7 +63,6 @@ make_parsestate(ParseState *parentParseState)
 		pstate->p_coerce_param_hook = parentParseState->p_coerce_param_hook;
 		pstate->p_ref_hook_state = parentParseState->p_ref_hook_state;
 		/* query environment stays in context for the whole parse analysis */
-		pstate->p_queryEnv = parentParseState->p_queryEnv;
 	}
 
 	return pstate;

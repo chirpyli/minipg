@@ -103,7 +103,7 @@ typedef struct PortalData
 	List	   *stmts;			/* list of PlannedStmts */
 
 	ParamListInfo portalParams; /* params to pass to query */
-	QueryEnvironment *queryEnv; /* environment for query */
+
 
 	/* Features/options */
 	PortalStrategy strategy;	/* see above */

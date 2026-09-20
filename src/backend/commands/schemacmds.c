@@ -195,7 +195,6 @@ CreateSchemaCommand(CreateSchemaStmt *stmt, const char *queryString,
 					   false,
 					   PROCESS_UTILITY_SUBCOMMAND,
 					   NULL,
-					   NULL,
 					   None_Receiver,
 					   NULL);
 

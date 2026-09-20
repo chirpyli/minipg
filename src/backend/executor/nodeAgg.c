@@ -130,11 +130,7 @@
  *	  data for the first phase is handled by the planner, as it might be
  *	  satisfied by underlying nodes.)
  *
- *	  Hashing can be mixed with sorted grouping.  To do this, we have an
- *	  AGG_MIXED strategy that populates the hashtables during the first sorted
- *	  phase, and switches to reading them out after completing all sort phases.
- *	  We can also support AGG_HASHED with multiple hash tables and no sorting
- *	  at all.
+ *	  We support AGG_HASHED with multiple hash tables and no sorting at all.
  *
  *	  From the perspective of aggregate transition and final functions, the
  *	  only issue regarding grouping sets is this: a single call site (flinfo)
@@ -156,13 +152,9 @@
  *
  *	  For many purposes, we treat the "real" node as if it were just the first
  *	  node in the chain.  The chain must be ordered such that hashed entries
- *	  come before sorted/plain entries; the real node is marked AGG_MIXED if
- *	  there are both types present (in which case the real node describes one
- *	  of the hashed groupings, other AGG_HASHED nodes may optionally follow in
- *	  the chain, followed in turn by AGG_SORTED or (one) AGG_PLAIN node).  If
- *	  the real node is marked AGG_HASHED or AGG_SORTED, then all the chained
- *	  nodes must be of the same type; if it is AGG_PLAIN, there can be no
- *	  chained nodes.
+ *	  come before sorted/plain entries.  If the real node is marked AGG_HASHED
+ *	  or AGG_SORTED, then all the chained nodes must be of the same type; if it
+ *	  is AGG_PLAIN, there can be no chained nodes.
  *
  *	  We collect all hashed nodes into a single "phase", numbered 0, and create
  *	  a sorted phase (numbered 1..n) for each AGG_SORTED or AGG_PLAIN node.
@@ -488,8 +480,8 @@ select_current_set(AggState *aggstate, int setno, bool is_hash)
  * Switch to phase "newphase", which must either be 0 or 1 (to reset) or
  * current_phase + 1. Juggle the tuplesorts accordingly.
  *
- * Phase 0 is for hashing, which we currently handle last in the AGG_MIXED
- * case, so when entering phase 0, all we need to do is drop open sorts.
+ * Phase 0 is for hashing, so when entering phase 0, all we need to do is
+ * drop open sorts.
  */
 static void
 initialize_phase(AggState *aggstate, int newphase)
@@ -1327,8 +1319,7 @@ finalize_aggregates(AggState *aggstate,
 
 		if (pertrans->numSortCols > 0)
 		{
-			Assert(aggstate->aggstrategy != AGG_HASHED &&
-				   aggstate->aggstrategy != AGG_MIXED);
+			Assert(aggstate->aggstrategy != AGG_HASHED);
 
 			if (pertrans->numInputs == 1)
 				process_ordered_aggregate_single(aggstate,
@@ -1507,8 +1498,7 @@ build_hash_table(AggState *aggstate, int setno, long nbuckets)
 	MemoryContext tmpcxt = aggstate->tmpcontext->ecxt_per_tuple_memory;
 	Size		additionalsize;
 
-	Assert(aggstate->aggstrategy == AGG_HASHED ||
-		   aggstate->aggstrategy == AGG_MIXED);
+	Assert(aggstate->aggstrategy == AGG_HASHED);
 
 	/*
 	 * Used to make sure initial hash table allocation does not exceed
@@ -1742,13 +1732,9 @@ hashagg_recompile_expressions(AggState *aggstate, bool minslot, bool nullcheck)
 	int			i = minslot ? 1 : 0;
 	int			j = nullcheck ? 1 : 0;
 
-	Assert(aggstate->aggstrategy == AGG_HASHED ||
-		   aggstate->aggstrategy == AGG_MIXED);
+	Assert(aggstate->aggstrategy == AGG_HASHED);
 
-	if (aggstate->aggstrategy == AGG_HASHED)
-		phase = &aggstate->phases[0];
-	else						/* AGG_MIXED */
-		phase = &aggstate->phases[1];
+	phase = &aggstate->phases[0];
 
 	if (phase->evaltrans_cache[i][j] == NULL)
 	{
@@ -1756,14 +1742,6 @@ hashagg_recompile_expressions(AggState *aggstate, bool minslot, bool nullcheck)
 		bool		outerfixed = aggstate->ss.ps.outeropsfixed;
 		bool		dohash = true;
 		bool		dosort = false;
-
-		/*
-		 * If minslot is true, that means we are processing a spilled batch
-		 * (inside agg_refill_hash_table()), and we must not advance the
-		 * sorted grouping sets.
-		 */
-		if (aggstate->aggstrategy == AGG_MIXED && !minslot)
-			dosort = true;
 
 		/* temporarily change the outerops while compiling the expression */
 		if (minslot)
@@ -1919,8 +1897,7 @@ hash_agg_update_metrics(AggState *aggstate, bool from_tape, int npartitions)
 	Size		buffer_mem;
 	Size		total_mem;
 
-	if (aggstate->aggstrategy != AGG_MIXED &&
-		aggstate->aggstrategy != AGG_HASHED)
+	if (aggstate->aggstrategy != AGG_HASHED)
 		return;
 
 	/* memory for the hash table itself */
@@ -2168,8 +2145,6 @@ ExecAgg(PlanState *pstate)
 			case AGG_HASHED:
 				if (!node->table_filled)
 					agg_fill_hash_table(node);
-				/* FALLTHROUGH */
-			case AGG_MIXED:
 				result = agg_retrieve_hash_table(node);
 				break;
 			case AGG_PLAIN:
@@ -2281,19 +2256,6 @@ agg_retrieve_direct(AggState *aggstate)
 				numGroupingSets = Max(aggstate->phase->numsets, 1);
 				node = aggstate->phase->aggnode;
 				numReset = numGroupingSets;
-			}
-			else if (aggstate->aggstrategy == AGG_MIXED)
-			{
-				/*
-				 * Mixed mode; we've output all the grouped stuff and have
-				 * full hashtables, so switch to outputting those.
-				 */
-				initialize_phase(aggstate, 0);
-				aggstate->table_filled = true;
-				ResetTupleHashIterator(aggstate->perhash[0].hashtable,
-									   &aggstate->perhash[0].hashiter);
-				select_current_set(aggstate, 0, true);
-				return agg_retrieve_hash_table(aggstate);
 			}
 			else
 			{
@@ -2438,16 +2400,6 @@ agg_retrieve_direct(AggState *aggstate)
 				 */
 				for (;;)
 				{
-					/*
-					 * During phase 1 only of a mixed agg, we need to update
-					 * hashtables as well in advance_aggregates.
-					 */
-					if (aggstate->aggstrategy == AGG_MIXED &&
-						aggstate->current_phase == 1)
-					{
-						lookup_hash_entries(aggstate);
-					}
-
 					/* Advance the aggregates (or combine functions) */
 					advance_aggregates(aggstate);
 
@@ -2458,11 +2410,6 @@ agg_retrieve_direct(AggState *aggstate)
 					if (TupIsNull(outerslot))
 					{
 						/* no more outer-plan tuples available */
-
-						/* if we built hash tables, finalize any spills */
-						if (aggstate->aggstrategy == AGG_MIXED &&
-							aggstate->current_phase == 1)
-							hashagg_finish_initial_spills(aggstate);
 
 						if (hasGroupingSets)
 						{
@@ -2625,17 +2572,7 @@ agg_refill_hash_table(AggState *aggstate)
 
 	aggstate->hash_ngroups_current = 0;
 
-	/*
-	 * In AGG_MIXED mode, hash aggregation happens in phase 1 and the output
-	 * happens in phase 0. So, we switch to phase 1 when processing a batch,
-	 * and back to phase 0 after the batch is done.
-	 */
 	Assert(aggstate->current_phase == 0);
-	if (aggstate->phase->aggstrategy == AGG_MIXED)
-	{
-		aggstate->current_phase = 1;
-		aggstate->phase = &aggstate->phases[aggstate->current_phase];
-	}
 
 	select_current_set(aggstate, batch->setno, true);
 
@@ -3261,8 +3198,7 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 	int			numHashes;
 	int			i = 0;
 	int			j = 0;
-	bool		use_hashing = (node->aggstrategy == AGG_HASHED ||
-							   node->aggstrategy == AGG_MIXED);
+	bool		use_hashing = (node->aggstrategy == AGG_HASHED);
 
 	/* check for unsupported flags */
 	Assert(!(eflags & (EXEC_FLAG_BACKWARD | EXEC_FLAG_MARK)));
@@ -3453,8 +3389,7 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 
 		Assert(phase <= 1 || sortnode);
 
-		if (aggnode->aggstrategy == AGG_HASHED
-			|| aggnode->aggstrategy == AGG_MIXED)
+		if (aggnode->aggstrategy == AGG_HASHED)
 		{
 			AggStatePerPhase phasedata = &aggstate->phases[0];
 			AggStatePerHash perhash;
@@ -3892,25 +3827,7 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 		if (!phase->aggnode)
 			continue;
 
-		if (aggstate->aggstrategy == AGG_MIXED && phaseidx == 1)
-		{
-			/*
-			 * Phase one, and only phase one, in a mixed agg performs both
-			 * sorting and aggregation.
-			 */
-			dohash = true;
-			dosort = true;
-		}
-		else if (aggstate->aggstrategy == AGG_MIXED && phaseidx == 0)
-		{
-			/*
-			 * No need to compute a transition function for an AGG_MIXED phase
-			 * 0 - the contents of the hashtables will have been computed
-			 * during phase 1.
-			 */
-			continue;
-		}
-		else if (phase->aggstrategy == AGG_PLAIN ||
+		if (phase->aggstrategy == AGG_PLAIN ||
 				 phase->aggstrategy == AGG_SORTED)
 		{
 			dohash = false;
@@ -4164,7 +4081,7 @@ build_pertrans_for_aggref(AggStatePerTrans pertrans,
 		 * We don't implement DISTINCT or ORDER BY aggs in the HASHED case
 		 * (yet)
 		 */
-		Assert(aggstate->aggstrategy != AGG_HASHED && aggstate->aggstrategy != AGG_MIXED);
+		Assert(aggstate->aggstrategy != AGG_HASHED);
 
 		/* If we have only one input, we need its len/byval info. */
 		if (numInputs == 1)
@@ -4392,11 +4309,11 @@ ExecReScanAgg(AggState *node)
 	MemSet(econtext->ecxt_aggnulls, 0, sizeof(bool) * node->numaggs);
 
 	/*
-	 * With AGG_HASHED/MIXED, the hash table is allocated in a sub-context of
+	 * With AGG_HASHED, the hash table is allocated in a sub-context of
 	 * the hashcontext. This used to be an issue, but now, resetting a context
 	 * automatically deletes sub-contexts too.
 	 */
-	if (node->aggstrategy == AGG_HASHED || node->aggstrategy == AGG_MIXED)
+	if (node->aggstrategy == AGG_HASHED)
 	{
 		hashagg_reset_spill_state(node);
 

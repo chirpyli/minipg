@@ -44,8 +44,7 @@ explain_get_index_name_hook_type explain_get_index_name_hook = NULL;
 
 static void ExplainOneQuery(Query *query, int cursorOptions,
 							ExplainState *es,
-							const char *queryString, ParamListInfo params,
-							QueryEnvironment *queryEnv);
+							const char *queryString, ParamListInfo params);
 static double elapsed_time(instr_time *starttime);
 static bool ExplainPreScanNode(PlanState *planstate, Bitmapset **rels_used);
 static void ExplainNode(PlanState *planstate, List *ancestors,
@@ -69,8 +68,6 @@ static void show_sort_keys(SortState *sortstate, List *ancestors,
 						   ExplainState *es);
 static void show_incremental_sort_keys(IncrementalSortState *incrsortstate,
 									   List *ancestors, ExplainState *es);
-static void show_merge_append_keys(MergeAppendState *mstate, List *ancestors,
-								   ExplainState *es);
 static void show_agg_keys(AggState *astate, List *ancestors,
 						  ExplainState *es);
 static void show_group_keys(GroupState *gstate, List *ancestors,
@@ -209,7 +206,7 @@ ExplainQuery(ParseState *pstate, ExplainStmt *stmt,
 		{
 			ExplainOneQuery(lfirst_node(Query, l),
 							0, es,
-							pstate->p_sourcetext, params, pstate->p_queryEnv);
+							pstate->p_sourcetext, params);
 
 			/* Separate plans with a blank line */
 			if (lnext(rewritten, l) != NULL)
@@ -267,21 +264,19 @@ ExplainResultDesc(ExplainStmt *stmt)
 static void
 ExplainOneQuery(Query *query, int cursorOptions,
 				ExplainState *es,
-				const char *queryString, ParamListInfo params,
-				QueryEnvironment *queryEnv)
+				const char *queryString, ParamListInfo params)
 {
 	/* planner will not cope with utility statements */
 	if (query->commandType == CMD_UTILITY)
 	{
-		ExplainOneUtility(query->utilityStmt, es, queryString, params,
-						  queryEnv);
+		ExplainOneUtility(query->utilityStmt, es, queryString, params);
 		return;
 	}
 
 	/* if an advisor plugin is present, let it manage things */
 	if (ExplainOneQuery_hook)
 		(*ExplainOneQuery_hook) (query, cursorOptions, es,
-								 queryString, params, queryEnv);
+								 queryString, params);
 	else
 	{
 		PlannedStmt *plan;
@@ -308,7 +303,7 @@ ExplainOneQuery(Query *query, int cursorOptions,
 		}
 
 		/* run it (if needed) and produce output */
-		ExplainOnePlan(plan, es, queryString, params, queryEnv,
+		ExplainOnePlan(plan, es, queryString, params,
 					   &planduration, (es->buffers ? &bufusage : NULL));
 	}
 }
@@ -320,8 +315,7 @@ ExplainOneQuery(Query *query, int cursorOptions,
  */
 void
 ExplainOneUtility(Node *utilityStmt, ExplainState *es,
-				  const char *queryString, ParamListInfo params,
-				  QueryEnvironment *queryEnv)
+				  const char *queryString, ParamListInfo params)
 {
 	if (utilityStmt == NULL)
 		return;
@@ -341,7 +335,7 @@ ExplainOneUtility(Node *utilityStmt, ExplainState *es,
 void
 ExplainOnePlan(PlannedStmt *plannedstmt, ExplainState *es,
 			   const char *queryString, ParamListInfo params,
-			   QueryEnvironment *queryEnv, const instr_time *planduration,
+			   const instr_time *planduration,
 			   const BufferUsage *bufusage)
 {
 	DestReceiver *dest;
@@ -385,7 +379,7 @@ ExplainOnePlan(PlannedStmt *plannedstmt, ExplainState *es,
 	/* Create a QueryDesc for the query */
 	queryDesc = CreateQueryDesc(plannedstmt, queryString,
 								GetActiveSnapshot(), InvalidSnapshot,
-								dest, params, queryEnv, instrument_option);
+								dest, params, instrument_option);
 
 	/* Select execution options */
 	if (es->analyze)
@@ -587,7 +581,6 @@ ExplainPreScanNode(PlanState *planstate, Bitmapset **rels_used)
 		case T_TidRangeScan:
 		case T_SubqueryScan:
 		case T_ValuesScan:
-		case T_NamedTuplestoreScan:
 			*rels_used = bms_add_member(*rels_used,
 										((Scan *) plan)->scanrelid);
 			break;
@@ -598,10 +591,6 @@ ExplainPreScanNode(PlanState *planstate, Bitmapset **rels_used)
 		case T_Append:
 			*rels_used = bms_add_members(*rels_used,
 										 ((Append *) plan)->apprelids);
-			break;
-		case T_MergeAppend:
-			*rels_used = bms_add_members(*rels_used,
-										 ((MergeAppend *) plan)->apprelids);
 			break;
 		default:
 			break;
@@ -668,9 +657,6 @@ ExplainNode(PlanState *planstate, List *ancestors,
 		case T_Append:
 			pname = "Append";
 			break;
-		case T_MergeAppend:
-			pname = "Merge Append";
-			break;
 		case T_BitmapAnd:
 			pname = "BitmapAnd";
 			break;
@@ -713,9 +699,6 @@ ExplainNode(PlanState *planstate, List *ancestors,
 		case T_ValuesScan:
 			pname = "Values Scan";
 			break;
-		case T_NamedTuplestoreScan:
-			pname = "Named Tuplestore Scan";
-			break;
 		case T_Material:
 			pname = "Materialize";
 			break;
@@ -745,9 +728,6 @@ ExplainNode(PlanState *planstate, List *ancestors,
 						break;
 					case AGG_HASHED:
 						pname = "HashAggregate";
-						break;
-					case AGG_MIXED:
-						pname = "MixedAggregate";
 						break;
 					default:
 						pname = "Aggregate ???";
@@ -991,7 +971,6 @@ ExplainNode(PlanState *planstate, List *ancestors,
 			break;
 		case T_SeqScan:
 		case T_ValuesScan:
-		case T_NamedTuplestoreScan:
 		case T_SubqueryScan:
 			show_scan_qual(plan->qual, "Filter", planstate, ancestors, es);
 			if (plan->qual)
@@ -1096,10 +1075,6 @@ ExplainNode(PlanState *planstate, List *ancestors,
 			show_incremental_sort_info(castNode(IncrementalSortState, planstate),
 									   es);
 			break;
-		case T_MergeAppend:
-			show_merge_append_keys(castNode(MergeAppendState, planstate),
-								   ancestors, es);
-			break;
 		case T_Result:
 			show_upper_qual((List *) ((Result *) plan)->resconstantqual,
 							"One-Time Filter", planstate, ancestors, es);
@@ -1145,11 +1120,6 @@ ExplainNode(PlanState *planstate, List *ancestors,
 								  list_length(((Append *) plan)->appendplans),
 								  es);
 			break;
-		case T_MergeAppend:
-			ExplainMissingMembers(((MergeAppendState *) planstate)->ms_nplans,
-								  list_length(((MergeAppend *) plan)->mergeplans),
-								  es);
-			break;
 		default:
 			break;
 	}
@@ -1159,7 +1129,6 @@ ExplainNode(PlanState *planstate, List *ancestors,
 		outerPlanState(planstate) ||
 		innerPlanState(planstate) ||
 		IsA(plan, Append) ||
-		IsA(plan, MergeAppend) ||
 		IsA(plan, BitmapAnd) ||
 		IsA(plan, BitmapOr) ||
 		IsA(plan, SubqueryScan) ||
@@ -1190,11 +1159,6 @@ ExplainNode(PlanState *planstate, List *ancestors,
 		case T_Append:
 			ExplainMemberNodes(((AppendState *) planstate)->appendplans,
 							   ((AppendState *) planstate)->as_nplans,
-							   ancestors, es);
-			break;
-		case T_MergeAppend:
-			ExplainMemberNodes(((MergeAppendState *) planstate)->mergeplans,
-							   ((MergeAppendState *) planstate)->ms_nplans,
 							   ancestors, es);
 			break;
 		case T_BitmapAnd:
@@ -1246,9 +1210,6 @@ show_plan_tlist(PlanState *planstate, List *ancestors, ExplainState *es)
 		return;
 	/* The tlist of an Append isn't real helpful, so suppress it */
 	if (IsA(plan, Append))
-		return;
-	/* Likewise for MergeAppend */
-	if (IsA(plan, MergeAppend))
 		return;
 
 	/* Set up deparsing context */
@@ -1372,22 +1333,6 @@ show_incremental_sort_keys(IncrementalSortState *incrsortstate,
 						 plan->sort.sortColIdx,
 						 plan->sort.sortOperators, plan->sort.collations,
 						 plan->sort.nullsFirst,
-						 ancestors, es);
-}
-
-/*
- * Likewise, for a MergeAppend node.
- */
-static void
-show_merge_append_keys(MergeAppendState *mstate, List *ancestors,
-					   ExplainState *es)
-{
-	MergeAppend *plan = (MergeAppend *) mstate->ps.plan;
-
-	show_sort_group_keys((PlanState *) mstate, "Sort Key",
-						 plan->numCols, 0, plan->sortColIdx,
-						 plan->sortOperators, plan->collations,
-						 plan->nullsFirst,
 						 ancestors, es);
 }
 
@@ -1815,8 +1760,7 @@ show_hashagg_info(AggState *aggstate, ExplainState *es)
 	Agg		   *agg = (Agg *) aggstate->ss.ps.plan;
 	int64		memPeakKb = (aggstate->hash_mem_peak + 1023) / 1024;
 
-	if (agg->aggstrategy != AGG_HASHED &&
-		agg->aggstrategy != AGG_MIXED)
+	if (agg->aggstrategy != AGG_HASHED)
 		return;
 
 	{
@@ -2138,10 +2082,6 @@ ExplainTargetRel(Plan *plan, Index rti, ExplainState *es)
 		case T_ValuesScan:
 			Assert(rte->rtekind == RTE_VALUES);
 			break;
-		case T_NamedTuplestoreScan:
-			Assert(rte->rtekind == RTE_NAMEDTUPLESTORE);
-			objectname = rte->enrname;
-			break;
 		default:
 			break;
 	}
@@ -2222,7 +2162,7 @@ show_modifytable_info(ModifyTableState *mtstate, List *ancestors,
 
 
 /*
- * Explain the constituent plans of an Append, MergeAppend,
+ * Explain the constituent plans of an Append,
  * BitmapAnd, or BitmapOr node.
  *
  * The ancestors list should already contain the immediate parent of these
@@ -2240,7 +2180,7 @@ ExplainMemberNodes(PlanState **planstates, int nplans,
 }
 
 /*
- * Report about any pruned subnodes of an Append or MergeAppend node.
+ * Report about any pruned subnodes of an Append node.
  *
  * nplans indicates the number of live subplans.
  * nchildren indicates the original number of subnodes in the Plan;

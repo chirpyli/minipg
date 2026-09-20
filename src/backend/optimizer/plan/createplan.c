@@ -82,8 +82,6 @@ static Plan *create_gating_plan(PlannerInfo *root, Path *path, Plan *plan,
 static Plan *create_join_plan(PlannerInfo *root, JoinPath *best_path);
 static Plan *create_append_plan(PlannerInfo *root, AppendPath *best_path,
 								int flags);
-static Plan *create_merge_append_plan(PlannerInfo *root, MergeAppendPath *best_path,
-									  int flags);
 static Result *create_group_result_plan(PlannerInfo *root,
 										GroupResultPath *best_path);
 static ProjectSet *create_project_set_plan(PlannerInfo *root, ProjectSetPath *best_path);
@@ -125,8 +123,6 @@ static SubqueryScan *create_subqueryscan_plan(PlannerInfo *root,
 											  List *tlist, List *scan_clauses);
 static ValuesScan *create_valuesscan_plan(PlannerInfo *root, Path *best_path,
 										  List *tlist, List *scan_clauses);
-static NamedTuplestoreScan *create_namedtuplestorescan_plan(PlannerInfo *root,
-															Path *best_path, List *tlist, List *scan_clauses);
 static Result *create_resultscan_plan(PlannerInfo *root, Path *best_path,
 									  List *tlist, List *scan_clauses);
 static NestLoop *create_nestloop_plan(PlannerInfo *root, NestPath *best_path);
@@ -177,8 +173,6 @@ static SubqueryScan *make_subqueryscan(List *qptlist,
 									   Plan *subplan);
 static ValuesScan *make_valuesscan(List *qptlist, List *qpqual,
 								   Index scanrelid, List *values_lists);
-static NamedTuplestoreScan *make_namedtuplestorescan(List *qptlist, List *qpqual,
-													 Index scanrelid, char *enrname);
 static BitmapAnd *make_bitmap_and(List *bitmapplans);
 static BitmapOr *make_bitmap_or(List *bitmapplans);
 static NestLoop *make_nestloop(List *tlist,
@@ -332,7 +326,6 @@ create_plan_recurse(PlannerInfo *root, Path *best_path, int flags)
 		case T_TidRangeScan:
 		case T_SubqueryScan:
 		case T_ValuesScan:
-		case T_NamedTuplestoreScan:
 			plan = create_scan_plan(root, best_path, flags);
 			break;
 		case T_HashJoin:
@@ -345,11 +338,6 @@ create_plan_recurse(PlannerInfo *root, Path *best_path, int flags)
 			plan = create_append_plan(root,
 									  (AppendPath *) best_path,
 									  flags);
-			break;
-		case T_MergeAppend:
-			plan = create_merge_append_plan(root,
-											(MergeAppendPath *) best_path,
-											flags);
 			break;
 		case T_Result:
 			if (IsA(best_path, ProjectionPath))
@@ -594,13 +582,6 @@ create_scan_plan(PlannerInfo *root, Path *best_path, int flags)
 												   best_path,
 												   tlist,
 												   scan_clauses);
-			break;
-
-		case T_NamedTuplestoreScan:
-			plan = (Plan *) create_namedtuplestorescan_plan(root,
-															best_path,
-															tlist,
-															scan_clauses);
 			break;
 
 		case T_Result:
@@ -1104,134 +1085,6 @@ create_append_plan(PlannerInfo *root, AppendPath *best_path, int flags)
 }
 
 /*
- * create_merge_append_plan
- *	  Create a MergeAppend plan for 'best_path' and (recursively) plans
- *	  for its subpaths.
- *
- *	  Returns a Plan node.
- */
-static Plan *
-create_merge_append_plan(PlannerInfo *root, MergeAppendPath *best_path,
-						 int flags)
-{
-	MergeAppend *node = makeNode(MergeAppend);
-	Plan	   *plan = &node->plan;
-	List	   *tlist = build_path_tlist(root, &best_path->path);
-	int			orig_tlist_length = list_length(tlist);
-	bool		tlist_was_changed;
-	List	   *pathkeys = best_path->path.pathkeys;
-	List	   *subplans = NIL;
-	ListCell   *subpaths;
-	RelOptInfo *rel = best_path->path.parent;
-
-	/*
-	 * We don't have the actual creation of the MergeAppend node split out
-	 * into a separate make_xxx function.  This is because we want to run
-	 * prepare_sort_from_pathkeys on it before we do so on the individual
-	 * child plans, to make cross-checking the sort info easier.
-	 */
-	copy_generic_path_info(plan, (Path *) best_path);
-	plan->targetlist = tlist;
-	plan->qual = NIL;
-	plan->lefttree = NULL;
-	plan->righttree = NULL;
-	node->apprelids = rel->relids;
-
-	/*
-	 * Compute sort column info, and adjust MergeAppend's tlist as needed.
-	 * Because we pass adjust_tlist_in_place = true, we may ignore the
-	 * function result; it must be the same plan node.  However, we then need
-	 * to detect whether any tlist entries were added.
-	 */
-	(void) prepare_sort_from_pathkeys(plan, pathkeys,
-									  best_path->path.parent->relids,
-									  NULL,
-									  true,
-									  &node->numCols,
-									  &node->sortColIdx,
-									  &node->sortOperators,
-									  &node->collations,
-									  &node->nullsFirst);
-	tlist_was_changed = (orig_tlist_length != list_length(plan->targetlist));
-
-	/*
-	 * Now prepare the child plans.  We must apply prepare_sort_from_pathkeys
-	 * even to subplans that don't need an explicit sort, to make sure they
-	 * are returning the same sort key columns the MergeAppend expects.
-	 */
-	foreach(subpaths, best_path->subpaths)
-	{
-		Path	   *subpath = (Path *) lfirst(subpaths);
-		Plan	   *subplan;
-		int			numsortkeys;
-		AttrNumber *sortColIdx;
-		Oid		   *sortOperators;
-		Oid		   *collations;
-		bool	   *nullsFirst;
-
-		/* Build the child plan */
-		/* Must insist that all children return the same tlist */
-		subplan = create_plan_recurse(root, subpath, CP_EXACT_TLIST);
-
-		/* Compute sort column info, and adjust subplan's tlist as needed */
-		subplan = prepare_sort_from_pathkeys(subplan, pathkeys,
-											 subpath->parent->relids,
-											 node->sortColIdx,
-											 false,
-											 &numsortkeys,
-											 &sortColIdx,
-											 &sortOperators,
-											 &collations,
-											 &nullsFirst);
-
-		/*
-		 * Check that we got the same sort key information.  We just Assert
-		 * that the sortops match, since those depend only on the pathkeys;
-		 * but it seems like a good idea to check the sort column numbers
-		 * explicitly, to ensure the tlists really do match up.
-		 */
-		Assert(numsortkeys == node->numCols);
-		if (memcmp(sortColIdx, node->sortColIdx,
-				   numsortkeys * sizeof(AttrNumber)) != 0)
-			elog(ERROR, "MergeAppend child's targetlist doesn't match MergeAppend");
-		Assert(memcmp(sortOperators, node->sortOperators,
-					  numsortkeys * sizeof(Oid)) == 0);
-		Assert(memcmp(collations, node->collations,
-					  numsortkeys * sizeof(Oid)) == 0);
-		Assert(memcmp(nullsFirst, node->nullsFirst,
-					  numsortkeys * sizeof(bool)) == 0);
-
-		/* Now, insert a Sort node if subplan isn't sufficiently ordered */
-		if (!pathkeys_contained_in(pathkeys, subpath->pathkeys))
-		{
-			Sort	   *sort = make_sort(subplan, numsortkeys,
-										 sortColIdx, sortOperators,
-										 collations, nullsFirst);
-
-			label_sort_with_costsize(root, sort);
-			subplan = (Plan *) sort;
-		}
-
-		subplans = lappend(subplans, subplan);
-	}
-
-	node->mergeplans = subplans;
-
-	/*
-	 * If prepare_sort_from_pathkeys added sort columns, but we were told to
-	 * produce either the exact tlist or a narrow tlist, we should get rid of
-	 * the sort columns again.  We must inject a projection node to do so.
-	 */
-	if (tlist_was_changed && (flags & (CP_EXACT_TLIST | CP_SMALL_TLIST)))
-	{
-		tlist = list_truncate(list_copy(plan->targetlist), orig_tlist_length);
-		return inject_projection_plan(plan, tlist);
-	}
-	else
-		return plan;
-}
-
-/*
  * create_group_result_plan
  *	  Create a Result plan for 'best_path'.
  *	  This is only used for degenerate grouping cases.
@@ -1583,8 +1436,8 @@ create_projection_plan(PlannerInfo *root, ProjectionPath *best_path, int flags)
 	 * In most cases where we don't need to project, create_projection_path
 	 * will have set dummypp, but not always.  First, some createplan.c
 	 * routines change the tlists of their nodes.  (An example is that
-	 * create_merge_append_plan might add resjunk sort columns to a
-	 * MergeAppend.)  Second, create_projection_path has no way of knowing
+	 * create_sort_plan might add resjunk sort columns to a Sort.)
+	 * Second, create_projection_path has no way of knowing
 	 * what path node will be placed on top of the projection path and
 	 * therefore can't predict whether it will require an exact tlist. For
 	 * both of these reasons, we have to recheck here.
@@ -2739,45 +2592,6 @@ create_valuesscan_plan(PlannerInfo *root, Path *best_path,
 
 	scan_plan = make_valuesscan(tlist, scan_clauses, scan_relid,
 								values_lists);
-
-	copy_generic_path_info(&scan_plan->scan.plan, best_path);
-
-	return scan_plan;
-}
-
-/*
- * create_namedtuplestorescan_plan
- *	 Returns a tuplestorescan plan for the base relation scanned by
- *	'best_path' with restriction clauses 'scan_clauses' and targetlist
- *	'tlist'.
- */
-static NamedTuplestoreScan *
-create_namedtuplestorescan_plan(PlannerInfo *root, Path *best_path,
-								List *tlist, List *scan_clauses)
-{
-	NamedTuplestoreScan *scan_plan;
-	Index		scan_relid = best_path->parent->relid;
-	RangeTblEntry *rte;
-
-	Assert(scan_relid > 0);
-	rte = planner_rt_fetch(scan_relid, root);
-	Assert(rte->rtekind == RTE_NAMEDTUPLESTORE);
-
-	/* Sort clauses into best execution order */
-	scan_clauses = order_qual_clauses(root, scan_clauses);
-
-	/* Reduce RestrictInfo list to bare expressions; ignore pseudoconstants */
-	scan_clauses = extract_actual_clauses(scan_clauses, false);
-
-	/* Replace any outer-relation variables with nestloop params */
-	if (best_path->param_info)
-	{
-		scan_clauses = (List *)
-			replace_nestloop_params(root, (Node *) scan_clauses);
-	}
-
-	scan_plan = make_namedtuplestorescan(tlist, scan_clauses, scan_relid,
-										 rte->enrname);
 
 	copy_generic_path_info(&scan_plan->scan.plan, best_path);
 
@@ -4113,26 +3927,6 @@ make_valuesscan(List *qptlist,
 }
 
 
-static NamedTuplestoreScan *
-make_namedtuplestorescan(List *qptlist,
-						 List *qpqual,
-						 Index scanrelid,
-						 char *enrname)
-{
-	NamedTuplestoreScan *node = makeNode(NamedTuplestoreScan);
-	Plan	   *plan = &node->scan.plan;
-
-	/* cost should be inserted by caller */
-	plan->targetlist = qptlist;
-	plan->qual = qpqual;
-	plan->lefttree = NULL;
-	plan->righttree = NULL;
-	node->scan.scanrelid = scanrelid;
-	node->enrname = enrname;
-
-	return node;
-}
-
 
 
 static BitmapAnd *
@@ -4344,7 +4138,7 @@ make_incrementalsort(Plan *lefttree, int numCols, int nPresortedCols,
  * prepare_sort_from_pathkeys
  *	  Prepare to sort according to given pathkeys
  *
- * This is used to set up for Sort and MergeAppend nodes.  It
+ * This is used to set up for Sort nodes.  It
  * calculates the executor's representation of the sort key information, and
  * adjusts the plan targetlist if needed to add resjunk sort columns.
  *
@@ -4366,17 +4160,16 @@ make_incrementalsort(Plan *lefttree, int numCols, int nPresortedCols,
  * Vars.
  *
  * If reqColIdx isn't NULL then it contains sort key column numbers that
- * we should match.  This is used when making child plans for a MergeAppend;
- * it's an error if we can't match the columns.
+ * we should match.  It's an error if we can't match the columns.
  *
  * If the pathkeys include expressions that aren't simple Vars, we will
  * usually need to add resjunk items to the input plan's targetlist to
- * compute these expressions, since a Sort or MergeAppend node itself won't
+ * compute these expressions, since a Sort node itself won't
  * do any such calculations.  If the input plan type isn't one that can do
  * projections, this means adding a Result node just to do the projection.
  * However, the caller can pass adjust_tlist_in_place = true to force the
  * lefttree tlist to be modified in-place regardless of whether the node type
- * can project --- we use this for fixing the tlist of MergeAppend itself.
+ * can project.
  *
  * Returns the node which is to be the input to the Sort (either lefttree,
  * or a Result stacked atop lefttree).
@@ -5056,7 +4849,6 @@ is_projection_capable_path(Path *path)
 		case T_IncrementalSort:
 		case T_Unique:
 		case T_ModifyTable:
-		case T_MergeAppend:
 			return false;
 		case T_Append:
 
@@ -5098,7 +4890,6 @@ is_projection_capable_plan(Plan *plan)
 		case T_Unique:
 		case T_ModifyTable:
 		case T_Append:
-		case T_MergeAppend:
 			return false;
 		case T_ProjectSet:
 

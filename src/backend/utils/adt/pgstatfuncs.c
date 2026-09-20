@@ -489,10 +489,6 @@ pg_stat_get_progress_info(PG_FUNCTION_ARGS)
 		cmdtype = PROGRESS_COMMAND_CLUSTER;
 	else if (pg_strcasecmp(cmd, "CREATE INDEX") == 0)
 		cmdtype = PROGRESS_COMMAND_CREATE_INDEX;
-	else if (pg_strcasecmp(cmd, "BASEBACKUP") == 0)
-		cmdtype = PROGRESS_COMMAND_BASEBACKUP;
-	else if (pg_strcasecmp(cmd, "COPY") == 0)
-		cmdtype = PROGRESS_COMMAND_COPY;
 	else
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -2027,71 +2023,5 @@ pg_stat_reset_slru(PG_FUNCTION_ARGS)
 	pgstat_reset_slru_counter(target);
 
 	PG_RETURN_VOID();
-}
-
-Datum
-pg_stat_get_archiver(PG_FUNCTION_ARGS)
-{
-	TupleDesc	tupdesc;
-	Datum		values[7];
-	bool		nulls[7];
-	PgStat_ArchiverStats *archiver_stats;
-
-	/* Initialise values and NULL flags arrays */
-	MemSet(values, 0, sizeof(values));
-	MemSet(nulls, 0, sizeof(nulls));
-
-	/* Initialise attributes information in the tuple descriptor */
-	tupdesc = CreateTemplateTupleDesc(7);
-	TupleDescInitEntry(tupdesc, (AttrNumber) 1, "archived_count",
-					   INT8OID, -1, 0);
-	TupleDescInitEntry(tupdesc, (AttrNumber) 2, "last_archived_wal",
-					   TEXTOID, -1, 0);
-	TupleDescInitEntry(tupdesc, (AttrNumber) 3, "last_archived_time",
-					   TIMESTAMPTZOID, -1, 0);
-	TupleDescInitEntry(tupdesc, (AttrNumber) 4, "failed_count",
-					   INT8OID, -1, 0);
-	TupleDescInitEntry(tupdesc, (AttrNumber) 5, "last_failed_wal",
-					   TEXTOID, -1, 0);
-	TupleDescInitEntry(tupdesc, (AttrNumber) 6, "last_failed_time",
-					   TIMESTAMPTZOID, -1, 0);
-	TupleDescInitEntry(tupdesc, (AttrNumber) 7, "stats_reset",
-					   TIMESTAMPTZOID, -1, 0);
-
-	BlessTupleDesc(tupdesc);
-
-	/* Get statistics about the archiver process */
-	archiver_stats = pgstat_fetch_stat_archiver();
-
-	/* Fill values and NULLs */
-	values[0] = Int64GetDatum(archiver_stats->archived_count);
-	if (*(archiver_stats->last_archived_wal) == '\0')
-		nulls[1] = true;
-	else
-		values[1] = CStringGetTextDatum(archiver_stats->last_archived_wal);
-
-	if (archiver_stats->last_archived_timestamp == 0)
-		nulls[2] = true;
-	else
-		values[2] = TimestampTzGetDatum(archiver_stats->last_archived_timestamp);
-
-	values[3] = Int64GetDatum(archiver_stats->failed_count);
-	if (*(archiver_stats->last_failed_wal) == '\0')
-		nulls[4] = true;
-	else
-		values[4] = CStringGetTextDatum(archiver_stats->last_failed_wal);
-
-	if (archiver_stats->last_failed_timestamp == 0)
-		nulls[5] = true;
-	else
-		values[5] = TimestampTzGetDatum(archiver_stats->last_failed_timestamp);
-
-	if (archiver_stats->stat_reset_timestamp == 0)
-		nulls[6] = true;
-	else
-		values[6] = TimestampTzGetDatum(archiver_stats->stat_reset_timestamp);
-
-	/* Returns the record as Datum */
-	PG_RETURN_DATUM(HeapTupleGetDatum(heap_form_tuple(tupdesc, values, nulls)));
 }
 

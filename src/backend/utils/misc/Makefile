@@ -20,7 +20,6 @@ OBJS = \
 	pg_controldata.o \
 	pg_rusage.o \
 	ps_status.o \
-	queryenvironment.o \
 	queryjumble.o \
 	sampling.o \
 	timeout.o \

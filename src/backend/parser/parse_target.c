@@ -342,7 +342,6 @@ markTargetListOrigin(ParseState *pstate, TargetEntry *tle,
 			break;
 		case RTE_JOIN:
 		case RTE_VALUES:
-		case RTE_NAMEDTUPLESTORE:
 		case RTE_RESULT:
 			/* not a simple relation, leave it unmarked */
 			break;
@@ -1457,12 +1456,11 @@ expandRecordVariable(ParseState *pstate, Var *var, int levelsup)
 	{
 		case RTE_RELATION:
 		case RTE_VALUES:
-		case RTE_NAMEDTUPLESTORE:
 		case RTE_RESULT:
 
 			/*
 			 * This case should not occur: a column of a table, values list,
-			 * or ENR shouldn't have type RECORD.  Fall through and fail (most
+			 * shouldn't have type RECORD.  Fall through and fail (most
 			 * likely) at the bottom.
 			 */
 			break;

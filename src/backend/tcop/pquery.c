@@ -38,7 +38,6 @@ Portal		ActivePortal = NULL;
 static void ProcessQuery(PlannedStmt *plan,
 						 const char *sourceText,
 						 ParamListInfo params,
-						 QueryEnvironment *queryEnv,
 						 DestReceiver *dest,
 						 QueryCompletion *qc);
 static void FillPortalStore(Portal portal, bool isTopLevel);
@@ -65,7 +64,6 @@ CreateQueryDesc(PlannedStmt *plannedstmt,
 				Snapshot crosscheck_snapshot,
 				DestReceiver *dest,
 				ParamListInfo params,
-				QueryEnvironment *queryEnv,
 				int instrument_options)
 {
 	QueryDesc  *qd = (QueryDesc *) palloc(sizeof(QueryDesc));
@@ -78,7 +76,6 @@ CreateQueryDesc(PlannedStmt *plannedstmt,
 	qd->crosscheck_snapshot = RegisterSnapshot(crosscheck_snapshot);
 	qd->dest = dest;			/* output dest */
 	qd->params = params;		/* parameter values passed into query */
-	qd->queryEnv = queryEnv;
 	qd->instrument_options = instrument_options;	/* instrumentation wanted? */
 
 	/* null these fields until set by ExecutorStart */
@@ -131,7 +128,6 @@ static void
 ProcessQuery(PlannedStmt *plan,
 			 const char *sourceText,
 			 ParamListInfo params,
-			 QueryEnvironment *queryEnv,
 			 DestReceiver *dest,
 			 QueryCompletion *qc)
 {
@@ -142,7 +138,7 @@ ProcessQuery(PlannedStmt *plan,
 	 */
 	queryDesc = CreateQueryDesc(plan, sourceText,
 								GetActiveSnapshot(), InvalidSnapshot,
-								dest, params, queryEnv, 0);
+								dest, params, 0);
 
 	/*
 	 * Call ExecutorStart to prepare the plan for execution
@@ -414,7 +410,6 @@ PortalStart(Portal portal, ParamListInfo params,
 											InvalidSnapshot,
 											None_Receiver,
 											params,
-											portal->queryEnv,
 											0);
 
 				/*
@@ -988,7 +983,6 @@ PortalRunUtility(Portal portal, PlannedStmt *pstmt,
 				   false, /* protect tree */
 				   isTopLevel ? PROCESS_UTILITY_TOPLEVEL : PROCESS_UTILITY_QUERY,
 				   portal->portalParams,
-				   portal->queryEnv,
 				   dest,
 				   qc);
 
@@ -1103,7 +1097,6 @@ PortalRunMulti(Portal portal,
 				ProcessQuery(pstmt,
 							 portal->sourceText,
 							 portal->portalParams,
-							 portal->queryEnv,
 							 dest, qc);
 			}
 			else
@@ -1112,7 +1105,6 @@ PortalRunMulti(Portal portal,
 				ProcessQuery(pstmt,
 							 portal->sourceText,
 							 portal->portalParams,
-							 portal->queryEnv,
 							 altdest, NULL);
 			}
 

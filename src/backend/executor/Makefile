@@ -41,10 +41,8 @@ OBJS = \
 	nodeIndexscan.o \
 	nodeMaterial.o \
 	nodeMemoize.o \
-	nodeMergeAppend.o \
 	nodeMergejoin.o \
 	nodeModifyTable.o \
-	nodeNamedtuplestorescan.o \
 	nodeNestloop.o \
 	nodeProjectSet.o \
 	nodeResult.o \

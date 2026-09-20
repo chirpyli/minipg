@@ -209,9 +209,6 @@ pgstat_get_wait_activity(WaitEventActivity w)
 
 	switch (w)
 	{
-		case WAIT_EVENT_ARCHIVER_MAIN:
-			event_name = "ArchiverMain";
-			break;
 		case WAIT_EVENT_AUTOVACUUM_MAIN:
 			event_name = "AutoVacuumMain";
 			break;

@@ -384,7 +384,7 @@ DefineView(ViewStmt *stmt, const char *queryString,
 	rawstmt->stmt_location = stmt_location;
 	rawstmt->stmt_len = stmt_len;
 
-	viewParse = parse_analyze(rawstmt, queryString, NULL, 0, NULL);
+	viewParse = parse_analyze(rawstmt, queryString, NULL, 0);
 
 	/*
 	 * The grammar should ensure that the result is a single SELECT Query.

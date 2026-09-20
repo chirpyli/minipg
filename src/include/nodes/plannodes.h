@@ -230,24 +230,6 @@ typedef struct Append
 } Append;
 
 /* ----------------
- *	 MergeAppend node -
- *		Merge the results of pre-sorted sub-plans to preserve the ordering.
- * ----------------
- */
-typedef struct MergeAppend
-{
-	Plan		plan;
-	Bitmapset  *apprelids;		/* RTIs of appendrel(s) formed by this node */
-	List	   *mergeplans;
-	/* these fields are just like the sort-key info in struct Sort: */
-	int			numCols;		/* number of sort-key columns */
-	AttrNumber *sortColIdx;		/* their indexes in the target list */
-	Oid		   *sortOperators;	/* OIDs of operators to sort them by */
-	Oid		   *collations;		/* OIDs of collations */
-	bool	   *nullsFirst;		/* NULLS FIRST/LAST directions */
-} MergeAppend;
-
-/* ----------------
  *	 BitmapAnd node -
  *		Generate the intersection of the results of sub-plans.
  *
@@ -482,16 +464,6 @@ typedef struct ValuesScan
 	Scan		scan;
 	List	   *values_lists;	/* list of expression lists */
 } ValuesScan;
-
-/* ----------------
- *		NamedTuplestoreScan node
- * ----------------
- */
-typedef struct NamedTuplestoreScan
-{
-	Scan		scan;
-	char	   *enrname;		/* Name given to Ephemeral Named Relation */
-} NamedTuplestoreScan;
 
 /*
  * ==========

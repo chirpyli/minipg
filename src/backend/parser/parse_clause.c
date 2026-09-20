@@ -63,8 +63,6 @@ static Node *transformJoinOnClause(ParseState *pstate, JoinExpr *j,
 static ParseNamespaceItem *transformTableEntry(ParseState *pstate, RangeVar *r);
 static ParseNamespaceItem *transformRangeSubselect(ParseState *pstate,
 												   RangeSubselect *r);
-static ParseNamespaceItem *getNSItemForSpecialRelationTypes(ParseState *pstate,
-															RangeVar *rv);
 static Node *transformFromClauseItem(ParseState *pstate, Node *n,
 									 ParseNamespaceItem **top_nsitem,
 									 List **namespace);
@@ -158,17 +156,6 @@ setTargetTable(ParseState *pstate, RangeVar *relation,
 			   bool alsoSource)
 {
 	ParseNamespaceItem *nsitem;
-
-	/*
-	 * ENRs hide tables of the same name, so we need to check for them first.
-	 * In contrast, CTEs don't hide tables (for this purpose).
-	 */
-	if (relation->schemaname == NULL &&
-		scanNameSpaceForENR(pstate, relation->relname))
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("relation \"%s\" cannot be the target of a modifying statement",
-						relation->relname)));
 
 	/* Close old target; this could only happen for multi-action rules */
 	if (pstate->p_target_relation != NULL)
@@ -427,27 +414,6 @@ transformRangeSubselect(ParseState *pstate, RangeSubselect *r)
 
 
 /*
- * getNSItemForSpecialRelationTypes
- *
- * If given RangeVar refers to an EphemeralNamedRelation,
- * build and return an appropriate ParseNamespaceItem, otherwise return NULL
- */
-static ParseNamespaceItem *
-getNSItemForSpecialRelationTypes(ParseState *pstate, RangeVar *rv)
-{
-	/*
-	 * if it is a qualified name, it can't be a tuplestore reference
-	 */
-	if (rv->schemaname)
-		return NULL;
-
-	if (scanNameSpaceForENR(pstate, rv->relname))
-		return addRangeTableEntryForENR(pstate, rv, true);
-
-	return NULL;
-}
-
-/*
  * transformFromClauseItem -
  *	  Transform a FROM-clause item, adding any required entries to the
  *	  range table list being built in the ParseState, and return the
@@ -476,17 +442,12 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 
 	if (IsA(n, RangeVar))
 	{
-		/* Plain relation reference, or perhaps a CTE reference */
+		/* Plain relation reference */
 		RangeVar   *rv = (RangeVar *) n;
 		RangeTblRef *rtr;
 		ParseNamespaceItem *nsitem;
 
-		/* Check if it's a CTE or tuplestore reference */
-		nsitem = getNSItemForSpecialRelationTypes(pstate, rv);
-
-		/* if not found above, must be a table reference */
-		if (!nsitem)
-			nsitem = transformTableEntry(pstate, rv);
+		nsitem = transformTableEntry(pstate, rv);
 
 		*top_nsitem = nsitem;
 		*namespace = list_make1(nsitem);

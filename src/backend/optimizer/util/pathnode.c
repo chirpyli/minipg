@@ -1003,89 +1003,6 @@ create_append_path(PlannerInfo *root,
 }
 
 /*
- * create_merge_append_path
- *	  Creates a path corresponding to a MergeAppend plan, returning the
- *	  pathnode.
- */
-MergeAppendPath *
-create_merge_append_path(PlannerInfo *root,
-						 RelOptInfo *rel,
-						 List *subpaths,
-						 List *pathkeys,
-						 Relids required_outer)
-{
-	MergeAppendPath *pathnode = makeNode(MergeAppendPath);
-	Cost		input_startup_cost;
-	Cost		input_total_cost;
-	ListCell   *l;
-
-	pathnode->path.pathtype = T_MergeAppend;
-	pathnode->path.parent = rel;
-	pathnode->path.pathtarget = rel->reltarget;
-	pathnode->path.param_info = get_appendrel_parampathinfo(rel,
-															required_outer);
-	pathnode->path.pathkeys = pathkeys;
-	pathnode->subpaths = subpaths;
-
-	/*
-	 * Add up the sizes and costs of the input paths.
-	 */
-	pathnode->path.rows = 0;
-	input_startup_cost = 0;
-	input_total_cost = 0;
-	foreach(l, subpaths)
-	{
-		Path	   *subpath = (Path *) lfirst(l);
-
-		pathnode->path.rows += subpath->rows;
-
-		if (pathkeys_contained_in(pathkeys, subpath->pathkeys))
-		{
-			/* Subpath is adequately ordered, we won't need to sort it */
-			input_startup_cost += subpath->startup_cost;
-			input_total_cost += subpath->total_cost;
-		}
-		else
-		{
-			/* We'll need to insert a Sort node, so include cost for that */
-			Path		sort_path;	/* dummy for result of cost_sort */
-
-			cost_sort(&sort_path,
-					  root,
-					  pathkeys,
-					  subpath->total_cost,
-					  subpath->parent->tuples,
-					  subpath->pathtarget->width,
-					  0.0,
-					  work_mem);
-			input_startup_cost += sort_path.startup_cost;
-			input_total_cost += sort_path.total_cost;
-		}
-
-		/* All child paths must have same parameterization */
-		Assert(bms_equal(PATH_REQ_OUTER(subpath), required_outer));
-	}
-
-	/*
-	 * Now we can compute total costs of the MergeAppend.  If there's exactly
-	 * one child path, the MergeAppend is a no-op and will be discarded later
-	 * (in setrefs.c); otherwise we do the normal cost calculation.
-	 */
-	if (list_length(subpaths) == 1)
-	{
-		pathnode->path.startup_cost = input_startup_cost;
-		pathnode->path.total_cost = input_total_cost;
-	}
-	else
-		cost_merge_append(&pathnode->path, root,
-						  pathkeys, list_length(subpaths),
-						  input_startup_cost, input_total_cost,
-						  pathnode->path.rows);
-
-	return pathnode;
-}
-
-/*
  * create_group_result_path
  *	  Creates a path representing a Result-and-nothing-else plan.
  *
@@ -1510,28 +1427,6 @@ create_valuesscan_path(PlannerInfo *root, RelOptInfo *rel,
 	return pathnode;
 }
 
-/*
- * create_namedtuplestorescan_path
- *	  Creates a path corresponding to a scan of a named tuplestore, returning
- *	  the pathnode.
- */
-Path *
-create_namedtuplestorescan_path(PlannerInfo *root, RelOptInfo *rel,
-								Relids required_outer)
-{
-	Path	   *pathnode = makeNode(Path);
-
-	pathnode->pathtype = T_NamedTuplestoreScan;
-	pathnode->parent = rel;
-	pathnode->pathtarget = rel->reltarget;
-	pathnode->param_info = get_baserel_parampathinfo(root, rel,
-													 required_outer);
-	pathnode->pathkeys = NIL;	/* result is always unordered */
-
-	cost_namedtuplestorescan(pathnode, root, rel, pathnode->param_info);
-
-	return pathnode;
-}
 
 /*
  * create_resultscan_path

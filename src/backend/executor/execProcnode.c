@@ -87,10 +87,8 @@
 #include "executor/nodeIndexscan.h"
 #include "executor/nodeMaterial.h"
 #include "executor/nodeMemoize.h"
-#include "executor/nodeMergeAppend.h"
 #include "executor/nodeMergejoin.h"
 #include "executor/nodeModifyTable.h"
-#include "executor/nodeNamedtuplestorescan.h"
 #include "executor/nodeNestloop.h"
 #include "executor/nodeProjectSet.h"
 #include "executor/nodeResult.h"
@@ -169,12 +167,6 @@ ExecInitNode(Plan *node, EState *estate, int eflags)
 												  estate, eflags);
 			break;
 
-		case T_MergeAppend:
-			result = (PlanState *) ExecInitMergeAppend((MergeAppend *) node,
-													   estate, eflags);
-			break;
-
-
 		case T_BitmapAnd:
 			result = (PlanState *) ExecInitBitmapAnd((BitmapAnd *) node,
 													 estate, eflags);
@@ -234,11 +226,6 @@ ExecInitNode(Plan *node, EState *estate, int eflags)
 													  estate, eflags);
 			break;
 
-
-		case T_NamedTuplestoreScan:
-			result = (PlanState *) ExecInitNamedTuplestoreScan((NamedTuplestoreScan *) node,
-															   estate, eflags);
-			break;
 
 			/*
 			 * join nodes
@@ -514,11 +501,6 @@ ExecEndNode(PlanState *node)
 			ExecEndAppend((AppendState *) node);
 			break;
 
-		case T_MergeAppendState:
-			ExecEndMergeAppend((MergeAppendState *) node);
-			break;
-
-
 		case T_BitmapAndState:
 			ExecEndBitmapAnd((BitmapAndState *) node);
 			break;
@@ -566,10 +548,6 @@ ExecEndNode(PlanState *node)
 			ExecEndValuesScan((ValuesScanState *) node);
 			break;
 
-
-		case T_NamedTuplestoreScanState:
-			ExecEndNamedTuplestoreScan((NamedTuplestoreScanState *) node);
-			break;
 
 			/*
 			 * join nodes

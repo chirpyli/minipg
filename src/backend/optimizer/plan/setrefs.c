@@ -120,9 +120,6 @@ static Plan *clean_up_removed_plan_level(Plan *parent, Plan *child);
 static Plan *set_append_references(PlannerInfo *root,
 								   Append *aplan,
 								   int rtoffset);
-static Plan *set_mergeappend_references(PlannerInfo *root,
-										MergeAppend *mplan,
-										int rtoffset);
 static void set_hash_references(PlannerInfo *root, Plan *plan, int rtoffset);
 static Relids offset_relid_set(Relids relids, int rtoffset);
 static Node *fix_scan_expr(PlannerInfo *root, Node *node,
@@ -201,7 +198,7 @@ static Node *fix_upper_expr_mutator(Node *node,
  * 9. We assign every plan node in the tree a unique ID.
  *
  * We also perform one final optimization step, which is to delete
- * SubqueryScan, Append, and MergeAppend plan nodes that aren't doing
+ * SubqueryScan and Append plan nodes that aren't doing
  * anything useful.  The reason for doing this last is that
  * it can't readily be done before set_plan_references, because it would
  * break set_upper_references: the Vars in the child plan's top tlist
@@ -209,7 +206,7 @@ static Node *fix_upper_expr_mutator(Node *node,
  * serves a necessary function as a buffer between outer query and subquery
  * variable numbering ... but after we've flattened the rangetable this is
  * no longer a problem, since then there's only one rtindex namespace.
- * Likewise, Append and MergeAppend buffer between the parent and child vars
+ * Likewise, Append buffers between the parent and child vars
  * of an appendrel, but we don't need to worry about that once we've done
  * set_plan_references.
  *
@@ -667,20 +664,6 @@ set_plan_refs(PlannerInfo *root, Plan *plan, int rtoffset)
 								  rtoffset, 1);
 			}
 			break;
-		case T_NamedTuplestoreScan:
-			{
-				NamedTuplestoreScan *splan = (NamedTuplestoreScan *) plan;
-
-				splan->scan.scanrelid += rtoffset;
-				splan->scan.plan.targetlist =
-					fix_scan_list(root, splan->scan.plan.targetlist,
-								  rtoffset, NUM_EXEC_TLIST(plan));
-				splan->scan.plan.qual =
-					fix_scan_list(root, splan->scan.plan.qual,
-								  rtoffset, NUM_EXEC_QUAL(plan));
-			}
-			break;
-
 		case T_NestLoop:
 		case T_MergeJoin:
 		case T_HashJoin:
@@ -846,11 +829,6 @@ set_plan_refs(PlannerInfo *root, Plan *plan, int rtoffset)
 			return set_append_references(root,
 										 (Append *) plan,
 										 rtoffset);
-		case T_MergeAppend:
-			/* Needs special treatment, see comments below */
-			return set_mergeappend_references(root,
-											  (MergeAppend *) plan,
-											  rtoffset);
 		case T_BitmapAnd:
 			{
 				BitmapAnd  *splan = (BitmapAnd *) plan;
@@ -1166,61 +1144,6 @@ set_append_references(PlannerInfo *root,
 	Assert(aplan->plan.righttree == NULL);
 
 	return (Plan *) aplan;
-}
-
-/*
- * set_mergeappend_references
- *		Do set_plan_references processing on a MergeAppend
- *
- * We try to strip out the MergeAppend entirely; if we can't, we have
- * to do the normal processing on it.
- */
-static Plan *
-set_mergeappend_references(PlannerInfo *root,
-						   MergeAppend *mplan,
-						   int rtoffset)
-{
-	ListCell   *l;
-
-	/*
-	 * MergeAppend, like Sort et al, doesn't actually evaluate its targetlist
-	 * or check quals.  If it's got exactly one child plan, then it's not
-	 * doing anything useful at all, and we can strip it out.
-	 */
-	Assert(mplan->plan.qual == NIL);
-
-	/* First, we gotta recurse on the children */
-	foreach(l, mplan->mergeplans)
-	{
-		lfirst(l) = set_plan_refs(root, (Plan *) lfirst(l), rtoffset);
-	}
-
-	/*
-	 * See if it's safe to get rid of the MergeAppend entirely.  For this to
-	 * be safe, there must be only one child plan and that child plan's
-	 * parallel awareness must match that of the MergeAppend's.  The reason
-	 * for the latter is that the if the MergeAppend is parallel aware and the
-	 * child is not then the calling plan may execute the non-parallel aware
-	 * child multiple times.
-	 */
-	if (list_length(mplan->mergeplans) == 1)
-		return clean_up_removed_plan_level((Plan *) mplan,
-										   (Plan *) linitial(mplan->mergeplans));
-
-	/*
-	 * Otherwise, clean up the MergeAppend as needed.  It's okay to do this
-	 * after recursing to the children, because set_dummy_tlist_references
-	 * doesn't look at those.
-	 */
-	set_dummy_tlist_references((Plan *) mplan, rtoffset);
-
-	mplan->apprelids = offset_relid_set(mplan->apprelids, rtoffset);
-
-	/* We don't need to recurse to lefttree or righttree ... */
-	Assert(mplan->plan.lefttree == NULL);
-	Assert(mplan->plan.righttree == NULL);
-
-	return (Plan *) mplan;
 }
 
 /*
@@ -2423,11 +2346,6 @@ extract_query_dependencies_walker(Node *node, PlannerInfo *context)
 			if (rte->rtekind == RTE_RELATION)
 				context->glob->relationOids =
 					lappend_oid(context->glob->relationOids, rte->relid);
-			else if (rte->rtekind == RTE_NAMEDTUPLESTORE &&
-					 OidIsValid(rte->relid))
-				context->glob->relationOids =
-					lappend_oid(context->glob->relationOids,
-								rte->relid);
 		}
 
 		/* And recurse into the query's subexpressions */

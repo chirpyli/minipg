@@ -986,14 +986,6 @@ _readRangeTblEntry(void)
 			READ_NODE_FIELD(coltypmods);
 			READ_NODE_FIELD(colcollations);
 			break;
-		case RTE_NAMEDTUPLESTORE:
-			READ_STRING_FIELD(enrname);
-			READ_FLOAT_FIELD(enrtuples);
-			READ_OID_FIELD(relid);
-			READ_NODE_FIELD(coltypes);
-			READ_NODE_FIELD(coltypmods);
-			READ_NODE_FIELD(colcollations);
-			break;
 		case RTE_RESULT:
 			/* no extra fields */
 			break;
@@ -1169,28 +1161,6 @@ _readAppend(void)
 
 	READ_DONE();
 }
-
-/*
- * _readMergeAppend
- */
-static MergeAppend *
-_readMergeAppend(void)
-{
-	READ_LOCALS(MergeAppend);
-
-	ReadCommonPlan(&local_node->plan);
-
-	READ_BITMAPSET_FIELD(apprelids);
-	READ_NODE_FIELD(mergeplans);
-	READ_INT_FIELD(numCols);
-	READ_ATTRNUMBER_ARRAY(sortColIdx, local_node->numCols);
-	READ_OID_ARRAY(sortOperators, local_node->numCols);
-	READ_OID_ARRAY(collations, local_node->numCols);
-	READ_BOOL_ARRAY(nullsFirst, local_node->numCols);
-
-	READ_DONE();
-}
-
 
 /*
  * _readBitmapAnd
@@ -1398,21 +1368,6 @@ _readValuesScan(void)
 }
 
 
-
-/*
- * _readNamedTuplestoreScan
- */
-static NamedTuplestoreScan *
-_readNamedTuplestoreScan(void)
-{
-	READ_LOCALS(NamedTuplestoreScan);
-
-	ReadCommonScan(&local_node->scan);
-
-	READ_STRING_FIELD(enrname);
-
-	READ_DONE();
-}
 
 /*
  * ReadCommonJoin
@@ -1862,8 +1817,6 @@ parseNodeString(void)
 		return_value = _readModifyTable();
 	else if (MATCH("APPEND", 6))
 		return_value = _readAppend();
-	else if (MATCH("MERGEAPPEND", 11))
-		return_value = _readMergeAppend();
 	else if (MATCH("BITMAPAND", 9))
 		return_value = _readBitmapAnd();
 	else if (MATCH("BITMAPOR", 8))
@@ -1888,8 +1841,6 @@ parseNodeString(void)
 		return_value = _readSubqueryScan();
 	else if (MATCH("VALUESSCAN", 10))
 		return_value = _readValuesScan();
-	else if (MATCH("NAMEDTUPLESTORESCAN", 19))
-		return_value = _readNamedTuplestoreScan();
 	else if (MATCH("JOIN", 4))
 		return_value = _readJoin();
 	else if (MATCH("NESTLOOP", 8))

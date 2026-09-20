@@ -44,8 +44,7 @@ typedef void (*ExplainOneQuery_hook_type) (Query *query,
 										   int cursorOptions,
 										   ExplainState *es,
 										   const char *queryString,
-										   ParamListInfo params,
-										   QueryEnvironment *queryEnv);
+										   ParamListInfo params);
 extern PGDLLIMPORT ExplainOneQuery_hook_type ExplainOneQuery_hook;
 
 /* Hook for plugins to get control in explain_get_index_name() */
@@ -62,11 +61,11 @@ extern TupleDesc ExplainResultDesc(ExplainStmt *stmt);
 
 extern void ExplainOneUtility(Node *utilityStmt, ExplainState *es,
 							  const char *queryString,
-							  ParamListInfo params, QueryEnvironment *queryEnv);
+							  ParamListInfo params);
 
 extern void ExplainOnePlan(PlannedStmt *plannedstmt, ExplainState *es,
 						   const char *queryString,
-						   ParamListInfo params, QueryEnvironment *queryEnv,
+						   ParamListInfo params,
 						   const instr_time *planduration,
 						   const BufferUsage *bufusage);
 

@@ -1725,58 +1725,26 @@ is_degenerate_grouping(PlannerInfo *root)
  * create_degenerate_grouping_paths
  *
  * When the grouping is degenerate (see is_degenerate_grouping), we are
- * supposed to emit either zero or one row for each grouping set depending on
- * whether HAVING succeeds.  Furthermore, there cannot be any variables in
- * either HAVING or the targetlist, so we actually do not need the FROM table
- * at all! We can just throw away the plan-so-far and generate a Result node.
- * This is a sufficiently unusual corner case that it's not worth contorting
- * the structure of this module to avoid having to generate the earlier paths
- * in the first place.
+ * supposed to emit either zero or one row, depending on whether HAVING
+ * succeeds.  Furthermore, there cannot be any variables in either HAVING or
+ * the targetlist, so we actually do not need the FROM table at all! We can
+ * just throw away the plan-so-far and generate a Result node.  This is a
+ * sufficiently unusual corner case that it's not worth contorting the
+ * structure of this module to avoid having to generate the earlier paths in
+ * the first place.
  */
 static void
 create_degenerate_grouping_paths(PlannerInfo *root, RelOptInfo *input_rel,
 								 RelOptInfo *grouped_rel)
 {
 	Query	   *parse = root->parse;
-	int			nrows;
 	Path	   *path;
 
-	nrows = 0;
-	if (nrows > 1)
-	{
-		/*
-		 * Doesn't seem worthwhile writing code to cons up a generate_series
-		 * or a values scan to emit multiple rows. Instead just make N clones
-		 * and append them.  (With a volatile HAVING clause, this means you
-		 * might get between 0 and N output rows. Offhand I think that's
-		 * desired.)
-		 */
-		List	   *paths = NIL;
-
-		while (--nrows >= 0)
-		{
-			path = (Path *)
-				create_group_result_path(root, grouped_rel,
-										 grouped_rel->reltarget,
-										 (List *) parse->havingQual);
-			paths = lappend(paths, path);
-		}
-		path = (Path *)
-			create_append_path(root,
-							   grouped_rel,
-							   paths,
-							   NIL,
-							   NULL,
-							   -1);
-	}
-	else
-	{
-		/* No grouping sets, or just one, so one output row */
-		path = (Path *)
-			create_group_result_path(root, grouped_rel,
-									 grouped_rel->reltarget,
-									 (List *) parse->havingQual);
-	}
+	/* No grouping sets, so exactly one output row (if HAVING passes) */
+	path = (Path *)
+		create_group_result_path(root, grouped_rel,
+								 grouped_rel->reltarget,
+								 (List *) parse->havingQual);
 
 	add_path(grouped_rel, path);
 }

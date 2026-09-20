@@ -383,7 +383,7 @@ struct PlannerInfo
  * is present in the query join tree but the members are not.  The member
  * RTEs and otherrels are used to plan the scans of the individual tables or
  * subqueries of the append set; then the parent baserel is given Append
- * and/or MergeAppend paths comprising the best paths for the individual
+ * paths comprising the best paths for the individual
  * member rels.  (See comments for AppendRelInfo for more information.)
  *
  * At one time we also made otherrels to represent join RTEs, for use in
@@ -787,9 +787,8 @@ typedef struct EquivalenceClass
  * em_is_child signifies that this element was built by transposing a member
  * for an appendrel parent relation to represent the corresponding expression
  * for an appendrel child.  These members are used for determining the
- * pathkeys of scans on the child relation and for explicitly sorting the
- * child when necessary to build a MergeAppend path for the whole appendrel
- * tree.  An em_is_child member has no impact on the properties of the EC as a
+ * pathkeys of scans on the child relation.  An em_is_child member has no
+ * impact on the properties of the EC as a
  * whole; in particular the EC's ec_relids field does NOT include the child
  * relation.  An em_is_child member should never be marked em_is_const nor
  * cause ec_has_const or ec_has_volatile to be set, either.  Thus, em_is_child
@@ -1180,16 +1179,6 @@ typedef struct AppendPath
  */
 #define IS_DUMMY_REL(r) is_dummy_rel(r)
 extern bool is_dummy_rel(RelOptInfo *rel);
-
-/*
- * MergeAppendPath represents a MergeAppend plan, ie, the merging of sorted
- * results from several member plans to produce similarly-sorted output.
- */
-typedef struct MergeAppendPath
-{
-	Path		path;
-	List	   *subpaths;		/* list of component Paths */
-} MergeAppendPath;
 
 /*
  * GroupResultPath represents use of a Result plan node to compute the

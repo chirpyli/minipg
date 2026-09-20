@@ -15,7 +15,6 @@
 #define PARSE_NODE_H
 
 #include "nodes/parsenodes.h"
-#include "utils/queryenvironment.h"
 #include "utils/relcache.h"
 
 
@@ -144,9 +143,7 @@ struct ParseState
 	ParseExprKind p_expr_kind;	/* what kind of expression we're parsing */
 	int			p_next_resno;	/* next targetlist resno to assign */
 	bool		p_resolve_unknowns; /* resolve unknown-type SELECT outputs as
-									 * type text */
-
-	QueryEnvironment *p_queryEnv;	/* curr env, incl refs to enclosing env */
+								 * type text */
 
 	/* Flags telling about things found in the query: */
 	bool		p_hasAggs;

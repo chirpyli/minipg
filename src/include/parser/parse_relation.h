@@ -22,7 +22,6 @@ extern ParseNamespaceItem *refnameNamespaceItem(ParseState *pstate,
 												const char *refname,
 												int location,
 												int *sublevels_up);
-extern bool scanNameSpaceForENR(ParseState *pstate, const char *refname);
 extern void checkNameSpaceConflicts(ParseState *pstate, List *namespace1,
 									List *namespace2);
 extern ParseNamespaceItem *GetNSItemByRangeTablePosn(ParseState *pstate,
@@ -72,9 +71,6 @@ extern ParseNamespaceItem *addRangeTableEntryForJoin(ParseState *pstate,
 													 Alias *joinalias,
 													 Alias *alias,
 													 bool inFromCl);
-extern ParseNamespaceItem *addRangeTableEntryForENR(ParseState *pstate,
-													RangeVar *rv,
-													bool inFromCl);
 extern void addNSItemToQuery(ParseState *pstate, ParseNamespaceItem *nsitem,
 							 bool addToJoinList,
 							 bool addToRelNameSpace, bool addToVarNameSpace);

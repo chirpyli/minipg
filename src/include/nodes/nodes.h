@@ -46,7 +46,6 @@ typedef enum NodeTag
 	T_ProjectSet,
 	T_ModifyTable,
 	T_Append,
-	T_MergeAppend,
 	T_BitmapAnd,
 	T_BitmapOr,
 	T_Scan,
@@ -59,7 +58,6 @@ typedef enum NodeTag
 	T_TidRangeScan,
 	T_SubqueryScan,
 	T_ValuesScan,
-	T_NamedTuplestoreScan,
 	T_Join,
 	T_NestLoop,
 	T_MergeJoin,
@@ -87,7 +85,6 @@ typedef enum NodeTag
 	T_ProjectSetState,
 	T_ModifyTableState,
 	T_AppendState,
-	T_MergeAppendState,
 	T_BitmapAndState,
 	T_BitmapOrState,
 	T_ScanState,
@@ -100,7 +97,6 @@ typedef enum NodeTag
 	T_TidRangeScanState,
 	T_SubqueryScanState,
 	T_ValuesScanState,
-	T_NamedTuplestoreScanState,
 	T_JoinState,
 	T_NestLoopState,
 	T_MergeJoinState,
@@ -188,7 +184,6 @@ typedef enum NodeTag
 	T_MergePath,
 	T_HashPath,
 	T_AppendPath,
-	T_MergeAppendPath,
 	T_GroupResultPath,
 	T_MaterialPath,
 	T_MemoizePath,
@@ -553,8 +548,7 @@ typedef enum AggStrategy
 {
 	AGG_PLAIN,					/* simple agg across all input rows */
 	AGG_SORTED,					/* grouped agg, input must be sorted */
-	AGG_HASHED,					/* grouped agg, use internal hashtable */
-	AGG_MIXED					/* grouped agg, hash and sort both used */
+	AGG_HASHED					/* grouped agg, use internal hashtable */
 } AggStrategy;
 
 /*

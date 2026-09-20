@@ -233,33 +233,6 @@ _copyAppend(const Append *from)
 }
 
 /*
- * _copyMergeAppend
- */
-static MergeAppend *
-_copyMergeAppend(const MergeAppend *from)
-{
-	MergeAppend *newnode = makeNode(MergeAppend);
-
-	/*
-	 * copy node superclass fields
-	 */
-	CopyPlanFields((const Plan *) from, (Plan *) newnode);
-
-	/*
-	 * copy remainder of node
-	 */
-	COPY_BITMAPSET_FIELD(apprelids);
-	COPY_NODE_FIELD(mergeplans);
-	COPY_SCALAR_FIELD(numCols);
-	COPY_POINTER_FIELD(sortColIdx, from->numCols * sizeof(AttrNumber));
-	COPY_POINTER_FIELD(sortOperators, from->numCols * sizeof(Oid));
-	COPY_POINTER_FIELD(collations, from->numCols * sizeof(Oid));
-	COPY_POINTER_FIELD(nullsFirst, from->numCols * sizeof(bool));
-
-	return newnode;
-}
-
-/*
  * _copyBitmapAnd
  */
 static BitmapAnd *
@@ -526,27 +499,6 @@ _copyValuesScan(const ValuesScan *from)
 	 * copy remainder of node
 	 */
 	COPY_NODE_FIELD(values_lists);
-
-	return newnode;
-}
-
-/*
- * _copyNamedTuplestoreScan
- */
-static NamedTuplestoreScan *
-_copyNamedTuplestoreScan(const NamedTuplestoreScan *from)
-{
-	NamedTuplestoreScan *newnode = makeNode(NamedTuplestoreScan);
-
-	/*
-	 * copy node superclass fields
-	 */
-	CopyScanFields((const Scan *) from, (Scan *) newnode);
-
-	/*
-	 * copy remainder of node
-	 */
-	COPY_STRING_FIELD(enrname);
 
 	return newnode;
 }
@@ -1747,8 +1699,6 @@ _copyRangeTblEntry(const RangeTblEntry *from)
 	COPY_NODE_FIELD(coltypes);
 	COPY_NODE_FIELD(coltypmods);
 	COPY_NODE_FIELD(colcollations);
-	COPY_STRING_FIELD(enrname);
-	COPY_SCALAR_FIELD(enrtuples);
 	COPY_NODE_FIELD(alias);
 	COPY_NODE_FIELD(eref);
 	COPY_SCALAR_FIELD(lateral);
@@ -2475,9 +2425,6 @@ copyObjectImpl(const void *from)
 		case T_Append:
 			retval = _copyAppend(from);
 			break;
-		case T_MergeAppend:
-			retval = _copyMergeAppend(from);
-			break;
 		case T_BitmapAnd:
 			retval = _copyBitmapAnd(from);
 			break;
@@ -2513,9 +2460,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_ValuesScan:
 			retval = _copyValuesScan(from);
-			break;
-		case T_NamedTuplestoreScan:
-			retval = _copyNamedTuplestoreScan(from);
 			break;
 		case T_Join:
 			retval = _copyJoin(from);

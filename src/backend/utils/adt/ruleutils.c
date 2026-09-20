@@ -2693,15 +2693,13 @@ set_deparse_plan(deparse_namespace *dpns, Plan *plan)
 	dpns->plan = plan;
 
 	/*
-	 * We special-case Append and MergeAppend to pretend that the first child
+	 * We special-case Append to pretend that the first child
 	 * plan is the OUTER referent; we have to interpret OUTER Vars in their
 	 * tlists according to one of the children, and the first one is the most
 	 * natural choice.
 	 */
 	if (IsA(plan, Append))
 		dpns->outer_plan = linitial(((Append *) plan)->appendplans);
-	else if (IsA(plan, MergeAppend))
-		dpns->outer_plan = linitial(((MergeAppend *) plan)->mergeplans);
 	else
 		dpns->outer_plan = outerPlan(plan);
 
@@ -4049,7 +4047,7 @@ resolve_special_varno(Node *node, deparse_context *context,
 			elog(ERROR, "bogus varattno for OUTER_VAR var: %d", var->varattno);
 
 		/*
-		 * If we're descending to the first child of an Append or MergeAppend,
+		 * If we're descending to the first child of an Append,
 		 * update appendparents.  This will affect deparsing of all Vars
 		 * appearing within the eventually-resolved subexpression.
 		 */
@@ -4058,9 +4056,6 @@ resolve_special_varno(Node *node, deparse_context *context,
 		if (IsA(dpns->plan, Append))
 			context->appendparents = bms_union(context->appendparents,
 											   ((Append *) dpns->plan)->apprelids);
-		else if (IsA(dpns->plan, MergeAppend))
-			context->appendparents = bms_union(context->appendparents,
-											   ((MergeAppend *) dpns->plan)->apprelids);
 
 		push_child_plan(dpns, dpns->outer_plan, &save_dpns);
 		resolve_special_varno((Node *) tle->expr, context,
@@ -4299,12 +4294,11 @@ get_name_for_var_field(Var *var, int fieldno,
 	{
 		case RTE_RELATION:
 		case RTE_VALUES:
-		case RTE_NAMEDTUPLESTORE:
 		case RTE_RESULT:
 
 			/*
 			 * This case should not occur: a column of a table, values list,
-			 * or ENR shouldn't have type RECORD.  Fall through and fail (most
+			 * shouldn't have type RECORD.  Fall through and fail (most
 			 * likely) at the bottom.
 			 */
 			break;

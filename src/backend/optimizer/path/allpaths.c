@@ -72,20 +72,11 @@ static void set_plain_rel_size(PlannerInfo *root, RelOptInfo *rel,
 							   RangeTblEntry *rte);
 static void set_plain_rel_pathlist(PlannerInfo *root, RelOptInfo *rel,
 								   RangeTblEntry *rte);
-static void generate_orderedappend_paths(PlannerInfo *root, RelOptInfo *rel,
-										 List *live_childrels,
-										 List *all_child_pathkeys);
-static Path *get_cheapest_parameterized_child_path(PlannerInfo *root,
-												   RelOptInfo *rel,
-												   Relids required_outer);
-static void accumulate_append_subpath(Path *path, List **subpaths);
 static void set_dummy_rel_pathlist(RelOptInfo *rel);
 static void set_subquery_pathlist(PlannerInfo *root, RelOptInfo *rel,
 								  Index rti, RangeTblEntry *rte);
 static void set_values_pathlist(PlannerInfo *root, RelOptInfo *rel,
 								RangeTblEntry *rte);
-static void set_namedtuplestore_pathlist(PlannerInfo *root, RelOptInfo *rel,
-										 RangeTblEntry *rte);
 static void set_result_pathlist(PlannerInfo *root, RelOptInfo *rel,
 								RangeTblEntry *rte);
 static RelOptInfo *make_rel_from_joinlist(PlannerInfo *root, List *joinlist);
@@ -339,10 +330,6 @@ set_rel_size(PlannerInfo *root, RelOptInfo *rel,
 			case RTE_VALUES:
 				set_values_size_estimates(root, rel);
 				break;
-			case RTE_NAMEDTUPLESTORE:
-				/* Might as well just build the path immediately */
-				set_namedtuplestore_pathlist(root, rel, rte);
-				break;
 			case RTE_RESULT:
 				/* Might as well just build the path immediately */
 				set_result_pathlist(root, rel, rte);
@@ -384,9 +371,6 @@ set_rel_pathlist(PlannerInfo *root, RelOptInfo *rel,
 			case RTE_VALUES:
 				/* Values list */
 				set_values_pathlist(root, rel, rte);
-				break;
-			case RTE_NAMEDTUPLESTORE:
-				/* tuplestore reference --- fully handled during set_rel_size */
 				break;
 			case RTE_RESULT:
 				/* simple Result --- fully handled during set_rel_size */
@@ -456,395 +440,6 @@ set_plain_rel_pathlist(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte)
 	create_tidscan_paths(root, rel);
 }
 
-
-/*
- * add_paths_to_append_rel
- *		Generate paths for the given append relation given the set of non-dummy
- *		child rels.
- *
- * The function collects all parameterizations and orderings supported by the
- * non-dummy children. For every such parameterization or ordering, it creates
- * an append path collecting one path from each non-dummy child with given
- * parameterization or ordering.
- */
-void
-add_paths_to_append_rel(PlannerInfo *root, RelOptInfo *rel,
-						List *live_childrels)
-{
-	List	   *subpaths = NIL;
-	bool		subpaths_valid = true;
-	List	   *all_child_pathkeys = NIL;
-	List	   *all_child_outers = NIL;
-	ListCell   *l;
-
-	/*
-	 * For every non-dummy child, remember the cheapest path.  Also, identify
-	 * all pathkeys (orderings) and parameterizations (required_outer sets)
-	 * available for the non-dummy member relations.
-	 */
-	foreach(l, live_childrels)
-	{
-		RelOptInfo *childrel = lfirst(l);
-		ListCell   *lcp;
-
-		/*
-		 * If child has an unparameterized cheapest-total path, add that to
-		 * the unparameterized Append path we are constructing for the parent.
-		 * If not, there's no workable unparameterized path.
-		 *
-		 * With partitionwise aggregates, the child rel's pathlist may be
-		 * empty, so don't assume that a path exists here.
-		 */
-		if (childrel->pathlist != NIL &&
-			childrel->cheapest_total_path->param_info == NULL)
-			accumulate_append_subpath(childrel->cheapest_total_path,
-									  &subpaths);
-		else
-			subpaths_valid = false;
-
-		/*
-		 * parameterizations for all the children.  We use these as a
-		 * heuristic to indicate which sort orderings and parameterizations we
-		 * should build Append and MergeAppend paths for.
-		 */
-		foreach(lcp, childrel->pathlist)
-		{
-			Path	   *childpath = (Path *) lfirst(lcp);
-			List	   *childkeys = childpath->pathkeys;
-			Relids		childouter = PATH_REQ_OUTER(childpath);
-
-			/* Unsorted paths don't contribute to pathkey list */
-			if (childkeys != NIL)
-			{
-				ListCell   *lpk;
-				bool		found = false;
-
-				/* Have we already seen this ordering? */
-				foreach(lpk, all_child_pathkeys)
-				{
-					List	   *existing_pathkeys = (List *) lfirst(lpk);
-
-					if (compare_pathkeys(existing_pathkeys,
-										 childkeys) == PATHKEYS_EQUAL)
-					{
-						found = true;
-						break;
-					}
-				}
-				if (!found)
-				{
-					/* No, so add it to all_child_pathkeys */
-					all_child_pathkeys = lappend(all_child_pathkeys,
-												 childkeys);
-				}
-			}
-
-			/* Unparameterized paths don't contribute to param-set list */
-			if (childouter)
-			{
-				ListCell   *lco;
-				bool		found = false;
-
-				/* Have we already seen this param set? */
-				foreach(lco, all_child_outers)
-				{
-					Relids		existing_outers = (Relids) lfirst(lco);
-
-					if (bms_equal(existing_outers, childouter))
-					{
-						found = true;
-						break;
-					}
-				}
-				if (!found)
-				{
-					/* No, so add it to all_child_outers */
-					all_child_outers = lappend(all_child_outers,
-											   childouter);
-				}
-			}
-		}
-	}
-
-	/*
-	 * If we found unparameterized paths for all children, build an unordered,
-	 * unparameterized Append path for the rel.  (Note: this is correct even
-	 * if we have zero or one live subpath due to constraint exclusion.)
-	 */
-	if (subpaths_valid)
-		add_path(rel, (Path *) create_append_path(root, rel, subpaths,
-												  NIL, NULL, -1));
-
-	/*
-	 * Also build unparameterized ordered append paths based on the collected
-	 * list of child pathkeys.
-	 */
-	if (subpaths_valid)
-		generate_orderedappend_paths(root, rel, live_childrels,
-									 all_child_pathkeys);
-
-	/*
-	 * Build Append paths for each parameterization seen among the child rels.
-	 * (This may look pretty expensive, but in most cases of practical
-	 * interest, the child rels will expose mostly the same parameterizations,
-	 * so that not that many cases actually get considered here.)
-	 *
-	 * The Append node itself cannot enforce quals, so all qual checking must
-	 * be done in the child paths.  This means that to have a parameterized
-	 * Append path, we must have the exact same parameterization for each
-	 * child path; otherwise some children might be failing to check the
-	 * moved-down quals.  To make them match up, we can try to increase the
-	 * parameterization of lesser-parameterized paths.
-	 */
-	foreach(l, all_child_outers)
-	{
-		Relids		required_outer = (Relids) lfirst(l);
-		ListCell   *lcr;
-
-		/* Select the child paths for an Append with this parameterization */
-		subpaths = NIL;
-		subpaths_valid = true;
-		foreach(lcr, live_childrels)
-		{
-			RelOptInfo *childrel = (RelOptInfo *) lfirst(lcr);
-			Path	   *subpath;
-
-			if (childrel->pathlist == NIL)
-			{
-				/* failed to make a suitable path for this child */
-				subpaths_valid = false;
-				break;
-			}
-
-			subpath = get_cheapest_parameterized_child_path(root,
-															childrel,
-															required_outer);
-			if (subpath == NULL)
-			{
-				/* failed to make a suitable path for this child */
-				subpaths_valid = false;
-				break;
-			}
-			accumulate_append_subpath(subpath, &subpaths);
-		}
-
-		if (subpaths_valid)
-			add_path(rel, (Path *)
-					 create_append_path(root, rel, subpaths,
-										NIL, required_outer, -1));
-	}
-}
-
-/*
- * generate_orderedappend_paths
- *		Generate ordered append paths for an append relation
- *
- * We generate a MergeAppend path for each ordering (pathkey list) appearing
- * in all_child_pathkeys.
- *
- * We consider both cheapest-startup and cheapest-total cases, ie, for each
- * interesting ordering, collect all the cheapest startup subpaths and all the
- * cheapest total paths, and build a suitable path for each case.
- *
- * We don't currently generate any parameterized ordered paths here.  While
- * it would not take much more code here to do so, it's very unclear that it
- * is worth the planning cycles to investigate such paths: there's little
- * use for an ordered path on the inside of a nestloop.  In fact, it's likely
- * that the current coding of add_path would reject such paths out of hand,
- * because add_path gives no credit for sort ordering of parameterized paths,
- * and a parameterized MergeAppend is going to be more expensive than the
- * corresponding parameterized Append path.  If we ever try harder to support
- * parameterized mergejoin plans, it might be worth adding support for
- * parameterized paths here to feed such joins.  (See notes in
- * optimizer/README for why that might not ever happen, though.)
- */
-static void
-generate_orderedappend_paths(PlannerInfo *root, RelOptInfo *rel,
-							 List *live_childrels,
-							 List *all_child_pathkeys)
-{
-	ListCell   *lcp;
-
-	/* Now consider each interesting sort ordering */
-	foreach(lcp, all_child_pathkeys)
-	{
-		List	   *pathkeys = (List *) lfirst(lcp);
-		List	   *startup_subpaths = NIL;
-		List	   *total_subpaths = NIL;
-		bool		startup_neq_total = false;
-		ListCell   *lcr;
-
-		/* Select the child paths for this ordering... */
-		foreach(lcr, live_childrels)
-		{
-			RelOptInfo *childrel = (RelOptInfo *) lfirst(lcr);
-			Path	   *cheapest_startup,
-					   *cheapest_total;
-
-			/* Locate the right paths, if they are available. */
-			cheapest_startup =
-				get_cheapest_path_for_pathkeys(childrel->pathlist,
-											   pathkeys,
-											   NULL,
-											   STARTUP_COST);
-			cheapest_total =
-				get_cheapest_path_for_pathkeys(childrel->pathlist,
-											   pathkeys,
-											   NULL,
-											   TOTAL_COST);
-
-			/*
-			 * If we can't find any paths with the right order just use the
-			 * cheapest-total path; we'll have to sort it later.
-			 */
-			if (cheapest_startup == NULL || cheapest_total == NULL)
-			{
-				cheapest_startup = cheapest_total =
-					childrel->cheapest_total_path;
-				/* Assert we do have an unparameterized path for this child */
-				Assert(cheapest_total->param_info == NULL);
-			}
-
-			/*
-			 * Notice whether we actually have different paths for the
-			 * "cheapest" and "total" cases; frequently there will be no point
-			 * in two create_merge_append_path() calls.
-			 */
-			if (cheapest_startup != cheapest_total)
-				startup_neq_total = true;
-
-			/*
-			 * Rely on accumulate_append_subpath to collect the
-			 * child paths for the MergeAppend.
-			 */
-			accumulate_append_subpath(cheapest_startup,
-									  &startup_subpaths);
-			accumulate_append_subpath(cheapest_total,
-									  &total_subpaths);
-		}
-
-		/* ... and build the MergeAppend paths */
-		add_path(rel, (Path *) create_merge_append_path(root,
-														rel,
-														startup_subpaths,
-														pathkeys,
-														NULL));
-		if (startup_neq_total)
-			add_path(rel, (Path *) create_merge_append_path(root,
-															rel,
-															total_subpaths,
-															pathkeys,
-															NULL));
-	}
-}
-
-/*
- * get_cheapest_parameterized_child_path
- *		Get cheapest path for this relation that has exactly the requested
- *		parameterization.
- *
- * Returns NULL if unable to create such a path.
- */
-static Path *
-get_cheapest_parameterized_child_path(PlannerInfo *root, RelOptInfo *rel,
-									  Relids required_outer)
-{
-	Path	   *cheapest;
-	ListCell   *lc;
-
-	/*
-	 * Look up the cheapest existing path with no more than the needed
-	 * parameterization.  If it has exactly the needed parameterization, we're
-	 * done.
-	 */
-	cheapest = get_cheapest_path_for_pathkeys(rel->pathlist,
-											  NIL,
-											  required_outer,
-											  TOTAL_COST);
-	Assert(cheapest != NULL);
-	if (bms_equal(PATH_REQ_OUTER(cheapest), required_outer))
-		return cheapest;
-
-	/*
-	 * Otherwise, we can "reparameterize" an existing path to match the given
-	 * parameterization, which effectively means pushing down additional
-	 * joinquals to be checked within the path's scan.  However, some existing
-	 * paths might check the available joinquals already while others don't;
-	 * therefore, it's not clear which existing path will be cheapest after
-	 * reparameterization.  We have to go through them all and find out.
-	 */
-	cheapest = NULL;
-	foreach(lc, rel->pathlist)
-	{
-		Path	   *path = (Path *) lfirst(lc);
-
-		/* Can't use it if it needs more than requested parameterization */
-		if (!bms_is_subset(PATH_REQ_OUTER(path), required_outer))
-			continue;
-
-		/*
-		 * Reparameterization can only increase the path's cost, so if it's
-		 * already more expensive than the current cheapest, forget it.
-		 */
-		if (cheapest != NULL &&
-			compare_path_costs(cheapest, path, TOTAL_COST) <= 0)
-			continue;
-
-		/* Reparameterize if needed, then recheck cost */
-		if (!bms_equal(PATH_REQ_OUTER(path), required_outer))
-		{
-			path = reparameterize_path(root, path, required_outer, 1.0);
-			if (path == NULL)
-				continue;		/* failed to reparameterize this one */
-			Assert(bms_equal(PATH_REQ_OUTER(path), required_outer));
-
-			if (cheapest != NULL &&
-				compare_path_costs(cheapest, path, TOTAL_COST) <= 0)
-				continue;
-		}
-
-		/* We have a new best path */
-		cheapest = path;
-	}
-
-	/* Return the best path, or NULL if we found no suitable candidate */
-	return cheapest;
-}
-
-/*
- * accumulate_append_subpath
- *		Add a subpath to the list being built for an Append or MergeAppend.
- *
- * It's possible that the child is itself an Append or MergeAppend path, in
- * which case we can "cut out the middleman" and just add its child paths to
- * our own list.  (We don't try to do this earlier because we need to apply
- * both levels of transformation to the quals.)
- *
- * Note that if we omit a child MergeAppend in this way, we are effectively
- * omitting a sort step, which seems fine: if the parent is to be an Append,
- * its result would be unsorted anyway, while if the parent is to be a
- * MergeAppend, there's no point in a separate sort on a child.
- */
-static void
-accumulate_append_subpath(Path *path, List **subpaths)
-{
-	if (IsA(path, AppendPath))
-	{
-		AppendPath *apath = (AppendPath *) path;
-
-		*subpaths = list_concat(*subpaths, apath->subpaths);
-		return;
-	}
-	else if (IsA(path, MergeAppendPath))
-	{
-		MergeAppendPath *mpath = (MergeAppendPath *) path;
-
-		*subpaths = list_concat(*subpaths, mpath->subpaths);
-		return;
-	}
-
-	*subpaths = lappend(*subpaths, path);
-}
 
 /*
  * set_dummy_rel_pathlist
@@ -1108,36 +703,6 @@ set_values_pathlist(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte)
 	add_path(rel, create_valuesscan_path(root, rel, required_outer));
 }
 
-
-/*
- * set_namedtuplestore_pathlist
- *		Build the (single) access path for a named tuplestore RTE
- *
- * There's no need for a separate set_namedtuplestore_size phase, since we
- * don't support join-qual-parameterized paths for tuplestores.
- */
-static void
-set_namedtuplestore_pathlist(PlannerInfo *root, RelOptInfo *rel,
-							 RangeTblEntry *rte)
-{
-	Relids		required_outer;
-
-	/* Mark rel with estimated output rows, width, etc */
-	set_namedtuplestore_size_estimates(root, rel);
-
-	/*
-	 * We don't support pushing join clauses into the quals of a tuplestore
-	 * scan, but it could still have required parameterization due to LATERAL
-	 * refs in its tlist.
-	 */
-	required_outer = rel->lateral_relids;
-
-	/* Generate appropriate path */
-	add_path(rel, create_namedtuplestorescan_path(root, rel, required_outer));
-
-	/* Select cheapest path (pretty easy in this case...) */
-	set_cheapest(rel);
-}
 
 /*
  * set_result_pathlist
@@ -1830,9 +1395,6 @@ print_path(PlannerInfo *root, Path *path, int indent)
 				case T_ValuesScan:
 					ptype = "ValuesScan";
 					break;
-				case T_NamedTuplestoreScan:
-					ptype = "NamedTuplestoreScan";
-					break;
 				case T_Result:
 					ptype = "Result";
 					break;
@@ -1876,9 +1438,6 @@ print_path(PlannerInfo *root, Path *path, int indent)
 			break;
 		case T_AppendPath:
 			ptype = "Append";
-			break;
-		case T_MergeAppendPath:
-			ptype = "MergeAppend";
 			break;
 		case T_GroupResultPath:
 			ptype = "GroupResult";

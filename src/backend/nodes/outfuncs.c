@@ -418,23 +418,6 @@ _outAppend(StringInfo str, const Append *node)
 }
 
 static void
-_outMergeAppend(StringInfo str, const MergeAppend *node)
-{
-	WRITE_NODE_TYPE("MERGEAPPEND");
-
-	_outPlanInfo(str, (const Plan *) node);
-
-	WRITE_BITMAPSET_FIELD(apprelids);
-	WRITE_NODE_FIELD(mergeplans);
-	WRITE_INT_FIELD(numCols);
-	WRITE_ATTRNUMBER_ARRAY(sortColIdx, node->numCols);
-	WRITE_OID_ARRAY(sortOperators, node->numCols);
-	WRITE_OID_ARRAY(collations, node->numCols);
-	WRITE_BOOL_ARRAY(nullsFirst, node->numCols);
-}
-
-
-static void
 _outBitmapAnd(StringInfo str, const BitmapAnd *node)
 {
 	WRITE_NODE_TYPE("BITMAPAND");
@@ -565,16 +548,6 @@ _outValuesScan(StringInfo str, const ValuesScan *node)
 	WRITE_NODE_FIELD(values_lists);
 }
 
-
-static void
-_outNamedTuplestoreScan(StringInfo str, const NamedTuplestoreScan *node)
-{
-	WRITE_NODE_TYPE("NAMEDTUPLESTORESCAN");
-
-	_outScanInfo(str, (const Scan *) node);
-
-	WRITE_STRING_FIELD(enrname);
-}
 
 static void
 _outJoin(StringInfo str, const Join *node)
@@ -1416,16 +1389,6 @@ _outAppendPath(StringInfo str, const AppendPath *node)
 }
 
 static void
-_outMergeAppendPath(StringInfo str, const MergeAppendPath *node)
-{
-	WRITE_NODE_TYPE("MERGEAPPENDPATH");
-
-	_outPathInfo(str, (const Path *) node);
-
-	WRITE_NODE_FIELD(subpaths);
-}
-
-static void
 _outGroupResultPath(StringInfo str, const GroupResultPath *node)
 {
 	WRITE_NODE_TYPE("GROUPRESULTPATH");
@@ -2208,14 +2171,6 @@ _outRangeTblEntry(StringInfo str, const RangeTblEntry *node)
 			WRITE_NODE_FIELD(coltypmods);
 			WRITE_NODE_FIELD(colcollations);
 			break;
-		case RTE_NAMEDTUPLESTORE:
-			WRITE_STRING_FIELD(enrname);
-			WRITE_FLOAT_FIELD(enrtuples, "%.0f");
-			WRITE_OID_FIELD(relid);
-			WRITE_NODE_FIELD(coltypes);
-			WRITE_NODE_FIELD(coltypmods);
-			WRITE_NODE_FIELD(colcollations);
-			break;
 		case RTE_RESULT:
 			/* no extra fields */
 			break;
@@ -2518,9 +2473,6 @@ outNode(StringInfo str, const void *obj)
 			case T_Append:
 				_outAppend(str, obj);
 				break;
-			case T_MergeAppend:
-				_outMergeAppend(str, obj);
-				break;
 			case T_BitmapAnd:
 				_outBitmapAnd(str, obj);
 				break;
@@ -2556,9 +2508,6 @@ outNode(StringInfo str, const void *obj)
 				break;
 			case T_ValuesScan:
 				_outValuesScan(str, obj);
-				break;
-			case T_NamedTuplestoreScan:
-				_outNamedTuplestoreScan(str, obj);
 				break;
 			case T_Join:
 				_outJoin(str, obj);
@@ -2739,9 +2688,6 @@ outNode(StringInfo str, const void *obj)
 				break;
 			case T_AppendPath:
 				_outAppendPath(str, obj);
-				break;
-			case T_MergeAppendPath:
-				_outMergeAppendPath(str, obj);
 				break;
 			case T_GroupResultPath:
 				_outGroupResultPath(str, obj);

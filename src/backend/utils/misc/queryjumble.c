@@ -279,8 +279,6 @@ JumbleRangeTable(JumbleState *jstate, List *rtable)
 			case RTE_VALUES:
 				JumbleExpr(jstate, (Node *) rte->values_lists);
 				break;
-			case RTE_NAMEDTUPLESTORE:
-				APP_JUMB_STRING(rte->enrname);
 				break;
 			case RTE_RESULT:
 				break;

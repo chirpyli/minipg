@@ -1937,7 +1937,6 @@ range_table_entry_walker(RangeTblEntry *rte,
 			if (walker(rte->values_lists, context))
 				return true;
 			break;
-		case RTE_NAMEDTUPLESTORE:
 		case RTE_RESULT:
 			/* nothing to do */
 			break;
@@ -2570,7 +2569,6 @@ range_table_mutator(List *rtable,
 			case RTE_VALUES:
 				MUTATE(newrte->values_lists, rte->values_lists, List *);
 				break;
-		case RTE_NAMEDTUPLESTORE:
 		case RTE_RESULT:
 			/* nothing to do */
 			break;
@@ -2963,12 +2961,6 @@ planstate_tree_walker(PlanState *planstate,
 									   walker, context))
 				return true;
 			break;
-		case T_MergeAppend:
-			if (planstate_walk_members(((MergeAppendState *) planstate)->mergeplans,
-									   ((MergeAppendState *) planstate)->ms_nplans,
-									   walker, context))
-				return true;
-			break;
 		case T_BitmapAnd:
 			if (planstate_walk_members(((BitmapAndState *) planstate)->bitmapplans,
 									   ((BitmapAndState *) planstate)->nplans,
@@ -3018,7 +3010,7 @@ planstate_walk_subplans(List *plans,
 }
 
 /*
- * Walk the constituent plans of a ModifyTable, Append, MergeAppend,
+ * Walk the constituent plans of a ModifyTable, Append,
  * BitmapAnd, or BitmapOr node.
  */
 static bool

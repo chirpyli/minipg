@@ -512,8 +512,7 @@ pg_parse_query(const char *query_string)
  */
 List *
 pg_analyze_and_rewrite(RawStmt *parsetree, const char *query_string,
-					   Oid *paramTypes, int numParams,
-					   QueryEnvironment *queryEnv)
+					   Oid *paramTypes, int numParams)
 {
 	Query	   *query;
 	List	   *querytree_list;
@@ -523,8 +522,7 @@ pg_analyze_and_rewrite(RawStmt *parsetree, const char *query_string,
 	/*
 	 * (1) Perform parse analysis.
 	 */
-	query = parse_analyze(parsetree, query_string, paramTypes, numParams,
-						  queryEnv);
+	query = parse_analyze(parsetree, query_string, paramTypes, numParams);
 
 	/*
 	 * (2) Rewrite the queries, as necessary
@@ -545,8 +543,7 @@ List *
 pg_analyze_and_rewrite_params(RawStmt *parsetree,
 							  const char *query_string,
 							  ParserSetupHook parserSetup,
-							  void *parserSetupArg,
-							  QueryEnvironment *queryEnv)
+							  void *parserSetupArg)
 {
 	ParseState *pstate;
 	Query	   *query;
@@ -561,7 +558,6 @@ pg_analyze_and_rewrite_params(RawStmt *parsetree,
 	 */
 	pstate = make_parsestate(NULL);
 	pstate->p_sourcetext = query_string;
-	pstate->p_queryEnv = queryEnv;
 	(*parserSetup) (pstate, parserSetupArg);
 
 	query = transformTopLevelStmt(pstate, parsetree);
@@ -853,7 +849,7 @@ exec_simple_query(const char *query_string)
 			oldcontext = MemoryContextSwitchTo(MessageContext);
 
 		querytree_list = pg_analyze_and_rewrite(parsetree, query_string,
-												NULL, 0, NULL);
+												NULL, 0);
 
 		plantree_list = pg_plan_queries(querytree_list, query_string,
 										0, NULL);

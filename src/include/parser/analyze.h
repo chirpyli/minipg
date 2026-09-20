@@ -19,7 +19,7 @@
 
 
 extern Query *parse_analyze(RawStmt *parseTree, const char *sourceText,
-							Oid *paramTypes, int numParams, QueryEnvironment *queryEnv);
+							Oid *paramTypes, int numParams);
 
 extern Query *parse_sub_analyze(Node *parseTree, ParseState *parentParseState,
 								bool resolve_unknowns);

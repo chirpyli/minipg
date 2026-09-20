@@ -529,7 +529,6 @@ typedef enum RTEKind
 	RTE_SUBQUERY,				/* subquery in FROM */
 	RTE_JOIN,					/* join */
 	RTE_VALUES,					/* VALUES (<exprlist>), (<exprlist>), ... */
-	RTE_NAMEDTUPLESTORE,		/* tuplestore, e.g. for AFTER triggers */
 	RTE_RESULT					/* RTE represents an empty FROM clause; such
 								 * RTEs are added by the planner, they're not
 								 * present during parsing or rewriting */
@@ -555,11 +554,6 @@ typedef struct RangeTblEntry
 	 * RTE_SUBQUERY during rewriting.  We keep the relid because it is useful
 	 * during planning, cf makeWholeRowVar.  (It will not be passed on to the
 	 * executor, however.)
-	 *
-	 * As a special case, RTE_NAMEDTUPLESTORE can also set relid to indicate
-	 * that the tuple format of the tuplestore is the same as the referenced
-	 * relation.  This allows plans referencing AFTER trigger transition
-	 * tables to be invalidated if the underlying table is altered.
 	 *
 	 * rellockmode is really LOCKMODE, but it's declared int to avoid having
 	 * to include lock-related headers here.  It must be RowExclusiveLock if
@@ -636,28 +630,14 @@ typedef struct RangeTblEntry
 	List	   *values_lists;	/* list of expression lists */
 
 	/*
-	 * Fields valid for VALUES and ENR RTEs (else NIL):
+	 * Fields valid for a VALUES RTE (else NIL):
 	 *
-	 * For VALUES RTEs, storing these explicitly saves having to re-determine
-	 * the info by scanning the values_lists. For ENRs, we store the types
-	 * explicitly here (we could get the information from the catalogs if
-	 * 'relid' was supplied, but we'd still need these for TupleDesc-based
-	 * ENRs, so we might as well always store the type info here).
-	 *
-	 * For ENRs only, we have to consider the possibility of dropped columns.
-	 * A dropped column is included in these lists, but it will have zeroes in
-	 * all three lists (as well as an empty-string entry in eref).  Testing
-	 * for zero coltype is the standard way to detect a dropped column.
+	 * Storing these explicitly saves having to re-determine the info by
+	 * scanning the values_lists.
 	 */
 	List	   *coltypes;		/* OID list of column type OIDs */
 	List	   *coltypmods;		/* integer list of column typmods */
 	List	   *colcollations;	/* OID list of column collation OIDs */
-
-	/*
-	 * Fields valid for ENR RTEs (else NULL/zero):
-	 */
-	char	   *enrname;		/* name of ephemeral named relation */
-	double		enrtuples;		/* estimated or actual from caller */
 
 	/*
 	 * Fields valid in all RTEs:

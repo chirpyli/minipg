@@ -27,7 +27,6 @@
 #include "funcapi.h"
 #include "nodes/makefuncs.h"
 #include "nodes/nodeFuncs.h"
-#include "parser/parse_enr.h"
 #include "parser/parse_relation.h"
 #include "parser/parse_type.h"
 #include "parser/parsetree.h"
@@ -254,16 +253,6 @@ scanNameSpaceForRelid(ParseState *pstate, Oid relid, int location)
 
 
 /*
- * Search the query's ephemeral named relation namespace for a relation
- * matching the given unqualified refname.
- */
-bool
-scanNameSpaceForENR(ParseState *pstate, const char *refname)
-{
-	return name_matches_visible_ENR(pstate, refname);
-}
-
-/*
  * searchRangeTableForRel
  *	  See if any RangeTblEntry could possibly match the RangeVar.
  *	  If so, return a pointer to the RangeTblEntry; else return NULL.
@@ -283,16 +272,12 @@ searchRangeTableForRel(ParseState *pstate, RangeVar *relation)
 {
 	const char *refname = relation->relname;
 	Oid			relId = InvalidOid;
-	bool		isenr = false;
 	Index		levelsup;
 
 	if (!relation->schemaname)
-		isenr = scanNameSpaceForENR(pstate, refname);
-
-	if (!isenr)
 		relId = RangeVarGetRelid(relation, NoLock, true);
 
-	/* Now look for RTEs matching either the relation/ENR or the alias */
+	/* Now look for RTEs matching either the relation or the alias */
 	for (levelsup = 0;
 		 pstate != NULL;
 		 pstate = pstate->parentParseState, levelsup++)
@@ -306,10 +291,6 @@ searchRangeTableForRel(ParseState *pstate, RangeVar *relation)
 			if (rte->rtekind == RTE_RELATION &&
 				OidIsValid(relId) &&
 				rte->relid == relId)
-				return rte;
-			if (rte->rtekind == RTE_NAMEDTUPLESTORE &&
-				isenr &&
-				strcmp(rte->enrname, refname) == 0)
 				return rte;
 			if (strcmp(rte->eref->aliasname, refname) == 0)
 				return rte;
@@ -1646,115 +1627,6 @@ addRangeTableEntryForJoin(ParseState *pstate,
 }
 
 /*
- * Add an entry for an ephemeral named relation reference to the pstate's
- * range table (p_rtable).
- * Then, construct and return a ParseNamespaceItem for the new RTE.
- *
- * It is expected that the RangeVar, which up until now is only known to be an
- * ephemeral named relation, will (in conjunction with the QueryEnvironment in
- * the ParseState), create a RangeTblEntry for a specific *kind* of ephemeral
- * named relation, based on enrtype.
- *
- * This is much like addRangeTableEntry() except that it makes an RTE for an
- * ephemeral named relation.
- */
-ParseNamespaceItem *
-addRangeTableEntryForENR(ParseState *pstate,
-						 RangeVar *rv,
-						 bool inFromCl)
-{
-	RangeTblEntry *rte = makeNode(RangeTblEntry);
-	Alias	   *alias = rv->alias;
-	char	   *refname = alias ? alias->aliasname : rv->relname;
-	EphemeralNamedRelationMetadata enrmd;
-	TupleDesc	tupdesc;
-	int			attno;
-
-	Assert(pstate != NULL);
-	enrmd = get_visible_ENR(pstate, rv->relname);
-	Assert(enrmd != NULL);
-
-	switch (enrmd->enrtype)
-	{
-		case ENR_NAMED_TUPLESTORE:
-			rte->rtekind = RTE_NAMEDTUPLESTORE;
-			break;
-
-		default:
-			elog(ERROR, "unexpected enrtype: %d", enrmd->enrtype);
-			return NULL;		/* for fussy compilers */
-	}
-
-	/*
-	 * Record dependency on a relation.  This allows plans to be invalidated
-	 * if they access transition tables linked to a table that is altered.
-	 */
-	rte->relid = enrmd->reliddesc;
-
-	/*
-	 * Build the list of effective column names using user-supplied aliases
-	 * and/or actual column names.
-	 */
-	tupdesc = ENRMetadataGetTupDesc(enrmd);
-	rte->eref = makeAlias(refname, NIL);
-	buildRelationAliases(tupdesc, alias, rte->eref);
-
-	/* Record additional data for ENR, including column type info */
-	rte->enrname = enrmd->name;
-	rte->enrtuples = enrmd->enrtuples;
-	rte->coltypes = NIL;
-	rte->coltypmods = NIL;
-	rte->colcollations = NIL;
-	for (attno = 1; attno <= tupdesc->natts; ++attno)
-	{
-		Form_pg_attribute att = TupleDescAttr(tupdesc, attno - 1);
-
-		if (att->attisdropped)
-		{
-			/* Record zeroes for a dropped column */
-			rte->coltypes = lappend_oid(rte->coltypes, InvalidOid);
-			rte->coltypmods = lappend_int(rte->coltypmods, 0);
-			rte->colcollations = lappend_oid(rte->colcollations, InvalidOid);
-		}
-		else
-		{
-			/* Let's just make sure we can tell this isn't dropped */
-			if (att->atttypid == InvalidOid)
-				elog(ERROR, "atttypid is invalid for non-dropped column in \"%s\"",
-					 rv->relname);
-			rte->coltypes = lappend_oid(rte->coltypes, att->atttypid);
-			rte->coltypmods = lappend_int(rte->coltypmods, att->atttypmod);
-			rte->colcollations = lappend_oid(rte->colcollations,
-											 DEFAULT_COLLATION_OID);
-		}
-	}
-
-	/*
-	 * Set flags and access permissions.
-	 *
-	 * ENRs are never checked for access rights.
-	 */
-	rte->lateral = false;
-	rte->inFromCl = inFromCl;
-
-	rte->selectedCols = NULL;
-
-	/*
-	 * Add completed RTE to pstate's range table list, so that we know its
-	 * index.  But we don't add it to the join list --- caller must do that if
-	 * appropriate.
-	 */
-	pstate->p_rtable = lappend(pstate->p_rtable, rte);
-
-	/*
-	 * Build a ParseNamespaceItem, but don't add it to the pstate's namespace
-	 * list --- caller must do that if appropriate.
-	 */
-	return buildNSItemFromTupleDesc(rte, list_length(pstate->p_rtable),
-									tupdesc);
-}
-
-/*
  * Add the given nsitem/RTE as a top-level entry in the pstate's join list
  * and/or namespace list.  (We assume caller has checked for any
  * namespace conflicts.)  The nsitem is always marked as unconditionally
@@ -1962,9 +1834,8 @@ expandRTE(RangeTblEntry *rte, int rtindex, int sublevels_up,
 			}
 			break;
 		case RTE_VALUES:
-		case RTE_NAMEDTUPLESTORE:
 			{
-				/* Tablefunc, Values, or ENR RTE */
+				/* Values RTE */
 				ListCell   *aliasp_item = list_head(rte->eref->colnames);
 				ListCell   *lct;
 				ListCell   *lcm;
@@ -2324,15 +2195,6 @@ get_rte_attribute_is_dropped(RangeTblEntry *rte, AttrNumber attnum)
 				 * Subselect, Values RTEs never have dropped columns
 				 */
 				result = false;
-			}
-			break;
-		case RTE_NAMEDTUPLESTORE:
-			{
-				/* Check dropped-ness by testing for valid coltype */
-				if (attnum <= 0 ||
-					attnum > list_length(rte->coltypes))
-					elog(ERROR, "invalid varattno %d", attnum);
-				result = !OidIsValid((list_nth_oid(rte->coltypes, attnum - 1)));
 			}
 			break;
 		case RTE_JOIN:

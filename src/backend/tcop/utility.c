@@ -58,7 +58,6 @@ static void ProcessUtilitySlow(ParseState *pstate,
 							   const char *queryString,
 							   ProcessUtilityContext context,
 							   ParamListInfo params,
-							   QueryEnvironment *queryEnv,
 							   DestReceiver *dest,
 							   QueryCompletion *qc);
 static void ExecDropStmt(DropStmt *stmt, bool isTopLevel);
@@ -279,8 +278,6 @@ PreventCommandDuringRecovery(const char *cmdname)
  *	context: identifies source of statement (toplevel client command,
  *		non-toplevel client command, subcommand of a larger utility command)
  *	params: parameters to use during execution
- *	queryEnv: environment for parse through execution (e.g., ephemeral named
- *		tables like trigger transition tables).  May be NULL.
  *	dest: where to send results
  *	qc: where to store command completion status data.  May be NULL,
  *		but if not, then caller must have initialized it.
@@ -295,7 +292,6 @@ ProcessUtility(PlannedStmt *pstmt,
 			   bool readOnlyTree,
 			   ProcessUtilityContext context,
 			   ParamListInfo params,
-			   QueryEnvironment *queryEnv,
 			   DestReceiver *dest,
 			   QueryCompletion *qc)
 {
@@ -305,7 +301,7 @@ ProcessUtility(PlannedStmt *pstmt,
 	Assert(qc == NULL || qc->commandTag == CMDTAG_UNKNOWN);
 
 	standard_ProcessUtility(pstmt, queryString, readOnlyTree,
-								context, params, queryEnv,
+								context, params,
 								dest, qc);
 }
 
@@ -326,7 +322,6 @@ standard_ProcessUtility(PlannedStmt *pstmt,
 						bool readOnlyTree,
 						ProcessUtilityContext context,
 						ParamListInfo params,
-						QueryEnvironment *queryEnv,
 						DestReceiver *dest,
 						QueryCompletion *qc)
 {
@@ -367,7 +362,6 @@ standard_ProcessUtility(PlannedStmt *pstmt,
 
 	pstate = make_parsestate(NULL);
 	pstate->p_sourcetext = queryString;
-	pstate->p_queryEnv = queryEnv;
 
 	switch (nodeTag(parsetree))
 	{
@@ -530,7 +524,7 @@ standard_ProcessUtility(PlannedStmt *pstmt,
 				default:
 			/* All other statement types have event trigger support */
 			ProcessUtilitySlow(pstate, pstmt, queryString,
-							   context, params, queryEnv,
+							   context, params,
 							   dest, qc);
 			break;
 	}
@@ -554,7 +548,6 @@ ProcessUtilitySlow(ParseState *pstate,
 				   const char *queryString,
 				   ProcessUtilityContext context,
 				   ParamListInfo params,
-				   QueryEnvironment *queryEnv,
 				   DestReceiver *dest,
 				   QueryCompletion *qc)
 {
@@ -632,7 +625,6 @@ ProcessUtilitySlow(ParseState *pstate,
 										   false,
 										   PROCESS_UTILITY_SUBCOMMAND,
 										   params,
-										   NULL,
 										   None_Receiver,
 										   NULL);
 						}
@@ -673,7 +665,6 @@ ProcessUtilitySlow(ParseState *pstate,
 						atcontext.queryString = queryString;
 						atcontext.relid = relid;
 						atcontext.params = params;
-					atcontext.queryEnv = queryEnv;
 
 					/* ... and do it */
 					AlterTable(atstmt, lockmode, &atcontext);
@@ -803,7 +794,6 @@ ProcessUtilityForAlterTable(Node *stmt, AlterTableUtilityContext *context)
 				   false,
 				   PROCESS_UTILITY_SUBCOMMAND,
 				   context->params,
-				   context->queryEnv,
 				   None_Receiver,
 				   NULL);
 }
