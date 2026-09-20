@@ -48,7 +48,7 @@ typedef union core_YYSTYPE
  * However, those are not defined in this file, because bison insists on
  * defining them for itself.  The token codes used by the core scanner are
  * the ASCII characters plus these:
- *	%token <str>	IDENT UIDENT FCONST SCONST USCONST Op
+ *	%token <str>	IDENT FCONST SCONST Op
  *	%token <ival>	ICONST PARAM
  *	%token			TYPECAST COLON_EQUALS EQUALS_GREATER
  *	%token			LESS_EQUALS GREATER_EQUALS NOT_EQUALS

@@ -294,13 +294,13 @@ ERROR:  syntax error at or near "with"
 LINE 1: SELECT date '2001-02-03' + time with time zone '04:05:06 UTC...
                                         ^
 SELECT date '1991-02-03' + interval '2 years' AS "Add Two Years";
-ERROR:  syntax error at or near "'2 years'"
+ERROR:  type "interval" does not exist
 LINE 1: SELECT date '1991-02-03' + interval '2 years' AS "Add Two Ye...
-                                            ^
+                                   ^
 SELECT date '2001-12-13' - interval '2 years' AS "Subtract Two Years";
-ERROR:  syntax error at or near "'2 years'"
+ERROR:  type "interval" does not exist
 LINE 1: SELECT date '2001-12-13' - interval '2 years' AS "Subtract T...
-                                            ^
+                                   ^
 -- subtract time from date should not make sense; use interval instead
 SELECT date '1991-02-03' - time '04:05:06' AS "Subtract Time";
 ERROR:  operator does not exist: date - time without time zone
@@ -315,37 +315,37 @@ LINE 1: SELECT date '1991-02-03' - time with time zone '04:05:06 UTC...
 -- timestamp, interval arithmetic
 --
 SELECT timestamp without time zone '1996-03-01' - interval '1 second' AS "Feb 29";
-ERROR:  syntax error at or near "'1 second'"
-LINE 1: ...mestamp without time zone '1996-03-01' - interval '1 second'...
-                                                             ^
+ERROR:  type "interval" does not exist
+LINE 1: SELECT timestamp without time zone '1996-03-01' - interval '...
+                                                          ^
 SELECT timestamp without time zone '1999-03-01' - interval '1 second' AS "Feb 28";
-ERROR:  syntax error at or near "'1 second'"
-LINE 1: ...mestamp without time zone '1999-03-01' - interval '1 second'...
-                                                             ^
+ERROR:  type "interval" does not exist
+LINE 1: SELECT timestamp without time zone '1999-03-01' - interval '...
+                                                          ^
 SELECT timestamp without time zone '2000-03-01' - interval '1 second' AS "Feb 29";
-ERROR:  syntax error at or near "'1 second'"
-LINE 1: ...mestamp without time zone '2000-03-01' - interval '1 second'...
-                                                             ^
+ERROR:  type "interval" does not exist
+LINE 1: SELECT timestamp without time zone '2000-03-01' - interval '...
+                                                          ^
 SELECT timestamp without time zone '1999-12-01' + interval '1 month - 1 second' AS "Dec 31";
-ERROR:  syntax error at or near "'1 month - 1 second'"
-LINE 1: ...mestamp without time zone '1999-12-01' + interval '1 month -...
-                                                             ^
+ERROR:  type "interval" does not exist
+LINE 1: SELECT timestamp without time zone '1999-12-01' + interval '...
+                                                          ^
 SELECT timestamp without time zone 'Jan 1, 4713 BC' + interval '106000000 days' AS "Feb 23, 285506";
-ERROR:  syntax error at or near "'106000000 days'"
-LINE 1: ...amp without time zone 'Jan 1, 4713 BC' + interval '106000000...
+ERROR:  type "interval" does not exist
+LINE 1: ...CT timestamp without time zone 'Jan 1, 4713 BC' + interval '...
                                                              ^
 SELECT timestamp without time zone 'Jan 1, 4713 BC' + interval '107000000 days' AS "Jan 20, 288244";
-ERROR:  syntax error at or near "'107000000 days'"
-LINE 1: ...amp without time zone 'Jan 1, 4713 BC' + interval '107000000...
+ERROR:  type "interval" does not exist
+LINE 1: ...CT timestamp without time zone 'Jan 1, 4713 BC' + interval '...
                                                              ^
 SELECT timestamp without time zone 'Jan 1, 4713 BC' + interval '109203489 days' AS "Dec 31, 294276";
-ERROR:  syntax error at or near "'109203489 days'"
-LINE 1: ...amp without time zone 'Jan 1, 4713 BC' + interval '109203489...
+ERROR:  type "interval" does not exist
+LINE 1: ...CT timestamp without time zone 'Jan 1, 4713 BC' + interval '...
                                                              ^
 SELECT timestamp without time zone '2000-01-01' - interval '2483590 days' AS "out of range";
-ERROR:  syntax error at or near "'2483590 days'"
-LINE 1: ...mestamp without time zone '2000-01-01' - interval '2483590 d...
-                                                             ^
+ERROR:  type "interval" does not exist
+LINE 1: SELECT timestamp without time zone '2000-01-01' - interval '...
+                                                          ^
 SELECT timestamp without time zone '12/31/294276' - timestamp without time zone '12/23/1999' AS "106751991 Days";
 ERROR:  operator does not exist: timestamp without time zone - timestamp without time zone
 LINE 1: SELECT timestamp without time zone '12/31/294276' - timestam...
@@ -355,40 +355,40 @@ HINT:  No operator matches the given name and argument types. You might need to 
 -- Not directly usable for regression testing since these are not constants.
 -- So, just try to test parser and hope for the best - thomas 97/04/26
 SELECT (timestamp without time zone 'today' = (timestamp without time zone 'yesterday' + interval '1 day')) as "True";
-ERROR:  syntax error at or near "'1 day'"
-LINE 1: ...imestamp without time zone 'yesterday' + interval '1 day')) ...
+ERROR:  type "interval" does not exist
+LINE 1: ...day' = (timestamp without time zone 'yesterday' + interval '...
                                                              ^
 SELECT (timestamp without time zone 'today' = (timestamp without time zone 'tomorrow' - interval '1 day')) as "True";
-ERROR:  syntax error at or near "'1 day'"
-LINE 1: ...timestamp without time zone 'tomorrow' - interval '1 day')) ...
+ERROR:  type "interval" does not exist
+LINE 1: ...oday' = (timestamp without time zone 'tomorrow' - interval '...
                                                              ^
 SELECT (timestamp without time zone 'today 10:30' = (timestamp without time zone 'yesterday' + interval '1 day 10 hr 30 min')) as "True";
-ERROR:  syntax error at or near "'1 day 10 hr 30 min'"
-LINE 1: ...imestamp without time zone 'yesterday' + interval '1 day 10 ...
+ERROR:  type "interval" does not exist
+LINE 1: ...:30' = (timestamp without time zone 'yesterday' + interval '...
                                                              ^
 SELECT (timestamp without time zone '10:30 today' = (timestamp without time zone 'yesterday' + interval '1 day 10 hr 30 min')) as "True";
-ERROR:  syntax error at or near "'1 day 10 hr 30 min'"
-LINE 1: ...imestamp without time zone 'yesterday' + interval '1 day 10 ...
+ERROR:  type "interval" does not exist
+LINE 1: ...day' = (timestamp without time zone 'yesterday' + interval '...
                                                              ^
 SELECT (timestamp without time zone 'tomorrow' = (timestamp without time zone 'yesterday' + interval '2 days')) as "True";
-ERROR:  syntax error at or near "'2 days'"
-LINE 1: ...imestamp without time zone 'yesterday' + interval '2 days'))...
+ERROR:  type "interval" does not exist
+LINE 1: ...row' = (timestamp without time zone 'yesterday' + interval '...
                                                              ^
 SELECT (timestamp without time zone 'tomorrow 16:00:00' = (timestamp without time zone 'today' + interval '1 day 16 hours')) as "True";
-ERROR:  syntax error at or near "'1 day 16 hours'"
-LINE 1: ...= (timestamp without time zone 'today' + interval '1 day 16 ...
+ERROR:  type "interval" does not exist
+LINE 1: ...6:00:00' = (timestamp without time zone 'today' + interval '...
                                                              ^
 SELECT (timestamp without time zone '16:00:00 tomorrow' = (timestamp without time zone 'today' + interval '1 day 16 hours')) as "True";
-ERROR:  syntax error at or near "'1 day 16 hours'"
-LINE 1: ...= (timestamp without time zone 'today' + interval '1 day 16 ...
+ERROR:  type "interval" does not exist
+LINE 1: ...omorrow' = (timestamp without time zone 'today' + interval '...
                                                              ^
 SELECT (timestamp without time zone 'yesterday 12:34:56' = (timestamp without time zone 'tomorrow' - interval '2 days - 12:34:56')) as "True";
-ERROR:  syntax error at or near "'2 days - 12:34:56'"
-LINE 1: ...timestamp without time zone 'tomorrow' - interval '2 days - ...
+ERROR:  type "interval" does not exist
+LINE 1: ...4:56' = (timestamp without time zone 'tomorrow' - interval '...
                                                              ^
 SELECT (timestamp without time zone '12:34:56 yesterday' = (timestamp without time zone 'tomorrow' - interval '2 days - 12:34:56')) as "True";
-ERROR:  syntax error at or near "'2 days - 12:34:56'"
-LINE 1: ...timestamp without time zone 'tomorrow' - interval '2 days - ...
+ERROR:  type "interval" does not exist
+LINE 1: ...rday' = (timestamp without time zone 'tomorrow' - interval '...
                                                              ^
 SELECT (timestamp without time zone 'tomorrow' > 'now') as "True";
  True 
@@ -412,44 +412,44 @@ SELECT date '1994-01-01' + time '10:00' AS "Jan_01_1994_10am";
 (1 row)
 
 SELECT d1 + interval '1 year' AS one_year FROM TIMESTAMP_TBL;
-ERROR:  syntax error at or near "'1 year'"
+ERROR:  type "interval" does not exist
 LINE 1: SELECT d1 + interval '1 year' AS one_year FROM TIMESTAMP_TBL...
-                             ^
+                    ^
 SELECT d1 - interval '1 year' AS one_year FROM TIMESTAMP_TBL;
-ERROR:  syntax error at or near "'1 year'"
+ERROR:  type "interval" does not exist
 LINE 1: SELECT d1 - interval '1 year' AS one_year FROM TIMESTAMP_TBL...
-                             ^
+                    ^
 SELECT timestamp with time zone '1996-03-01' - interval '1 second' AS "Feb 29";
-ERROR:  syntax error at or near "'1 second'"
-LINE 1: ... timestamp with time zone '1996-03-01' - interval '1 second'...
-                                                             ^
+ERROR:  type "interval" does not exist
+LINE 1: SELECT timestamp with time zone '1996-03-01' - interval '1 s...
+                                                       ^
 SELECT timestamp with time zone '1999-03-01' - interval '1 second' AS "Feb 28";
-ERROR:  syntax error at or near "'1 second'"
-LINE 1: ... timestamp with time zone '1999-03-01' - interval '1 second'...
-                                                             ^
+ERROR:  type "interval" does not exist
+LINE 1: SELECT timestamp with time zone '1999-03-01' - interval '1 s...
+                                                       ^
 SELECT timestamp with time zone '2000-03-01' - interval '1 second' AS "Feb 29";
-ERROR:  syntax error at or near "'1 second'"
-LINE 1: ... timestamp with time zone '2000-03-01' - interval '1 second'...
-                                                             ^
+ERROR:  type "interval" does not exist
+LINE 1: SELECT timestamp with time zone '2000-03-01' - interval '1 s...
+                                                       ^
 SELECT timestamp with time zone '1999-12-01' + interval '1 month - 1 second' AS "Dec 31";
-ERROR:  syntax error at or near "'1 month - 1 second'"
-LINE 1: ... timestamp with time zone '1999-12-01' + interval '1 month -...
-                                                             ^
+ERROR:  type "interval" does not exist
+LINE 1: SELECT timestamp with time zone '1999-12-01' + interval '1 m...
+                                                       ^
 SELECT timestamp with time zone '2000-01-01' - interval '2483590 days' AS "out of range";
-ERROR:  syntax error at or near "'2483590 days'"
-LINE 1: ... timestamp with time zone '2000-01-01' - interval '2483590 d...
-                                                             ^
+ERROR:  type "interval" does not exist
+LINE 1: SELECT timestamp with time zone '2000-01-01' - interval '248...
+                                                       ^
 SELECT (timestamp with time zone 'today' = (timestamp with time zone 'yesterday' + interval '1 day')) as "True";
-ERROR:  syntax error at or near "'1 day'"
-LINE 1: ... (timestamp with time zone 'yesterday' + interval '1 day')) ...
+ERROR:  type "interval" does not exist
+LINE 1: ...'today' = (timestamp with time zone 'yesterday' + interval '...
                                                              ^
 SELECT (timestamp with time zone 'today' = (timestamp with time zone 'tomorrow' - interval '1 day')) as "True";
-ERROR:  syntax error at or near "'1 day'"
-LINE 1: ...= (timestamp with time zone 'tomorrow' - interval '1 day')) ...
+ERROR:  type "interval" does not exist
+LINE 1: ... 'today' = (timestamp with time zone 'tomorrow' - interval '...
                                                              ^
 SELECT (timestamp with time zone 'tomorrow' = (timestamp with time zone 'yesterday' + interval '2 days')) as "True";
-ERROR:  syntax error at or near "'2 days'"
-LINE 1: ... (timestamp with time zone 'yesterday' + interval '2 days'))...
+ERROR:  type "interval" does not exist
+LINE 1: ...morrow' = (timestamp with time zone 'yesterday' + interval '...
                                                              ^
 SELECT (timestamp with time zone 'tomorrow' > 'now') as "True";
  True 
@@ -461,20 +461,20 @@ SELECT (timestamp with time zone 'tomorrow' > 'now') as "True";
 -- (just for fun, let's use an intentionally nonstandard POSIX zone spec)
 SET TIME ZONE 'CST7CDT,M4.1.0,M10.5.0';
 SELECT timestamp with time zone '2005-04-02 12:00-07' + interval '1 day' as "Apr 3, 12:00";
-ERROR:  syntax error at or near "'1 day'"
-LINE 1: ...p with time zone '2005-04-02 12:00-07' + interval '1 day' as...
+ERROR:  type "interval" does not exist
+LINE 1: ... timestamp with time zone '2005-04-02 12:00-07' + interval '...
                                                              ^
 SELECT timestamp with time zone '2005-04-02 12:00-07' + interval '24 hours' as "Apr 3, 13:00";
-ERROR:  syntax error at or near "'24 hours'"
-LINE 1: ...p with time zone '2005-04-02 12:00-07' + interval '24 hours'...
+ERROR:  type "interval" does not exist
+LINE 1: ... timestamp with time zone '2005-04-02 12:00-07' + interval '...
                                                              ^
 SELECT timestamp with time zone '2005-04-03 12:00-06' - interval '1 day' as "Apr 2, 12:00";
-ERROR:  syntax error at or near "'1 day'"
-LINE 1: ...p with time zone '2005-04-03 12:00-06' - interval '1 day' as...
+ERROR:  type "interval" does not exist
+LINE 1: ... timestamp with time zone '2005-04-03 12:00-06' - interval '...
                                                              ^
 SELECT timestamp with time zone '2005-04-03 12:00-06' - interval '24 hours' as "Apr 2, 11:00";
-ERROR:  syntax error at or near "'24 hours'"
-LINE 1: ...p with time zone '2005-04-03 12:00-06' - interval '24 hours'...
+ERROR:  type "interval" does not exist
+LINE 1: ... timestamp with time zone '2005-04-03 12:00-06' - interval '...
                                                              ^
 RESET TIME ZONE;
 SELECT timestamptz(date '1994-01-01', time '11:00') AS "Jan_01_1994_10am";
@@ -502,48 +502,48 @@ ERROR:  syntax error at or near "with"
 LINE 1: SELECT timestamptz(date '1994-01-01', time with time zone '1...
                                                    ^
 SELECT d1 + interval '1 year' AS one_year FROM TIMESTAMPTZ_TBL;
-ERROR:  syntax error at or near "'1 year'"
+ERROR:  type "interval" does not exist
 LINE 1: SELECT d1 + interval '1 year' AS one_year FROM TIMESTAMPTZ_T...
-                             ^
+                    ^
 SELECT d1 - interval '1 year' AS one_year FROM TIMESTAMPTZ_TBL;
-ERROR:  syntax error at or near "'1 year'"
+ERROR:  type "interval" does not exist
 LINE 1: SELECT d1 - interval '1 year' AS one_year FROM TIMESTAMPTZ_T...
-                             ^
+                    ^
 --
 -- time, interval arithmetic
 --
 SELECT CAST(time '01:02' AS interval) AS "+01:02";
-ERROR:  syntax error at or near "interval"
+ERROR:  type "interval" does not exist
 LINE 1: SELECT CAST(time '01:02' AS interval) AS "+01:02";
                                     ^
 SELECT CAST(interval '02:03' AS time) AS "02:03:00";
-ERROR:  syntax error at or near "'02:03'"
+ERROR:  type "interval" does not exist
 LINE 1: SELECT CAST(interval '02:03' AS time) AS "02:03:00";
-                             ^
+                    ^
 SELECT time '01:30' + interval '02:01' AS "03:31:00";
-ERROR:  syntax error at or near "'02:01'"
+ERROR:  type "interval" does not exist
 LINE 1: SELECT time '01:30' + interval '02:01' AS "03:31:00";
-                                       ^
+                              ^
 SELECT time '01:30' - interval '02:01' AS "23:29:00";
-ERROR:  syntax error at or near "'02:01'"
+ERROR:  type "interval" does not exist
 LINE 1: SELECT time '01:30' - interval '02:01' AS "23:29:00";
-                                       ^
+                              ^
 SELECT time '02:30' + interval '36:01' AS "14:31:00";
-ERROR:  syntax error at or near "'36:01'"
+ERROR:  type "interval" does not exist
 LINE 1: SELECT time '02:30' + interval '36:01' AS "14:31:00";
-                                       ^
+                              ^
 SELECT time '03:30' + interval '1 month 04:01' AS "07:31:00";
-ERROR:  syntax error at or near "'1 month 04:01'"
+ERROR:  type "interval" does not exist
 LINE 1: SELECT time '03:30' + interval '1 month 04:01' AS "07:31:00"...
-                                       ^
+                              ^
 SELECT CAST(time with time zone '01:02-08' AS interval) AS "+00:01";
 ERROR:  syntax error at or near "with"
 LINE 1: SELECT CAST(time with time zone '01:02-08' AS interval) AS "...
                          ^
 SELECT CAST(interval '02:03' AS time with time zone) AS "02:03:00-08";
-ERROR:  syntax error at or near "'02:03'"
+ERROR:  syntax error at or near "with"
 LINE 1: SELECT CAST(interval '02:03' AS time with time zone) AS "02:...
-                             ^
+                                             ^
 SELECT time with time zone '01:30-08' - interval '02:01' AS "23:29:00-08";
 ERROR:  syntax error at or near "with"
 LINE 1: SELECT time with time zone '01:30-08' - interval '02:01' AS ...

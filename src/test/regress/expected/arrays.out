@@ -1134,7 +1134,7 @@ select '{{{1,2,3,4},{2,3,4,5}},{{3,4,5,6},{4,5,6,7}}}'::text[];
 (1 row)
 
 select '{0 second  ,0 second}'::interval[];
-ERROR:  syntax error at or near "interval"
+ERROR:  type "interval[]" does not exist
 LINE 1: select '{0 second  ,0 second}'::interval[];
                                         ^
 select '{ { "," } , { 3 } }'::text[];
@@ -1153,7 +1153,7 @@ select '{
            0 second,
            @ 1 hour @ 42 minutes @ 20 seconds
          }'::interval[];
-ERROR:  syntax error at or near "interval"
+ERROR:  type "interval[]" does not exist
 LINE 4:          }'::interval[];
                      ^
 select array[]::text[];

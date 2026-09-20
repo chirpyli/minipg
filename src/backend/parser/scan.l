@@ -176,8 +176,6 @@ extern void core_yyset_column(int column_no, yyscan_t yyscanner);
  *  <xqs> quote stop (detect continued strings)
  *  <xe> extended quoted strings (support backslash escape sequences)
  *  <xdolq> $foo$ quoted strings
- *  <xui> quoted identifier with Unicode escapes
- *  <xus> quoted string with Unicode escapes
  *  <xeu> Unicode surrogate pair in extended quoted string
  *
  * Remember to add an <<EOF>> case whenever you add a new exclusive state!
@@ -190,8 +188,6 @@ extern void core_yyset_column(int column_no, yyscan_t yyscanner);
 %x xqs
 %x xe
 %x xdolq
-%x xui
-%x xus
 %x xeu
 
 /*
@@ -284,15 +280,6 @@ xdstart			{dquote}
 xdstop			{dquote}
 xddouble		{dquote}{dquote}
 xdinside		[^"]+
-
-/* Quoted identifier with Unicode escapes */
-xuistart		[uU]&{dquote}
-
-/* Quoted string with Unicode escapes */
-xusstart		[uU]&{quote}
-
-/* error rule to avoid backup */
-xufailed		[uU]&
 
 
 /* C-style comments
@@ -452,19 +439,7 @@ other			.
 					BEGIN(xe);
 					startlit();
 				}
-{xusstart}		{
-					SET_YYLLOC();
-					if (!yyextra->standard_conforming_strings)
-						ereport(ERROR,
-								(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-								 errmsg("unsafe use of string constant with Unicode escapes"),
-								 errdetail("String constants with Unicode escapes cannot be used when standard_conforming_strings is off."),
-								 lexer_errposition()));
-					BEGIN(xus);
-					startlit();
-				}
-
-<xq,xe,xus>{quote} {
+<xq,xe>{quote} {
 					/*
 					 * When we are scanning a quoted string and see an end
 					 * quote, we must look ahead for a possible continuation.
@@ -509,18 +484,15 @@ other			.
 											   false);
 							yylval->str = litbufdup(yyscanner);
 							return SCONST;
-						case xus:
-							yylval->str = litbufdup(yyscanner);
-							return USCONST;
 						default:
 							yyerror("unhandled previous state in xqs");
 					}
 				}
 
-<xq,xe,xus>{xqdouble} {
+<xq,xe>{xqdouble} {
 					addlitchar('\'', yyscanner);
 				}
-<xq,xus>{xqinside}  {
+<xq>{xqinside}  {
 					addlit(yytext, yyleng, yyscanner);
 				}
 <xe>{xeinside}  {
@@ -626,7 +598,7 @@ other			.
 					/* This is only needed for \ just before EOF */
 					addlitchar(yytext[0], yyscanner);
 				}
-<xq,xe,xus><<EOF>>		{ yyerror("unterminated quoted string"); }
+<xq,xe><<EOF>>		{ yyerror("unterminated quoted string"); }
 
 {dolqdelim}		{
 					SET_YYLLOC();
@@ -678,11 +650,6 @@ other			.
 					BEGIN(xd);
 					startlit();
 				}
-{xuistart}		{
-					SET_YYLLOC();
-					BEGIN(xui);
-					startlit();
-				}
 <xd>{xdstop}	{
 					char	   *ident;
 
@@ -695,33 +662,13 @@ other			.
 					yylval->str = ident;
 					return IDENT;
 				}
-<xui>{dquote}	{
-					BEGIN(INITIAL);
-					if (yyextra->literallen == 0)
-						yyerror("zero-length delimited identifier");
-					/* can't truncate till after we de-escape the ident */
-					yylval->str = litbufdup(yyscanner);
-					return UIDENT;
-				}
-<xd,xui>{xddouble}	{
+<xd>{xddouble}	{
 					addlitchar('"', yyscanner);
 				}
-<xd,xui>{xdinside}	{
+<xd>{xdinside}	{
 					addlit(yytext, yyleng, yyscanner);
 				}
-<xd,xui><<EOF>>		{ yyerror("unterminated quoted identifier"); }
-
-{xufailed}	{
-					char	   *ident;
-
-					SET_YYLLOC();
-					/* throw back all but the initial u/U */
-					yyless(1);
-					/* and treat it as {identifier} */
-					ident = downcase_truncate_identifier(yytext, yyleng, true);
-					yylval->str = ident;
-					return IDENT;
-				}
+<xd><<EOF>>		{ yyerror("unterminated quoted identifier"); }
 
 {typecast}		{
 					SET_YYLLOC();

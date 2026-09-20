@@ -348,11 +348,8 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
  * Non-keyword token types.  These are hard-wired into the "flex" lexer.
  * They must be listed first so that their numeric codes do not depend on
  * the set of keywords.
- *
- * UIDENT and USCONST are reduced to IDENT and SCONST in parser.c, so that
- * they need no productions here; but we must assign token codes to them.
  */
-%token <str>	IDENT UIDENT FCONST SCONST USCONST Op
+%token <str>	IDENT FCONST SCONST Op
 %token <ival>	ICONST PARAM
 %token			TYPECAST COLON_EQUALS EQUALS_GREATER
 %token			LESS_EQUALS GREATER_EQUALS NOT_EQUALS
@@ -367,26 +364,26 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 /* ordinary key words in alphabetical order */
 %token <keyword> ABORT_P ADD_P
 	ALL ALTER ANALYSE ANALYZE AND ANY ARRAY AS ASC
-	AT AUTHORIZATION
+	AT
 
 	BEGIN_P BETWEEN BIGINT
 	BOOLEAN_P BOTH BY
 
-	CASCADE CASCADED CASE CAST CHAR_P
-	CHARACTER CHARACTERISTICS CHECK CHECKPOINT
-	CLUSTER COALESCE COLUMN COMMIT
-	COMMITTED CONCURRENTLY CONFLICT
+	CASCADE CASE CAST CHAR_P
+	CHARACTER CHARACTERISTICS CHECKPOINT
+	COALESCE COLUMN COMMIT
+	COMMITTED CONCURRENTLY
 	CONNECTION CONSTRAINT
 	CREATE CROSS CURRENT_P
 	CURRENT_CATALOG CURRENT_DATE CURRENT_SCHEMA
 	CURRENT_TIMESTAMP
 
 	DATA_P DATABASE DAY_P DEFAULT
-	DEFERRABLE DEFINER DELETE_P DESC
+	DEFERRABLE DELETE_P DESC
 	DISTINCT
 	DOUBLE_P DROP
 
-	ELSE ENCODING END_P ESCAPE EXCEPT
+	ELSE ENCODING END_P ESCAPE
 	EXISTS EXPLAIN
 	EXTENSION EXTRACT
 
@@ -400,23 +397,23 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 	IF_P ILIKE IN_P INCLUDE
 	INDEX
 	INNER_P INSERT INT_P INTEGER
-	INTERSECT INTERVAL INTO IS ISOLATION
+	INTO IS ISOLATION
 
 	JOIN
 
 	KEY
 
 	LAST_P LATERAL_P
-	LEADING LEAKPROOF LEAST LEFT LEVEL LIKE LIMIT LISTEN LOCAL
+	LEADING LEAST LEFT LEVEL LIKE LIMIT LOCAL
 	LOCALTIME LOCALTIMESTAMP
 
 	MINUTE_P MONTH_P
 
-	NAMES NATURAL NO NONE
-	NOT NOTIFY NULL_P NULLIF
+	NAMES NATURAL NONE
+	NOT NULL_P NULLIF
 	NULLS_P
 
-	OFF ON ONLY OPERATOR OPTION OPTIONS OR
+	ON ONLY OPERATOR OR
 	ORDER ORDINALITY OUTER_P
 	OVERLAY
 
@@ -427,12 +424,12 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 
 
 	READ REAL
-	REINDEX RELEASE RENAME REPEATABLE REPLACE
-	RESET RESTRICT RIGHT ROLE ROLLBACK
+	RELEASE REPEATABLE REPLACE
+	RESET RESTRICT RIGHT ROLLBACK
 	ROWS
 
-	SAVEPOINT SCHEMA SECOND_P SELECT SEQUENCE SEQUENCES
-	SERIALIZABLE SERVER SESSION SET SHOW
+	SAVEPOINT SCHEMA SECOND_P SELECT
+	SERIALIZABLE SESSION SET SHOW
 	SMALLINT SNAPSHOT SOME
 	START STATISTICS STORAGE
 	SUBSTRING
@@ -442,8 +439,8 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 	TRIM TRUE_P
 	TRUNCATE TYPE_P
 
-	UESCAPE UNCOMMITTED UNION UNIQUE UNKNOWN
-	UNLISTEN UPDATE USING
+	UNCOMMITTED UNIQUE UNKNOWN
+	UPDATE USING
 
 	VACUUM VALUES VARCHAR VARIADIC VARYING
 	VERBOSE VERSION_P VIEW
@@ -479,8 +476,6 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 
 /* Precedence: lowest to highest */
 %nonassoc	SET				/* see relation_expr_opt_alias */
-%left		UNION EXCEPT
-%left		INTERSECT
 %left		OR
 %left		AND
 %right		NOT
@@ -1451,26 +1446,6 @@ create_extension_opt_item:
 
 /*****************************************************************************
  *
- * ALTER EXTENSION name UPDATE [ TO version ]
- *
- *****************************************************************************/
-
-
-
-/*****************************************************************************
- *
- *		QUERY:
- *				[ { LIMIT TO | EXCEPT } ( table_list ) ]
- *				FROM SERVER server_name INTO local_schema [ OPTIONS (...) ]
- *
- ****************************************************************************/
-
-
-		;
-
-
-/*****************************************************************************
- *
  *		QUERY :
  *				generic definition list (name '=' value, ...)
  *
@@ -1874,17 +1849,6 @@ AlterObjectSchemaStmt:
 
 /*****************************************************************************
  *
- *		QUERY:
- *				LISTEN / NOTIFY / UNLISTEN are not supported in minipg
- *				(see mydoc/CHANGE.md); the grammar keywords are retained
- *				only as reserved fallback keywords to keep check_keywords.pl
- *				consistent with kwlist.h.
- *
- *****************************************************************************/
-
-
-/*****************************************************************************
- *
  *		Transactions:
  *
  *		BEGIN / COMMIT / ROLLBACK
@@ -2040,7 +2004,7 @@ transaction_mode_list_or_empty:
  *
  *	QUERY:
  *		CREATE [ OR REPLACE ] VIEW <viewname> '('target-list ')'
- *			AS <query> [ WITH [ CASCADED | LOCAL ] CHECK OPTION ]
+ *			AS <query>
  *
  *****************************************************************************/
 
@@ -2542,10 +2506,7 @@ set_target:
  * absorbing parentheses into the sub-SELECT, we will do so, and only when
  * it's no longer possible to do that will we decide that parens belong to
  * the expression.	For example, in "SELECT (((SELECT 2)) + 3)" the extra
- * parentheses are treated as part of the sub-select.  The necessity of doing
- * it that way is shown by "SELECT (((SELECT 2)) UNION SELECT 2)".	Had we
- * parsed "((SELECT 2))" as an a_expr, it'd be too late to go back to the
- * SELECT viewpoint when we see the UNION.
+ * parentheses are treated as part of the sub-select.
  *
  * This approach is implemented by defining a nonterminal select_with_parens,
  * which represents a SELECT with at least one outer layer of parentheses,
@@ -2597,29 +2558,19 @@ select_clause:
 		;
 
 /*
- * This rule parses SELECT statements that can appear within set operations,
- * including UNION, INTERSECT and EXCEPT.  '(' and ')' can be used to specify
- * the ordering of the set operations.	Without '(' and ')' we want the
- * operations to be ordered per the precedence specs at the head of this file.
- *
- * As with select_no_parens, simple_select cannot have outer parentheses,
+ * simple_select is the core SELECT production.  The set operations
+ * (UNION/INTERSECT/EXCEPT), WITH, FOR UPDATE and LIMIT have been cropped,
+ * so as with select_no_parens, simple_select cannot have outer parentheses,
  * but can have parenthesized subclauses.
  *
  * It might appear that we could fold the first two alternatives into one
- * by using opt_distinct_clause.  However, that causes a shift/reduce conflict
- * against INSERT ... SELECT ... ON CONFLICT.  We avoid the ambiguity by
- * requiring SELECT DISTINCT [ON] to be followed by a non-empty target_list.
+ * by using opt_distinct_clause.  We avoid the ambiguity by requiring
+ * SELECT DISTINCT to be followed by a non-empty target_list.
  *
- * Note that sort clauses cannot be included at this level --- SQL requires
- *		SELECT foo UNION SELECT bar ORDER BY baz
- * to be parsed as
- *		(SELECT foo UNION SELECT bar) ORDER BY baz
- * not
- *		SELECT foo UNION (SELECT bar ORDER BY baz)
- * Likewise for WITH, FOR UPDATE and LIMIT.  Therefore, those clauses are
- * described as part of the select_no_parens production, not simple_select.
- * This does not limit functionality, because you can reintroduce these
- * clauses inside parentheses.
+ * Note that sort clauses cannot be included at this level, per SQL: an
+ * ORDER BY applies to the whole SELECT, so it is described as part of the
+ * select_no_parens production, not simple_select.  This does not limit
+ * functionality, because you can reintroduce the clause inside parentheses.
  *
  * NOTE: only the leftmost component SelectStmt should have INTO.
  * However, this is not checked by the grammar; parse analysis must check it.
@@ -4876,12 +4827,10 @@ unreserved_keyword:
 			| BEGIN_P
 			| BY
 			| CASCADE
-			| CASCADED
 			| CHARACTERISTICS
 			| CHECKPOINT
 			| COMMIT
 			| COMMITTED
-			| CONFLICT
 			| CONNECTION
 			| CURRENT_P
 			| DATA_P
@@ -4905,36 +4854,27 @@ unreserved_keyword:
 			| KEY
 			| LAST_P
 			| LEVEL
-			| LISTEN
 			| LOCAL
 			| MINUTE_P
 			| MONTH_P
 			| NAMES
-			| NO
-			| NOTIFY
 			| NULLS_P
-			| OFF
 			| OPERATOR
-			| OPTION
-			| OPTIONS
 			| ORDINALITY
 			| PREPARE
 			| PREPARED
 			| READ
 			| RELEASE
-			| RENAME
 			| REPEATABLE
 			| REPLACE
 			| RESET
 			| RESTRICT
-			| ROLE
 			| ROLLBACK
 			| ROWS
 			| SAVEPOINT
 			| SCHEMA
 			| SECOND_P
 			| SERIALIZABLE
-			| SERVER
 			| SESSION
 			| SET
 			| SHOW
@@ -4947,10 +4887,8 @@ unreserved_keyword:
 			| TRANSACTION
 			| TRUNCATE
 			| TYPE_P
-			| UESCAPE
 			| UNCOMMITTED
 			| UNKNOWN
-			| UNLISTEN
 			| UPDATE
 			| VACUUM
 			| VARYING
@@ -4986,7 +4924,6 @@ col_name_keyword:
 			| GREATEST
 			| INT_P
 			| INTEGER
-			| INTERVAL
 			| LEAST
 			| NONE
 			| NULLIF
@@ -5014,8 +4951,7 @@ col_name_keyword:
  * - thomas 2000-11-28
  */
 type_func_name_keyword:
-			  AUTHORIZATION
-			| CONCURRENTLY
+			  CONCURRENTLY
 			| CROSS
 			| CURRENT_SCHEMA
 			| FREEZE
@@ -5051,7 +4987,6 @@ reserved_keyword:
 			| BOTH
 			| CASE
 			| CAST
-			| CHECK
 			| COLUMN
 			| CONSTRAINT
 			| CREATE
@@ -5064,14 +4999,12 @@ reserved_keyword:
 			| DISTINCT
 			| ELSE
 			| END_P
-			| EXCEPT
 			| FALSE_P
 			| FOR
 			| FROM
 			| GROUP_P
 			| HAVING
 			| IN_P
-			| INTERSECT
 			| INTO
 			| LATERAL_P
 			| LEADING
@@ -5093,7 +5026,6 @@ reserved_keyword:
 			| TO
 			| TRAILING
 			| TRUE_P
-			| UNION
 			| UNIQUE
 			| USING
 			| VARIADIC
@@ -5122,7 +5054,6 @@ bare_label_keyword:
 			| ANY
 			| ASC
 			| AT
-			| AUTHORIZATION
 			| BEGIN_P
 			| BETWEEN
 			| BIGINT
@@ -5130,18 +5061,15 @@ bare_label_keyword:
 			| BOTH
 			| BY
 			| CASCADE
-			| CASCADED
 			| CASE
 			| CAST
 			| CHARACTERISTICS
-			| CHECK
 			| CHECKPOINT
 			| COALESCE
 			| COLUMN
 			| COMMIT
 			| COMMITTED
 			| CONCURRENTLY
-			| CONFLICT
 			| CONNECTION
 			| CONSTRAINT
 			| CROSS
@@ -5183,7 +5111,6 @@ bare_label_keyword:
 			| INSERT
 			| INT_P
 			| INTEGER
-			| INTERVAL
 			| IS
 			| ISOLATION
 			| JOIN
@@ -5195,24 +5122,18 @@ bare_label_keyword:
 			| LEFT
 			| LEVEL
 			| LIKE
-			| LISTEN
 			| LOCAL
 			| LOCALTIME
 			| LOCALTIMESTAMP
 			| NAMES
 			| NATURAL
-			| NO
 			| NONE
 			| NOT
-			| NOTIFY
 			| NULL_P
 			| NULLIF
 			| NULLS_P
-			| OFF
 			| ONLY
 			| OPERATOR
-			| OPTION
-			| OPTIONS
 			| OR
 			| ORDINALITY
 			| OUTER_P
@@ -5226,20 +5147,17 @@ bare_label_keyword:
 			| REAL
 
 			| RELEASE
-			| RENAME
 			| REPEATABLE
 			| REPLACE
 			| RESET
 			| RESTRICT
 			| RIGHT
-			| ROLE
 			| ROLLBACK
 			| ROWS
 			| SAVEPOINT
 			| SCHEMA
 			| SELECT
 			| SERIALIZABLE
-			| SERVER
 			| SESSION
 			| SET
 			| SHOW
@@ -5263,11 +5181,9 @@ bare_label_keyword:
 			| TRUE_P
 			| TRUNCATE
 			| TYPE_P
-			| UESCAPE
 			| UNCOMMITTED
 			| UNIQUE
 			| UNKNOWN
-			| UNLISTEN
 			| UPDATE
 			| USING
 			| VACUUM

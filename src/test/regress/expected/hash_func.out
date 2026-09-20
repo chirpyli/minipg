@@ -246,7 +246,7 @@ FROM   (VALUES (NULL::interval),
         ('17 year 11 month 7 day 9 hours 46 minutes 5 seconds')) x(v)
 WHERE  interval_hash(v)::int8 != interval_hash_extended(v, 0)::int8
        OR interval_hash(v)::int8 = interval_hash_extended(v, 1)::int8;
-ERROR:  syntax error at or near "interval"
+ERROR:  type "interval" does not exist
 LINE 4: FROM   (VALUES (NULL::interval),
                               ^
 SELECT v as value, timestamp_hash(v)::int8 as standard,
