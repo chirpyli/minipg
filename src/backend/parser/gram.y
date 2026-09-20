@@ -305,7 +305,6 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 %type <jexpr>	joined_table
 %type <range>	relation_expr
 %type <range>	relation_expr_opt_alias
-%type <node>	tablesample_clause opt_repeatable_clause
 %type <target>	target_el set_target insert_column_item
 
 
@@ -423,7 +422,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 	SMALLINT SNAPSHOT SOME
 	START STATISTICS STORAGE
 
-	TABLE TABLESAMPLE TEMPLATE THEN
+	TABLE TEMPLATE THEN
 	TIME TIMESTAMP TO TRANSACTION
 	TRUE_P
 	TRUNCATE TYPE_P
@@ -2736,14 +2735,6 @@ table_ref:	relation_expr opt_alias_clause
 					$1->alias = $2;
 					$$ = (Node *) $1;
 				}
-			| relation_expr opt_alias_clause tablesample_clause
-				{
-					RangeTableSample *n = (RangeTableSample *) $3;
-					$1->alias = $2;
-					/* relation_expr goes inside the RangeTableSample node */
-					n->relation = (Node *) $1;
-					$$ = (Node *) n;
-				}
 			| func_table func_alias_clause
 				{
 					RangeFunction *n = (RangeFunction *) $1;
@@ -3057,26 +3048,7 @@ relation_expr_opt_alias: relation_expr					%prec UMINUS
 				}
 		;
 
-/*
- * TABLESAMPLE decoration in a FROM item
- */
-tablesample_clause:
-			TABLESAMPLE func_name '(' expr_list ')' opt_repeatable_clause
-				{
-					RangeTableSample *n = makeNode(RangeTableSample);
-					/* n->relation will be filled in later */
-					n->method = $2;
-					n->args = $4;
-					n->repeatable = $6;
-					n->location = @2;
-					$$ = (Node *) n;
-				}
-		;
 
-opt_repeatable_clause:
-			REPEATABLE '(' a_expr ')'	{ $$ = (Node *) $3; }
-			| /*EMPTY*/					{ $$ = NULL; }
-		;
 
 /*
  * func_table represents a function invocation in a FROM list. It can be
@@ -4473,7 +4445,6 @@ type_func_name_keyword:
 			| LIKE
 			| OUTER_P
 			| RIGHT
-			| TABLESAMPLE
 			| VERBOSE
 		;
 
@@ -4653,7 +4624,6 @@ bare_label_keyword:
 			| STORAGE
 			| TABLE
 
-			| TABLESAMPLE
 			| TEMPLATE
 			| THEN
 			| TIME

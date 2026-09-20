@@ -9,6 +9,6 @@ top_builddir = ../../..
 include $(top_builddir)/src/Makefile.global
 
 SUBDIRS	    = common hash heap index nbtree rmgrdesc \
-		  table tablesample transam
+		  table transam
 
 include $(top_srcdir)/src/backend/common.mk

@@ -19,7 +19,6 @@
 #include <math.h>
 
 #include "access/sysattr.h"
-#include "access/tsmapi.h"
 #include "catalog/pg_class.h"
 #include "catalog/pg_operator.h"
 #include "catalog/pg_proc.h"
@@ -78,10 +77,6 @@ static void set_rel_consider_parallel(PlannerInfo *root, RelOptInfo *rel,
 									  RangeTblEntry *rte);
 static void set_plain_rel_pathlist(PlannerInfo *root, RelOptInfo *rel,
 								   RangeTblEntry *rte);
-static void set_tablesample_rel_size(PlannerInfo *root, RelOptInfo *rel,
-									 RangeTblEntry *rte);
-static void set_tablesample_rel_pathlist(PlannerInfo *root, RelOptInfo *rel,
-										 RangeTblEntry *rte);
 static void generate_orderedappend_paths(PlannerInfo *root, RelOptInfo *rel,
 										 List *live_childrels,
 										 List *all_child_pathkeys);
@@ -351,16 +346,7 @@ set_rel_size(PlannerInfo *root, RelOptInfo *rel,
 		switch (rel->rtekind)
 		{
 		case RTE_RELATION:
-			if (rte->tablesample != NULL)
-			{
-				/* Sampled relation */
-				set_tablesample_rel_size(root, rel, rte);
-			}
-			else
-			{
-				/* Plain relation */
-				set_plain_rel_size(root, rel, rte);
-			}
+			set_plain_rel_size(root, rel, rte);
 			break;
 			case RTE_SUBQUERY:
 
@@ -414,17 +400,8 @@ set_rel_pathlist(PlannerInfo *root, RelOptInfo *rel,
 		switch (rel->rtekind)
 		{
 		case RTE_RELATION:
-			if (rte->tablesample != NULL)
-			{
-					/* Sampled relation */
-					set_tablesample_rel_pathlist(root, rel, rte);
-				}
-				else
-				{
-					/* Plain relation */
-					set_plain_rel_pathlist(root, rel, rte);
-				}
-				break;
+			set_plain_rel_pathlist(root, rel, rte);
+			break;
 			case RTE_SUBQUERY:
 				/* Subquery --- fully handled during set_rel_size */
 				break;
@@ -525,20 +502,6 @@ set_rel_consider_parallel(PlannerInfo *root, RelOptInfo *rel,
 	switch (rte->rtekind)
 	{
 		case RTE_RELATION:
-
-			/*
-			 * Table sampling can be pushed down to workers if the sample
-			 * function and its arguments are safe.
-			 */
-			if (rte->tablesample != NULL)
-			{
-				char		proparallel = func_parallel(rte->tablesample->tsmhandler);
-
-				if (proparallel != PROPARALLEL_SAFE)
-					return;
-				if (!is_parallel_safe(root, (Node *) rte->tablesample->args))
-					return;
-			}
 
 			/*
 			 * Just set consider_parallel based on the rel's own quals and
@@ -664,94 +627,6 @@ create_plain_partial_paths(PlannerInfo *root, RelOptInfo *rel)
 
 	/* Add an unordered partial path based on a parallel sequential scan. */
 	add_partial_path(rel, create_seqscan_path(root, rel, NULL, parallel_workers));
-}
-
-/*
- * set_tablesample_rel_size
- *	  Set size estimates for a sampled relation
- */
-static void
-set_tablesample_rel_size(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte)
-{
-	TableSampleClause *tsc = rte->tablesample;
-	TsmRoutine *tsm;
-	BlockNumber pages;
-	double		tuples;
-
-	/*
-	 * Test any partial indexes of rel for applicability.  We must do this
-	 * first since partial unique indexes can affect size estimates.
-	 */
-	check_index_predicates(root, rel);
-
-	/*
-	 * Call the sampling method's estimation function to estimate the number
-	 * of pages it will read and the number of tuples it will return.  (Note:
-	 * we assume the function returns sane values.)
-	 */
-	tsm = GetTsmRoutine(tsc->tsmhandler);
-	tsm->SampleScanGetSampleSize(root, rel, tsc->args,
-								 &pages, &tuples);
-
-	/*
-	 * For the moment, because we will only consider a SampleScan path for the
-	 * rel, it's okay to just overwrite the pages and tuples estimates for the
-	 * whole relation.  If we ever consider multiple path types for sampled
-	 * rels, we'll need more complication.
-	 */
-	rel->pages = pages;
-	rel->tuples = tuples;
-
-	/* Mark rel with estimated output rows, width, etc */
-	set_baserel_size_estimates(root, rel);
-}
-
-/*
- * set_tablesample_rel_pathlist
- *	  Build access paths for a sampled relation
- */
-static void
-set_tablesample_rel_pathlist(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte)
-{
-	Relids		required_outer;
-	Path	   *path;
-
-	/*
-	 * We don't support pushing join clauses into the quals of a samplescan,
-	 * but it could still have required parameterization due to LATERAL refs
-	 * in its tlist or TABLESAMPLE arguments.
-	 */
-	required_outer = rel->lateral_relids;
-
-	/* Consider sampled scan */
-	path = create_samplescan_path(root, rel, required_outer);
-
-	/*
-	 * If the sampling method does not support repeatable scans, we must avoid
-	 * plans that would scan the rel multiple times.  Ideally, we'd simply
-	 * avoid putting the rel on the inside of a nestloop join; but adding such
-	 * a consideration to the planner seems like a great deal of complication
-	 * to support an uncommon usage of second-rate sampling methods.  Instead,
-	 * if there is a risk that the query might perform an unsafe join, just
-	 * wrap the SampleScan in a Materialize node.  We can check for joins by
-	 * counting the membership of all_baserels (note that this correctly
-	 * counts inheritance trees as single rels).  If we're inside a subquery,
-	 * we can't easily check whether a join might occur in the outer query, so
-	 * just assume one is possible.
-	 *
-	 * GetTsmRoutine is relatively expensive compared to the other tests here,
-	 * so check repeatable_across_scans last, even though that's a bit odd.
-	 */
-	if ((root->query_level > 1 ||
-		 bms_membership(root->all_baserels) != BMS_SINGLETON) &&
-		!(GetTsmRoutine(rte->tablesample->tsmhandler)->repeatable_across_scans))
-	{
-		path = (Path *) create_material_path(rel, path);
-	}
-
-	add_path(rel, path);
-
-	/* For the moment, at least, there are no other paths to consider */
 }
 
 
@@ -2853,9 +2728,6 @@ print_path(PlannerInfo *root, Path *path, int indent)
 			{
 				case T_SeqScan:
 					ptype = "SeqScan";
-					break;
-				case T_SampleScan:
-					ptype = "SampleScan";
 					break;
 				case T_FunctionScan:
 					ptype = "FunctionScan";

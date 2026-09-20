@@ -95,7 +95,7 @@ test: select_distinct select_implicit select_having btree_index hash_index prepa
 # 权限/角色机制已裁剪，matview identity generated 依赖 ROLE/OWNER，移除
 # information_schema 已裁剪，collate 引用 information_schema.views，移除
 # lock 已随表继承(INHERITS)功能裁剪而移除
-test: tablesample join_hash
+test: join_hash
 
 # ----------
 # Another group of parallel tests

@@ -474,7 +474,6 @@ add_rte_to_flat_rtable(PlannerGlobal *glob, RangeTblEntry *rte)
 	memcpy(newrte, rte, sizeof(RangeTblEntry));
 
 	/* zap unneeded sub-structure */
-	newrte->tablesample = NULL;
 	newrte->subquery = NULL;
 	newrte->joinaliasvars = NIL;
 	newrte->joinleftcols = NIL;
@@ -552,22 +551,6 @@ set_plan_refs(PlannerInfo *root, Plan *plan, int rtoffset)
 				splan->plan.qual =
 					fix_scan_list(root, splan->plan.qual,
 								  rtoffset, NUM_EXEC_QUAL(plan));
-			}
-			break;
-		case T_SampleScan:
-			{
-				SampleScan *splan = (SampleScan *) plan;
-
-				splan->scan.scanrelid += rtoffset;
-				splan->scan.plan.targetlist =
-					fix_scan_list(root, splan->scan.plan.targetlist,
-								  rtoffset, NUM_EXEC_TLIST(plan));
-				splan->scan.plan.qual =
-					fix_scan_list(root, splan->scan.plan.qual,
-								  rtoffset, NUM_EXEC_QUAL(plan));
-				splan->tablesample = (TableSampleClause *)
-					fix_scan_expr(root, (Node *) splan->tablesample,
-								  rtoffset, 1);
 			}
 			break;
 		case T_IndexScan:

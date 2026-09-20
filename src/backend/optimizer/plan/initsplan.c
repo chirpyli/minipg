@@ -328,7 +328,7 @@ extract_lateral_references(PlannerInfo *root, RelOptInfo *brel, Index rtindex)
 
 	/* Fetch the appropriate variables */
 	if (rte->rtekind == RTE_RELATION)
-		vars = pull_vars_of_level((Node *) rte->tablesample, 0);
+		vars = NIL;
 	else if (rte->rtekind == RTE_SUBQUERY)
 		vars = pull_vars_of_level((Node *) rte->subquery, 1);
 	else if (rte->rtekind == RTE_FUNCTION)

@@ -34,7 +34,7 @@ extern bool synchronize_seqscans;
 
 struct BulkInsertStateData;
 struct IndexInfo;
-struct SampleScanState;
+
 struct TBMIterateResult;
 struct VacuumParams;
 struct ValidateIndexState;
@@ -47,7 +47,7 @@ typedef enum ScanOptions
 	/* one of SO_TYPE_* may be specified */
 	SO_TYPE_SEQSCAN = 1 << 0,
 	SO_TYPE_BITMAPSCAN = 1 << 1,
-	SO_TYPE_SAMPLESCAN = 1 << 2,
+
 	SO_TYPE_TIDSCAN = 1 << 3,
 	SO_TYPE_TIDRANGESCAN = 1 << 4,
 	SO_TYPE_ANALYZE = 1 << 5,
@@ -802,50 +802,6 @@ typedef struct TableAmRoutine
 										   struct TBMIterateResult *tbmres,
 										   TupleTableSlot *slot);
 
-	/*
-	 * Prepare to fetch tuples from the next block in a sample scan. Return
-	 * false if the sample scan is finished, true otherwise. `scan` was
-	 * started via table_beginscan_sampling().
-	 *
-	 * Typically this will first determine the target block by calling the
-	 * TsmRoutine's NextSampleBlock() callback if not NULL, or alternatively
-	 * perform a sequential scan over all blocks.  The determined block is
-	 * then typically read and pinned.
-	 *
-	 * As the TsmRoutine interface is block based, a block needs to be passed
-	 * to NextSampleBlock(). If that's not appropriate for an AM, it
-	 * internally needs to perform mapping between the internal and a block
-	 * based representation.
-	 *
-	 * Note that it's not acceptable to hold deadlock prone resources such as
-	 * lwlocks until scan_sample_next_tuple() has exhausted the tuples on the
-	 * block - the tuple is likely to be returned to an upper query node, and
-	 * the next call could be off a long while. Holding buffer pins and such
-	 * is obviously OK.
-	 *
-	 * Currently it is required to implement this interface, as there's no
-	 * alternative way (contrary e.g. to bitmap scans) to implement sample
-	 * scans. If infeasible to implement, the AM may raise an error.
-	 */
-	bool		(*scan_sample_next_block) (TableScanDesc scan,
-										   struct SampleScanState *scanstate);
-
-	/*
-	 * This callback, only called after scan_sample_next_block has returned
-	 * true, should determine the next tuple to be returned from the selected
-	 * block using the TsmRoutine's NextSampleTuple() callback.
-	 *
-	 * The callback needs to perform visibility checks, and only return
-	 * visible tuples. That obviously can mean calling NextSampleTuple()
-	 * multiple times.
-	 *
-	 * The TsmRoutine interface assumes that there's a maximum offset on a
-	 * given page, so if that doesn't apply to an AM, it needs to emulate that
-	 * assumption somehow.
-	 */
-	bool		(*scan_sample_next_tuple) (TableScanDesc scan,
-										   struct SampleScanState *scanstate,
-										   TupleTableSlot *slot);
 
 } TableAmRoutine;
 
@@ -931,30 +887,7 @@ table_beginscan_bm(Relation rel, Snapshot snapshot,
 	return rel->rd_tableam->scan_begin(rel, snapshot, nkeys, key, NULL, flags);
 }
 
-/*
- * table_beginscan_sampling is an alternative entry point for setting up a
- * TableScanDesc for a TABLESAMPLE scan.  As with bitmap scans, it's worth
- * using the same data structure although the behavior is rather different.
- * In addition to the options offered by table_beginscan_strat, this call
- * also allows control of whether page-mode visibility checking is used.
- */
-static inline TableScanDesc
-table_beginscan_sampling(Relation rel, Snapshot snapshot,
-						 int nkeys, struct ScanKeyData *key,
-						 bool allow_strat, bool allow_sync,
-						 bool allow_pagemode)
-{
-	uint32		flags = SO_TYPE_SAMPLESCAN;
 
-	if (allow_strat)
-		flags |= SO_ALLOW_STRAT;
-	if (allow_sync)
-		flags |= SO_ALLOW_SYNC;
-	if (allow_pagemode)
-		flags |= SO_ALLOW_PAGEMODE;
-
-	return rel->rd_tableam->scan_begin(rel, snapshot, nkeys, key, NULL, flags);
-}
 
 /*
  * table_beginscan_tid is an alternative entry point for setting up a
@@ -1960,52 +1893,9 @@ table_scan_bitmap_next_tuple(TableScanDesc scan,
 														   slot);
 }
 
-/*
- * Prepare to fetch tuples from the next block in a sample scan. Returns false
- * if the sample scan is finished, true otherwise. `scan` needs to have been
- * started via table_beginscan_sampling().
- *
- * This will call the TsmRoutine's NextSampleBlock() callback if necessary
- * (i.e. NextSampleBlock is not NULL), or perform a sequential scan over the
- * underlying relation.
- */
-static inline bool
-table_scan_sample_next_block(TableScanDesc scan,
-							 struct SampleScanState *scanstate)
-{
-	/*
-	 * We don't expect direct calls to table_scan_sample_next_block with valid
-	 * CheckXidAlive for catalog or regular tables.  See detailed comments in
-	 * xact.c where these variables are declared.
-	 */
-	if (unlikely(TransactionIdIsValid(CheckXidAlive) && !bsysscan))
-		elog(ERROR, "unexpected table_scan_sample_next_block call during logical decoding");
-	return scan->rs_rd->rd_tableam->scan_sample_next_block(scan, scanstate);
-}
 
-/*
- * Fetch the next sample tuple into `slot` and return true if a visible tuple
- * was found, false otherwise. table_scan_sample_next_block() needs to
- * previously have selected a block (i.e. returned true), and no previous
- * table_scan_sample_next_tuple() for the same block may have returned false.
- *
- * This will call the TsmRoutine's NextSampleTuple() callback.
- */
-static inline bool
-table_scan_sample_next_tuple(TableScanDesc scan,
-							 struct SampleScanState *scanstate,
-							 TupleTableSlot *slot)
-{
-	/*
-	 * We don't expect direct calls to table_scan_sample_next_tuple with valid
-	 * CheckXidAlive for catalog or regular tables.  See detailed comments in
-	 * xact.c where these variables are declared.
-	 */
-	if (unlikely(TransactionIdIsValid(CheckXidAlive) && !bsysscan))
-		elog(ERROR, "unexpected table_scan_sample_next_tuple call during logical decoding");
-	return scan->rs_rd->rd_tableam->scan_sample_next_tuple(scan, scanstate,
-														   slot);
-}
+
+
 
 
 /* ----------------------------------------------------------------------------

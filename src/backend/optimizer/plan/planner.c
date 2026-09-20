@@ -78,7 +78,6 @@ create_upper_paths_hook_type create_upper_paths_hook = NULL;
 #define EXPRKIND_LIMIT				6
 #define EXPRKIND_APPINFO			7
 #define EXPRKIND_PHV				8
-#define EXPRKIND_TABLESAMPLE		9
 #define EXPRKIND_TABLEFUNC			11
 #define EXPRKIND_TABLEFUNC_LATERAL	12
 
@@ -592,15 +591,7 @@ subquery_planner(PlannerGlobal *glob, Query *parse,
 		RangeTblEntry *rte = lfirst_node(RangeTblEntry, l);
 		int			kind;
 
-		if (rte->rtekind == RTE_RELATION)
-		{
-			if (rte->tablesample)
-				rte->tablesample = (TableSampleClause *)
-					preprocess_expression(root,
-										  (Node *) rte->tablesample,
-										  EXPRKIND_TABLESAMPLE);
-		}
-		else if (rte->rtekind == RTE_SUBQUERY)
+		if (rte->rtekind == RTE_SUBQUERY)
 		{
 			/*
 			 * We don't want to do all preprocessing yet on the subquery's
@@ -783,13 +774,12 @@ preprocess_expression(PlannerInfo *root, Node *expr, int kind)
 	 * we may extract from the joinaliasvars lists have not been preprocessed.
 	 * For example, if we did this after sublink processing, sublinks expanded
 	 * out from join aliases would not get processed.  But we can skip this in
-	 * non-lateral RTE functions, VALUES lists, and TABLESAMPLE clauses, since
-	 * they can't contain any Vars of the current query level.
+	 * non-lateral RTE functions and VALUES lists, since they can't contain
+	 * any Vars of the current query level.
 	 */
 	if (root->hasJoinRTEs &&
 		!(kind == EXPRKIND_RTFUNC ||
 		  kind == EXPRKIND_VALUES ||
-		  kind == EXPRKIND_TABLESAMPLE ||
 		  kind == EXPRKIND_TABLEFUNC))
 		expr = flatten_join_alias_vars(root->parse, expr);
 

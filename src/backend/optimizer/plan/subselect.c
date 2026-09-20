@@ -1797,12 +1797,6 @@ finalize_plan(PlannerInfo *root, Plan *plan,
 			context.paramids = bms_add_members(context.paramids, scan_params);
 			break;
 
-		case T_SampleScan:
-			finalize_primnode((Node *) ((SampleScan *) plan)->tablesample,
-							  &context);
-			context.paramids = bms_add_members(context.paramids, scan_params);
-			break;
-
 		case T_IndexScan:
 			finalize_primnode((Node *) ((IndexScan *) plan)->indexqual,
 							  &context);

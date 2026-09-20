@@ -418,10 +418,6 @@ rewriteRuleAction(Query *parsetree,
 
 			switch (rte->rtekind)
 			{
-				case RTE_RELATION:
-					sub_action->hasSubLinks =
-						checkExprHasSubLink((Node *) rte->tablesample);
-					break;
 				case RTE_FUNCTION:
 					sub_action->hasSubLinks =
 						checkExprHasSubLink((Node *) rte->functions);
@@ -1009,7 +1005,6 @@ ApplyRetrieveRule(Query *parsetree,
 	 */
 	rte->relkind = 0;
 	rte->rellockmode = 0;
-	rte->tablesample = NULL;
 
 	/*
 	 * We move the view's permission check data down to its rangetable. The
@@ -1558,9 +1553,6 @@ view_query_is_auto_updatable(Query *viewquery, bool check_cols)
 		(base_rte->relkind != RELKIND_RELATION &&
 		 base_rte->relkind != RELKIND_VIEW))
 		return gettext_noop("Views that do not select from a single table or view are not automatically updatable.");
-
-	if (base_rte->tablesample)
-		return gettext_noop("Views containing TABLESAMPLE are not automatically updatable.");
 
 	/*
 	 * Check that the view has at least one updatable column. This is required

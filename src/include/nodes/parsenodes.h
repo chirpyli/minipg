@@ -407,25 +407,7 @@ typedef struct RangeFunction
 								 * of function returning RECORD */
 } RangeFunction;
 
-/*
- * RangeTableSample - TABLESAMPLE appearing in a raw FROM clause
- *
- * This node, appearing only in raw parse trees, represents
- *		<relation> TABLESAMPLE <method> (<params>) REPEATABLE (<num>)
- * Currently, the <relation> can only be a RangeVar, but we might in future
- * allow RangeSubselect and other options.  Note that the RangeTableSample
- * is wrapped around the node representing the <relation>, rather than being
- * a subfield of it.
- */
-typedef struct RangeTableSample
-{
-	NodeTag		type;
-	Node	   *relation;		/* relation to be sampled */
-	List	   *method;			/* sampling method name (possibly qualified) */
-	List	   *args;			/* argument(s) for sampling method */
-	Node	   *repeatable;		/* REPEATABLE expression, or NULL if none */
-	int			location;		/* method name location, or -1 if unknown */
-} RangeTableSample;
+
 
 /*
  * ColumnDef - column definition (used in various creates)
@@ -621,7 +603,7 @@ typedef struct RangeTblEntry
 	Oid			relid;			/* OID of the relation */
 	char		relkind;		/* relation kind (see pg_class.relkind) */
 	int			rellockmode;	/* lock level that query requires on the rel */
-	struct TableSampleClause *tablesample;	/* sampling info, or NULL */
+
 
 	/*
 	 * Fields valid for a subquery RTE (else NULL):
@@ -761,18 +743,7 @@ typedef struct RangeTblFunction
 	Bitmapset  *funcparams;		/* PARAM_EXEC Param IDs affecting this func */
 } RangeTblFunction;
 
-/*
- * TableSampleClause - TABLESAMPLE appearing in a transformed FROM clause
- *
- * Unlike RangeTableSample, this is a subnode of the relevant RangeTblEntry.
- */
-typedef struct TableSampleClause
-{
-	NodeTag		type;
-	Oid			tsmhandler;		/* OID of the tablesample handler function */
-	List	   *args;			/* tablesample argument expression(s) */
-	Expr	   *repeatable;		/* REPEATABLE expression, or NULL if none */
-} TableSampleClause;
+
 
 /*
  * SortGroupClause -

@@ -39,7 +39,6 @@
 #include "executor/nodeNestloop.h"
 #include "executor/nodeProjectSet.h"
 #include "executor/nodeResult.h"
-#include "executor/nodeSamplescan.h"
 #include "executor/nodeSeqscan.h"
 #include "executor/nodeSort.h"
 #include "executor/nodeSubplan.h"
@@ -154,9 +153,6 @@ ExecReScan(PlanState *node)
 			ExecReScanSeqScan((SeqScanState *) node);
 			break;
 
-		case T_SampleScanState:
-			ExecReScanSampleScan((SampleScanState *) node);
-			break;
 
 		case T_GatherState:
 			ExecReScanGather((GatherState *) node);
@@ -481,72 +477,9 @@ ExecSupportsBackwardScan(Plan *node)
 				return true;
 			}
 
-		case T_SampleScan:
-			/* Simplify life for tablesample methods by disallowing this */
-			return false;
-
-		case T_Gather:
-			return false;
-
-		case T_IndexScan:
-			return IndexSupportsBackwardScan(((IndexScan *) node)->indexid);
-
-		case T_IndexOnlyScan:
-			return IndexSupportsBackwardScan(((IndexOnlyScan *) node)->indexid);
-
-		case T_SubqueryScan:
-			return ExecSupportsBackwardScan(((SubqueryScan *) node)->subplan);
-
-		case T_SeqScan:
-		case T_TidScan:
-		case T_TidRangeScan:
-		case T_FunctionScan:
-		case T_ValuesScan:
-		case T_Material:
-		case T_Sort:
-			/* these don't evaluate tlist */
-			return true;
-
-		case T_IncrementalSort:
-
-			/*
-			 * Unlike full sort, incremental sort keeps only a single group of
-			 * tuples in memory, so it can't scan backwards.
-			 */
-			return false;
-
-		default:
-			return false;
 	}
-}
 
-/*
- * An IndexScan or IndexOnlyScan node supports backward scan only if the
- * index's AM does.
- */
-static bool
-IndexSupportsBackwardScan(Oid indexid)
-{
-	bool		result;
-	HeapTuple	ht_idxrel;
-	Form_pg_class idxrelrec;
-	IndexAmRoutine *amroutine;
-
-	/* Fetch the pg_class tuple of the index relation */
-	ht_idxrel = SearchSysCache1(RELOID, ObjectIdGetDatum(indexid));
-	if (!HeapTupleIsValid(ht_idxrel))
-		elog(ERROR, "cache lookup failed for relation %u", indexid);
-	idxrelrec = (Form_pg_class) GETSTRUCT(ht_idxrel);
-
-	/* Fetch the index AM's API struct */
-	amroutine = GetIndexAmRoutineByAmId(idxrelrec->relam, false);
-
-	result = amroutine->amcanbackward;
-
-	pfree(amroutine);
-	ReleaseSysCache(ht_idxrel);
-
-	return result;
+	return false;
 }
 
 /*

@@ -404,26 +404,7 @@ _copySeqScan(const SeqScan *from)
 	return newnode;
 }
 
-/*
- * _copySampleScan
- */
-static SampleScan *
-_copySampleScan(const SampleScan *from)
-{
-	SampleScan *newnode = makeNode(SampleScan);
 
-	/*
-	 * copy node superclass fields
-	 */
-	CopyScanFields((const Scan *) from, (Scan *) newnode);
-
-	/*
-	 * copy remainder of node
-	 */
-	COPY_NODE_FIELD(tablesample);
-
-	return newnode;
-}
 
 /*
  * _copyIndexScan
@@ -1836,7 +1817,6 @@ _copyRangeTblEntry(const RangeTblEntry *from)
 	COPY_SCALAR_FIELD(relid);
 	COPY_SCALAR_FIELD(relkind);
 	COPY_SCALAR_FIELD(rellockmode);
-	COPY_NODE_FIELD(tablesample);
 	COPY_NODE_FIELD(subquery);
 	COPY_SCALAR_FIELD(security_barrier);
 	COPY_SCALAR_FIELD(jointype);
@@ -1881,17 +1861,7 @@ _copyRangeTblFunction(const RangeTblFunction *from)
 	return newnode;
 }
 
-static TableSampleClause *
-_copyTableSampleClause(const TableSampleClause *from)
-{
-	TableSampleClause *newnode = makeNode(TableSampleClause);
 
-	COPY_SCALAR_FIELD(tsmhandler);
-	COPY_NODE_FIELD(args);
-	COPY_NODE_FIELD(repeatable);
-
-	return newnode;
-}
 
 static SortGroupClause *
 _copySortGroupClause(const SortGroupClause *from)
@@ -2100,19 +2070,7 @@ _copyRangeFunction(const RangeFunction *from)
 	return newnode;
 }
 
-static RangeTableSample *
-_copyRangeTableSample(const RangeTableSample *from)
-{
-	RangeTableSample *newnode = makeNode(RangeTableSample);
 
-	COPY_NODE_FIELD(relation);
-	COPY_NODE_FIELD(method);
-	COPY_NODE_FIELD(args);
-	COPY_NODE_FIELD(repeatable);
-	COPY_LOCATION_FIELD(location);
-
-	return newnode;
-}
 
 
 
@@ -2654,9 +2612,6 @@ copyObjectImpl(const void *from)
 		case T_SeqScan:
 			retval = _copySeqScan(from);
 			break;
-		case T_SampleScan:
-			retval = _copySampleScan(from);
-			break;
 		case T_IndexScan:
 			retval = _copyIndexScan(from);
 			break;
@@ -3014,9 +2969,6 @@ copyObjectImpl(const void *from)
 		case T_RangeFunction:
 			retval = _copyRangeFunction(from);
 			break;
-		case T_RangeTableSample:
-			retval = _copyRangeTableSample(from);
-			break;
 		case T_TypeName:
 			retval = _copyTypeName(from);
 			break;
@@ -3038,9 +2990,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_RangeTblFunction:
 			retval = _copyRangeTblFunction(from);
-			break;
-		case T_TableSampleClause:
-			retval = _copyTableSampleClause(from);
 			break;
 		case T_SortGroupClause:
 			retval = _copySortGroupClause(from);

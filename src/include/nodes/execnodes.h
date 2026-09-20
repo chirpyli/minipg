@@ -1168,26 +1168,7 @@ typedef struct SeqScanState
 	Size		pscan_len;		/* size of parallel heap scan descriptor */
 } SeqScanState;
 
-/* ----------------
- *	 SampleScanState information
- * ----------------
- */
-typedef struct SampleScanState
-{
-	ScanState	ss;
-	List	   *args;			/* expr states for TABLESAMPLE params */
-	ExprState  *repeatable;		/* expr state for REPEATABLE expr */
-	/* use struct pointer to avoid including tsmapi.h here */
-	struct TsmRoutine *tsmroutine;	/* descriptor for tablesample method */
-	void	   *tsm_state;		/* tablesample method can keep state here */
-	bool		use_bulkread;	/* use bulkread buffer access strategy? */
-	bool		use_pagemode;	/* use page-at-a-time visibility checking? */
-	bool		begun;			/* false means need to call BeginSampleScan */
-	uint32		seed;			/* random seed */
-	int64		donetuples;		/* number of tuples already returned */
-	bool		haveblock;		/* has a block for sampling been determined */
-	bool		done;			/* exhausted all tuples? */
-} SampleScanState;
+
 
 /*
  * These structs store information about index quals that don't have simple

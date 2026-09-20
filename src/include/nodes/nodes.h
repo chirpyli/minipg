@@ -51,7 +51,6 @@ typedef enum NodeTag
 	T_BitmapOr,
 	T_Scan,
 	T_SeqScan,
-	T_SampleScan,
 	T_IndexScan,
 	T_IndexOnlyScan,
 	T_BitmapIndexScan,
@@ -96,7 +95,6 @@ typedef enum NodeTag
 	T_BitmapOrState,
 	T_ScanState,
 	T_SeqScanState,
-	T_SampleScanState,
 	T_IndexScanState,
 	T_IndexOnlyScanState,
 	T_BitmapIndexScanState,
@@ -295,7 +293,6 @@ typedef enum NodeTag
 	T_SortBy,
 	T_RangeSubselect,
 	T_RangeFunction,
-	T_RangeTableSample,
 	T_TypeName,
 	T_ColumnDef,
 	T_IndexElem,
@@ -303,7 +300,6 @@ typedef enum NodeTag
 	T_DefElem,
 	T_RangeTblEntry,
 	T_RangeTblFunction,
-	T_TableSampleClause,
 	T_SortGroupClause,
 	T_ObjectWithArgs,
 	T_VacuumRelation,
@@ -320,7 +316,6 @@ typedef enum NodeTag
 	T_TIDBitmap,				/* in nodes/tidbitmap.h */
 	T_IndexAmRoutine,			/* in access/amapi.h */
 	T_TableAmRoutine,			/* in access/tableam.h */
-	T_TsmRoutine,				/* in access/tsmapi.h */
 	T_CallContext,				/* in nodes/parsenodes.h */
 	T_SupportRequestSimplify,	/* in nodes/supportnodes.h */
 	T_SupportRequestSelectivity,	/* in nodes/supportnodes.h */

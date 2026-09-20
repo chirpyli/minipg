@@ -18,7 +18,6 @@
 #include "access/htup_details.h"
 #include "access/nbtree.h"
 #include "access/table.h"
-#include "access/tsmapi.h"
 #include "catalog/catalog.h"
 #include "catalog/heap.h"
 #include "catalog/pg_am.h"
@@ -66,8 +65,6 @@ static ParseNamespaceItem *transformRangeSubselect(ParseState *pstate,
 												   RangeSubselect *r);
 static ParseNamespaceItem *transformRangeFunction(ParseState *pstate,
 												  RangeFunction *r);
-static TableSampleClause *transformRangeTableSample(ParseState *pstate,
-													RangeTableSample *rts);
 static ParseNamespaceItem *getNSItemForSpecialRelationTypes(ParseState *pstate,
 															RangeVar *rv);
 static Node *transformFromClauseItem(ParseState *pstate, Node *n,
@@ -646,108 +643,6 @@ transformRangeFunction(ParseState *pstate, RangeFunction *r)
 										 r, is_lateral, true);
 }
 
-/*
- * transformRangeTableSample --- transform a TABLESAMPLE clause
- *
- * Caller has already transformed rts->relation, we just have to validate
- * the remaining fields and create a TableSampleClause node.
- */
-static TableSampleClause *
-transformRangeTableSample(ParseState *pstate, RangeTableSample *rts)
-{
-	TableSampleClause *tablesample;
-	Oid			handlerOid;
-	Oid			funcargtypes[1];
-	TsmRoutine *tsm;
-	List	   *fargs;
-	ListCell   *larg,
-			   *ltyp;
-
-	/*
-	 * To validate the sample method name, look up the handler function, which
-	 * has the same name, one dummy INTERNAL argument, and a result type of
-	 * tsm_handler.  (Note: tablesample method names are not schema-qualified
-	 * in the SQL standard; but since they are just functions to us, we allow
-	 * schema qualification to resolve any potential ambiguity.)
-	 */
-	funcargtypes[0] = INTERNALOID;
-
-	handlerOid = LookupFuncName(rts->method, 1, funcargtypes, true);
-
-	/* we want error to complain about no-such-method, not no-such-function */
-	if (!OidIsValid(handlerOid))
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_OBJECT),
-				 errmsg("tablesample method %s does not exist",
-						NameListToString(rts->method)),
-				 parser_errposition(pstate, rts->location)));
-
-	/* check that handler has correct return type */
-	if (get_func_rettype(handlerOid) != TSM_HANDLEROID)
-		ereport(ERROR,
-				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-				 errmsg("function %s must return type %s",
-						NameListToString(rts->method), "tsm_handler"),
-				 parser_errposition(pstate, rts->location)));
-
-	/* OK, run the handler to get TsmRoutine, for argument type info */
-	tsm = GetTsmRoutine(handlerOid);
-
-	tablesample = makeNode(TableSampleClause);
-	tablesample->tsmhandler = handlerOid;
-
-	/* check user provided the expected number of arguments */
-	if (list_length(rts->args) != list_length(tsm->parameterTypes))
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_TABLESAMPLE_ARGUMENT),
-				 errmsg_plural("tablesample method %s requires %d argument, not %d",
-							   "tablesample method %s requires %d arguments, not %d",
-							   list_length(tsm->parameterTypes),
-							   NameListToString(rts->method),
-							   list_length(tsm->parameterTypes),
-							   list_length(rts->args)),
-				 parser_errposition(pstate, rts->location)));
-
-	/*
-	 * Transform the arguments, typecasting them as needed.  Note we must also
-	 * assign collations now, because assign_query_collations() doesn't
-	 * examine any substructure of RTEs.
-	 */
-	fargs = NIL;
-	forboth(larg, rts->args, ltyp, tsm->parameterTypes)
-	{
-		Node	   *arg = (Node *) lfirst(larg);
-		Oid			argtype = lfirst_oid(ltyp);
-
-		arg = transformExpr(pstate, arg, EXPR_KIND_FROM_FUNCTION);
-		arg = coerce_to_specific_type(pstate, arg, argtype, "TABLESAMPLE");
-		assign_expr_collations(pstate, arg);
-		fargs = lappend(fargs, arg);
-	}
-	tablesample->args = fargs;
-
-	/* Process REPEATABLE (seed) */
-	if (rts->repeatable != NULL)
-	{
-		Node	   *arg;
-
-		if (!tsm->repeatable_across_queries)
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("tablesample method %s does not support REPEATABLE",
-							NameListToString(rts->method)),
-					 parser_errposition(pstate, rts->location)));
-
-		arg = transformExpr(pstate, rts->repeatable, EXPR_KIND_FROM_FUNCTION);
-		arg = coerce_to_specific_type(pstate, arg, FLOAT8OID, "REPEATABLE");
-		assign_expr_collations(pstate, arg);
-		tablesample->repeatable = (Expr *) arg;
-	}
-	else
-		tablesample->repeatable = NULL;
-
-	return tablesample;
-}
 
 /*
  * getNSItemForSpecialRelationTypes
@@ -842,29 +737,6 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 		rtr = makeNode(RangeTblRef);
 		rtr->rtindex = nsitem->p_rtindex;
 		return (Node *) rtr;
-	}
-	else if (IsA(n, RangeTableSample))
-	{
-		/* TABLESAMPLE clause (wrapping some other valid FROM node) */
-		RangeTableSample *rts = (RangeTableSample *) n;
-		Node	   *rel;
-		RangeTblEntry *rte;
-
-		/* Recursively transform the contained relation */
-		rel = transformFromClauseItem(pstate, rts->relation,
-									  top_nsitem, namespace);
-		rte = (*top_nsitem)->p_rte;
-		/* We only support this on plain relations */
-		if (rte->rtekind != RTE_RELATION ||
-			rte->relkind != RELKIND_RELATION)
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("TABLESAMPLE clause can only be applied to tables and materialized views"),
-					 parser_errposition(pstate, exprLocation(rts->relation))));
-
-		/* Transform TABLESAMPLE details and attach to the RTE */
-		rte->tablesample = transformRangeTableSample(pstate, rts);
-		return rel;
 	}
 	else if (IsA(n, JoinExpr))
 	{

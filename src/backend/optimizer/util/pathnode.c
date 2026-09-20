@@ -950,30 +950,6 @@ create_seqscan_path(PlannerInfo *root, RelOptInfo *rel,
 }
 
 /*
- * create_samplescan_path
- *	  Creates a path node for a sampled table scan.
- */
-Path *
-create_samplescan_path(PlannerInfo *root, RelOptInfo *rel, Relids required_outer)
-{
-	Path	   *pathnode = makeNode(Path);
-
-	pathnode->pathtype = T_SampleScan;
-	pathnode->parent = rel;
-	pathnode->pathtarget = rel->reltarget;
-	pathnode->param_info = get_baserel_parampathinfo(root, rel,
-													 required_outer);
-	pathnode->parallel_aware = false;
-	pathnode->parallel_safe = rel->consider_parallel;
-	pathnode->parallel_workers = 0;
-	pathnode->pathkeys = NIL;	/* samplescan has unordered result */
-
-	cost_samplescan(pathnode, root, rel, pathnode->param_info);
-
-	return pathnode;
-}
-
-/*
  * create_index_path
  *	  Creates a path node for an index scan.
  *
@@ -3009,8 +2985,6 @@ reparameterize_path(PlannerInfo *root, Path *path,
 	{
 		case T_SeqScan:
 			return create_seqscan_path(root, rel, required_outer, 0);
-		case T_SampleScan:
-			return (Path *) create_samplescan_path(root, rel, required_outer);
 		case T_IndexScan:
 		case T_IndexOnlyScan:
 			{
@@ -3202,28 +3176,6 @@ do { \
 										  path->parent->baserestrictinfo,
 										  child_rel->top_parent_relids))
 				return NULL;
-
-			/*
-			 * If it's a SampleScan with tablesample parameters referencing
-			 * the other relation, we can't reparameterize, because we must
-			 * not change the RTE's contents here.  (Doing so would break
-			 * things if we end up using a non-partitionwise join.)
-			 */
-			if (path->pathtype == T_SampleScan)
-			{
-				Index		scan_relid = path->parent->relid;
-				RangeTblEntry *rte;
-
-				/* it should be a base rel with a tablesample clause... */
-				Assert(scan_relid > 0);
-				rte = planner_rt_fetch(scan_relid, root);
-				Assert(rte->rtekind == RTE_RELATION);
-				Assert(rte->tablesample != NULL);
-
-				if (contain_references_to(root, (Node *) rte->tablesample,
-										  child_rel->top_parent_relids))
-					return NULL;
-			}
 
 			FLAT_COPY_PATH(new_path, path, Path);
 			break;
@@ -3474,7 +3426,7 @@ contain_references_to(PlannerInfo *root, Node *clause, Relids relids)
 	 *
 	 * By omitting the relevant flags, this also gives us a cheap sanity check
 	 * that no aggregates or window functions appear in the clause.  We don't
-	 * expect any of those in scan-level restrictions or tablesamples.
+	 * expect any of those in scan-level restrictions.
 	 */
 	vars = pull_var_clause(clause, PVC_INCLUDE_PLACEHOLDERS);
 	foreach(lc, vars)
@@ -3501,8 +3453,7 @@ contain_references_to(PlannerInfo *root, Node *clause, Relids relids)
 			 * computed at the other relation and then laterally referenced
 			 * here) and ph_lateral (in case the PHV is to be evaluated here
 			 * but contains lateral references to the other relation).  The
-			 * former case should not occur in baserestrictinfo clauses, but
-			 * it can occur in tablesample clauses.
+			 * former case should not occur in baserestrictinfo clauses.
 			 */
 			if (bms_overlap(phinfo->ph_eval_at, relids) ||
 				bms_overlap(phinfo->ph_lateral, relids))

@@ -81,8 +81,6 @@ static void show_sort_group_keys(PlanState *planstate, const char *qlabel,
 								 List *ancestors, ExplainState *es);
 static void show_sortorder_options(StringInfo buf, Node *sortexpr,
 								   Oid sortOperator, Oid collation, bool nullsFirst);
-static void show_tablesample(TableSampleClause *tsc, PlanState *planstate,
-							 List *ancestors, ExplainState *es);
 static void show_sort_info(SortState *sortstate, ExplainState *es);
 static void show_incremental_sort_info(IncrementalSortState *incrsortstate,
 									   ExplainState *es);
@@ -601,7 +599,6 @@ ExplainPreScanNode(PlanState *planstate, Bitmapset **rels_used)
 	switch (nodeTag(plan))
 	{
 		case T_SeqScan:
-		case T_SampleScan:
 		case T_IndexScan:
 		case T_IndexOnlyScan:
 		case T_BitmapHeapScan:
@@ -722,9 +719,6 @@ ExplainNode(PlanState *planstate, List *ancestors,
 		case T_SeqScan:
 			pname = "Seq Scan";
 			break;
-		case T_SampleScan:
-			pname = "Sample Scan";
-			break;
 		case T_Gather:
 			pname = "Gather";
 			break;
@@ -836,7 +830,6 @@ ExplainNode(PlanState *planstate, List *ancestors,
 	switch (nodeTag(plan))
 	{
 		case T_SeqScan:
-		case T_SampleScan:
 		case T_BitmapHeapScan:
 		case T_TidScan:
 		case T_TidRangeScan:
@@ -1072,11 +1065,6 @@ ExplainNode(PlanState *planstate, List *ancestors,
 			if (es->analyze)
 				show_tidbitmap_info((BitmapHeapScanState *) planstate, es);
 			break;
-		case T_SampleScan:
-			show_tablesample(((SampleScan *) plan)->tablesample,
-							 planstate, ancestors, es);
-			/* fall through to print additional fields the same as SeqScan */
-			/* FALLTHROUGH */
 		case T_SeqScan:
 		case T_ValuesScan:
 		case T_NamedTuplestoreScan:
@@ -1738,64 +1726,6 @@ show_sortorder_options(StringInfo buf, Node *sortexpr,
 	else if (!nullsFirst && reverse)
 	{
 		appendStringInfoString(buf, " NULLS LAST");
-	}
-}
-
-/*
- * Show TABLESAMPLE properties
- */
-static void
-show_tablesample(TableSampleClause *tsc, PlanState *planstate,
-				 List *ancestors, ExplainState *es)
-{
-	List	   *context;
-	bool		useprefix;
-	char	   *method_name;
-	List	   *params = NIL;
-	char	   *repeatable;
-	ListCell   *lc;
-
-	/* Set up deparsing context */
-	context = set_deparse_context_plan(es->deparse_cxt,
-									   planstate->plan,
-									   ancestors);
-	useprefix = list_length(es->rtable) > 1;
-
-	/* Get the tablesample method name */
-	method_name = get_func_name(tsc->tsmhandler);
-
-	/* Deparse parameter expressions */
-	foreach(lc, tsc->args)
-	{
-		Node	   *arg = (Node *) lfirst(lc);
-
-		params = lappend(params,
-						 deparse_expression(arg, context,
-											useprefix, false));
-	}
-	if (tsc->repeatable)
-		repeatable = deparse_expression((Node *) tsc->repeatable, context,
-										useprefix, false);
-	else
-		repeatable = NULL;
-
-	/* Print results */
-	{
-		bool		first = true;
-
-		ExplainIndentText(es);
-		appendStringInfo(es->str, "Sampling: %s (", method_name);
-		foreach(lc, params)
-		{
-			if (!first)
-				appendStringInfoString(es->str, ", ");
-			appendStringInfoString(es->str, (const char *) lfirst(lc));
-			first = false;
-		}
-		appendStringInfoChar(es->str, ')');
-		if (repeatable)
-			appendStringInfo(es->str, " REPEATABLE (%s)", repeatable);
-		appendStringInfoChar(es->str, '\n');
 	}
 }
 
@@ -2576,7 +2506,6 @@ ExplainTargetRel(Plan *plan, Index rti, ExplainState *es)
 	switch (nodeTag(plan))
 	{
 		case T_SeqScan:
-		case T_SampleScan:
 		case T_IndexScan:
 		case T_IndexOnlyScan:
 		case T_BitmapHeapScan:

@@ -1241,7 +1241,7 @@ heap_beginscan(Relation relation, Snapshot snapshot,
 	 * to be at least page-level granularity, but we'd need to add per-tuple
 	 * locking for that.
 	 */
-	if (scan->rs_base.rs_flags & (SO_TYPE_SEQSCAN | SO_TYPE_SAMPLESCAN))
+	if (scan->rs_base.rs_flags & (SO_TYPE_SEQSCAN))
 	{
 		/*
 		 * Ensure a missing snapshot is noticed reliably, even if the

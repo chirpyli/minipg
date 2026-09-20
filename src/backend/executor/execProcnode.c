@@ -97,7 +97,6 @@
 #include "executor/nodeNestloop.h"
 #include "executor/nodeProjectSet.h"
 #include "executor/nodeResult.h"
-#include "executor/nodeSamplescan.h"
 #include "executor/nodeSeqscan.h"
 #include "executor/nodeSort.h"
 #include "executor/nodeSubplan.h"
@@ -197,10 +196,6 @@ ExecInitNode(Plan *node, EState *estate, int eflags)
 												   estate, eflags);
 			break;
 
-		case T_SampleScan:
-			result = (PlanState *) ExecInitSampleScan((SampleScan *) node,
-													  estate, eflags);
-			break;
 
 		case T_IndexScan:
 			result = (PlanState *) ExecInitIndexScan((IndexScan *) node,
@@ -557,9 +552,6 @@ ExecEndNode(PlanState *node)
 			ExecEndSeqScan((SeqScanState *) node);
 			break;
 
-		case T_SampleScanState:
-			ExecEndSampleScan((SampleScanState *) node);
-			break;
 
 		case T_GatherState:
 			ExecEndGather((GatherState *) node);

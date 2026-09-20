@@ -75,7 +75,6 @@
 
 #include "access/amapi.h"
 #include "access/htup_details.h"
-#include "access/tsmapi.h"
 #include "executor/executor.h"
 #include "executor/nodeAgg.h"
 #include "executor/nodeHash.h"
@@ -278,77 +277,6 @@ cost_seqscan(Path *path, PlannerInfo *root,
 
 	path->startup_cost = startup_cost;
 	path->total_cost = startup_cost + cpu_run_cost + disk_run_cost;
-}
-
-/*
- * cost_samplescan
- *	  Determines and returns the cost of scanning a relation using sampling.
- *
- * 'baserel' is the relation to be scanned
- * 'param_info' is the ParamPathInfo if this is a parameterized path, else NULL
- */
-void
-cost_samplescan(Path *path, PlannerInfo *root,
-				RelOptInfo *baserel, ParamPathInfo *param_info)
-{
-	Cost		startup_cost = 0;
-	Cost		run_cost = 0;
-	RangeTblEntry *rte;
-	TableSampleClause *tsc;
-	TsmRoutine *tsm;
-	double		spc_seq_page_cost,
-				spc_random_page_cost,
-				spc_page_cost;
-	QualCost	qpqual_cost;
-	Cost		cpu_per_tuple;
-
-	/* Should only be applied to base relations with tablesample clauses */
-	Assert(baserel->relid > 0);
-	rte = planner_rt_fetch(baserel->relid, root);
-	Assert(rte->rtekind == RTE_RELATION);
-	tsc = rte->tablesample;
-	Assert(tsc != NULL);
-	tsm = GetTsmRoutine(tsc->tsmhandler);
-
-	/* Mark the path with the correct row estimate */
-	if (param_info)
-		path->rows = param_info->ppi_rows;
-	else
-		path->rows = baserel->rows;
-
-	/* fetch estimated page cost for tablespace containing table */
-	spc_random_page_cost = random_page_cost;
-	spc_seq_page_cost = seq_page_cost;
-
-	/* if NextSampleBlock is used, assume random access, else sequential */
-	spc_page_cost = (tsm->NextSampleBlock != NULL) ?
-		spc_random_page_cost : spc_seq_page_cost;
-
-	/*
-	 * disk costs (recall that baserel->pages has already been set to the
-	 * number of pages the sampling method will visit)
-	 */
-	run_cost += spc_page_cost * baserel->pages;
-
-	/*
-	 * CPU costs (recall that baserel->tuples has already been set to the
-	 * number of tuples the sampling method will select).  Note that we ignore
-	 * execution cost of the TABLESAMPLE parameter expressions; they will be
-	 * evaluated only once per scan, and in most usages they'll likely be
-	 * simple constants anyway.  We also don't charge anything for the
-	 * calculations the sampling method might do internally.
-	 */
-	get_restriction_qual_cost(root, baserel, param_info, &qpqual_cost);
-
-	startup_cost += qpqual_cost.startup;
-	cpu_per_tuple = cpu_tuple_cost + qpqual_cost.per_tuple;
-	run_cost += cpu_per_tuple * baserel->tuples;
-	/* tlist eval costs are paid per output row, not per tuple scanned */
-	startup_cost += path->pathtarget->cost.startup;
-	run_cost += path->pathtarget->cost.per_tuple * path->rows;
-
-	path->startup_cost = startup_cost;
-	path->total_cost = startup_cost + run_cost;
 }
 
 /*

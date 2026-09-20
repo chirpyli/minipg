@@ -434,8 +434,6 @@ static void get_column_alias_list(deparse_columns *colinfo,
 static void get_from_clause_coldeflist(RangeTblFunction *rtfunc,
 									   deparse_columns *colinfo,
 									   deparse_context *context);
-static void get_tablesample_def(TableSampleClause *tablesample,
-								deparse_context *context);
 static void get_opclass_name(Oid opclass, Oid actual_datatype,
 							 StringInfo buf);
 static Node *processIndirection(Node *node, deparse_context *context);
@@ -6842,9 +6840,6 @@ get_from_clause_item(Node *jtnode, Query *query, deparse_context *context)
 			get_column_alias_list(colinfo, context);
 		}
 
-		/* Tablesample clause must go after any alias */
-		if (rte->rtekind == RTE_RELATION && rte->tablesample)
-			get_tablesample_def(rte->tablesample, context);
 	}
 	else if (IsA(jtnode, JoinExpr))
 	{
@@ -7114,44 +7109,6 @@ get_from_clause_coldeflist(RangeTblFunction *rtfunc,
 	}
 
 	appendStringInfoChar(buf, ')');
-}
-
-/*
- * get_tablesample_def			- print a TableSampleClause
- */
-static void
-get_tablesample_def(TableSampleClause *tablesample, deparse_context *context)
-{
-	StringInfo	buf = context->buf;
-	Oid			argtypes[1];
-	int			nargs;
-	ListCell   *l;
-
-	/*
-	 * We should qualify the handler's function name if it wouldn't be
-	 * resolved by lookup in the current search path.
-	 */
-	argtypes[0] = INTERNALOID;
-	appendStringInfo(buf, " TABLESAMPLE %s (",
-					 generate_function_name(tablesample->tsmhandler, 1,
-											NIL, argtypes,
-											false, NULL, EXPR_KIND_NONE));
-
-	nargs = 0;
-	foreach(l, tablesample->args)
-	{
-		if (nargs++ > 0)
-			appendStringInfoString(buf, ", ");
-		get_rule_expr((Node *) lfirst(l), context, false);
-	}
-	appendStringInfoChar(buf, ')');
-
-	if (tablesample->repeatable != NULL)
-	{
-		appendStringInfoString(buf, " REPEATABLE (");
-		get_rule_expr((Node *) tablesample->repeatable, context, false);
-		appendStringInfoChar(buf, ')');
-	}
 }
 
 /*

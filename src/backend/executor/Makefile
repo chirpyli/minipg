@@ -52,7 +52,6 @@ OBJS = \
 	nodeNestloop.o \
 	nodeProjectSet.o \
 	nodeResult.o \
-	nodeSamplescan.o \
 	nodeSeqscan.o \
 	spi.o \
 	nodeSort.o \

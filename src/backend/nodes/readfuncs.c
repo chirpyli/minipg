@@ -967,7 +967,6 @@ _readRangeTblEntry(void)
 			READ_OID_FIELD(relid);
 			READ_CHAR_FIELD(relkind);
 			READ_INT_FIELD(rellockmode);
-			READ_NODE_FIELD(tablesample);
 			break;
 		case RTE_SUBQUERY:
 			READ_NODE_FIELD(subquery);
@@ -1037,20 +1036,7 @@ _readRangeTblFunction(void)
 	READ_DONE();
 }
 
-/*
- * _readTableSampleClause
- */
-static TableSampleClause *
-_readTableSampleClause(void)
-{
-	READ_LOCALS(TableSampleClause);
 
-	READ_OID_FIELD(tsmhandler);
-	READ_NODE_FIELD(args);
-	READ_NODE_FIELD(repeatable);
-
-	READ_DONE();
-}
 
 /*
  * _readDefElem
@@ -1303,20 +1289,7 @@ _readSeqScan(void)
 	READ_DONE();
 }
 
-/*
- * _readSampleScan
- */
-static SampleScan *
-_readSampleScan(void)
-{
-	READ_LOCALS(SampleScan);
 
-	ReadCommonScan(&local_node->scan);
-
-	READ_NODE_FIELD(tablesample);
-
-	READ_DONE();
-}
 
 /*
  * _readIndexScan
@@ -1963,8 +1936,6 @@ parseNodeString(void)
 		return_value = _readRangeTblEntry();
 	else if (MATCH("RANGETBLFUNCTION", 16))
 		return_value = _readRangeTblFunction();
-	else if (MATCH("TABLESAMPLECLAUSE", 17))
-		return_value = _readTableSampleClause();
 	else if (MATCH("DEFELEM", 7))
 		return_value = _readDefElem();
 	else if (MATCH("PLANNEDSTMT", 11))
@@ -1989,8 +1960,6 @@ parseNodeString(void)
 		return_value = _readScan();
 	else if (MATCH("SEQSCAN", 7))
 		return_value = _readSeqScan();
-	else if (MATCH("SAMPLESCAN", 10))
-		return_value = _readSampleScan();
 	else if (MATCH("INDEXSCAN", 9))
 		return_value = _readIndexScan();
 	else if (MATCH("INDEXONLYSCAN", 13))

@@ -1180,17 +1180,7 @@ _equalRangeFunction(const RangeFunction *a, const RangeFunction *b)
 	return true;
 }
 
-static bool
-_equalRangeTableSample(const RangeTableSample *a, const RangeTableSample *b)
-{
-	COMPARE_NODE_FIELD(relation);
-	COMPARE_NODE_FIELD(method);
-	COMPARE_NODE_FIELD(args);
-	COMPARE_NODE_FIELD(repeatable);
-	COMPARE_LOCATION_FIELD(location);
 
-	return true;
-}
 
 
 
@@ -1261,7 +1251,6 @@ _equalRangeTblEntry(const RangeTblEntry *a, const RangeTblEntry *b)
 	COMPARE_SCALAR_FIELD(relid);
 	COMPARE_SCALAR_FIELD(relkind);
 	COMPARE_SCALAR_FIELD(rellockmode);
-	COMPARE_NODE_FIELD(tablesample);
 	COMPARE_NODE_FIELD(subquery);
 	COMPARE_SCALAR_FIELD(security_barrier);
 	COMPARE_SCALAR_FIELD(jointype);
@@ -1304,15 +1293,7 @@ _equalRangeTblFunction(const RangeTblFunction *a, const RangeTblFunction *b)
 	return true;
 }
 
-static bool
-_equalTableSampleClause(const TableSampleClause *a, const TableSampleClause *b)
-{
-	COMPARE_SCALAR_FIELD(tsmhandler);
-	COMPARE_NODE_FIELD(args);
-	COMPARE_NODE_FIELD(repeatable);
 
-	return true;
-}
 
 static bool
 _equalSortGroupClause(const SortGroupClause *a, const SortGroupClause *b)
@@ -1713,9 +1694,6 @@ equal(const void *a, const void *b)
 		case T_RangeFunction:
 			retval = _equalRangeFunction(a, b);
 			break;
-		case T_RangeTableSample:
-			retval = _equalRangeTableSample(a, b);
-			break;
 		case T_TypeName:
 			retval = _equalTypeName(a, b);
 			break;
@@ -1736,9 +1714,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_RangeTblFunction:
 			retval = _equalRangeTblFunction(a, b);
-			break;
-		case T_TableSampleClause:
-			retval = _equalTableSampleClause(a, b);
 			break;
 		case T_SortGroupClause:
 			retval = _equalSortGroupClause(a, b);
