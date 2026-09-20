@@ -370,7 +370,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 	COMMITTED CONCURRENTLY
 	CONNECTION CONSTRAINT
 	CREATE CROSS CURRENT_P
-	CURRENT_CATALOG CURRENT_DATE CURRENT_SCHEMA
+	CURRENT_DATE
 	CURRENT_TIMESTAMP
 
 	DATA_P DATABASE DEFAULT
@@ -400,9 +400,8 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 
 	LAST_P LATERAL_P
 	LEFT LEVEL LIKE LIMIT LOCAL
-	LOCALTIME LOCALTIMESTAMP
 
-	NAMES NATURAL NONE
+	NAMES NONE
 	NOT NULL_P NULLIF
 	NULLS_P
 
@@ -498,7 +497,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
  * They wouldn't be given a precedence at all, were it not that we need
  * left-associativity among the JOIN rules themselves.
  */
-%left		JOIN CROSS LEFT FULL RIGHT INNER_P NATURAL
+%left		JOIN CROSS LEFT FULL RIGHT INNER_P
 
 %%
 
@@ -2844,9 +2843,6 @@ table_ref:	relation_expr opt_alias_clause
  * Note that a CROSS JOIN is the same as an unqualified
  * INNER JOIN, and an INNER JOIN/ON has the same shape
  * but a qualification expression to limit membership.
- * A NATURAL JOIN implicitly matches column names between
- * tables and the shape is determined by which columns are
- * in common. We'll collect columns during the later transformations.
  */
 
 joined_table:
@@ -2859,7 +2855,6 @@ joined_table:
 					/* CROSS JOIN is same as unqualified inner join */
 					JoinExpr *n = makeNode(JoinExpr);
 					n->jointype = JOIN_INNER;
-					n->isNatural = false;
 					n->larg = $1;
 					n->rarg = $4;
 					n->usingClause = NIL;
@@ -2871,7 +2866,6 @@ joined_table:
 				{
 					JoinExpr *n = makeNode(JoinExpr);
 					n->jointype = $2;
-					n->isNatural = false;
 					n->larg = $1;
 					n->rarg = $4;
 					if ($5 != NULL && IsA($5, List))
@@ -2892,7 +2886,6 @@ joined_table:
 					/* letting join_type reduce to empty doesn't work */
 					JoinExpr *n = makeNode(JoinExpr);
 					n->jointype = JOIN_INNER;
-					n->isNatural = false;
 					n->larg = $1;
 					n->rarg = $3;
 					if ($4 != NULL && IsA($4, List))
@@ -2906,31 +2899,6 @@ joined_table:
 						/* ON clause */
 						n->quals = $4;
 					}
-					$$ = n;
-				}
-			| table_ref NATURAL join_type JOIN table_ref
-				{
-					JoinExpr *n = makeNode(JoinExpr);
-					n->jointype = $3;
-					n->isNatural = true;
-					n->larg = $1;
-					n->rarg = $5;
-					n->usingClause = NIL; /* figure out which columns later... */
-					n->join_using_alias = NULL;
-					n->quals = NULL; /* fill later */
-					$$ = n;
-				}
-			| table_ref NATURAL JOIN table_ref
-				{
-					/* letting join_type reduce to empty doesn't work */
-					JoinExpr *n = makeNode(JoinExpr);
-					n->jointype = JOIN_INNER;
-					n->isNatural = true;
-					n->larg = $1;
-					n->rarg = $4;
-					n->usingClause = NIL; /* figure out which columns later... */
-					n->join_using_alias = NULL;
-					n->quals = NULL; /* fill later */
 					$$ = n;
 				}
 		;
@@ -3880,30 +3848,6 @@ func_expr_common_subexpr:
 				{
 					$$ = makeSQLValueFunction(SVFOP_CURRENT_TIMESTAMP_N, $3, @1);
 				}
-			| LOCALTIME
-				{
-					$$ = makeSQLValueFunction(SVFOP_LOCALTIME, -1, @1);
-				}
-			| LOCALTIME '(' Iconst ')'
-				{
-					$$ = makeSQLValueFunction(SVFOP_LOCALTIME_N, $3, @1);
-				}
-			| LOCALTIMESTAMP
-				{
-					$$ = makeSQLValueFunction(SVFOP_LOCALTIMESTAMP, -1, @1);
-				}
-			| LOCALTIMESTAMP '(' Iconst ')'
-				{
-					$$ = makeSQLValueFunction(SVFOP_LOCALTIMESTAMP_N, $3, @1);
-				}
-			| CURRENT_CATALOG
-				{
-					$$ = makeSQLValueFunction(SVFOP_CURRENT_CATALOG, -1, @1);
-				}
-			| CURRENT_SCHEMA
-				{
-					$$ = makeSQLValueFunction(SVFOP_CURRENT_SCHEMA, -1, @1);
-				}
 			| CAST '(' a_expr AS Typename ')'
 				{ $$ = makeTypeCast($3, $5, @1); }
 			| NULLIF '(' a_expr ',' a_expr ')'
@@ -4545,7 +4489,6 @@ col_name_keyword:
 type_func_name_keyword:
 			  CONCURRENTLY
 			| CROSS
-			| CURRENT_SCHEMA
 			| FREEZE
 			| FULL
 			| INNER_P
@@ -4553,7 +4496,6 @@ type_func_name_keyword:
 			| JOIN
 			| LEFT
 			| LIKE
-			| NATURAL
 			| OUTER_P
 			| RIGHT
 			| TABLESAMPLE
@@ -4580,7 +4522,6 @@ reserved_keyword:
 			| COLUMN
 			| CONSTRAINT
 			| CREATE
-			| CURRENT_CATALOG
 			| CURRENT_DATE
 			| CURRENT_TIMESTAMP
 			| DEFAULT
@@ -4598,8 +4539,6 @@ reserved_keyword:
 			| INTO
 			| LATERAL_P
 			| LIMIT
-			| LOCALTIME
-			| LOCALTIMESTAMP
 			| NOT
 			| NULL_P
 			| ON
@@ -4658,9 +4597,7 @@ bare_label_keyword:
 			| CONSTRAINT
 			| CROSS
 			| CURRENT_P
-			| CURRENT_CATALOG
 			| CURRENT_DATE
-			| CURRENT_SCHEMA
 			| CURRENT_TIMESTAMP
 			| DATA_P
 			| DATABASE
@@ -4701,10 +4638,7 @@ bare_label_keyword:
 			| LEVEL
 			| LIKE
 			| LOCAL
-			| LOCALTIME
-			| LOCALTIMESTAMP
 			| NAMES
-			| NATURAL
 			| NONE
 			| NOT
 			| NULL_P

@@ -567,7 +567,6 @@ JumbleExpr(JumbleState *jstate, Node *node)
 				JoinExpr   *join = (JoinExpr *) node;
 
 				APP_JUMB(join->jointype);
-				APP_JUMB(join->isNatural);
 				APP_JUMB(join->rtindex);
 				JumbleExpr(jstate, join->larg);
 				JumbleExpr(jstate, join->rarg);

@@ -164,8 +164,8 @@ create table tt2 (a int, b int, c int);
 create table tt3 (ax int8, b int2, c int4);
 create table tt4 (ay int, b int, q int);
 
-create view v1 as select * from tt2 natural join tt3;
-create view v1a as select * from (tt2 natural join tt3) j;
+create view v1 as select * from tt2 join tt3 using (b, c);
+create view v1a as select * from (tt2 join tt3 using (b, c)) j;
 create view v2 as select * from tt2 join tt3 using (b,c) join tt4 using (b);
 create view v2a as select * from (tt2 join tt3 using (b,c) join tt4 using (b)) j;
 create view v3 as select * from tt2 join tt3 using (b,c) full join tt4 using (b);
@@ -335,7 +335,6 @@ select * from
   coalesce(1,2) as c,
 -- minipg: COLLATION FOR 已随 COLLATE 一并裁剪
   current_date as d,
-  localtimestamp(3) as t,
   cast(1+2 as int4) as i4,
   cast(1+2 as int8) as i8;
 select pg_get_viewdef('tt20v', true);
@@ -361,11 +360,11 @@ select pg_get_viewdef('tt201v', true);
 -- corner cases with empty join conditions
 
 create view tt21v as
-select * from tt5 natural inner join tt6;
+select * from tt5 cross join tt6;
 select pg_get_viewdef('tt21v', true);
 
 create view tt22v as
-select * from tt5 natural left join tt6;
+select * from tt5 left join tt6 on true;
 select pg_get_viewdef('tt22v', true);
 
 -- check handling of views with immediately-renamed columns

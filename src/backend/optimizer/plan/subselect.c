@@ -921,7 +921,6 @@ convert_ANY_sublink_to_join(PlannerInfo *root, SubLink *sublink,
 	 */
 	result = makeNode(JoinExpr);
 	result->jointype = JOIN_SEMI;
-	result->isNatural = false;
 	result->larg = NULL;		/* caller must fill this in */
 	result->rarg = (Node *) rtr;
 	result->usingClause = NIL;
@@ -1062,7 +1061,6 @@ convert_EXISTS_sublink_to_join(PlannerInfo *root, SubLink *sublink,
 	 */
 	result = makeNode(JoinExpr);
 	result->jointype = under_not ? JOIN_ANTI : JOIN_SEMI;
-	result->isNatural = false;
 	result->larg = NULL;		/* caller must fill this in */
 	/* flatten out the FromExpr node if it's useless */
 	if (list_length(subselect->jointree->fromlist) == 1)

@@ -952,13 +952,7 @@ typedef enum SQLValueFunctionOp
 {
 	SVFOP_CURRENT_DATE,
 	SVFOP_CURRENT_TIMESTAMP,
-	SVFOP_CURRENT_TIMESTAMP_N,
-	SVFOP_LOCALTIME,
-	SVFOP_LOCALTIME_N,
-	SVFOP_LOCALTIMESTAMP,
-	SVFOP_LOCALTIMESTAMP_N,
-	SVFOP_CURRENT_CATALOG,
-	SVFOP_CURRENT_SCHEMA
+	SVFOP_CURRENT_TIMESTAMP_N
 } SQLValueFunctionOp;
 
 typedef struct SQLValueFunction
@@ -1141,13 +1135,11 @@ typedef struct RangeTblRef
 /*----------
  * JoinExpr - for SQL JOIN expressions
  *
- * isNatural, usingClause, and quals are interdependent.  The user can write
- * only one of NATURAL, USING(), or ON() (this is enforced by the grammar).
- * If he writes NATURAL then parse analysis generates the equivalent USING()
- * list, and from that fills in "quals" with the right equality comparisons.
+ * usingClause and quals are interdependent.  The user can write only one of
+ * USING() or ON() (this is enforced by the grammar).
  * If he writes USING() then "quals" is filled with equality comparisons.
- * If he writes ON() then only "quals" is set.  Note that NATURAL/USING
- * are not equivalent to ON() since they also affect the output column list.
+ * If he writes ON() then only "quals" is set.  Note that USING
+ * is not equivalent to ON() since it also affects the output column list.
  *
  * alias is an Alias node representing the AS alias-clause attached to the
  * join expression, or NULL if no clause.  NB: presence or absence of the
@@ -1170,7 +1162,6 @@ typedef struct JoinExpr
 {
 	NodeTag		type;
 	JoinType	jointype;		/* type of join */
-	bool		isNatural;		/* Natural join? Will need to shape table */
 	Node	   *larg;			/* left subtree */
 	Node	   *rarg;			/* right subtree */
 	List	   *usingClause;	/* USING clause, if any (list of String) */

@@ -1698,24 +1698,6 @@ transformSQLValueFunction(ParseState *pstate, SQLValueFunction *svf)
 			svf->type = TIMESTAMPTZOID;
 			svf->typmod = anytimestamp_typmod_check(true, svf->typmod);
 			break;
-		case SVFOP_LOCALTIME:
-			svf->type = TIMEOID;
-			break;
-		case SVFOP_LOCALTIME_N:
-			svf->type = TIMEOID;
-			svf->typmod = anytime_typmod_check(false, svf->typmod);
-			break;
-		case SVFOP_LOCALTIMESTAMP:
-			svf->type = TIMESTAMPOID;
-			break;
-		case SVFOP_LOCALTIMESTAMP_N:
-			svf->type = TIMESTAMPOID;
-			svf->typmod = anytimestamp_typmod_check(false, svf->typmod);
-			break;
-		case SVFOP_CURRENT_CATALOG:
-		case SVFOP_CURRENT_SCHEMA:
-			svf->type = NAMEOID;
-			break;
 	}
 
 	return (Node *) svf;

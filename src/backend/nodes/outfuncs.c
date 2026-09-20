@@ -1307,7 +1307,6 @@ _outJoinExpr(StringInfo str, const JoinExpr *node)
 	WRITE_NODE_TYPE("JOINEXPR");
 
 	WRITE_ENUM_FIELD(jointype, JoinType);
-	WRITE_BOOL_FIELD(isNatural);
 	WRITE_NODE_FIELD(larg);
 	WRITE_NODE_FIELD(rarg);
 	WRITE_NODE_FIELD(usingClause);

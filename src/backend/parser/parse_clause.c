@@ -949,50 +949,6 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 		r_colnames = r_nsitem->p_names->colnames;
 
 		/*
-		 * Natural join does not explicitly specify columns; must generate
-		 * columns to join. Need to run through the list of columns from each
-		 * table or join result and match up the column names. Use the first
-		 * table, and check every column in the second table for a match.
-		 * (We'll check that the matches were unique later on.) The result of
-		 * this step is a list of column names just like an explicitly-written
-		 * USING list.
-		 */
-		if (j->isNatural)
-		{
-			List	   *rlist = NIL;
-			ListCell   *lx,
-					   *rx;
-
-			Assert(j->usingClause == NIL);	/* shouldn't have USING() too */
-
-			foreach(lx, l_colnames)
-			{
-				char	   *l_colname = strVal(lfirst(lx));
-				Value	   *m_name = NULL;
-
-				if (l_colname[0] == '\0')
-					continue;	/* ignore dropped columns */
-
-				foreach(rx, r_colnames)
-				{
-					char	   *r_colname = strVal(lfirst(rx));
-
-					if (strcmp(l_colname, r_colname) == 0)
-					{
-						m_name = makeString(l_colname);
-						break;
-					}
-				}
-
-				/* matched a right column? then keep as join column... */
-				if (m_name != NULL)
-					rlist = lappend(rlist, m_name);
-			}
-
-			j->usingClause = rlist;
-		}
-
-		/*
 		 * If a USING clause alias was specified, save the USING columns as
 		 * its column list.
 		 */
@@ -1016,9 +972,8 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 		if (j->usingClause)
 		{
 			/*
-			 * JOIN/USING (or NATURAL JOIN, as transformed above). Transform
-			 * the list into an explicit ON-condition, and generate a list of
-			 * merged result columns.
+			 * JOIN/USING. Transform the list into an explicit ON-condition,
+			 * and generate a list of merged result columns.
 			 */
 			List	   *ucols = j->usingClause;
 			List	   *l_usingvars = NIL;

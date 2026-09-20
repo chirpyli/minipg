@@ -262,7 +262,7 @@ typedef struct
 	 * simple reference to a column of the left child, leftattnos[i] is the
 	 * child RTE's attno and rightattnos[i] is zero; and conversely for a
 	 * column of the right child.  But for merged columns produced by JOIN
-	 * USING/NATURAL JOIN, both leftattnos[i] and rightattnos[i] are nonzero.
+	 * USING JOIN, both leftattnos[i] and rightattnos[i] are nonzero.
 	 * Note that a simple reference might be to a child RTE column that's been
 	 * dropped; but that's OK since the column could not be used in the query.
 	 *
@@ -5667,25 +5667,6 @@ get_rule_expr(Node *node, deparse_context *context,
 					case SVFOP_CURRENT_TIMESTAMP_N:
 						appendStringInfo(buf, "CURRENT_TIMESTAMP(%d)",
 										 svf->typmod);
-						break;
-					case SVFOP_LOCALTIME:
-						appendStringInfoString(buf, "LOCALTIME");
-						break;
-					case SVFOP_LOCALTIME_N:
-						appendStringInfo(buf, "LOCALTIME(%d)", svf->typmod);
-						break;
-					case SVFOP_LOCALTIMESTAMP:
-						appendStringInfoString(buf, "LOCALTIMESTAMP");
-						break;
-					case SVFOP_LOCALTIMESTAMP_N:
-						appendStringInfo(buf, "LOCALTIMESTAMP(%d)",
-										 svf->typmod);
-						break;
-					case SVFOP_CURRENT_CATALOG:
-						appendStringInfoString(buf, "CURRENT_CATALOG");
-						break;
-					case SVFOP_CURRENT_SCHEMA:
-						appendStringInfoString(buf, "CURRENT_SCHEMA");
 						break;
 				}
 			}

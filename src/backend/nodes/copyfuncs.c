@@ -1648,7 +1648,6 @@ _copyJoinExpr(const JoinExpr *from)
 	JoinExpr   *newnode = makeNode(JoinExpr);
 
 	COPY_SCALAR_FIELD(jointype);
-	COPY_SCALAR_FIELD(isNatural);
 	COPY_NODE_FIELD(larg);
 	COPY_NODE_FIELD(rarg);
 	COPY_NODE_FIELD(usingClause);

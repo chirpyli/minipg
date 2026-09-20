@@ -656,7 +656,7 @@ typedef struct RangeTblEntry
 	 * joinleftcols is an integer list of physical column numbers of the left
 	 * join input rel that are included in the join; likewise joinrighttcols
 	 * for the right join input rel.  (Which rels those are can be determined
-	 * from the associated JoinExpr.)  If the join is USING/NATURAL, then the
+	 * from the associated JoinExpr.)  If the join is USING, then the
 	 * first joinmergedcols entries in each list identify the merged columns.
 	 * The merged columns come first in the join output, then remaining
 	 * columns of the left input, then remaining columns of the right.
