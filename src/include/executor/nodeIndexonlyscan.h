@@ -14,7 +14,6 @@
 #ifndef NODEINDEXONLYSCAN_H
 #define NODEINDEXONLYSCAN_H
 
-#include "access/parallel.h"
 #include "nodes/execnodes.h"
 
 extern IndexOnlyScanState *ExecInitIndexOnlyScan(IndexOnlyScan *node, EState *estate, int eflags);
@@ -24,13 +23,5 @@ extern void ExecIndexOnlyRestrPos(IndexOnlyScanState *node);
 extern void ExecReScanIndexOnlyScan(IndexOnlyScanState *node);
 
 /* Support functions for parallel index-only scans */
-extern void ExecIndexOnlyScanEstimate(IndexOnlyScanState *node,
-									  ParallelContext *pcxt);
-extern void ExecIndexOnlyScanInitializeDSM(IndexOnlyScanState *node,
-										   ParallelContext *pcxt);
-extern void ExecIndexOnlyScanReInitializeDSM(IndexOnlyScanState *node,
-											 ParallelContext *pcxt);
-extern void ExecIndexOnlyScanInitializeWorker(IndexOnlyScanState *node,
-											  ParallelWorkerContext *pwcxt);
 
 #endif							/* NODEINDEXONLYSCAN_H */

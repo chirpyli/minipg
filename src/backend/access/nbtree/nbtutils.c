@@ -591,10 +591,6 @@ _bt_advance_array_keys(IndexScanDesc scan, ScanDirection dir)
 			break;
 	}
 
-	/* advance parallel scan */
-	if (scan->parallel_scan != NULL)
-		_bt_parallel_advance_array_keys(scan);
-
 	/*
 	 * When no new array keys were found, the scan is "past the end" of the
 	 * array keys.  _bt_start_array_keys can still "restart" the array keys if

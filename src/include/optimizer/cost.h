@@ -45,7 +45,6 @@ typedef enum
 
 /* parameter variables and flags (see also optimizer.h) */
 extern PGDLLIMPORT Cost disable_cost;
-extern PGDLLIMPORT int max_parallel_workers_per_gather;
 extern PGDLLIMPORT bool enable_seqscan;
 extern PGDLLIMPORT bool enable_indexscan;
 extern PGDLLIMPORT bool enable_indexonlyscan;
@@ -59,9 +58,6 @@ extern PGDLLIMPORT bool enable_material;
 extern PGDLLIMPORT bool enable_memoize;
 extern PGDLLIMPORT bool enable_mergejoin;
 extern PGDLLIMPORT bool enable_hashjoin;
-extern PGDLLIMPORT bool enable_gathermerge;
-extern PGDLLIMPORT bool enable_parallel_append;
-extern PGDLLIMPORT bool enable_parallel_hash;
 extern PGDLLIMPORT int constraint_exclusion;
 
 extern double index_pages_fetched(double tuples_fetched, BlockNumber pages,
@@ -70,7 +66,7 @@ extern void cost_seqscan(Path *path, PlannerInfo *root, RelOptInfo *baserel,
 						 ParamPathInfo *param_info);
 
 extern void cost_index(IndexPath *path, PlannerInfo *root,
-					   double loop_count, bool partial_path);
+					   double loop_count);
 extern void cost_bitmap_heap_scan(Path *path, PlannerInfo *root, RelOptInfo *baserel,
 								  ParamPathInfo *param_info,
 								  Path *bitmapqual, double loop_count);
@@ -140,17 +136,10 @@ extern void initial_cost_hashjoin(PlannerInfo *root,
 								  JoinType jointype,
 								  List *hashclauses,
 								  Path *outer_path, Path *inner_path,
-								  JoinPathExtraData *extra,
-								  bool parallel_hash);
+								  JoinPathExtraData *extra);
 extern void final_cost_hashjoin(PlannerInfo *root, HashPath *path,
 								JoinCostWorkspace *workspace,
 								JoinPathExtraData *extra);
-extern void cost_gather(GatherPath *path, PlannerInfo *root,
-						RelOptInfo *baserel, ParamPathInfo *param_info, double *rows);
-extern void cost_gather_merge(GatherMergePath *path, PlannerInfo *root,
-							  RelOptInfo *rel, ParamPathInfo *param_info,
-							  Cost input_startup_cost, Cost input_total_cost,
-							  double *rows);
 extern void cost_subplan(PlannerInfo *root, SubPlan *subplan, Plan *plan);
 extern void cost_qual_eval(QualCost *cost, List *quals, PlannerInfo *root);
 extern void cost_qual_eval_node(QualCost *cost, Node *qual, PlannerInfo *root);

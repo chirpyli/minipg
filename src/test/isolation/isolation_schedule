@@ -66,7 +66,4 @@ test: propagate-lock-delete
 # vacuum-conflict: 依赖 ROLE/OWNER TO 权限锁冲突，权限已裁剪，移除
 # vacuum-skip-locked 已随分区功能裁剪而移除
 test: predicate-hash
-test: serializable-parallel
-test: serializable-parallel-2
-test: serializable-parallel-3
 # ddl-dependency-locking: 依赖 DROP ROLE/OWNER 权限锁冲突，权限已裁剪，移除

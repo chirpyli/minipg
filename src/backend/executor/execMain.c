@@ -128,20 +128,8 @@ standard_ExecutorStart(QueryDesc *queryDesc, int eflags)
 	/*
 	 * If the transaction is read-only, we need to check if any writes are
 	 * planned to non-temporary tables.  EXPLAIN is considered read-only.
-	 *
-	 * Don't allow writes in parallel mode.  Supporting UPDATE and DELETE
-	 * would require (a) storing the combo CID hash in shared memory, rather
-	 * than synchronizing it just once at the start of parallelism, and (b) an
-	 * alternative to heap_update()'s reliance on xmax for mutual exclusion.
-	 * INSERT may have no such troubles, but we forbid it to simplify the
-	 * checks.
-	 *
-	 * We have lower-level defenses in CommandCounterIncrement and elsewhere
-	 * against performing unsafe operations in parallel mode, but this gives a
-	 * more user-friendly error message.
 	 */
-	if ((XactReadOnly || IsInParallelMode()) &&
-		!(eflags & EXEC_FLAG_EXPLAIN_ONLY))
+	if (XactReadOnly && !(eflags & EXEC_FLAG_EXPLAIN_ONLY))
 		ExecCheckXactReadOnly(queryDesc->plannedstmt);
 
 	/*
@@ -487,13 +475,11 @@ ExecutorRewind(QueryDesc *queryDesc)
 
 
 /*
- * Check that the query does not imply any writes to non-temp tables;
- * unless we're in parallel mode, in which case don't even allow writes
- * to temp tables.
+ * Check that the query does not imply any writes to non-temp tables.
  *
- * Note: in a Hot Standby this would need to reject writes to temp
- * tables just as we do in parallel mode; but an HS standby can't have created
- * any temp tables in the first place, so no need to check that.
+ * Note: in a Hot Standby this would need to reject writes to temp tables;
+ * but an HS standby can't have created any temp tables in the first place,
+ * so no need to check that.
  */
 static void
 ExecCheckXactReadOnly(PlannedStmt *plannedstmt)
@@ -502,8 +488,8 @@ ExecCheckXactReadOnly(PlannedStmt *plannedstmt)
 
 	/*
 	 * minipg 已裁 ACL 判定（RangeTblEntry 不再携带 requiredPerms 权限位），
-	 * 无法再从 RTE 区分 SELECT 与写权限，故直接基于 commandType 做只读 /
-	 * 并行模式下的写操作检查。
+	 * 无法再从 RTE 区分 SELECT 与写权限，故直接基于 commandType 做只读
+	 * 模式下的写操作检查。
 	 */
 	foreach(l, plannedstmt->rtable)
 	{
@@ -517,9 +503,6 @@ ExecCheckXactReadOnly(PlannedStmt *plannedstmt)
 
 		PreventCommandIfReadOnly(CreateCommandName((Node *) plannedstmt));
 	}
-
-	if (plannedstmt->commandType != CMD_SELECT || plannedstmt->hasModifyingCTE)
-		PreventCommandIfParallelMode(CreateCommandName((Node *) plannedstmt));
 }
 
 
@@ -976,7 +959,6 @@ ExecutePlan(QueryDesc *queryDesc,
 {
 	EState	   *estate = queryDesc->estate;
 	PlanState  *planstate = queryDesc->planstate;
-	bool		use_parallel_mode;
 	TupleTableSlot *slot;
 	uint64		current_tuple_count;
 
@@ -990,22 +972,7 @@ ExecutePlan(QueryDesc *queryDesc,
 	 */
 	estate->es_direction = direction;
 
-	/*
-	 * Set up parallel mode if appropriate.
-	 *
-	 * Parallel mode only supports complete execution of a plan.  If we've
-	 * already partially executed it, or if the caller asks us to exit early,
-	 * we must force the plan to run without parallelism.
-	 */
-	if (queryDesc->already_executed || numberTuples != 0)
-		use_parallel_mode = false;
-	else
-		use_parallel_mode = queryDesc->plannedstmt->parallelModeNeeded;
 	queryDesc->already_executed = true;
-
-	estate->es_use_parallel_mode = use_parallel_mode;
-	if (use_parallel_mode)
-		EnterParallelMode();
 
 	/*
 	 * Loop until we've processed the proper number of tuples from the plan.
@@ -1077,9 +1044,6 @@ ExecutePlan(QueryDesc *queryDesc,
 	 */
 	if (!(estate->es_top_eflags & EXEC_FLAG_BACKWARD))
 		(void) ExecShutdownNode(planstate);
-
-	if (use_parallel_mode)
-		ExitParallelMode();
 }
 
 

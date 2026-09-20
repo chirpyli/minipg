@@ -359,20 +359,6 @@ static const struct config_enum_entry huge_pages_options[] = {
 	{NULL, 0, false}
 };
 
-static const struct config_enum_entry force_parallel_mode_options[] = {
-	{"off", FORCE_PARALLEL_OFF, false},
-	{"on", FORCE_PARALLEL_ON, false},
-	{"regress", FORCE_PARALLEL_REGRESS, false},
-	{"true", FORCE_PARALLEL_ON, true},
-	{"false", FORCE_PARALLEL_OFF, true},
-	{"yes", FORCE_PARALLEL_ON, true},
-	{"no", FORCE_PARALLEL_OFF, true},
-	{"1", FORCE_PARALLEL_ON, true},
-	{"0", FORCE_PARALLEL_OFF, true},
-	{NULL, 0, false}
-};
-
-
 static struct config_enum_entry recovery_init_sync_method_options[] = {
 	{"fsync", RECOVERY_INIT_SYNC_METHOD_FSYNC, false},
 #ifdef HAVE_SYNCFS
@@ -888,36 +874,6 @@ static struct config_bool ConfigureNamesBool[] =
 			GUC_EXPLAIN
 		},
 		&enable_hashjoin,
-		true,
-		NULL, NULL, NULL
-	},
-	{
-		{"enable_gathermerge", PGC_USERSET, QUERY_TUNING_METHOD,
-			gettext_noop("Enables the planner's use of gather merge plans."),
-			NULL,
-			GUC_EXPLAIN
-		},
-		&enable_gathermerge,
-		true,
-		NULL, NULL, NULL
-	},
-	{
-		{"enable_parallel_append", PGC_USERSET, QUERY_TUNING_METHOD,
-			gettext_noop("Enables the planner's use of parallel append plans."),
-			NULL,
-			GUC_EXPLAIN
-		},
-		&enable_parallel_append,
-		true,
-		NULL, NULL, NULL
-	},
-	{
-		{"enable_parallel_hash", PGC_USERSET, QUERY_TUNING_METHOD,
-			gettext_noop("Enables the planner's use of parallel hash plans."),
-			NULL,
-			GUC_EXPLAIN
-		},
-		&enable_parallel_hash,
 		true,
 		NULL, NULL, NULL
 	},
@@ -1494,17 +1450,6 @@ static struct config_bool ConfigureNamesBool[] =
 		},
 		&quote_all_identifiers,
 		false,
-		NULL, NULL, NULL
-	},
-
-	{
-		{"parallel_leader_participation", PGC_USERSET, RESOURCES_ASYNCHRONOUS,
-			gettext_noop("Controls whether Gather and Gather Merge also run subplans."),
-			gettext_noop("Should gather nodes also run subplans or just gather tuples?"),
-			GUC_EXPLAIN
-		},
-		&parallel_leader_participation,
-		true,
 		NULL, NULL, NULL
 	},
 
@@ -2437,17 +2382,6 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 	{
-		{"max_parallel_workers_per_gather", PGC_USERSET, RESOURCES_ASYNCHRONOUS,
-			gettext_noop("Sets the maximum number of parallel processes per executor node."),
-			NULL,
-			GUC_EXPLAIN
-		},
-		&max_parallel_workers_per_gather,
-		2, 0, MAX_PARALLEL_WORKER_LIMIT,
-		NULL, NULL, NULL
-	},
-
-	{
 		{"max_parallel_workers", PGC_USERSET, RESOURCES_ASYNCHRONOUS,
 			gettext_noop("Sets the maximum number of parallel workers that can be active at one time."),
 			NULL,
@@ -2682,29 +2616,6 @@ static struct config_real ConfigureNamesReal[] =
 		DEFAULT_CPU_OPERATOR_COST, 0, DBL_MAX,
 		NULL, NULL, NULL
 	},
-	{
-		{"parallel_tuple_cost", PGC_USERSET, QUERY_TUNING_COST,
-			gettext_noop("Sets the planner's estimate of the cost of "
-						 "passing each tuple (row) from worker to leader backend."),
-			NULL,
-			GUC_EXPLAIN
-		},
-		&parallel_tuple_cost,
-		DEFAULT_PARALLEL_TUPLE_COST, 0, DBL_MAX,
-		NULL, NULL, NULL
-	},
-	{
-		{"parallel_setup_cost", PGC_USERSET, QUERY_TUNING_COST,
-			gettext_noop("Sets the planner's estimate of the cost of "
-						 "starting up worker processes for parallel query."),
-			NULL,
-			GUC_EXPLAIN
-		},
-		&parallel_setup_cost,
-		DEFAULT_PARALLEL_SETUP_COST, 0, DBL_MAX,
-		NULL, NULL, NULL
-	},
-
 	{
 		{"hash_mem_multiplier", PGC_USERSET, RESOURCES_MEM,
 			gettext_noop("Multiple of work_mem to use for hash tables."),
@@ -3397,17 +3308,6 @@ static struct config_enum ConfigureNamesEnum[] =
 		},
 		&huge_pages,
 		HUGE_PAGES_TRY, huge_pages_options,
-		NULL, NULL, NULL
-	},
-
-	{
-		{"force_parallel_mode", PGC_USERSET, DEVELOPER_OPTIONS,
-			gettext_noop("Forces use of parallel query facilities."),
-			gettext_noop("If possible, run query using a parallel worker and with parallel restrictions."),
-			GUC_NOT_IN_SAMPLE | GUC_EXPLAIN
-		},
-		&force_parallel_mode,
-		FORCE_PARALLEL_OFF, force_parallel_mode_options,
 		NULL, NULL, NULL
 	},
 

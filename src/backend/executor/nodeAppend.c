@@ -63,28 +63,11 @@
 #include "pgstat.h"
 #include "storage/latch.h"
 
-/* Shared state for parallel-aware Append. */
-struct ParallelAppendState
-{
-	LWLock		pa_lock;		/* mutual exclusion to choose next subplan */
-	int			pa_next_plan;	/* next plan to choose by any worker */
-
-	/*
-	 * pa_finished[i] should be true if no more workers should select subplan
-	 * i.  for a non-partial plan, this should be set to true as soon as a
-	 * worker selects the plan; for a partial plan, it remains false until
-	 * some worker executes the plan to completion.
-	 */
-	bool		pa_finished[FLEXIBLE_ARRAY_MEMBER];
-};
-
 #define INVALID_SUBPLAN_INDEX		-1
 #define EVENT_BUFFER_SIZE			16
 
 static TupleTableSlot *ExecAppend(PlanState *pstate);
 static bool choose_next_subplan_locally(AppendState *node);
-static bool choose_next_subplan_for_leader(AppendState *node);
-static bool choose_next_subplan_for_worker(AppendState *node);
 
 /* ----------------------------------------------------------------
  *		ExecInitAppend
@@ -104,7 +87,6 @@ ExecInitAppend(Append *node, EState *estate, int eflags)
 	PlanState **appendplanstates;
 	Bitmapset  *validsubplans;
 	int			nplans;
-	int			firstvalid;
 	int			i,
 				j;
 
@@ -118,7 +100,7 @@ ExecInitAppend(Append *node, EState *estate, int eflags)
 	appendstate->ps.state = estate;
 	appendstate->ps.ExecProcNode = ExecAppend;
 
-	/* Let choose_next_subplan_* function handle setting the first subplan */
+	/* Let choose_next_subplan_locally handle setting the first subplan */
 	appendstate->as_whichplan = INVALID_SUBPLAN_INDEX;
 	appendstate->as_syncdone = false;
 	appendstate->as_begun = false;
@@ -147,26 +129,16 @@ ExecInitAppend(Append *node, EState *estate, int eflags)
 	/*
 	 * call ExecInitNode on each of the valid plans to be executed and save
 	 * the results into the appendplanstates array.
-	 *
-	 * While at it, find out the first valid partial plan.
 	 */
 	j = 0;
-	firstvalid = nplans;
 	i = -1;
 	while ((i = bms_next_member(validsubplans, i)) >= 0)
 	{
 		Plan	   *initNode = (Plan *) list_nth(node->appendplans, i);
 
-		/*
-		 * Record the lowest appendplans index which is a valid partial plan.
-		 */
-		if (i >= node->first_partial_plan && j < firstvalid)
-			firstvalid = j;
-
 		appendplanstates[j++] = ExecInitNode(initNode, estate, eflags);
 	}
 
-	appendstate->as_first_partial_plan = firstvalid;
 	appendstate->appendplans = appendplanstates;
 	appendstate->as_nplans = nplans;
 
@@ -176,7 +148,6 @@ ExecInitAppend(Append *node, EState *estate, int eflags)
 
 	appendstate->ps.ps_ProjInfo = NULL;
 
-	/* For parallel query, this will be overridden later. */
 	appendstate->choose_next_subplan = choose_next_subplan_locally;
 
 	return appendstate;
@@ -322,81 +293,6 @@ ExecReScanAppend(AppendState *node)
 }
 
 /* ----------------------------------------------------------------
- *						Parallel Append Support
- * ----------------------------------------------------------------
- */
-
-/* ----------------------------------------------------------------
- *		ExecAppendEstimate
- *
- *		Compute the amount of space we'll need in the parallel
- *		query DSM, and inform pcxt->estimator about our needs.
- * ----------------------------------------------------------------
- */
-void
-ExecAppendEstimate(AppendState *node,
-				   ParallelContext *pcxt)
-{
-	node->pstate_len =
-		add_size(offsetof(ParallelAppendState, pa_finished),
-				 sizeof(bool) * node->as_nplans);
-
-	shm_toc_estimate_chunk(&pcxt->estimator, node->pstate_len);
-	shm_toc_estimate_keys(&pcxt->estimator, 1);
-}
-
-
-/* ----------------------------------------------------------------
- *		ExecAppendInitializeDSM
- *
- *		Set up shared state for Parallel Append.
- * ----------------------------------------------------------------
- */
-void
-ExecAppendInitializeDSM(AppendState *node,
-						ParallelContext *pcxt)
-{
-	ParallelAppendState *pstate;
-
-	pstate = shm_toc_allocate(pcxt->toc, node->pstate_len);
-	memset(pstate, 0, node->pstate_len);
-	LWLockInitialize(&pstate->pa_lock, LWTRANCHE_PARALLEL_APPEND);
-	shm_toc_insert(pcxt->toc, node->ps.plan->plan_node_id, pstate);
-
-	node->as_pstate = pstate;
-	node->choose_next_subplan = choose_next_subplan_for_leader;
-}
-
-/* ----------------------------------------------------------------
- *		ExecAppendReInitializeDSM
- *
- *		Reset shared state before beginning a fresh scan.
- * ----------------------------------------------------------------
- */
-void
-ExecAppendReInitializeDSM(AppendState *node, ParallelContext *pcxt)
-{
-	ParallelAppendState *pstate = node->as_pstate;
-
-	pstate->pa_next_plan = 0;
-	memset(pstate->pa_finished, 0, sizeof(bool) * node->as_nplans);
-}
-
-/* ----------------------------------------------------------------
- *		ExecAppendInitializeWorker
- *
- *		Copy relevant information from TOC into planstate, and initialize
- *		whatever is required to choose and execute the optimal subplan.
- * ----------------------------------------------------------------
- */
-void
-ExecAppendInitializeWorker(AppendState *node, ParallelWorkerContext *pwcxt)
-{
-	node->as_pstate = shm_toc_lookup(pwcxt->toc, node->ps.plan->plan_node_id, false);
-	node->choose_next_subplan = choose_next_subplan_for_worker;
-}
-
-/* ----------------------------------------------------------------
  *		choose_next_subplan_locally
  *
  *		Choose next sync subplan for a non-parallel-aware Append,
@@ -450,189 +346,3 @@ choose_next_subplan_locally(AppendState *node)
 
 	return true;
 }
-
-/* ----------------------------------------------------------------
- *		choose_next_subplan_for_leader
- *
- *      Try to pick a plan which doesn't commit us to doing much
- *      work locally, so that as much work as possible is done in
- *      the workers.  Cheapest subplans are at the end.
- * ----------------------------------------------------------------
- */
-static bool
-choose_next_subplan_for_leader(AppendState *node)
-{
-	ParallelAppendState *pstate = node->as_pstate;
-
-	/* Backward scan is not supported by parallel-aware plans */
-	Assert(ScanDirectionIsForward(node->ps.state->es_direction));
-
-	/* We should never be called when there are no subplans */
-	Assert(node->as_nplans > 0);
-
-	LWLockAcquire(&pstate->pa_lock, LW_EXCLUSIVE);
-
-	if (node->as_whichplan != INVALID_SUBPLAN_INDEX)
-	{
-		/* Mark just-completed subplan as finished. */
-		node->as_pstate->pa_finished[node->as_whichplan] = true;
-	}
-	else
-	{
-		/* Start with last subplan. */
-		node->as_whichplan = node->as_nplans - 1;
-	}
-
-	/* Loop until we find a subplan to execute. */
-	while (pstate->pa_finished[node->as_whichplan])
-	{
-		if (node->as_whichplan == 0)
-		{
-			pstate->pa_next_plan = INVALID_SUBPLAN_INDEX;
-			node->as_whichplan = INVALID_SUBPLAN_INDEX;
-			LWLockRelease(&pstate->pa_lock);
-			return false;
-		}
-
-		/*
-		 * We needn't pay attention to as_valid_subplans here as all invalid
-		 * plans have been marked as finished.
-		 */
-		node->as_whichplan--;
-	}
-
-	/* If non-partial, immediately mark as finished. */
-	if (node->as_whichplan < node->as_first_partial_plan)
-		node->as_pstate->pa_finished[node->as_whichplan] = true;
-
-	LWLockRelease(&pstate->pa_lock);
-
-	return true;
-}
-
-/* ----------------------------------------------------------------
- *		choose_next_subplan_for_worker
- *
- *		Choose next subplan for a parallel-aware Append, returning
- *		false if there are no more.
- *
- *		We start from the first plan and advance through the list;
- *		when we get back to the end, we loop back to the first
- *		partial plan.  This assigns the non-partial plans first in
- *		order of descending cost and then spreads out the workers
- *		as evenly as possible across the remaining partial plans.
- * ----------------------------------------------------------------
- */
-static bool
-choose_next_subplan_for_worker(AppendState *node)
-{
-	ParallelAppendState *pstate = node->as_pstate;
-
-	/* Backward scan is not supported by parallel-aware plans */
-	Assert(ScanDirectionIsForward(node->ps.state->es_direction));
-
-	/* We should never be called when there are no subplans */
-	Assert(node->as_nplans > 0);
-
-	LWLockAcquire(&pstate->pa_lock, LW_EXCLUSIVE);
-
-	/* Mark just-completed subplan as finished. */
-	if (node->as_whichplan != INVALID_SUBPLAN_INDEX)
-		node->as_pstate->pa_finished[node->as_whichplan] = true;
-
-	/* If all the plans are already done, we have nothing to do */
-	if (pstate->pa_next_plan == INVALID_SUBPLAN_INDEX)
-	{
-		LWLockRelease(&pstate->pa_lock);
-		return false;
-	}
-
-	/* Save the plan from which we are starting the search. */
-	node->as_whichplan = pstate->pa_next_plan;
-
-	/* Loop until we find a valid subplan to execute. */
-	while (pstate->pa_finished[pstate->pa_next_plan])
-	{
-		int			nextplan;
-
-		nextplan = bms_next_member(node->as_valid_subplans,
-								   pstate->pa_next_plan);
-		if (nextplan >= 0)
-		{
-			/* Advance to the next valid plan. */
-			pstate->pa_next_plan = nextplan;
-		}
-		else if (node->as_whichplan > node->as_first_partial_plan)
-		{
-			/*
-			 * Try looping back to the first valid partial plan, if there is
-			 * one.  If there isn't, arrange to bail out below.
-			 */
-			nextplan = bms_next_member(node->as_valid_subplans,
-									   node->as_first_partial_plan - 1);
-			pstate->pa_next_plan =
-				nextplan < 0 ? node->as_whichplan : nextplan;
-		}
-		else
-		{
-			/*
-			 * At last plan, and either there are no partial plans or we've
-			 * tried them all.  Arrange to bail out.
-			 */
-			pstate->pa_next_plan = node->as_whichplan;
-		}
-
-		if (pstate->pa_next_plan == node->as_whichplan)
-		{
-			/* We've tried everything! */
-			pstate->pa_next_plan = INVALID_SUBPLAN_INDEX;
-			LWLockRelease(&pstate->pa_lock);
-			return false;
-		}
-	}
-
-	/* Pick the plan we found, and advance pa_next_plan one more time. */
-	node->as_whichplan = pstate->pa_next_plan;
-	pstate->pa_next_plan = bms_next_member(node->as_valid_subplans,
-										   pstate->pa_next_plan);
-
-	/*
-	 * If there are no more valid plans then try setting the next plan to the
-	 * first valid partial plan.
-	 */
-	if (pstate->pa_next_plan < 0)
-	{
-		int			nextplan = bms_next_member(node->as_valid_subplans,
-											   node->as_first_partial_plan - 1);
-
-		if (nextplan >= 0)
-			pstate->pa_next_plan = nextplan;
-		else
-		{
-			/*
-			 * There are no valid partial plans, and we already chose the last
-			 * non-partial plan; so flag that there's nothing more for our
-			 * fellow workers to do.
-			 */
-			pstate->pa_next_plan = INVALID_SUBPLAN_INDEX;
-		}
-	}
-
-	/* If non-partial, immediately mark as finished. */
-	if (node->as_whichplan < node->as_first_partial_plan)
-		node->as_pstate->pa_finished[node->as_whichplan] = true;
-
-	LWLockRelease(&pstate->pa_lock);
-
-	return true;
-}
-
-/*
- * mark_invalid_subplans_as_finished
- *		Marks the ParallelAppendState's pa_finished as true for each invalid
- *		subplan.
- *
- * This function should only be called for parallel Append with run-time
- * pruning enabled.
- */
-

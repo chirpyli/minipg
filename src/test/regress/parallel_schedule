@@ -114,7 +114,6 @@ test: psql
 
 # run by itself so it can run parallel workers
 # information_schema 已裁剪，select_parallel 引用 information_schema，移除
-test: write_parallel
 test: vacuum_parallel
 
 # Run this alone, because concurrent DROP TABLE would make non-superuser

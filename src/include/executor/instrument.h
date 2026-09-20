@@ -88,12 +88,6 @@ typedef struct Instrumentation
 	WalUsage	walusage;		/* total WAL usage */
 } Instrumentation;
 
-typedef struct WorkerInstrumentation
-{
-	int			num_workers;	/* # of structures that follow */
-	Instrumentation instrument[FLEXIBLE_ARRAY_MEMBER];
-} WorkerInstrumentation;
-
 extern PGDLLIMPORT BufferUsage pgBufferUsage;
 extern PGDLLIMPORT WalUsage pgWalUsage;
 

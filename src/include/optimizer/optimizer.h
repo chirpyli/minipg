@@ -84,8 +84,6 @@ extern PGDLLIMPORT double random_page_cost;
 extern PGDLLIMPORT double cpu_tuple_cost;
 extern PGDLLIMPORT double cpu_index_tuple_cost;
 extern PGDLLIMPORT double cpu_operator_cost;
-extern PGDLLIMPORT double parallel_tuple_cost;
-extern PGDLLIMPORT double parallel_setup_cost;
 extern PGDLLIMPORT int effective_cache_size;
 
 extern double clamp_row_est(double nrows);
@@ -96,18 +94,6 @@ extern bool is_pseudo_constant_for_index(PlannerInfo *root, Node *expr,
 										 IndexOptInfo *index);
 
 /* in plan/planner.c: */
-
-/* possible values for force_parallel_mode */
-typedef enum
-{
-	FORCE_PARALLEL_OFF,
-	FORCE_PARALLEL_ON,
-	FORCE_PARALLEL_REGRESS
-}			ForceParallelMode;
-
-/* GUC parameters */
-extern int	force_parallel_mode;
-extern bool parallel_leader_participation;
 
 extern struct PlannedStmt *planner(Query *parse, const char *query_string,
 								   int cursorOptions,

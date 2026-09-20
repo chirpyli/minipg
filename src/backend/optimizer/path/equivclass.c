@@ -850,17 +850,12 @@ find_ec_member_matching_expr(EquivalenceClass *ec,
  * matches of Vars to the source tlist.
  *
  * Child EC members are ignored unless they belong to given 'relids'.
- * Also, non-parallel-safe expressions are ignored if 'require_parallel_safe'.
- *
- * Note: some callers pass root == NULL for notational reasons.  This is OK
- * when require_parallel_safe is false.
  */
 EquivalenceMember *
 find_computable_ec_member(PlannerInfo *root,
 						  EquivalenceClass *ec,
 						  List *exprs,
-						  Relids relids,
-						  bool require_parallel_safe)
+						  Relids relids)
 {
 	List	   *exprvars;
 	ListCell   *lc;
@@ -910,14 +905,6 @@ find_computable_ec_member(PlannerInfo *root,
 		if (lc2)
 			continue;			/* we hit a non-available Var */
 
-		/*
-		 * If requested, reject expressions that are not parallel-safe.  We
-		 * check this last because it's a rather expensive test.
-		 */
-		if (require_parallel_safe &&
-			!is_parallel_safe(root, (Node *) em->em_expr))
-			continue;
-
 		return em;				/* found usable expression */
 	}
 
@@ -960,15 +947,14 @@ find_em_expr_for_rel(EquivalenceClass *ec, RelOptInfo *rel)
  * To succeed, we must find an EC member that prepare_sort_from_pathkeys knows
  * how to sort on, given the rel's reltarget as input.  There are also a few
  * additional constraints based on the fact that the desired sort will be done
- * "early", within the scan/join part of the plan.  Also, non-parallel-safe
- * expressions are ignored if 'require_parallel_safe'.
+ * "early", within the scan/join part of the plan.
  *
  * At some point we might want to return the identified EquivalenceMember,
  * but for now, callers only want to know if there is one.
  */
 bool
 relation_can_be_sorted_early(PlannerInfo *root, RelOptInfo *rel,
-							 EquivalenceClass *ec, bool require_parallel_safe)
+							 EquivalenceClass *ec)
 {
 	PathTarget *target = rel->reltarget;
 	EquivalenceMember *em;
@@ -1000,22 +986,13 @@ relation_can_be_sorted_early(PlannerInfo *root, RelOptInfo *rel,
 		if (expression_returns_set((Node *) em->em_expr))
 			continue;
 
-		/*
-		 * If requested, reject expressions that are not parallel-safe.  We
-		 * check this last because it's a rather expensive test.
-		 */
-		if (require_parallel_safe &&
-			!is_parallel_safe(root, (Node *) em->em_expr))
-			continue;
-
 		return true;
 	}
 
 	/*
 	 * Try to find a expression computable from the reltarget.
 	 */
-	em = find_computable_ec_member(root, ec, target->exprs, rel->relids,
-								   require_parallel_safe);
+	em = find_computable_ec_member(root, ec, target->exprs, rel->relids);
 	if (!em)
 		return false;
 

@@ -161,19 +161,7 @@ typedef struct IndexScanDescData
 	Datum	   *xs_orderbyvals;
 	bool	   *xs_orderbynulls;
 	bool		xs_recheckorderby;
-
-	/* parallel index scan information, in shared memory */
-	struct ParallelIndexScanDescData *parallel_scan;
 }			IndexScanDescData;
-
-/* Generic structure for parallel scans */
-typedef struct ParallelIndexScanDescData
-{
-	Oid			ps_relid;
-	Oid			ps_indexid;
-	Size		ps_offset;		/* Offset in bytes of am specific structure */
-	char		ps_snapshot_data[FLEXIBLE_ARRAY_MEMBER];
-}			ParallelIndexScanDescData;
 
 struct TupleTableSlot;
 

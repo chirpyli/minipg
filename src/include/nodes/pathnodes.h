@@ -119,10 +119,6 @@ typedef struct PlannerGlobal
 
 	bool		dependsOnRole;	/* is plan specific to current role? */
 
-	bool		parallelModeOK; /* parallel mode potentially OK? */
-
-	bool		parallelModeNeeded; /* parallel mode actually required? */
-
 	char		maxParallelHazard;	/* worst PROPARALLEL hazard level */
 
 } PlannerGlobal;
@@ -567,7 +563,6 @@ typedef struct RelOptInfo
 	/* per-relation planner control flags */
 	bool		consider_startup;	/* keep cheap-startup-cost paths? */
 	bool		consider_param_startup; /* ditto, for parameterized paths? */
-	bool		consider_parallel;	/* consider parallel paths? */
 
 	/* default result targetlist for Paths scanning this relation */
 	struct PathTarget *reltarget;	/* list of Vars/Exprs, cost, width */
@@ -575,7 +570,6 @@ typedef struct RelOptInfo
 	/* materialization information */
 	List	   *pathlist;		/* Path structures */
 	List	   *ppilist;		/* ParamPathInfos used in pathlist */
-	List	   *partial_pathlist;	/* partial Paths */
 	struct Path *cheapest_startup_path;
 	struct Path *cheapest_total_path;
 	struct Path *cheapest_unique_path;
@@ -604,7 +598,6 @@ typedef struct RelOptInfo
 								 * ECs that mention this rel */
 	PlannerInfo *subroot;		/* if subquery */
 	List	   *subplan_params; /* if subquery */
-	int			rel_parallel_workers;	/* wanted number of parallel workers */
 	uint32		amflags;		/* Bitmask of optional features supported by
 								 * the table AM */
 
@@ -715,7 +708,6 @@ struct IndexOptInfo
 	bool		amsearchnulls;	/* can AM search for NULL/NOT NULL entries? */
 	bool		amhasgettuple;	/* does AM have amgettuple interface? */
 	bool		amhasgetbitmap; /* does AM have amgetbitmap interface? */
-	bool		amcanparallel;	/* does AM support parallel scan? */
 	bool		amcanmarkpos;	/* does AM support mark/restore? */
 	/* Rather than include amapi.h here, we declare amcostestimate like this */
 	void		(*amcostestimate) ();	/* AM's cost estimator */
@@ -964,10 +956,6 @@ typedef struct Path
 	PathTarget *pathtarget;		/* list of Vars/Exprs, cost, width */
 
 	ParamPathInfo *param_info;	/* parameterization info, or NULL if none */
-
-	bool		parallel_aware; /* engage parallel-aware logic? */
-	bool		parallel_safe;	/* OK to use as part of parallel plan? */
-	int			parallel_workers;	/* desired # of workers; 0 = not parallel */
 
 	/* estimated size/costs for path (see costsize.c for more info) */
 	double		rows;			/* estimated number of result tuples */
@@ -1276,31 +1264,6 @@ typedef struct UniquePath
 	List	   *in_operators;	/* equality operators of the IN clause */
 	List	   *uniq_exprs;		/* expressions to be made unique */
 } UniquePath;
-
-/*
- * GatherPath runs several copies of a plan in parallel and collects the
- * results.  The parallel leader may also execute the plan, unless the
- * single_copy flag is set.
- */
-typedef struct GatherPath
-{
-	Path		path;
-	Path	   *subpath;		/* path for each worker */
-	bool		single_copy;	/* don't execute path more than once */
-	int			num_workers;	/* number of workers sought to help */
-} GatherPath;
-
-/*
- * GatherMergePath runs several copies of a plan in parallel and collects
- * the results, preserving their common sort order.
- */
-typedef struct GatherMergePath
-{
-	Path		path;
-	Path	   *subpath;		/* path for each worker */
-	int			num_workers;	/* number of workers sought to help */
-} GatherMergePath;
-
 
 /*
  * All join-type paths share these fields.
@@ -2157,7 +2120,6 @@ typedef struct JoinPathExtraData
  * 		have been initialized.
  * agg_partial_costs gives partial aggregation costs.
  * agg_final_costs gives finalization costs.
- * target_parallel_safe is true if target is parallel safe.
  * havingQual gives list of quals to be applied after aggregation.
  * targetList gives list of columns to be projected.
  */
@@ -2170,7 +2132,6 @@ typedef struct
 	AggClauseCosts agg_final_costs;
 
 	/* Data which may differ across partitions. */
-	bool		target_parallel_safe;
 	Node	   *havingQual;
 	List	   *targetList;
 } GroupPathExtraData;

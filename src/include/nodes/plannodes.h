@@ -55,8 +55,6 @@ typedef struct PlannedStmt
 
 	bool		dependsOnRole;	/* is plan specific to current role? */
 
-	bool		parallelModeNeeded; /* parallel mode required to execute? */
-
 	struct Plan *planTree;		/* tree of Plan nodes */
 
 	List	   *rtable;			/* list of RangeTblEntry nodes */
@@ -118,12 +116,6 @@ typedef struct Plan
 	 */
 	double		plan_rows;		/* number of rows plan is expected to emit */
 	int			plan_width;		/* average row width in bytes */
-
-	/*
-	 * information needed for parallel query
-	 */
-	bool		parallel_aware; /* engage parallel-aware logic? */
-	bool		parallel_safe;	/* OK to use as part of parallel plan? */
 
 	/*
 	 * Common structural data for all Plan types.
@@ -280,7 +272,6 @@ typedef struct BitmapAnd
 typedef struct BitmapOr
 {
 	Plan		plan;
-	bool		isshared;
 	List	   *bitmapplans;
 } BitmapOr;
 
@@ -415,7 +406,6 @@ typedef struct BitmapIndexScan
 {
 	Scan		scan;
 	Oid			indexid;		/* OID of index to scan */
-	bool		isshared;		/* Create shared bitmap if set */
 	List	   *indexqual;		/* list of index quals (OpExprs) */
 	List	   *indexqualorig;	/* the same in original form */
 } BitmapIndexScan;
@@ -718,47 +708,6 @@ typedef struct Unique
 	Oid		   *uniqCollations; /* collations for equality comparisons */
 } Unique;
 
-/* ------------
- *		gather node
- *
- * Note: rescan_param is the ID of a PARAM_EXEC parameter slot.  That slot
- * will never actually contain a value, but the Gather node must flag it as
- * having changed whenever it is rescanned.  The child parallel-aware scan
- * nodes are marked as depending on that parameter, so that the rescan
- * machinery is aware that their output is likely to change across rescans.
- * In some cases we don't need a rescan Param, so rescan_param is set to -1.
- * ------------
- */
-typedef struct Gather
-{
-	Plan		plan;
-	int			num_workers;	/* planned number of worker processes */
-	int			rescan_param;	/* ID of Param that signals a rescan, or -1 */
-	bool		single_copy;	/* don't execute plan more than once */
-	bool		invisible;		/* suppress EXPLAIN display (for testing)? */
-	Bitmapset  *initParam;		/* param id's of initplans which are referred
-								 * at gather or one of it's child node */
-} Gather;
-
-/* ------------
- *		gather merge node
- * ------------
- */
-typedef struct GatherMerge
-{
-	Plan		plan;
-	int			num_workers;	/* planned number of worker processes */
-	int			rescan_param;	/* ID of Param that signals a rescan, or -1 */
-	/* remaining fields are just like the sort-key info in struct Sort */
-	int			numCols;		/* number of sort-key columns */
-	AttrNumber *sortColIdx;		/* their indexes in the target list */
-	Oid		   *sortOperators;	/* OIDs of operators to sort them by */
-	Oid		   *collations;		/* OIDs of collations */
-	bool	   *nullsFirst;		/* NULLS FIRST/LAST directions */
-	Bitmapset  *initParam;		/* param id's of initplans which are referred
-								 * at gather merge or one of it's child node */
-} GatherMerge;
-
 /* ----------------
  *		hash build node
  *
@@ -780,7 +729,6 @@ typedef struct Hash
 	AttrNumber	skewColumn;		/* outer join key's column #, or zero */
 	bool		skewInherit;	/* is outer join rel an inheritance tree? */
 	/* all other info is in the parent HashJoin node */
-	double		rows_total;		/* estimate total rows if parallel_aware */
 } Hash;
 
 /*

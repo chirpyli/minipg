@@ -23,7 +23,6 @@
 #include "catalog/index.h"
 #include "catalog/namespace.h"
 #include "catalog/storage.h"
-#include "executor/execParallel.h"
 #include "libpq/libpq.h"
 #include "libpq/pqformat.h"
 #include "libpq/pqmq.h"
@@ -135,9 +134,6 @@ static const struct
 }			InternalParallelWorkers[] =
 
 {
-	{
-		"ParallelQueryMain", ParallelQueryMain
-	},
 	{
 		"_bt_parallel_build_main", _bt_parallel_build_main
 	},
@@ -1145,21 +1141,16 @@ HandleParallelMessage(ParallelContext *pcxt, int i, StringInfo msg)
 				edata.elevel = Min(edata.elevel, ERROR);
 
 				/*
-				 * If desired, add a context line to show that this is a
-				 * message propagated from a parallel worker.  Otherwise, it
-				 * can sometimes be confusing to understand what actually
-				 * happened.  (We don't do this in FORCE_PARALLEL_REGRESS mode
-				 * because it causes test-result instability depending on
-				 * whether a parallel worker is actually used or not.)
+				 * Add a context line to show that this is a message
+				 * propagated from a parallel worker.  Otherwise, it can
+				 * sometimes be confusing to understand what actually
+				 * happened.
 				 */
-				if (force_parallel_mode != FORCE_PARALLEL_REGRESS)
-				{
-					if (edata.context)
-						edata.context = psprintf("%s\n%s", edata.context,
-												 _("parallel worker"));
-					else
-						edata.context = pstrdup(_("parallel worker"));
-				}
+				if (edata.context)
+					edata.context = psprintf("%s\n%s", edata.context,
+											 _("parallel worker"));
+				else
+					edata.context = pstrdup(_("parallel worker"));
 
 				/*
 				 * Context beyond that should use the error context callbacks

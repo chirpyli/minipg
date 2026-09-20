@@ -30,12 +30,8 @@ extern void add_path(RelOptInfo *parent_rel, Path *new_path);
 extern bool add_path_precheck(RelOptInfo *parent_rel,
 							  Cost startup_cost, Cost total_cost,
 							  List *pathkeys, Relids required_outer);
-extern void add_partial_path(RelOptInfo *parent_rel, Path *new_path);
-extern bool add_partial_path_precheck(RelOptInfo *parent_rel,
-									  Cost total_cost, List *pathkeys);
-
 extern Path *create_seqscan_path(PlannerInfo *root, RelOptInfo *rel,
-								 Relids required_outer, int parallel_workers);
+								 Relids required_outer);
 
 extern IndexPath *create_index_path(PlannerInfo *root,
 									IndexOptInfo *index,
@@ -46,14 +42,12 @@ extern IndexPath *create_index_path(PlannerInfo *root,
 									ScanDirection indexscandir,
 									bool indexonly,
 									Relids required_outer,
-									double loop_count,
-									bool partial_path);
+									double loop_count);
 extern BitmapHeapPath *create_bitmap_heap_path(PlannerInfo *root,
 											   RelOptInfo *rel,
 											   Path *bitmapqual,
 											   Relids required_outer,
-											   double loop_count,
-											   int parallel_degree);
+											   double loop_count);
 extern BitmapAndPath *create_bitmap_and_path(PlannerInfo *root,
 											 RelOptInfo *rel,
 											 List *bitmapquals);
@@ -67,9 +61,8 @@ extern TidRangePath *create_tidrangescan_path(PlannerInfo *root,
 											  List *tidrangequals,
 											  Relids required_outer);
 extern AppendPath *create_append_path(PlannerInfo *root, RelOptInfo *rel,
-									  List *subpaths, List *partial_subpaths,
+									  List *subpaths,
 									  List *pathkeys, Relids required_outer,
-									  int parallel_workers, bool parallel_aware,
 									  double rows);
 extern MergeAppendPath *create_merge_append_path(PlannerInfo *root,
 												 RelOptInfo *rel,
@@ -91,16 +84,6 @@ extern MemoizePath *create_memoize_path(PlannerInfo *root,
 										double calls);
 extern UniquePath *create_unique_path(PlannerInfo *root, RelOptInfo *rel,
 									  Path *subpath, SpecialJoinInfo *sjinfo);
-extern GatherPath *create_gather_path(PlannerInfo *root,
-									  RelOptInfo *rel, Path *subpath, PathTarget *target,
-									  Relids required_outer, double *rows);
-extern GatherMergePath *create_gather_merge_path(PlannerInfo *root,
-												 RelOptInfo *rel,
-												 Path *subpath,
-												 PathTarget *target,
-												 List *pathkeys,
-												 Relids required_outer,
-												 double *rows);
 extern SubqueryScanPath *create_subqueryscan_path(PlannerInfo *root,
 												  RelOptInfo *rel, Path *subpath,
 												  List *pathkeys, Relids required_outer);
@@ -149,7 +132,6 @@ extern HashPath *create_hashjoin_path(PlannerInfo *root,
 									  JoinPathExtraData *extra,
 									  Path *outer_path,
 									  Path *inner_path,
-									  bool parallel_hash,
 									  List *restrict_clauses,
 									  Relids required_outer,
 									  List *hashclauses);

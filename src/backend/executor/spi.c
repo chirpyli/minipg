@@ -568,7 +568,7 @@ SPI_execute(const char *src, bool read_only, long tcount)
 	memset(&plan, 0, sizeof(_SPI_plan));
 	plan.magic = _SPI_PLAN_MAGIC;
 	plan.parse_mode = RAW_PARSE_DEFAULT;
-	plan.cursor_options = CURSOR_OPT_PARALLEL_OK;
+	plan.cursor_options = 0;
 
 	_SPI_prepare_plan(src, &plan);
 
@@ -609,7 +609,7 @@ SPI_execute_extended(const char *src,
 	memset(&plan, 0, sizeof(_SPI_plan));
 	plan.magic = _SPI_PLAN_MAGIC;
 	plan.parse_mode = RAW_PARSE_DEFAULT;
-	plan.cursor_options = CURSOR_OPT_PARALLEL_OK;
+	plan.cursor_options = 0;
 	if (options->params)
 	{
 		plan.parserSetup = options->params->parserSetup;
@@ -791,7 +791,7 @@ SPI_execute_with_args(const char *src,
 	memset(&plan, 0, sizeof(_SPI_plan));
 	plan.magic = _SPI_PLAN_MAGIC;
 	plan.parse_mode = RAW_PARSE_DEFAULT;
-	plan.cursor_options = CURSOR_OPT_PARALLEL_OK;
+	plan.cursor_options = 0;
 	plan.nargs = nargs;
 	plan.argtypes = argtypes;
 	plan.parserSetup = NULL;

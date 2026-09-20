@@ -1050,7 +1050,6 @@ _readPlannedStmt(void)
 	READ_BOOL_FIELD(canSetTag);
 	READ_BOOL_FIELD(transientPlan);
 	READ_BOOL_FIELD(dependsOnRole);
-	READ_BOOL_FIELD(parallelModeNeeded);
 	READ_NODE_FIELD(planTree);
 	READ_NODE_FIELD(rtable);
 	READ_NODE_FIELD(resultRelations);
@@ -1081,8 +1080,6 @@ ReadCommonPlan(Plan *local_node)
 	READ_FLOAT_FIELD(total_cost);
 	READ_FLOAT_FIELD(plan_rows);
 	READ_INT_FIELD(plan_width);
-	READ_BOOL_FIELD(parallel_aware);
-	READ_BOOL_FIELD(parallel_safe);
 	READ_INT_FIELD(plan_node_id);
 	READ_NODE_FIELD(targetlist);
 	READ_NODE_FIELD(qual);
@@ -1220,7 +1217,6 @@ _readBitmapOr(void)
 
 	ReadCommonPlan(&local_node->plan);
 
-	READ_BOOL_FIELD(isshared);
 	READ_NODE_FIELD(bitmapplans);
 
 	READ_DONE();
@@ -1320,7 +1316,6 @@ _readBitmapIndexScan(void)
 	ReadCommonScan(&local_node->scan);
 
 	READ_OID_FIELD(indexid);
-	READ_BOOL_FIELD(isshared);
 	READ_NODE_FIELD(indexqual);
 	READ_NODE_FIELD(indexqualorig);
 
@@ -1647,47 +1642,6 @@ _readUnique(void)
 }
 
 /*
- * _readGather
- */
-static Gather *
-_readGather(void)
-{
-	READ_LOCALS(Gather);
-
-	ReadCommonPlan(&local_node->plan);
-
-	READ_INT_FIELD(num_workers);
-	READ_INT_FIELD(rescan_param);
-	READ_BOOL_FIELD(single_copy);
-	READ_BOOL_FIELD(invisible);
-	READ_BITMAPSET_FIELD(initParam);
-
-	READ_DONE();
-}
-
-/*
- * _readGatherMerge
- */
-static GatherMerge *
-_readGatherMerge(void)
-{
-	READ_LOCALS(GatherMerge);
-
-	ReadCommonPlan(&local_node->plan);
-
-	READ_INT_FIELD(num_workers);
-	READ_INT_FIELD(rescan_param);
-	READ_INT_FIELD(numCols);
-	READ_ATTRNUMBER_ARRAY(sortColIdx, local_node->numCols);
-	READ_OID_ARRAY(sortOperators, local_node->numCols);
-	READ_OID_ARRAY(collations, local_node->numCols);
-	READ_BOOL_ARRAY(nullsFirst, local_node->numCols);
-	READ_BITMAPSET_FIELD(initParam);
-
-	READ_DONE();
-}
-
-/*
  * _readHash
  */
 static Hash *
@@ -1701,7 +1655,6 @@ _readHash(void)
 	READ_OID_FIELD(skewTable);
 	READ_INT_FIELD(skewColumn);
 	READ_BOOL_FIELD(skewInherit);
-	READ_FLOAT_FIELD(rows_total);
 
 	READ_DONE();
 }
@@ -1959,10 +1912,6 @@ parseNodeString(void)
 		return_value = _readAgg();
 	else if (MATCH("UNIQUE", 6))
 		return_value = _readUnique();
-	else if (MATCH("GATHER", 6))
-		return_value = _readGather();
-	else if (MATCH("GATHERMERGE", 11))
-		return_value = _readGatherMerge();
 	else if (MATCH("HASH", 4))
 		return_value = _readHash();
 	else if (MATCH("NESTLOOPPARAM", 13))

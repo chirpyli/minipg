@@ -395,13 +395,11 @@ pathkeys_count_contained_in(List *keys1, List *keys2, int *n_common)
  * 'pathkeys' represents a required ordering (in canonical form!)
  * 'required_outer' denotes allowable outer relations for parameterized paths
  * 'cost_criterion' is STARTUP_COST or TOTAL_COST
- * 'require_parallel_safe' causes us to consider only parallel-safe paths
  */
 Path *
 get_cheapest_path_for_pathkeys(List *paths, List *pathkeys,
 							   Relids required_outer,
-							   CostSelector cost_criterion,
-							   bool require_parallel_safe)
+							   CostSelector cost_criterion)
 {
 	Path	   *matched_path = NULL;
 	ListCell   *l;
@@ -416,9 +414,6 @@ get_cheapest_path_for_pathkeys(List *paths, List *pathkeys,
 		 */
 		if (matched_path != NULL &&
 			compare_path_costs(matched_path, path, cost_criterion) <= 0)
-			continue;
-
-		if (require_parallel_safe && !path->parallel_safe)
 			continue;
 
 		if (pathkeys_contained_in(pathkeys, path->pathkeys) &&
@@ -470,27 +465,6 @@ get_cheapest_fractional_path_for_pathkeys(List *paths,
 	return matched_path;
 }
 
-
-/*
- * get_cheapest_parallel_safe_total_inner
- *	  Find the unparameterized parallel-safe path with the least total cost.
- */
-Path *
-get_cheapest_parallel_safe_total_inner(List *paths)
-{
-	ListCell   *l;
-
-	foreach(l, paths)
-	{
-		Path	   *innerpath = (Path *) lfirst(l);
-
-		if (innerpath->parallel_safe &&
-			bms_is_empty(PATH_REQ_OUTER(innerpath)))
-			return innerpath;
-	}
-
-	return NULL;
-}
 
 /****************************************************************************
  *		NEW PATHKEY FORMATION

@@ -113,7 +113,6 @@
 #include "postgres.h"
 
 #include "access/htup_details.h"
-#include "access/parallel.h"
 #include "executor/executor.h"
 #include "executor/hashjoin.h"
 #include "executor/nodeHash.h"
@@ -142,16 +141,11 @@
 static TupleTableSlot *ExecHashJoinOuterGetTuple(PlanState *outerNode,
 												 HashJoinState *hjstate,
 												 uint32 *hashvalue);
-static TupleTableSlot *ExecParallelHashJoinOuterGetTuple(PlanState *outerNode,
-														 HashJoinState *hjstate,
-														 uint32 *hashvalue);
 static TupleTableSlot *ExecHashJoinGetSavedTuple(HashJoinState *hjstate,
 												 BufFile *file,
 												 uint32 *hashvalue,
 												 TupleTableSlot *tupleSlot);
 static bool ExecHashJoinNewBatch(HashJoinState *hjstate);
-static bool ExecParallelHashJoinNewBatch(HashJoinState *hjstate);
-static void ExecParallelHashJoinPartitionOuter(HashJoinState *node);
 
 
 /* ----------------------------------------------------------------
@@ -168,7 +162,7 @@ static void ExecParallelHashJoinPartitionOuter(HashJoinState *node);
  * ----------------------------------------------------------------
  */
 static pg_always_inline TupleTableSlot *
-ExecHashJoinImpl(PlanState *pstate, bool parallel)
+ExecHashJoinImpl(PlanState *pstate)
 {
 	HashJoinState *node = castNode(HashJoinState, pstate);
 	PlanState  *outerNode;
@@ -180,7 +174,6 @@ ExecHashJoinImpl(PlanState *pstate, bool parallel)
 	TupleTableSlot *outerTupleSlot;
 	uint32		hashvalue;
 	int			batchno;
-	ParallelHashJoinState *parallel_state;
 
 	/*
 	 * get information from HashJoin node
@@ -191,7 +184,6 @@ ExecHashJoinImpl(PlanState *pstate, bool parallel)
 	outerNode = outerPlanState(node);
 	hashtable = node->hj_HashTable;
 	econtext = node->js.ps.ps_ExprContext;
-	parallel_state = hashNode->parallel_state;
 
 	/*
 	 * Reset per-tuple memory context to free any expression evaluation
@@ -249,18 +241,6 @@ ExecHashJoinImpl(PlanState *pstate, bool parallel)
 					/* no chance to not build the hash table */
 					node->hj_FirstOuterTupleSlot = NULL;
 				}
-				else if (parallel)
-				{
-					/*
-					 * The empty-outer optimization is not implemented for
-					 * shared hash tables, because no one participant can
-					 * determine that there are no outer tuples, and it's not
-					 * yet clear that it's worth the synchronization overhead
-					 * of reaching consensus to figure that out.  So we have
-					 * to build the hash table.
-					 */
-					node->hj_FirstOuterTupleSlot = NULL;
-				}
 				else if (HJ_FILL_OUTER(node) ||
 						 (outerNode->plan->startup_cost < hashNode->ps.plan->total_cost &&
 						  !node->hj_OuterNotEmpty))
@@ -302,21 +282,7 @@ ExecHashJoinImpl(PlanState *pstate, bool parallel)
 				 * outer relation.
 				 */
 				if (hashtable->totalTuples == 0 && !HJ_FILL_OUTER(node))
-				{
-					if (parallel)
-					{
-						/*
-						 * Advance the build barrier to PHJ_BUILD_RUNNING
-						 * before proceeding so we can negotiate resource
-						 * cleanup.
-						 */
-						Barrier    *build_barrier = &parallel_state->build_barrier;
-
-						while (BarrierPhase(build_barrier) < PHJ_BUILD_RUNNING)
-							BarrierArriveAndWait(build_barrier, 0);
-					}
 					return NULL;
-				}
 
 				/*
 				 * need to remember whether nbatch has increased since we
@@ -331,44 +297,7 @@ ExecHashJoinImpl(PlanState *pstate, bool parallel)
 				 */
 				node->hj_OuterNotEmpty = false;
 
-				if (parallel)
-				{
-					Barrier    *build_barrier;
-
-					build_barrier = &parallel_state->build_barrier;
-					Assert(BarrierPhase(build_barrier) == PHJ_BUILD_HASHING_OUTER ||
-						   BarrierPhase(build_barrier) == PHJ_BUILD_RUNNING ||
-						   BarrierPhase(build_barrier) == PHJ_BUILD_DONE);
-					if (BarrierPhase(build_barrier) == PHJ_BUILD_HASHING_OUTER)
-					{
-						/*
-						 * If multi-batch, we need to hash the outer relation
-						 * up front.
-						 */
-						if (hashtable->nbatch > 1)
-							ExecParallelHashJoinPartitionOuter(node);
-						BarrierArriveAndWait(build_barrier,
-											 WAIT_EVENT_HASH_BUILD_HASH_OUTER);
-					}
-					else if (BarrierPhase(build_barrier) == PHJ_BUILD_DONE)
-					{
-						/*
-						 * If we attached so late that the job is finished and
-						 * the batch state has been freed, we can return
-						 * immediately.
-						 */
-						return NULL;
-					}
-
-					/* Each backend should now select a batch to work on. */
-					Assert(BarrierPhase(build_barrier) == PHJ_BUILD_RUNNING);
-					hashtable->curbatch = -1;
-					node->hj_JoinState = HJ_NEED_NEW_BATCH;
-
-					continue;
-				}
-				else
-					node->hj_JoinState = HJ_NEED_NEW_OUTER;
+				node->hj_JoinState = HJ_NEED_NEW_OUTER;
 
 				/* FALL THRU */
 
@@ -377,13 +306,8 @@ ExecHashJoinImpl(PlanState *pstate, bool parallel)
 				/*
 				 * We don't have an outer tuple, try to get the next one
 				 */
-				if (parallel)
-					outerTupleSlot =
-						ExecParallelHashJoinOuterGetTuple(outerNode, node,
-														  &hashvalue);
-				else
-					outerTupleSlot =
-						ExecHashJoinOuterGetTuple(outerNode, node, &hashvalue);
+				outerTupleSlot =
+					ExecHashJoinOuterGetTuple(outerNode, node, &hashvalue);
 
 				if (TupIsNull(outerTupleSlot))
 				{
@@ -428,7 +352,6 @@ ExecHashJoinImpl(PlanState *pstate, bool parallel)
 					 * Need to postpone this outer tuple to a later batch.
 					 * Save it in the corresponding outer-batch file.
 					 */
-					Assert(parallel_state == NULL);
 					Assert(batchno > hashtable->curbatch);
 					ExecHashJoinSaveTuple(mintuple, hashvalue,
 										  &hashtable->outerBatchFile[batchno]);
@@ -450,23 +373,11 @@ ExecHashJoinImpl(PlanState *pstate, bool parallel)
 				/*
 				 * Scan the selected hash bucket for matches to current outer
 				 */
-				if (parallel)
+				if (!ExecScanHashBucket(node, econtext))
 				{
-					if (!ExecParallelScanHashBucket(node, econtext))
-					{
-						/* out of matches; check for possible outer-join fill */
-						node->hj_JoinState = HJ_FILL_OUTER_TUPLE;
-						continue;
-					}
-				}
-				else
-				{
-					if (!ExecScanHashBucket(node, econtext))
-					{
-						/* out of matches; check for possible outer-join fill */
-						node->hj_JoinState = HJ_FILL_OUTER_TUPLE;
-						continue;
-					}
+					/* out of matches; check for possible outer-join fill */
+					node->hj_JoinState = HJ_FILL_OUTER_TUPLE;
+					continue;
 				}
 
 				/*
@@ -485,25 +396,11 @@ ExecHashJoinImpl(PlanState *pstate, bool parallel)
 				{
 					node->hj_MatchedOuter = true;
 
-					if (parallel)
-					{
-						/*
-						 * Full/right outer joins are currently not supported
-						 * for parallel joins, so we don't need to set the
-						 * match bit.  Experiments show that it's worth
-						 * avoiding the shared memory traffic on large
-						 * systems.
-						 */
-						Assert(!HJ_FILL_INNER(node));
-					}
-					else
-					{
-						/*
-						 * This is really only needed if HJ_FILL_INNER(node),
-						 * but we'll avoid the branch and just set it always.
-						 */
-						HeapTupleHeaderSetMatch(HJTUPLE_MINTUPLE(node->hj_CurTuple));
-					}
+					/*
+					 * This is really only needed if HJ_FILL_INNER(node), but
+					 * we'll avoid the branch and just set it always.
+					 */
+					HeapTupleHeaderSetMatch(HJTUPLE_MINTUPLE(node->hj_CurTuple));
 
 					/* In an antijoin, we never return a matched tuple */
 					if (node->js.jointype == JOIN_ANTI)
@@ -585,16 +482,8 @@ ExecHashJoinImpl(PlanState *pstate, bool parallel)
 				/*
 				 * Try to advance to next batch.  Done if there are no more.
 				 */
-				if (parallel)
-				{
-					if (!ExecParallelHashJoinNewBatch(node))
-						return NULL;	/* end of parallel-aware join */
-				}
-				else
-				{
-					if (!ExecHashJoinNewBatch(node))
-						return NULL;	/* end of parallel-oblivious join */
-				}
+				if (!ExecHashJoinNewBatch(node))
+					return NULL;	/* end of parallel-oblivious join */
 				node->hj_JoinState = HJ_NEED_NEW_OUTER;
 				break;
 
@@ -607,8 +496,6 @@ ExecHashJoinImpl(PlanState *pstate, bool parallel)
 
 /* ----------------------------------------------------------------
  *		ExecHashJoin
- *
- *		Parallel-oblivious version.
  * ----------------------------------------------------------------
  */
 static TupleTableSlot *			/* return: a tuple or NULL */
@@ -618,23 +505,7 @@ ExecHashJoin(PlanState *pstate)
 	 * On sufficiently smart compilers this should be inlined with the
 	 * parallel-aware branches removed.
 	 */
-	return ExecHashJoinImpl(pstate, false);
-}
-
-/* ----------------------------------------------------------------
- *		ExecParallelHashJoin
- *
- *		Parallel-aware version.
- * ----------------------------------------------------------------
- */
-static TupleTableSlot *			/* return: a tuple or NULL */
-ExecParallelHashJoin(PlanState *pstate)
-{
-	/*
-	 * On sufficiently smart compilers this should be inlined with the
-	 * parallel-oblivious branches removed.
-	 */
-	return ExecHashJoinImpl(pstate, true);
+	return ExecHashJoinImpl(pstate);
 }
 
 /* ----------------------------------------------------------------
@@ -905,67 +776,6 @@ ExecHashJoinOuterGetTuple(PlanState *outerNode,
 	return NULL;
 }
 
-/*
- * ExecHashJoinOuterGetTuple variant for the parallel case.
- */
-static TupleTableSlot *
-ExecParallelHashJoinOuterGetTuple(PlanState *outerNode,
-								  HashJoinState *hjstate,
-								  uint32 *hashvalue)
-{
-	HashJoinTable hashtable = hjstate->hj_HashTable;
-	int			curbatch = hashtable->curbatch;
-	TupleTableSlot *slot;
-
-	/*
-	 * In the Parallel Hash case we only run the outer plan directly for
-	 * single-batch hash joins.  Otherwise we have to go to batch files, even
-	 * for batch 0.
-	 */
-	if (curbatch == 0 && hashtable->nbatch == 1)
-	{
-		slot = ExecProcNode(outerNode);
-
-		while (!TupIsNull(slot))
-		{
-			ExprContext *econtext = hjstate->js.ps.ps_ExprContext;
-
-			econtext->ecxt_outertuple = slot;
-			if (ExecHashGetHashValue(hashtable, econtext,
-									 hjstate->hj_OuterHashKeys,
-									 true,	/* outer tuple */
-									 HJ_FILL_OUTER(hjstate),
-									 hashvalue))
-				return slot;
-
-			/*
-			 * That tuple couldn't match because of a NULL, so discard it and
-			 * continue with the next one.
-			 */
-			slot = ExecProcNode(outerNode);
-		}
-	}
-	else if (curbatch < hashtable->nbatch)
-	{
-		MinimalTuple tuple;
-
-		tuple = sts_parallel_scan_next(hashtable->batches[curbatch].outer_tuples,
-									   hashvalue);
-		if (tuple != NULL)
-		{
-			ExecForceStoreMinimalTuple(tuple,
-									   hjstate->hj_OuterTupleSlot,
-									   false);
-			slot = hjstate->hj_OuterTupleSlot;
-			return slot;
-		}
-		else
-			ExecClearTuple(hjstate->hj_OuterTupleSlot);
-	}
-
-	/* End of this batch */
-	return NULL;
-}
 
 /*
  * ExecHashJoinNewBatch
@@ -1109,121 +919,6 @@ ExecHashJoinNewBatch(HashJoinState *hjstate)
 	return true;
 }
 
-/*
- * Choose a batch to work on, and attach to it.  Returns true if successful,
- * false if there are no more batches.
- */
-static bool
-ExecParallelHashJoinNewBatch(HashJoinState *hjstate)
-{
-	HashJoinTable hashtable = hjstate->hj_HashTable;
-	int			start_batchno;
-	int			batchno;
-
-	/*
-	 * If we were already attached to a batch, remember not to bother checking
-	 * it again, and detach from it (possibly freeing the hash table if we are
-	 * last to detach).
-	 */
-	if (hashtable->curbatch >= 0)
-	{
-		hashtable->batches[hashtable->curbatch].done = true;
-		ExecHashTableDetachBatch(hashtable);
-	}
-
-	/*
-	 * Search for a batch that isn't done.  We use an atomic counter to start
-	 * our search at a different batch in every participant when there are
-	 * more batches than participants.
-	 */
-	batchno = start_batchno =
-		pg_atomic_fetch_add_u32(&hashtable->parallel_state->distributor, 1) %
-		hashtable->nbatch;
-	do
-	{
-		uint32		hashvalue;
-		MinimalTuple tuple;
-		TupleTableSlot *slot;
-
-		if (!hashtable->batches[batchno].done)
-		{
-			SharedTuplestoreAccessor *inner_tuples;
-			Barrier    *batch_barrier =
-			&hashtable->batches[batchno].shared->batch_barrier;
-
-			switch (BarrierAttach(batch_barrier))
-			{
-				case PHJ_BATCH_ELECTING:
-
-					/* One backend allocates the hash table. */
-					if (BarrierArriveAndWait(batch_barrier,
-											 WAIT_EVENT_HASH_BATCH_ELECT))
-						ExecParallelHashTableAlloc(hashtable, batchno);
-					/* Fall through. */
-
-				case PHJ_BATCH_ALLOCATING:
-					/* Wait for allocation to complete. */
-					BarrierArriveAndWait(batch_barrier,
-										 WAIT_EVENT_HASH_BATCH_ALLOCATE);
-					/* Fall through. */
-
-				case PHJ_BATCH_LOADING:
-					/* Start (or join in) loading tuples. */
-					ExecParallelHashTableSetCurrentBatch(hashtable, batchno);
-					inner_tuples = hashtable->batches[batchno].inner_tuples;
-					sts_begin_parallel_scan(inner_tuples);
-					while ((tuple = sts_parallel_scan_next(inner_tuples,
-														   &hashvalue)))
-					{
-						ExecForceStoreMinimalTuple(tuple,
-												   hjstate->hj_HashTupleSlot,
-												   false);
-						slot = hjstate->hj_HashTupleSlot;
-						ExecParallelHashTableInsertCurrentBatch(hashtable, slot,
-																hashvalue);
-					}
-					sts_end_parallel_scan(inner_tuples);
-					BarrierArriveAndWait(batch_barrier,
-										 WAIT_EVENT_HASH_BATCH_LOAD);
-					/* Fall through. */
-
-				case PHJ_BATCH_PROBING:
-
-					/*
-					 * This batch is ready to probe.  Return control to
-					 * caller. We stay attached to batch_barrier so that the
-					 * hash table stays alive until everyone's finished
-					 * probing it, but no participant is allowed to wait at
-					 * this barrier again (or else a deadlock could occur).
-					 * All attached participants must eventually call
-					 * BarrierArriveAndDetach() so that the final phase
-					 * PHJ_BATCH_DONE can be reached.
-					 */
-					ExecParallelHashTableSetCurrentBatch(hashtable, batchno);
-					sts_begin_parallel_scan(hashtable->batches[batchno].outer_tuples);
-					return true;
-
-				case PHJ_BATCH_DONE:
-
-					/*
-					 * Already done.  Detach and go around again (if any
-					 * remain).
-					 */
-					BarrierDetach(batch_barrier);
-					hashtable->batches[batchno].done = true;
-					hashtable->curbatch = -1;
-					break;
-
-				default:
-					elog(ERROR, "unexpected batch phase %d",
-						 BarrierPhase(batch_barrier));
-			}
-		}
-		batchno = (batchno + 1) % hashtable->nbatch;
-	} while (batchno != start_batchno);
-
-	return false;
-}
 
 /*
  * ExecHashJoinSaveTuple
@@ -1392,187 +1087,4 @@ ExecReScanHashJoin(HashJoinState *node)
 	 */
 	if (node->js.ps.lefttree->chgParam == NULL)
 		ExecReScan(node->js.ps.lefttree);
-}
-
-void
-ExecShutdownHashJoin(HashJoinState *node)
-{
-	if (node->hj_HashTable)
-	{
-		/*
-		 * Detach from shared state before DSM memory goes away.  This makes
-		 * sure that we don't have any pointers into DSM memory by the time
-		 * ExecEndHashJoin runs.
-		 */
-		ExecHashTableDetachBatch(node->hj_HashTable);
-		ExecHashTableDetach(node->hj_HashTable);
-	}
-}
-
-static void
-ExecParallelHashJoinPartitionOuter(HashJoinState *hjstate)
-{
-	PlanState  *outerState = outerPlanState(hjstate);
-	ExprContext *econtext = hjstate->js.ps.ps_ExprContext;
-	HashJoinTable hashtable = hjstate->hj_HashTable;
-	TupleTableSlot *slot;
-	uint32		hashvalue;
-	int			i;
-
-	Assert(hjstate->hj_FirstOuterTupleSlot == NULL);
-
-	/* Execute outer plan, writing all tuples to shared tuplestores. */
-	for (;;)
-	{
-		slot = ExecProcNode(outerState);
-		if (TupIsNull(slot))
-			break;
-		econtext->ecxt_outertuple = slot;
-		if (ExecHashGetHashValue(hashtable, econtext,
-								 hjstate->hj_OuterHashKeys,
-								 true,	/* outer tuple */
-								 HJ_FILL_OUTER(hjstate),
-								 &hashvalue))
-		{
-			int			batchno;
-			int			bucketno;
-			bool		shouldFree;
-			MinimalTuple mintup = ExecFetchSlotMinimalTuple(slot, &shouldFree);
-
-			ExecHashGetBucketAndBatch(hashtable, hashvalue, &bucketno,
-									  &batchno);
-			sts_puttuple(hashtable->batches[batchno].outer_tuples,
-						 &hashvalue, mintup);
-
-			if (shouldFree)
-				heap_free_minimal_tuple(mintup);
-		}
-		CHECK_FOR_INTERRUPTS();
-	}
-
-	/* Make sure all outer partitions are readable by any backend. */
-	for (i = 0; i < hashtable->nbatch; ++i)
-		sts_end_write(hashtable->batches[i].outer_tuples);
-}
-
-void
-ExecHashJoinEstimate(HashJoinState *state, ParallelContext *pcxt)
-{
-	shm_toc_estimate_chunk(&pcxt->estimator, sizeof(ParallelHashJoinState));
-	shm_toc_estimate_keys(&pcxt->estimator, 1);
-}
-
-void
-ExecHashJoinInitializeDSM(HashJoinState *state, ParallelContext *pcxt)
-{
-	int			plan_node_id = state->js.ps.plan->plan_node_id;
-	HashState  *hashNode;
-	ParallelHashJoinState *pstate;
-
-	/*
-	 * Disable shared hash table mode if we failed to create a real DSM
-	 * segment, because that means that we don't have a DSA area to work with.
-	 */
-	if (pcxt->seg == NULL)
-		return;
-
-	ExecSetExecProcNode(&state->js.ps, ExecParallelHashJoin);
-
-	/*
-	 * Set up the state needed to coordinate access to the shared hash
-	 * table(s), using the plan node ID as the toc key.
-	 */
-	pstate = shm_toc_allocate(pcxt->toc, sizeof(ParallelHashJoinState));
-	shm_toc_insert(pcxt->toc, plan_node_id, pstate);
-
-	/*
-	 * Set up the shared hash join state with no batches initially.
-	 * ExecHashTableCreate() will prepare at least one later and set nbatch
-	 * and space_allowed.
-	 */
-	pstate->nbatch = 0;
-	pstate->space_allowed = 0;
-	pstate->batches = InvalidDsaPointer;
-	pstate->old_batches = InvalidDsaPointer;
-	pstate->nbuckets = 0;
-	pstate->growth = PHJ_GROWTH_OK;
-	pstate->chunk_work_queue = InvalidDsaPointer;
-	pg_atomic_init_u32(&pstate->distributor, 0);
-	pstate->nparticipants = pcxt->nworkers + 1;
-	pstate->total_tuples = 0;
-	LWLockInitialize(&pstate->lock,
-					 LWTRANCHE_PARALLEL_HASH_JOIN);
-	BarrierInit(&pstate->build_barrier, 0);
-	BarrierInit(&pstate->grow_batches_barrier, 0);
-	BarrierInit(&pstate->grow_buckets_barrier, 0);
-
-	/* Set up the space we'll use for shared temporary files. */
-	SharedFileSetInit(&pstate->fileset, pcxt->seg);
-
-	/* Initialize the shared state in the hash node. */
-	hashNode = (HashState *) innerPlanState(state);
-	hashNode->parallel_state = pstate;
-}
-
-/* ----------------------------------------------------------------
- *		ExecHashJoinReInitializeDSM
- *
- *		Reset shared state before beginning a fresh scan.
- * ----------------------------------------------------------------
- */
-void
-ExecHashJoinReInitializeDSM(HashJoinState *state, ParallelContext *cxt)
-{
-	int			plan_node_id = state->js.ps.plan->plan_node_id;
-	ParallelHashJoinState *pstate;
-
-	/* Nothing to do if we failed to create a DSM segment. */
-	if (cxt->seg == NULL)
-		return;
-
-	pstate = shm_toc_lookup(cxt->toc, plan_node_id, false);
-
-	/*
-	 * It would be possible to reuse the shared hash table in single-batch
-	 * cases by resetting and then fast-forwarding build_barrier to
-	 * PHJ_BUILD_DONE and batch 0's batch_barrier to PHJ_BATCH_PROBING, but
-	 * currently shared hash tables are already freed by now (by the last
-	 * participant to detach from the batch).  We could consider keeping it
-	 * around for single-batch joins.  We'd also need to adjust
-	 * finalize_plan() so that it doesn't record a dummy dependency for
-	 * Parallel Hash nodes, preventing the rescan optimization.  For now we
-	 * don't try.
-	 */
-
-	/* Detach, freeing any remaining shared memory. */
-	if (state->hj_HashTable != NULL)
-	{
-		ExecHashTableDetachBatch(state->hj_HashTable);
-		ExecHashTableDetach(state->hj_HashTable);
-	}
-
-	/* Clear any shared batch files. */
-	SharedFileSetDeleteAll(&pstate->fileset);
-
-	/* Reset build_barrier to PHJ_BUILD_ELECTING so we can go around again. */
-	BarrierInit(&pstate->build_barrier, 0);
-}
-
-void
-ExecHashJoinInitializeWorker(HashJoinState *state,
-							 ParallelWorkerContext *pwcxt)
-{
-	HashState  *hashNode;
-	int			plan_node_id = state->js.ps.plan->plan_node_id;
-	ParallelHashJoinState *pstate =
-	shm_toc_lookup(pwcxt->toc, plan_node_id, false);
-
-	/* Attach to the space for shared temporary files. */
-	SharedFileSetAttach(&pstate->fileset, pwcxt->seg);
-
-	/* Attach to the shared state in the hash node. */
-	hashNode = (HashState *) innerPlanState(state);
-	hashNode->parallel_state = pstate;
-
-	ExecSetExecProcNode(&state->js.ps, ExecParallelHashJoin);
 }

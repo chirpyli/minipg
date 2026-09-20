@@ -330,12 +330,8 @@ create_index_paths(PlannerInfo *root, RelOptInfo *rel)
 
 		bitmapqual = choose_bitmap_and(root, rel, bitindexpaths);
 		bpath = create_bitmap_heap_path(root, rel, bitmapqual,
-										rel->lateral_relids, 1.0, 0);
+										rel->lateral_relids, 1.0);
 		add_path(rel, (Path *) bpath);
-
-		/* create a partial bitmap heap path */
-		if (rel->consider_parallel && rel->lateral_relids == NULL)
-			create_partial_bitmap_paths(root, rel, bitmapqual);
 	}
 
 	/*
@@ -398,7 +394,7 @@ create_index_paths(PlannerInfo *root, RelOptInfo *rel)
 			required_outer = PATH_REQ_OUTER(bitmapqual);
 			loop_count = get_loop_count(root, rel->relid, required_outer);
 			bpath = create_bitmap_heap_path(root, rel, bitmapqual,
-											required_outer, loop_count, 0);
+											required_outer, loop_count);
 			add_path(rel, (Path *) bpath);
 		}
 	}
@@ -1030,40 +1026,8 @@ build_index_paths(PlannerInfo *root, RelOptInfo *rel,
 								  NoMovementScanDirection,
 								  index_only_scan,
 								  outer_relids,
-								  loop_count,
-								  false);
+								  loop_count);
 		result = lappend(result, ipath);
-
-		/*
-		 * If appropriate, consider parallel index scan.  We don't allow
-		 * parallel index scan for bitmap index scans.
-		 */
-		if (index->amcanparallel &&
-			rel->consider_parallel && outer_relids == NULL &&
-			scantype != ST_BITMAPSCAN)
-		{
-			ipath = create_index_path(root, index,
-									  index_clauses,
-									  orderbyclauses,
-									  orderbyclausecols,
-									  useful_pathkeys,
-									  index_is_ordered ?
-									  ForwardScanDirection :
-									  NoMovementScanDirection,
-									  index_only_scan,
-									  outer_relids,
-									  loop_count,
-									  true);
-
-			/*
-			 * if, after costing the path, we find that it's not worth using
-			 * parallel workers, just free it.
-			 */
-			if (ipath->path.parallel_workers > 0)
-				add_partial_path(rel, (Path *) ipath);
-			else
-				pfree(ipath);
-		}
 	}
 
 	/*
@@ -1085,35 +1049,8 @@ build_index_paths(PlannerInfo *root, RelOptInfo *rel,
 									  BackwardScanDirection,
 									  index_only_scan,
 									  outer_relids,
-									  loop_count,
-									  false);
+									  loop_count);
 			result = lappend(result, ipath);
-
-			/* If appropriate, consider parallel index scan */
-			if (index->amcanparallel &&
-				rel->consider_parallel && outer_relids == NULL &&
-				scantype != ST_BITMAPSCAN)
-			{
-				ipath = create_index_path(root, index,
-										  index_clauses,
-										  NIL,
-										  NIL,
-										  useful_pathkeys,
-										  BackwardScanDirection,
-										  index_only_scan,
-										  outer_relids,
-										  loop_count,
-										  true);
-
-				/*
-				 * if, after costing the path, we find that it's not worth
-				 * using parallel workers, just free it.
-				 */
-				if (ipath->path.parallel_workers > 0)
-					add_partial_path(rel, (Path *) ipath);
-				else
-					pfree(ipath);
-			}
 		}
 	}
 
@@ -1600,12 +1537,6 @@ bitmap_scan_cost_est(PlannerInfo *root, RelOptInfo *rel, Path *ipath)
 	bpath.path.param_info = ipath->param_info;
 	bpath.path.pathkeys = NIL;
 	bpath.bitmapqual = ipath;
-
-	/*
-	 * Check the cost of temporary path without considering parallelism.
-	 * Parallel bitmap heap path will be considered at later stage.
-	 */
-	bpath.path.parallel_workers = 0;
 
 	/* Now we can do cost_bitmap_heap_scan */
 	cost_bitmap_heap_scan(&bpath.path, root, rel,

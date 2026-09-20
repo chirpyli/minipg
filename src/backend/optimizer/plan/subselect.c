@@ -85,7 +85,6 @@ static Node *process_sublinks_mutator(Node *node,
 									  process_sublinks_context *context);
 static Bitmapset *finalize_plan(PlannerInfo *root,
 								Plan *plan,
-								int gather_param,
 								Bitmapset *valid_params,
 								Bitmapset *scan_params);
 static bool finalize_primnode(Node *node, finalize_primnode_context *context);
@@ -323,7 +322,6 @@ build_subplan(PlannerInfo *root, Plan *plan, PlannerInfo *subroot,
 					   &splan->firstColCollation);
 	splan->useHashTable = false;
 	splan->unknownEqFalse = unknownEqFalse;
-	splan->parallel_safe = plan->parallel_safe;
 	splan->setParam = NIL;
 	splan->parParam = NIL;
 	splan->args = NIL;
@@ -1592,18 +1590,16 @@ SS_identify_outer_params(PlannerInfo *root)
 }
 
 /*
- * SS_charge_for_initplans - account for initplans in Path costs & parallelism
+ * SS_charge_for_initplans - account for initplans in Path costs
  *
  * If any initPlans have been created in the current query level, they will
  * get attached to the Plan tree created from whichever Path we select from
- * the given rel.  Increment all that rel's Paths' costs to account for them,
- * and make sure the paths get marked as parallel-unsafe, since we can't
- * currently transmit initPlans to parallel workers.
+ * the given rel.  Increment all that rel's Paths' costs to account for them.
  *
  * This is separate from SS_attach_initplans because we might conditionally
  * create more initPlans during create_plan(), depending on which Path we
  * select.  However, Paths that would generate such initPlans are expected
- * to have included their cost and parallel-safety effects already.
+ * to have included their cost effects already.
  */
 void
 SS_charge_for_initplans(PlannerInfo *root, RelOptInfo *final_rel)
@@ -1630,7 +1626,7 @@ SS_charge_for_initplans(PlannerInfo *root, RelOptInfo *final_rel)
 	}
 
 	/*
-	 * Now adjust the costs and parallel_safe flags.
+	 * Now adjust the costs.
 	 */
 	foreach(lc, final_rel->pathlist)
 	{
@@ -1638,15 +1634,7 @@ SS_charge_for_initplans(PlannerInfo *root, RelOptInfo *final_rel)
 
 		path->startup_cost += initplan_cost;
 		path->total_cost += initplan_cost;
-		path->parallel_safe = false;
 	}
-
-	/*
-	 * Forget about any partial paths and clear consider_parallel, too;
-	 * they're not usable if we attached an initPlan.
-	 */
-	final_rel->partial_pathlist = NIL;
-	final_rel->consider_parallel = false;
 
 	/* We needn't do set_cheapest() here, caller will do it */
 }
@@ -1660,9 +1648,9 @@ SS_charge_for_initplans(PlannerInfo *root, RelOptInfo *final_rel)
  * referenced; but there seems no reason to put them any lower than the
  * topmost node, so we don't bother to track exactly where they came from.)
  *
- * We do not touch the plan node's cost or parallel_safe flag.  The initplans
- * must have been accounted for in SS_charge_for_initplans, or by any later
- * code that adds initplans via SS_make_initplan_from_plan.
+ * We do not touch the plan node's cost.  The initplans must have been
+ * accounted for in SS_charge_for_initplans, or by any later code that adds
+ * initplans via SS_make_initplan_from_plan.
  */
 void
 SS_attach_initplans(PlannerInfo *root, Plan *plan)
@@ -1683,14 +1671,11 @@ void
 SS_finalize_plan(PlannerInfo *root, Plan *plan)
 {
 	/* No setup needed, just recurse through plan tree. */
-	(void) finalize_plan(root, plan, -1, root->outer_params, NULL);
+	(void) finalize_plan(root, plan, root->outer_params, NULL);
 }
 
 /*
  * Recursive processing of all nodes in the plan tree
- *
- * gather_param is the rescan_param of an ancestral Gather/GatherMerge,
- * or -1 if there is none.
  *
  * valid_params is the set of param IDs supplied by outer plan levels
  * that are valid to reference in this plan node or its children.
@@ -1719,7 +1704,6 @@ SS_finalize_plan(PlannerInfo *root, Plan *plan)
  */
 static Bitmapset *
 finalize_plan(PlannerInfo *root, Plan *plan,
-			  int gather_param,
 			  Bitmapset *valid_params,
 			  Bitmapset *scan_params)
 {
@@ -1772,18 +1756,6 @@ finalize_plan(PlannerInfo *root, Plan *plan,
 	/* Find params in targetlist and qual */
 	finalize_primnode((Node *) plan->targetlist, &context);
 	finalize_primnode((Node *) plan->qual, &context);
-
-	/*
-	 * If it's a parallel-aware scan node, mark it as dependent on the parent
-	 * Gather/GatherMerge's rescan Param.
-	 */
-	if (plan->parallel_aware)
-	{
-		if (gather_param < 0)
-			elog(ERROR, "parallel-aware plan node is not below a Gather");
-		context.paramids =
-			bms_add_member(context.paramids, gather_param);
-	}
 
 	/* Check additional node-type-specific fields */
 	switch (nodeTag(plan))
@@ -1862,10 +1834,7 @@ finalize_plan(PlannerInfo *root, Plan *plan,
 				/* We must run finalize_plan on the subquery */
 				rel = find_base_rel(root, sscan->scan.scanrelid);
 				subquery_params = rel->subroot->outer_params;
-				if (gather_param >= 0)
-					subquery_params = bms_add_member(bms_copy(subquery_params),
-													 gather_param);
-				finalize_plan(rel->subroot, sscan->subplan, gather_param,
+				finalize_plan(rel->subroot, sscan->subplan,
 							  subquery_params, NULL);
 
 				/* Now we can add its extParams to the parent's params */
@@ -1914,7 +1883,6 @@ finalize_plan(PlannerInfo *root, Plan *plan,
 						bms_add_members(context.paramids,
 										finalize_plan(root,
 													  (Plan *) lfirst(l),
-													  gather_param,
 													  valid_params,
 													  scan_params));
 				}
@@ -1931,7 +1899,6 @@ finalize_plan(PlannerInfo *root, Plan *plan,
 						bms_add_members(context.paramids,
 										finalize_plan(root,
 													  (Plan *) lfirst(l),
-													  gather_param,
 													  valid_params,
 													  scan_params));
 				}
@@ -1948,7 +1915,6 @@ finalize_plan(PlannerInfo *root, Plan *plan,
 						bms_add_members(context.paramids,
 										finalize_plan(root,
 													  (Plan *) lfirst(l),
-													  gather_param,
 													  valid_params,
 													  scan_params));
 				}
@@ -1965,7 +1931,6 @@ finalize_plan(PlannerInfo *root, Plan *plan,
 						bms_add_members(context.paramids,
 										finalize_plan(root,
 													  (Plan *) lfirst(l),
-													  gather_param,
 													  valid_params,
 													  scan_params));
 				}
@@ -2032,46 +1997,6 @@ finalize_plan(PlannerInfo *root, Plan *plan,
 			}
 			break;
 
-		case T_Gather:
-			/* child nodes are allowed to reference rescan_param, if any */
-			locally_added_param = ((Gather *) plan)->rescan_param;
-			if (locally_added_param >= 0)
-			{
-				valid_params = bms_add_member(bms_copy(valid_params),
-											  locally_added_param);
-
-				/*
-				 * We currently don't support nested Gathers.  The issue so
-				 * far as this function is concerned would be how to identify
-				 * which child nodes depend on which Gather.
-				 */
-				Assert(gather_param < 0);
-				/* Pass down rescan_param to child parallel-aware nodes */
-				gather_param = locally_added_param;
-			}
-			/* rescan_param does *not* get added to scan_params */
-			break;
-
-		case T_GatherMerge:
-			/* child nodes are allowed to reference rescan_param, if any */
-			locally_added_param = ((GatherMerge *) plan)->rescan_param;
-			if (locally_added_param >= 0)
-			{
-				valid_params = bms_add_member(bms_copy(valid_params),
-											  locally_added_param);
-
-				/*
-				 * We currently don't support nested Gathers.  The issue so
-				 * far as this function is concerned would be how to identify
-				 * which child nodes depend on which Gather.
-				 */
-				Assert(gather_param < 0);
-				/* Pass down rescan_param to child parallel-aware nodes */
-				gather_param = locally_added_param;
-			}
-			/* rescan_param does *not* get added to scan_params */
-			break;
-
 		case T_Memoize:
 			finalize_primnode((Node *) ((Memoize *) plan)->param_exprs,
 							  &context);
@@ -2094,7 +2019,6 @@ finalize_plan(PlannerInfo *root, Plan *plan,
 	/* Process left and right child plans, if any */
 	child_params = finalize_plan(root,
 								 plan->lefttree,
-								 gather_param,
 								 valid_params,
 								 scan_params);
 	context.paramids = bms_add_members(context.paramids, child_params);
@@ -2104,7 +2028,6 @@ finalize_plan(PlannerInfo *root, Plan *plan,
 		/* right child can reference nestloop_params as well as valid_params */
 		child_params = finalize_plan(root,
 									 plan->righttree,
-									 gather_param,
 									 bms_union(nestloop_params, valid_params),
 									 scan_params);
 		/* ... and they don't count as parameters used at my level */
@@ -2116,7 +2039,6 @@ finalize_plan(PlannerInfo *root, Plan *plan,
 		/* easy case */
 		child_params = finalize_plan(root,
 									 plan->righttree,
-									 gather_param,
 									 valid_params,
 									 scan_params);
 	}

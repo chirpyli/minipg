@@ -131,7 +131,6 @@ static Node *fix_scan_expr_mutator(Node *node, fix_scan_expr_context *context);
 static bool fix_scan_expr_walker(Node *node, fix_scan_expr_context *context);
 static void set_join_references(PlannerInfo *root, Join *join, int rtoffset);
 static void set_upper_references(PlannerInfo *root, Plan *plan, int rtoffset);
-static void set_param_references(PlannerInfo *root, Plan *plan);
 static Node *convert_combining_aggrefs(Node *node, void *context);
 static void set_dummy_tlist_references(Plan *plan, int rtoffset);
 static indexed_tlist *build_tlist_index(List *tlist);
@@ -688,14 +687,6 @@ set_plan_refs(PlannerInfo *root, Plan *plan, int rtoffset)
 			set_join_references(root, (Join *) plan, rtoffset);
 			break;
 
-		case T_Gather:
-		case T_GatherMerge:
-			{
-				set_upper_references(root, plan, rtoffset);
-				set_param_references(root, plan);
-			}
-			break;
-
 		case T_Hash:
 			set_hash_references(root, plan, rtoffset);
 			break;
@@ -1104,16 +1095,10 @@ clean_up_removed_plan_level(Plan *parent, Plan *child)
 {
 	/*
 	 * We have to be sure we don't lose any initplans, so move any that were
-	 * attached to the parent plan to the child.  If we do move any, the child
-	 * is no longer parallel-safe.
-	 */
-	if (parent->initPlan)
-		child->parallel_safe = false;
-
-	/*
-	 * Attach plans this way so that parent's initplans are processed before
-	 * any pre-existing initplans of the child.  Probably doesn't matter, but
-	 * let's preserve the ordering just in case.
+	 * attached to the parent plan to the child.  Attach plans this way so
+	 * that parent's initplans are processed before any pre-existing initplans
+	 * of the child.  Probably doesn't matter, but let's preserve the ordering
+	 * just in case.
 	 */
 	child->initPlan = list_concat(parent->initPlan,
 								  child->initPlan);
@@ -1163,8 +1148,7 @@ set_append_references(PlannerInfo *root,
 	 * the calling plan may execute the non-parallel aware child multiple
 	 * times.
 	 */
-	if (list_length(aplan->appendplans) == 1 &&
-		((Plan *) linitial(aplan->appendplans))->parallel_aware == aplan->plan.parallel_aware)
+	if (list_length(aplan->appendplans) == 1)
 		return clean_up_removed_plan_level((Plan *) aplan,
 										   (Plan *) linitial(aplan->appendplans));
 
@@ -1219,8 +1203,7 @@ set_mergeappend_references(PlannerInfo *root,
 	 * child is not then the calling plan may execute the non-parallel aware
 	 * child multiple times.
 	 */
-	if (list_length(mplan->mergeplans) == 1 &&
-		((Plan *) linitial(mplan->mergeplans))->parallel_aware == mplan->plan.parallel_aware)
+	if (list_length(mplan->mergeplans) == 1)
 		return clean_up_removed_plan_level((Plan *) mplan,
 										   (Plan *) linitial(mplan->mergeplans));
 
@@ -1749,51 +1732,6 @@ set_upper_references(PlannerInfo *root, Plan *plan, int rtoffset)
 					   NUM_EXEC_QUAL(plan));
 
 	pfree(subplan_itlist);
-}
-
-/*
- * set_param_references
- *	  Initialize the initParam list in Gather or Gather merge node such that
- *	  it contains reference of all the params that needs to be evaluated
- *	  before execution of the node.  It contains the initplan params that are
- *	  being passed to the plan nodes below it.
- */
-static void
-set_param_references(PlannerInfo *root, Plan *plan)
-{
-	Assert(IsA(plan, Gather) || IsA(plan, GatherMerge));
-
-	if (plan->lefttree->extParam)
-	{
-		PlannerInfo *proot;
-		Bitmapset  *initSetParam = NULL;
-		ListCell   *l;
-
-		for (proot = root; proot != NULL; proot = proot->parent_root)
-		{
-			foreach(l, proot->init_plans)
-			{
-				SubPlan    *initsubplan = (SubPlan *) lfirst(l);
-				ListCell   *l2;
-
-				foreach(l2, initsubplan->setParam)
-				{
-					initSetParam = bms_add_member(initSetParam, lfirst_int(l2));
-				}
-			}
-		}
-
-		/*
-		 * Remember the list of all external initplan params that are used by
-		 * the children of Gather or Gather merge node.
-		 */
-		if (IsA(plan, Gather))
-			((Gather *) plan)->initParam =
-				bms_intersect(plan->lefttree->extParam, initSetParam);
-		else
-			((GatherMerge *) plan)->initParam =
-				bms_intersect(plan->lefttree->extParam, initSetParam);
-	}
 }
 
 /*

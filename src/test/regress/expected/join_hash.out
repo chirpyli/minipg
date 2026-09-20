@@ -2,8 +2,6 @@
 -- exercises for the hash join code
 --
 begin;
-set local min_parallel_table_scan_size = 0;
-set local parallel_setup_cost = 0;
 set local enable_hashjoin = on;
 -- Verify that hash key expressions reference the correct
 -- nodes. Hashjoin's hashkeys need to reference its outer plan, Hash's

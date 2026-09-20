@@ -92,8 +92,7 @@ typedef enum
 	DestRemoteSimple,			/* sent to frontend, w/no catalog access */
 	DestSPI,					/* results sent to SPI manager */
 	DestTuplestore,				/* results sent to Tuplestore */
-	DestSQLFunction,			/* results sent to SQL-language func mgr */
-	DestTupleQueue				/* results sent to tuple queue */
+	DestSQLFunction				/* results sent to SQL-language func mgr */
 } CommandDest;
 
 /* ----------------

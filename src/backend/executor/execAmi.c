@@ -21,8 +21,6 @@
 #include "executor/nodeBitmapHeapscan.h"
 #include "executor/nodeBitmapIndexscan.h"
 #include "executor/nodeBitmapOr.h"
-#include "executor/nodeGather.h"
-#include "executor/nodeGatherMerge.h"
 #include "executor/nodeGroup.h"
 #include "executor/nodeHash.h"
 #include "executor/nodeHashjoin.h"
@@ -150,13 +148,6 @@ ExecReScan(PlanState *node)
 			break;
 
 
-		case T_GatherState:
-			ExecReScanGather((GatherState *) node);
-			break;
-
-		case T_GatherMergeState:
-			ExecReScanGatherMerge((GatherMergeState *) node);
-			break;
 
 		case T_IndexScanState:
 			ExecReScanIndexScan((IndexScanState *) node);
@@ -438,14 +429,6 @@ bool
 ExecSupportsBackwardScan(Plan *node)
 {
 	if (node == NULL)
-		return false;
-
-	/*
-	 * Parallel-aware nodes return a subset of the tuples in each worker, and
-	 * in general we can't expect to have enough bookkeeping state to know
-	 * which ones we returned in this worker as opposed to some other worker.
-	 */
-	if (node->parallel_aware)
 		return false;
 
 	switch (nodeTag(node))

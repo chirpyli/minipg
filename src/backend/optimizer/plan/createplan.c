@@ -93,11 +93,10 @@ static Memoize *create_memoize_plan(PlannerInfo *root, MemoizePath *best_path,
 									int flags);
 static Plan *create_unique_plan(PlannerInfo *root, UniquePath *best_path,
 								int flags);
-static Gather *create_gather_plan(PlannerInfo *root, GatherPath *best_path);
 static Plan *create_projection_plan(PlannerInfo *root,
 									ProjectionPath *best_path,
 									int flags);
-static Plan *inject_projection_plan(Plan *subplan, List *tlist, bool parallel_safe);
+static Plan *inject_projection_plan(Plan *subplan, List *tlist);
 static Sort *create_sort_plan(PlannerInfo *root, SortPath *best_path, int flags);
 static IncrementalSort *create_incrementalsort_plan(PlannerInfo *root,
 													IncrementalSortPath *best_path, int flags);
@@ -115,7 +114,6 @@ static BitmapHeapScan *create_bitmap_scan_plan(PlannerInfo *root,
 											   List *tlist, List *scan_clauses);
 static Plan *create_bitmap_subplan(PlannerInfo *root, Path *bitmapqual,
 								   List **qual, List **indexqual, List **indexECs);
-static void bitmap_subplan_mark_shared(Plan *plan);
 static TidScan *create_tidscan_plan(PlannerInfo *root, TidPath *best_path,
 									List *tlist, List *scan_clauses);
 static TidRangeScan *create_tidrangescan_plan(PlannerInfo *root,
@@ -240,8 +238,6 @@ static Memoize *make_memoize(Plan *lefttree, Oid *hashoperators,
 static Unique *make_unique_from_sortclauses(Plan *lefttree, List *distinctList);
 static Unique *make_unique_from_pathkeys(Plan *lefttree,
 										 List *pathkeys, int numCols);
-static Gather *make_gather(List *qptlist, List *qpqual,
-						   int nworkers, int rescan_param, bool single_copy, Plan *subplan);
 static Result *make_result(List *tlist, Node *resconstantqual, Plan *subplan);
 static ProjectSet *make_project_set(List *tlist, Plan *subplan);
 static ModifyTable *make_modifytable(PlannerInfo *root, Plan *subplan,
@@ -250,8 +246,6 @@ static ModifyTable *make_modifytable(PlannerInfo *root, Plan *subplan,
 									 List *resultRelations,
 									 List *updateColnosLists,
 									 List *rowMarks, int epqParam);
-static GatherMerge *create_gather_merge_plan(PlannerInfo *root,
-											 GatherMergePath *best_path);
 
 
 /*
@@ -405,10 +399,6 @@ create_plan_recurse(PlannerInfo *root, Path *best_path, int flags)
 										  flags);
 			}
 			break;
-		case T_Gather:
-			plan = (Plan *) create_gather_plan(root,
-											   (GatherPath *) best_path);
-			break;
 		case T_Sort:
 			plan = (Plan *) create_sort_plan(root,
 											 (SortPath *) best_path,
@@ -431,10 +421,6 @@ create_plan_recurse(PlannerInfo *root, Path *best_path, int flags)
 		case T_ModifyTable:
 			plan = (Plan *) create_modifytable_plan(root,
 													(ModifyTablePath *) best_path);
-			break;
-		case T_GatherMerge:
-			plan = (Plan *) create_gather_merge_plan(root,
-													 (GatherMergePath *) best_path);
 			break;
 		default:
 			elog(ERROR, "unrecognized node type: %d",
@@ -881,9 +867,6 @@ create_gating_plan(PlannerInfo *root, Path *path, Plan *plan,
 	 */
 	copy_plan_costsize(gplan, plan);
 
-	/* Gating quals could be unsafe, so better use the Path's safety flag */
-	gplan->parallel_safe = path->parallel_safe;
-
 	return gplan;
 }
 
@@ -1114,8 +1097,7 @@ create_append_plan(PlannerInfo *root, AppendPath *best_path, int flags)
 	{
 		tlist = list_truncate(list_copy(plan->plan.targetlist),
 							  orig_tlist_length);
-		return inject_projection_plan((Plan *) plan, tlist,
-									  plan->plan.parallel_safe);
+		return inject_projection_plan((Plan *) plan, tlist);
 	}
 	else
 		return (Plan *) plan;
@@ -1243,7 +1225,7 @@ create_merge_append_plan(PlannerInfo *root, MergeAppendPath *best_path,
 	if (tlist_was_changed && (flags & (CP_EXACT_TLIST | CP_SMALL_TLIST)))
 	{
 		tlist = list_truncate(list_copy(plan->targetlist), orig_tlist_length);
-		return inject_projection_plan(plan, tlist, plan->parallel_safe);
+		return inject_projection_plan(plan, tlist);
 	}
 	else
 		return plan;
@@ -1456,8 +1438,7 @@ create_unique_plan(PlannerInfo *root, UniquePath *best_path, int flags)
 
 	/* Use change_plan_targetlist in case we need to insert a Result node */
 	if (newitems || best_path->umethod == UNIQUE_PATH_SORT)
-		subplan = change_plan_targetlist(subplan, newtlist,
-										 best_path->path.parallel_safe);
+		subplan = change_plan_targetlist(subplan, newtlist);
 
 	/*
 	 * Build control information showing which subplan output columns are to
@@ -1581,104 +1562,6 @@ create_unique_plan(PlannerInfo *root, UniquePath *best_path, int flags)
 }
 
 /*
- * create_gather_plan
- *
- *	  Create a Gather plan for 'best_path' and (recursively) plans
- *	  for its subpaths.
- */
-static Gather *
-create_gather_plan(PlannerInfo *root, GatherPath *best_path)
-{
-	Gather	   *gather_plan;
-	Plan	   *subplan;
-	List	   *tlist;
-
-	/*
-	 * Push projection down to the child node.  That way, the projection work
-	 * is parallelized, and there can be no system columns in the result (they
-	 * can't travel through a tuple queue because it uses MinimalTuple
-	 * representation).
-	 */
-	subplan = create_plan_recurse(root, best_path->subpath, CP_EXACT_TLIST);
-
-	tlist = build_path_tlist(root, &best_path->path);
-
-	gather_plan = make_gather(tlist,
-							  NIL,
-							  best_path->num_workers,
-							  assign_special_exec_param(root),
-							  best_path->single_copy,
-							  subplan);
-
-	copy_generic_path_info(&gather_plan->plan, &best_path->path);
-
-	/* use parallel mode for parallel plans. */
-	root->glob->parallelModeNeeded = true;
-
-	return gather_plan;
-}
-
-/*
- * create_gather_merge_plan
- *
- *	  Create a Gather Merge plan for 'best_path' and (recursively)
- *	  plans for its subpaths.
- */
-static GatherMerge *
-create_gather_merge_plan(PlannerInfo *root, GatherMergePath *best_path)
-{
-	GatherMerge *gm_plan;
-	Plan	   *subplan;
-	List	   *pathkeys = best_path->path.pathkeys;
-	List	   *tlist = build_path_tlist(root, &best_path->path);
-
-	/* As with Gather, project away columns in the workers. */
-	subplan = create_plan_recurse(root, best_path->subpath, CP_EXACT_TLIST);
-
-	/* Create a shell for a GatherMerge plan. */
-	gm_plan = makeNode(GatherMerge);
-	gm_plan->plan.targetlist = tlist;
-	gm_plan->num_workers = best_path->num_workers;
-	copy_generic_path_info(&gm_plan->plan, &best_path->path);
-
-	/* Assign the rescan Param. */
-	gm_plan->rescan_param = assign_special_exec_param(root);
-
-	/* Gather Merge is pointless with no pathkeys; use Gather instead. */
-	Assert(pathkeys != NIL);
-
-	/* Compute sort column info, and adjust subplan's tlist as needed */
-	subplan = prepare_sort_from_pathkeys(subplan, pathkeys,
-										 best_path->subpath->parent->relids,
-										 gm_plan->sortColIdx,
-										 false,
-										 &gm_plan->numCols,
-										 &gm_plan->sortColIdx,
-										 &gm_plan->sortOperators,
-										 &gm_plan->collations,
-										 &gm_plan->nullsFirst);
-
-
-	/*
-	 * All gather merge paths should have already guaranteed the necessary
-	 * sort order either by adding an explicit sort node or by using presorted
-	 * input. We can't simply add a sort here on additional pathkeys, because
-	 * we can't guarantee the sort would be safe. For example, expressions may
-	 * be volatile or otherwise parallel unsafe.
-	 */
-	if (!pathkeys_contained_in(pathkeys, best_path->subpath->pathkeys))
-		elog(ERROR, "gather merge input not sufficiently sorted");
-
-	/* Now insert the subplan under GatherMerge. */
-	gm_plan->plan.lefttree = subplan;
-
-	/* use parallel mode for parallel plans. */
-	root->glob->parallelModeNeeded = true;
-
-	return gm_plan;
-}
-
-/*
  * create_projection_plan
  *
  *	  Create a plan tree to do a projection step and (recursively) plans
@@ -1762,8 +1645,6 @@ create_projection_plan(PlannerInfo *root, ProjectionPath *best_path, int flags)
 		plan->total_cost = best_path->path.total_cost;
 		plan->plan_rows = best_path->path.rows;
 		plan->plan_width = best_path->path.pathtarget->width;
-		plan->parallel_safe = best_path->path.parallel_safe;
-		/* ... but don't change subplan's parallel_aware flag */
 	}
 	else
 	{
@@ -1783,12 +1664,9 @@ create_projection_plan(PlannerInfo *root, ProjectionPath *best_path, int flags)
  * This is used in a few places where we decide on-the-fly that we need a
  * projection step as part of the tree generated for some Path node.
  * We should try to get rid of this in favor of doing it more honestly.
- *
- * One reason it's ugly is we have to be told the right parallel_safe marking
- * to apply (since the tlist might be unsafe even if the child plan is safe).
  */
 static Plan *
-inject_projection_plan(Plan *subplan, List *tlist, bool parallel_safe)
+inject_projection_plan(Plan *subplan, List *tlist)
 {
 	Plan	   *plan;
 
@@ -1802,7 +1680,6 @@ inject_projection_plan(Plan *subplan, List *tlist, bool parallel_safe)
 	 * consistent not more so.  Hence, just copy the subplan's cost.
 	 */
 	copy_plan_costsize(plan, subplan);
-	plan->parallel_safe = parallel_safe;
 
 	return plan;
 }
@@ -1814,12 +1691,9 @@ inject_projection_plan(Plan *subplan, List *tlist, bool parallel_safe)
  * This is used when we need to adjust the tlist computed by some subplan
  * tree.  In general, a Result node is needed to compute the new tlist, but
  * we can optimize some cases.
- *
- * In most cases, tlist_parallel_safe can just be passed as the parallel_safe
- * flag of the Path node the subplan was created from.
  */
 Plan *
-change_plan_targetlist(Plan *subplan, List *tlist, bool tlist_parallel_safe)
+change_plan_targetlist(Plan *subplan, List *tlist)
 {
 	/*
 	 * If the top plan node can't do projections and its existing target list
@@ -1828,14 +1702,11 @@ change_plan_targetlist(Plan *subplan, List *tlist, bool tlist_parallel_safe)
 	 */
 	if (!is_projection_capable_plan(subplan) &&
 		!tlist_same_exprs(tlist, subplan->targetlist))
-		subplan = inject_projection_plan(subplan, tlist,
-										 subplan->parallel_safe &&
-										 tlist_parallel_safe);
+		subplan = inject_projection_plan(subplan, tlist);
 	else
 	{
 		/* Else we can just replace the plan node's tlist */
 		subplan->targetlist = tlist;
-		subplan->parallel_safe &= tlist_parallel_safe;
 	}
 	return subplan;
 }
@@ -2318,9 +2189,6 @@ create_bitmap_scan_plan(PlannerInfo *root,
 										   &bitmapqualorig, &indexquals,
 										   &indexECs);
 
-	if (best_path->path.parallel_aware)
-		bitmap_subplan_mark_shared(bitmapqualplan);
-
 	/*
 	 * The qpqual list must contain all restrictions not automatically handled
 	 * by the index, other than pseudoconstant clauses which will be handled
@@ -2468,8 +2336,6 @@ create_bitmap_subplan(PlannerInfo *root, Path *bitmapqual,
 		plan->plan_rows =
 			clamp_row_est(apath->bitmapselectivity * apath->path.parent->tuples);
 		plan->plan_width = 0;	/* meaningless */
-		plan->parallel_aware = false;
-		plan->parallel_safe = apath->path.parallel_safe;
 		*qual = subquals;
 		*indexqual = subindexquals;
 		*indexECs = subindexECs;
@@ -2532,8 +2398,6 @@ create_bitmap_subplan(PlannerInfo *root, Path *bitmapqual,
 			plan->plan_rows =
 				clamp_row_est(opath->bitmapselectivity * opath->path.parent->tuples);
 			plan->plan_width = 0;	/* meaningless */
-			plan->parallel_aware = false;
-			plan->parallel_safe = opath->path.parallel_safe;
 		}
 
 		/*
@@ -2579,8 +2443,6 @@ create_bitmap_subplan(PlannerInfo *root, Path *bitmapqual,
 		plan->plan_rows =
 			clamp_row_est(ipath->indexselectivity * ipath->path.parent->tuples);
 		plan->plan_width = 0;	/* meaningless */
-		plan->parallel_aware = false;
-		plan->parallel_safe = ipath->path.parallel_safe;
 		/* Extract original index clauses, actual index quals, relevant ECs */
 		subquals = NIL;
 		subindexquals = NIL;
@@ -3494,17 +3356,6 @@ create_hashjoin_plan(PlannerInfo *root,
 	copy_plan_costsize(&hash_plan->plan, inner_plan);
 	hash_plan->plan.startup_cost = hash_plan->plan.total_cost;
 
-	/*
-	 * If parallel-aware, the executor will also need an estimate of the total
-	 * number of rows expected from all participants so that it can size the
-	 * shared hash table.
-	 */
-	if (best_path->jpath.path.parallel_aware)
-	{
-		hash_plan->plan.parallel_aware = true;
-		hash_plan->rows_total = best_path->inner_rows_total;
-	}
-
 	join_plan = make_hashjoin(tlist,
 							  joinclauses,
 							  otherclauses,
@@ -3999,7 +3850,6 @@ order_qual_clauses(PlannerInfo *root, List *clauses)
 /*
  * Copy cost and size info from a Path node to the Plan node created from it.
  * The executor usually won't use this info, but it's needed by EXPLAIN.
- * Also copy the parallel-related flags, which the executor *will* use.
  */
 static void
 copy_generic_path_info(Plan *dest, Path *src)
@@ -4008,8 +3858,6 @@ copy_generic_path_info(Plan *dest, Path *src)
 	dest->total_cost = src->total_cost;
 	dest->plan_rows = src->rows;
 	dest->plan_width = src->pathtarget->width;
-	dest->parallel_aware = src->parallel_aware;
-	dest->parallel_safe = src->parallel_safe;
 }
 
 /*
@@ -4023,10 +3871,6 @@ copy_plan_costsize(Plan *dest, Plan *src)
 	dest->total_cost = src->total_cost;
 	dest->plan_rows = src->plan_rows;
 	dest->plan_width = src->plan_width;
-	/* Assume the inserted node is not parallel-aware. */
-	dest->parallel_aware = false;
-	/* Assume the inserted node is parallel-safe, if child plan is. */
-	dest->parallel_safe = src->parallel_safe;
 }
 
 /*
@@ -4058,29 +3902,6 @@ label_sort_with_costsize(PlannerInfo *root, Sort *plan)
 	plan->plan.total_cost = sort_path.total_cost;
 	plan->plan.plan_rows = lefttree->plan_rows;
 	plan->plan.plan_width = lefttree->plan_width;
-	plan->plan.parallel_aware = false;
-	plan->plan.parallel_safe = lefttree->parallel_safe;
-}
-
-/*
- * bitmap_subplan_mark_shared
- *	 Set isshared flag in bitmap subplan so that it will be created in
- *	 shared memory.
- */
-static void
-bitmap_subplan_mark_shared(Plan *plan)
-{
-	if (IsA(plan, BitmapAnd))
-		bitmap_subplan_mark_shared(linitial(((BitmapAnd *) plan)->bitmapplans));
-	else if (IsA(plan, BitmapOr))
-	{
-		((BitmapOr *) plan)->isshared = true;
-		bitmap_subplan_mark_shared(linitial(((BitmapOr *) plan)->bitmapplans));
-	}
-	else if (IsA(plan, BitmapIndexScan))
-		((BitmapIndexScan *) plan)->isshared = true;
-	else
-		elog(ERROR, "unrecognized node type: %d", nodeTag(plan));
 }
 
 /*****************************************************************************
@@ -4523,7 +4344,7 @@ make_incrementalsort(Plan *lefttree, int numCols, int nPresortedCols,
  * prepare_sort_from_pathkeys
  *	  Prepare to sort according to given pathkeys
  *
- * This is used to set up for Sort, MergeAppend, and Gather Merge nodes.  It
+ * This is used to set up for Sort and MergeAppend nodes.  It
  * calculates the executor's representation of the sort key information, and
  * adjusts the plan targetlist if needed to add resjunk sort columns.
  *
@@ -4675,7 +4496,7 @@ prepare_sort_from_pathkeys(Plan *lefttree, List *pathkeys,
 			/*
 			 * No matching tlist item; look for a computable expression.
 			 */
-			em = find_computable_ec_member(NULL, ec, tlist, relids, false);
+			em = find_computable_ec_member(NULL, ec, tlist, relids);
 			if (!em)
 				elog(ERROR, "could not find pathkey item to sort");
 			pk_datatype = em->em_datatype;
@@ -4688,8 +4509,7 @@ prepare_sort_from_pathkeys(Plan *lefttree, List *pathkeys,
 			{
 				/* copy needed so we don't modify input's tlist below */
 				tlist = copyObject(tlist);
-				lefttree = inject_projection_plan(lefttree, tlist,
-												  lefttree->parallel_safe);
+				lefttree = inject_projection_plan(lefttree, tlist);
 			}
 
 			/* Don't bother testing is_projection_capable_plan again */
@@ -4901,8 +4721,6 @@ materialize_finished_plan(Plan *subplan)
 	matplan->total_cost = matpath.total_cost;
 	matplan->plan_rows = subplan->plan_rows;
 	matplan->plan_width = subplan->plan_width;
-	matplan->parallel_aware = false;
-	matplan->parallel_safe = subplan->parallel_safe;
 
 	return matplan;
 }
@@ -5144,31 +4962,6 @@ make_unique_from_pathkeys(Plan *lefttree, List *pathkeys, int numCols)
 
 	return node;
 }
-
-static Gather *
-make_gather(List *qptlist,
-			List *qpqual,
-			int nworkers,
-			int rescan_param,
-			bool single_copy,
-			Plan *subplan)
-{
-	Gather	   *node = makeNode(Gather);
-	Plan	   *plan = &node->plan;
-
-	plan->targetlist = qptlist;
-	plan->qual = qpqual;
-	plan->lefttree = subplan;
-	plan->righttree = NULL;
-	node->num_workers = nworkers;
-	node->rescan_param = rescan_param;
-	node->single_copy = single_copy;
-	node->invisible = false;
-	node->initParam = NULL;
-
-	return node;
-}
-
 
 /*
  * make_result

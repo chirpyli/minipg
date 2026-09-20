@@ -73,7 +73,6 @@ static List *build_index_tlist(PlannerInfo *root, IndexOptInfo *index,
  *	indexlist	list of IndexOptInfos for relation's indexes
  *	pages		number of pages
  *	tuples		number of tuples
- *	rel_parallel_workers user-defined number of parallel workers
  *
  * Also, initialize the attr_needed[] and attr_widths[] arrays.  In most
  * cases these are left as zeroes, but sometimes we need to compute attr
@@ -135,8 +134,6 @@ get_relation_info(PlannerInfo *root, Oid relationObjectId, bool inhparent,
 	if (!inhparent)
 		estimate_rel_size(relation, rel->attr_widths - rel->min_attr,
 						  &rel->pages, &rel->tuples, &rel->allvisfrac);
-
-	rel->rel_parallel_workers = -1;
 
 	/*
 	 * Make list of indexes.  Ignore indexes on system catalogs if told to.
@@ -246,7 +243,6 @@ get_relation_info(PlannerInfo *root, Oid relationObjectId, bool inhparent,
 			info->amoptionalkey = amroutine->amoptionalkey;
 			info->amsearcharray = amroutine->amsearcharray;
 			info->amsearchnulls = amroutine->amsearchnulls;
-			info->amcanparallel = amroutine->amcanparallel;
 			info->amhasgettuple = (amroutine->amgettuple != NULL);
 			info->amhasgetbitmap = amroutine->amgetbitmap != NULL &&
 				relation->rd_tableam->scan_bitmap_next_block != NULL;

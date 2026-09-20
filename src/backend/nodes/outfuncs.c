@@ -302,7 +302,6 @@ _outPlannedStmt(StringInfo str, const PlannedStmt *node)
 	WRITE_BOOL_FIELD(canSetTag);
 	WRITE_BOOL_FIELD(transientPlan);
 	WRITE_BOOL_FIELD(dependsOnRole);
-	WRITE_BOOL_FIELD(parallelModeNeeded);
 	WRITE_NODE_FIELD(planTree);
 	WRITE_NODE_FIELD(rtable);
 	WRITE_NODE_FIELD(resultRelations);
@@ -328,8 +327,6 @@ _outPlanInfo(StringInfo str, const Plan *node)
 	WRITE_FLOAT_FIELD(total_cost, "%.2f");
 	WRITE_FLOAT_FIELD(plan_rows, "%.0f");
 	WRITE_INT_FIELD(plan_width);
-	WRITE_BOOL_FIELD(parallel_aware);
-	WRITE_BOOL_FIELD(parallel_safe);
 	WRITE_INT_FIELD(plan_node_id);
 	WRITE_NODE_FIELD(targetlist);
 	WRITE_NODE_FIELD(qual);
@@ -454,39 +451,7 @@ _outBitmapOr(StringInfo str, const BitmapOr *node)
 
 	_outPlanInfo(str, (const Plan *) node);
 
-	WRITE_BOOL_FIELD(isshared);
 	WRITE_NODE_FIELD(bitmapplans);
-}
-
-static void
-_outGather(StringInfo str, const Gather *node)
-{
-	WRITE_NODE_TYPE("GATHER");
-
-	_outPlanInfo(str, (const Plan *) node);
-
-	WRITE_INT_FIELD(num_workers);
-	WRITE_INT_FIELD(rescan_param);
-	WRITE_BOOL_FIELD(single_copy);
-	WRITE_BOOL_FIELD(invisible);
-	WRITE_BITMAPSET_FIELD(initParam);
-}
-
-static void
-_outGatherMerge(StringInfo str, const GatherMerge *node)
-{
-	WRITE_NODE_TYPE("GATHERMERGE");
-
-	_outPlanInfo(str, (const Plan *) node);
-
-	WRITE_INT_FIELD(num_workers);
-	WRITE_INT_FIELD(rescan_param);
-	WRITE_INT_FIELD(numCols);
-	WRITE_ATTRNUMBER_ARRAY(sortColIdx, node->numCols);
-	WRITE_OID_ARRAY(sortOperators, node->numCols);
-	WRITE_OID_ARRAY(collations, node->numCols);
-	WRITE_BOOL_ARRAY(nullsFirst, node->numCols);
-	WRITE_BITMAPSET_FIELD(initParam);
 }
 
 static void
@@ -546,7 +511,6 @@ _outBitmapIndexScan(StringInfo str, const BitmapIndexScan *node)
 	_outScanInfo(str, (const Scan *) node);
 
 	WRITE_OID_FIELD(indexid);
-	WRITE_BOOL_FIELD(isshared);
 	WRITE_NODE_FIELD(indexqual);
 	WRITE_NODE_FIELD(indexqualorig);
 }
@@ -773,7 +737,6 @@ _outHash(StringInfo str, const Hash *node)
 	WRITE_OID_FIELD(skewTable);
 	WRITE_INT_FIELD(skewColumn);
 	WRITE_BOOL_FIELD(skewInherit);
-	WRITE_FLOAT_FIELD(rows_total, "%.0f");
 }
 
 
@@ -1334,9 +1297,6 @@ _outPathInfo(StringInfo str, const Path *node)
 		outBitmapset(str, node->param_info->ppi_req_outer);
 	else
 		outBitmapset(str, NULL);
-	WRITE_BOOL_FIELD(parallel_aware);
-	WRITE_BOOL_FIELD(parallel_safe);
-	WRITE_INT_FIELD(parallel_workers);
 	WRITE_FLOAT_FIELD(rows, "%.0f");
 	WRITE_FLOAT_FIELD(startup_cost, "%.2f");
 	WRITE_FLOAT_FIELD(total_cost, "%.2f");
@@ -1515,18 +1475,6 @@ _outUniquePath(StringInfo str, const UniquePath *node)
 }
 
 static void
-_outGatherPath(StringInfo str, const GatherPath *node)
-{
-	WRITE_NODE_TYPE("GATHERPATH");
-
-	_outPathInfo(str, (const Path *) node);
-
-	WRITE_NODE_FIELD(subpath);
-	WRITE_BOOL_FIELD(single_copy);
-	WRITE_INT_FIELD(num_workers);
-}
-
-static void
 _outProjectionPath(StringInfo str, const ProjectionPath *node)
 {
 	WRITE_NODE_TYPE("PROJECTIONPATH");
@@ -1634,17 +1582,6 @@ _outModifyTablePath(StringInfo str, const ModifyTablePath *node)
 }
 
 static void
-_outGatherMergePath(StringInfo str, const GatherMergePath *node)
-{
-	WRITE_NODE_TYPE("GATHERMERGEPATH");
-
-	_outPathInfo(str, (const Path *) node);
-
-	WRITE_NODE_FIELD(subpath);
-	WRITE_INT_FIELD(num_workers);
-}
-
-static void
 _outNestPath(StringInfo str, const NestPath *node)
 {
 	WRITE_NODE_TYPE("NESTPATH");
@@ -1698,8 +1635,6 @@ _outPlannerGlobal(StringInfo str, const PlannerGlobal *node)
 	WRITE_INT_FIELD(lastPlanNodeId);
 	WRITE_BOOL_FIELD(transientPlan);
 	WRITE_BOOL_FIELD(dependsOnRole);
-	WRITE_BOOL_FIELD(parallelModeOK);
-	WRITE_BOOL_FIELD(parallelModeNeeded);
 	WRITE_CHAR_FIELD(maxParallelHazard);
 }
 
@@ -1763,11 +1698,9 @@ _outRelOptInfo(StringInfo str, const RelOptInfo *node)
 	WRITE_FLOAT_FIELD(rows, "%.0f");
 	WRITE_BOOL_FIELD(consider_startup);
 	WRITE_BOOL_FIELD(consider_param_startup);
-	WRITE_BOOL_FIELD(consider_parallel);
 	WRITE_NODE_FIELD(reltarget);
 	WRITE_NODE_FIELD(pathlist);
 	WRITE_NODE_FIELD(ppilist);
-	WRITE_NODE_FIELD(partial_pathlist);
 	WRITE_NODE_FIELD(cheapest_startup_path);
 	WRITE_NODE_FIELD(cheapest_total_path);
 	WRITE_NODE_FIELD(cheapest_unique_path);
@@ -1788,7 +1721,6 @@ _outRelOptInfo(StringInfo str, const RelOptInfo *node)
 	WRITE_BITMAPSET_FIELD(eclass_indexes);
 	WRITE_NODE_FIELD(subroot);
 	WRITE_NODE_FIELD(subplan_params);
-	WRITE_INT_FIELD(rel_parallel_workers);
 	WRITE_UINT_FIELD(amflags);
 	/* can't print unique_for_rels/non_unique_for_rels; BMSes aren't Nodes */
 	WRITE_NODE_FIELD(baserestrictinfo);
@@ -2595,12 +2527,6 @@ outNode(StringInfo str, const void *obj)
 			case T_BitmapOr:
 				_outBitmapOr(str, obj);
 				break;
-			case T_Gather:
-				_outGather(str, obj);
-				break;
-			case T_GatherMerge:
-				_outGatherMerge(str, obj);
-				break;
 			case T_Scan:
 				_outScan(str, obj);
 				break;
@@ -2829,9 +2755,6 @@ outNode(StringInfo str, const void *obj)
 			case T_UniquePath:
 				_outUniquePath(str, obj);
 				break;
-			case T_GatherPath:
-				_outGatherPath(str, obj);
-				break;
 			case T_ProjectionPath:
 				_outProjectionPath(str, obj);
 				break;
@@ -2855,9 +2778,6 @@ outNode(StringInfo str, const void *obj)
 				break;
 			case T_ModifyTablePath:
 				_outModifyTablePath(str, obj);
-				break;
-				case T_GatherMergePath:
-				_outGatherMergePath(str, obj);
 				break;
 			case T_NestPath:
 				_outNestPath(str, obj);

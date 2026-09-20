@@ -1149,7 +1149,6 @@ typedef struct TruncateStmt
  * correspond to any SQL grammar.
  * ----------------------
  */
-#define CURSOR_OPT_PARALLEL_OK	0x0800	/* parallel mode OK */
 
 /* ----------------------
  *		Create Index Statement

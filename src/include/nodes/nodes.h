@@ -71,8 +71,6 @@ typedef enum NodeTag
 	T_Group,
 	T_Agg,
 	T_Unique,
-	T_Gather,
-	T_GatherMerge,
 	T_Hash,
 	/* these aren't subclasses of Plan: */
 	T_NestLoopParam,
@@ -114,8 +112,6 @@ typedef enum NodeTag
 	T_GroupState,
 	T_AggState,
 	T_UniqueState,
-	T_GatherState,
-	T_GatherMergeState,
 	T_HashState,
 
 	/*
@@ -197,8 +193,6 @@ typedef enum NodeTag
 	T_MaterialPath,
 	T_MemoizePath,
 	T_UniquePath,
-	T_GatherPath,
-	T_GatherMergePath,
 	T_ProjectionPath,
 	T_ProjectSetPath,
 	T_SortPath,

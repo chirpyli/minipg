@@ -17,14 +17,6 @@
 #include "lib/stringinfo.h"
 #include "parser/parse_node.h"
 
-typedef struct ExplainWorkersState
-{
-	int			num_workers;	/* # of worker processes the plan used */
-	bool	   *worker_inited;	/* per-worker state-initialized flags */
-	StringInfoData *worker_str; /* per-worker transient output buffers */
-	StringInfo	prev_str;		/* saved output buffer while redirecting */
-} ExplainWorkersState;
-
 typedef struct ExplainState
 {
 	StringInfo	str;			/* output buffer */
@@ -45,9 +37,6 @@ typedef struct ExplainState
 	List	   *rtable_names;	/* alias names for RTEs */
 	List	   *deparse_cxt;	/* context list for deparsing expressions */
 	Bitmapset  *printed_subplans;	/* ids of SubPlans we've printed */
-	bool		hide_workers;	/* set if we find an invisible Gather */
-	/* state related to the current plan node */
-	ExplainWorkersState *workers_state; /* needed if parallel plan */
 } ExplainState;
 
 /* Hook for plugins to get control in ExplainOneQuery() */

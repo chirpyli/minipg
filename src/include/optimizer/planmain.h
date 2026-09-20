@@ -30,8 +30,7 @@ extern RelOptInfo *query_planner(PlannerInfo *root,
  * prototypes for plan/createplan.c
  */
 extern Plan *create_plan(PlannerInfo *root, Path *best_path);
-extern Plan *change_plan_targetlist(Plan *subplan, List *tlist,
-									bool tlist_parallel_safe);
+extern Plan *change_plan_targetlist(Plan *subplan, List *tlist);
 extern Plan *materialize_finished_plan(Plan *subplan);
 extern bool is_projection_capable_path(Path *path);
 extern bool is_projection_capable_plan(Plan *plan);

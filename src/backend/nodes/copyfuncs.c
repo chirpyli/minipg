@@ -87,7 +87,6 @@ _copyPlannedStmt(const PlannedStmt *from)
 	COPY_SCALAR_FIELD(canSetTag);
 	COPY_SCALAR_FIELD(transientPlan);
 	COPY_SCALAR_FIELD(dependsOnRole);
-	COPY_SCALAR_FIELD(parallelModeNeeded);
 	COPY_NODE_FIELD(planTree);
 	COPY_NODE_FIELD(rtable);
 	COPY_NODE_FIELD(resultRelations);
@@ -118,8 +117,6 @@ CopyPlanFields(const Plan *from, Plan *newnode)
 	COPY_SCALAR_FIELD(total_cost);
 	COPY_SCALAR_FIELD(plan_rows);
 	COPY_SCALAR_FIELD(plan_width);
-	COPY_SCALAR_FIELD(parallel_aware);
-	COPY_SCALAR_FIELD(parallel_safe);
 	COPY_SCALAR_FIELD(plan_node_id);
 	COPY_NODE_FIELD(targetlist);
 	COPY_NODE_FIELD(qual);
@@ -299,61 +296,7 @@ _copyBitmapOr(const BitmapOr *from)
 	/*
 	 * copy remainder of node
 	 */
-	COPY_SCALAR_FIELD(isshared);
 	COPY_NODE_FIELD(bitmapplans);
-
-	return newnode;
-}
-
-/*
- * _copyGather
- */
-static Gather *
-_copyGather(const Gather *from)
-{
-	Gather	   *newnode = makeNode(Gather);
-
-	/*
-	 * copy node superclass fields
-	 */
-	CopyPlanFields((const Plan *) from, (Plan *) newnode);
-
-	/*
-	 * copy remainder of node
-	 */
-	COPY_SCALAR_FIELD(num_workers);
-	COPY_SCALAR_FIELD(rescan_param);
-	COPY_SCALAR_FIELD(single_copy);
-	COPY_SCALAR_FIELD(invisible);
-	COPY_BITMAPSET_FIELD(initParam);
-
-	return newnode;
-}
-
-/*
- * _copyGatherMerge
- */
-static GatherMerge *
-_copyGatherMerge(const GatherMerge *from)
-{
-	GatherMerge *newnode = makeNode(GatherMerge);
-
-	/*
-	 * copy node superclass fields
-	 */
-	CopyPlanFields((const Plan *) from, (Plan *) newnode);
-
-	/*
-	 * copy remainder of node
-	 */
-	COPY_SCALAR_FIELD(num_workers);
-	COPY_SCALAR_FIELD(rescan_param);
-	COPY_SCALAR_FIELD(numCols);
-	COPY_POINTER_FIELD(sortColIdx, from->numCols * sizeof(AttrNumber));
-	COPY_POINTER_FIELD(sortOperators, from->numCols * sizeof(Oid));
-	COPY_POINTER_FIELD(collations, from->numCols * sizeof(Oid));
-	COPY_POINTER_FIELD(nullsFirst, from->numCols * sizeof(bool));
-	COPY_BITMAPSET_FIELD(initParam);
 
 	return newnode;
 }
@@ -476,7 +419,6 @@ _copyBitmapIndexScan(const BitmapIndexScan *from)
 	 * copy remainder of node
 	 */
 	COPY_SCALAR_FIELD(indexid);
-	COPY_SCALAR_FIELD(isshared);
 	COPY_NODE_FIELD(indexqual);
 	COPY_NODE_FIELD(indexqualorig);
 
@@ -906,7 +848,6 @@ _copyHash(const Hash *from)
 	COPY_SCALAR_FIELD(skewTable);
 	COPY_SCALAR_FIELD(skewColumn);
 	COPY_SCALAR_FIELD(skewInherit);
-	COPY_SCALAR_FIELD(rows_total);
 
 	return newnode;
 }
@@ -2545,12 +2486,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_Scan:
 			retval = _copyScan(from);
-			break;
-		case T_Gather:
-			retval = _copyGather(from);
-			break;
-		case T_GatherMerge:
-			retval = _copyGatherMerge(from);
 			break;
 		case T_SeqScan:
 			retval = _copySeqScan(from);

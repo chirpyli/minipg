@@ -20,7 +20,6 @@ OBJS = \
 	execIndexing.o \
 	execJunk.o \
 	execMain.o \
-	execParallel.o \
 	execProcnode.o \
 	execSRF.o \
 	execScan.o \
@@ -34,8 +33,6 @@ OBJS = \
 	nodeBitmapHeapscan.o \
 	nodeBitmapIndexscan.o \
 	nodeBitmapOr.o \
-	nodeGather.o \
-	nodeGatherMerge.o \
 	nodeGroup.o \
 	nodeHash.o \
 	nodeHashjoin.o \
@@ -60,7 +57,6 @@ OBJS = \
 	nodeTidscan.o \
 	nodeUnique.o \
 	nodeValuesscan.o \
-	tqueue.o \
 	tstoreReceiver.o
 
 include $(top_srcdir)/src/backend/common.mk

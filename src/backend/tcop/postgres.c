@@ -855,7 +855,7 @@ exec_simple_query(const char *query_string)
 												NULL, 0, NULL);
 
 		plantree_list = pg_plan_queries(querytree_list, query_string,
-										CURSOR_OPT_PARALLEL_OK, NULL);
+										0, NULL);
 
 		/*
 		 * Done with the snapshot used for parsing/planning.

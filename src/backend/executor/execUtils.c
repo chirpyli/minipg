@@ -153,8 +153,6 @@ CreateExecutorState(void)
 
 	estate->es_sourceText = NULL;
 
-	estate->es_use_parallel_mode = false;
-
 	/*
 	 * Return the executor state structure
 	 */
@@ -738,28 +736,15 @@ ExecGetRangeTableRelation(EState *estate, Index rti)
 
 		Assert(rte->rtekind == RTE_RELATION);
 
-		if (!IsParallelWorker())
-		{
-			/*
-			 * In a normal query, we should already have the appropriate lock,
-			 * but verify that through an Assert.  Since there's already an
-			 * Assert inside table_open that insists on holding some lock, it
-			 * seems sufficient to check this only when rellockmode is higher
-			 * than the minimum.
-			 */
-			rel = table_open(rte->relid, NoLock);
-			Assert(rte->rellockmode == AccessShareLock ||
-				   CheckRelationLockedByMe(rel, rte->rellockmode, false));
-		}
-		else
-		{
-			/*
-			 * If we are a parallel worker, we need to obtain our own local
-			 * lock on the relation.  This ensures sane behavior in case the
-			 * parent process exits before we do.
-			 */
-			rel = table_open(rte->relid, rte->rellockmode);
-		}
+		/*
+		 * We should already have the appropriate lock, but verify that
+		 * through an Assert.  Since there's already an Assert inside
+		 * table_open that insists on holding some lock, it seems sufficient
+		 * to check this only when rellockmode is higher than the minimum.
+		 */
+		rel = table_open(rte->relid, NoLock);
+		Assert(rte->rellockmode == AccessShareLock ||
+			   CheckRelationLockedByMe(rel, rte->rellockmode, false));
 
 		estate->es_relations[rti - 1] = rel;
 	}

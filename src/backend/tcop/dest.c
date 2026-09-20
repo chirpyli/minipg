@@ -32,7 +32,6 @@
 #include "access/printtup.h"
 #include "access/xact.h"
 #include "executor/functions.h"
-#include "executor/tqueue.h"
 #include "executor/tstoreReceiver.h"
 #include "libpq/libpq.h"
 #include "libpq/pqformat.h"
@@ -137,9 +136,6 @@ CreateDestReceiver(CommandDest dest)
 
 		case DestSQLFunction:
 			return CreateSQLFunctionDestReceiver();
-
-		case DestTupleQueue:
-			return CreateTupleQueueDestReceiver(NULL);
 	}
 
 	/* should never get here */
@@ -192,7 +188,6 @@ EndCommand(const QueryCompletion *qc, CommandDest dest, bool force_undecorated_o
 		case DestTuplestore:
 		
 		case DestSQLFunction:
-		case DestTupleQueue:
 			break;
 	}
 }
@@ -235,7 +230,6 @@ NullCommand(CommandDest dest)
 		case DestTuplestore:
 		
 		case DestSQLFunction:
-		case DestTupleQueue:
 			break;
 	}
 }
@@ -276,7 +270,6 @@ ReadyForQuery(CommandDest dest)
 		case DestTuplestore:
 		
 		case DestSQLFunction:
-		case DestTupleQueue:
 			break;
 	}
 }

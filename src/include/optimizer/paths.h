@@ -50,14 +50,8 @@ extern RelOptInfo *make_one_rel(PlannerInfo *root, List *joinlist);
 extern RelOptInfo *standard_join_search(PlannerInfo *root, int levels_needed,
 										List *initial_rels);
 
-extern void generate_gather_paths(PlannerInfo *root, RelOptInfo *rel,
-								  bool override_rows);
-extern void generate_useful_gather_paths(PlannerInfo *root, RelOptInfo *rel,
-										 bool override_rows);
 extern int	compute_parallel_worker(RelOptInfo *rel, double heap_pages,
 									double index_pages, int max_workers);
-extern void create_partial_bitmap_paths(PlannerInfo *root, RelOptInfo *rel,
-										Path *bitmapqual);
 
 #ifdef OPTIMIZER_DEBUG
 extern void debug_print_rel(PlannerInfo *root, RelOptInfo *rel);
@@ -137,12 +131,10 @@ extern EquivalenceMember *find_ec_member_matching_expr(EquivalenceClass *ec,
 extern EquivalenceMember *find_computable_ec_member(PlannerInfo *root,
 													EquivalenceClass *ec,
 													List *exprs,
-													Relids relids,
-													bool require_parallel_safe);
+													Relids relids);
 extern Expr *find_em_expr_for_rel(EquivalenceClass *ec, RelOptInfo *rel);
 extern bool relation_can_be_sorted_early(PlannerInfo *root, RelOptInfo *rel,
-										 EquivalenceClass *ec,
-										 bool require_parallel_safe);
+										 EquivalenceClass *ec);
 extern void generate_base_implied_equalities(PlannerInfo *root);
 extern List *generate_join_implied_equalities(PlannerInfo *root,
 											  Relids join_relids,
@@ -191,13 +183,11 @@ extern bool pathkeys_contained_in(List *keys1, List *keys2);
 extern bool pathkeys_count_contained_in(List *keys1, List *keys2, int *n_common);
 extern Path *get_cheapest_path_for_pathkeys(List *paths, List *pathkeys,
 											Relids required_outer,
-											CostSelector cost_criterion,
-											bool require_parallel_safe);
+											CostSelector cost_criterion);
 extern Path *get_cheapest_fractional_path_for_pathkeys(List *paths,
 													   List *pathkeys,
 													   Relids required_outer,
 													   double fraction);
-extern Path *get_cheapest_parallel_safe_total_inner(List *paths);
 extern List *build_index_pathkeys(PlannerInfo *root, IndexOptInfo *index,
 								  ScanDirection scandir);
 extern List *build_expression_pathkey(PlannerInfo *root, Expr *expr,
