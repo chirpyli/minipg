@@ -163,63 +163,6 @@ SELECT BOOLTBL1.*, BOOLTBL2.*
    WHERE BOOLTBL2.f1 = BOOLTBL1.f1 or BOOLTBL1.f1 = bool 'true'
    ORDER BY BOOLTBL1.f1, BOOLTBL2.f1;
 
---
--- SQL syntax
--- Try all combinations to ensure that we get nothing when we expect nothing
--- - thomas 2000-01-04
---
-
-SELECT f1
-   FROM BOOLTBL1
-   WHERE f1 IS TRUE;
-
-SELECT f1
-   FROM BOOLTBL1
-   WHERE f1 IS NOT FALSE;
-
-SELECT f1
-   FROM BOOLTBL1
-   WHERE f1 IS FALSE;
-
-SELECT f1
-   FROM BOOLTBL1
-   WHERE f1 IS NOT TRUE;
-
-SELECT f1
-   FROM BOOLTBL2
-   WHERE f1 IS TRUE;
-
-SELECT f1
-   FROM BOOLTBL2
-   WHERE f1 IS NOT FALSE;
-
-SELECT f1
-   FROM BOOLTBL2
-   WHERE f1 IS FALSE;
-
-SELECT f1
-   FROM BOOLTBL2
-   WHERE f1 IS NOT TRUE;
-
---
--- Tests for BooleanTest
---
-CREATE TABLE BOOLTBL3 (d text, b bool, o int);
-INSERT INTO BOOLTBL3 (d, b, o) VALUES ('true', true, 1);
-INSERT INTO BOOLTBL3 (d, b, o) VALUES ('false', false, 2);
-INSERT INTO BOOLTBL3 (d, b, o) VALUES ('null', null, 3);
-
-SELECT
-    d,
-    b IS TRUE AS istrue,
-    b IS NOT TRUE AS isnottrue,
-    b IS FALSE AS isfalse,
-    b IS NOT FALSE AS isnotfalse,
-    b IS UNKNOWN AS isunknown,
-    b IS NOT UNKNOWN AS isnotunknown
-FROM booltbl3 ORDER BY o;
-
-
 -- Test to make sure short-circuiting and NULL handling is
 -- correct. Use a table as source to prevent constant simplification
 -- to interfer.
@@ -256,7 +199,5 @@ SELECT isnul OR istrue OR isfalse FROM booltbl4;
 DROP TABLE  BOOLTBL1;
 
 DROP TABLE  BOOLTBL2;
-
-DROP TABLE  BOOLTBL3;
 
 DROP TABLE  BOOLTBL4;

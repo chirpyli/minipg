@@ -130,8 +130,7 @@ AND case proargtypes[array_length(proargtypes, 1)-1]
 SELECT oid::regprocedure, proargmodes, provariadic
 FROM pg_proc
 WHERE (proargmodes IS NOT NULL AND 'v' = any(proargmodes))
-    IS DISTINCT FROM
-    (provariadic != 0);
+    <> (provariadic != 0);
  oid | proargmodes | provariadic 
 -----+-------------+-------------
 (0 rows)

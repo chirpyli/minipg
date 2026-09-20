@@ -115,7 +115,7 @@ typedef struct SupportRequestSelectivity
  *
  * The "node" argument is normally the parse node that is invoking the
  * target function.  This is a FuncExpr in the simplest case, but it could
- * also be an OpExpr, DistinctExpr, NullIfExpr, or WindowFunc, or possibly
+ * also be an OpExpr, NullIfExpr, or WindowFunc, or possibly
  * other cases in future.  NULL is passed if the function cannot presume
  * its arguments to be equivalent to what the calling node presents as
  * arguments; that happens for, e.g., aggregate support functions and

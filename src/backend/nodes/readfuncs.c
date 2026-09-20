@@ -500,26 +500,6 @@ _readOpExpr(void)
 }
 
 /*
- * _readDistinctExpr
- */
-static DistinctExpr *
-_readDistinctExpr(void)
-{
-	READ_LOCALS(DistinctExpr);
-
-	READ_OID_FIELD(opno);
-	READ_OID_FIELD(opfuncid);
-	READ_OID_FIELD(opresulttype);
-	READ_BOOL_FIELD(opretset);
-	READ_OID_FIELD(opcollid);
-	READ_OID_FIELD(inputcollid);
-	READ_NODE_FIELD(args);
-	READ_LOCATION_FIELD(location);
-
-	READ_DONE();
-}
-
-/*
  * _readNullIfExpr
  */
 static NullIfExpr *
@@ -816,24 +796,6 @@ _readCoalesceExpr(void)
 
 	READ_OID_FIELD(coalescetype);
 	READ_OID_FIELD(coalescecollid);
-	READ_NODE_FIELD(args);
-	READ_LOCATION_FIELD(location);
-
-	READ_DONE();
-}
-
-/*
- * _readMinMaxExpr
- */
-static MinMaxExpr *
-_readMinMaxExpr(void)
-{
-	READ_LOCALS(MinMaxExpr);
-
-	READ_OID_FIELD(minmaxtype);
-	READ_OID_FIELD(minmaxcollid);
-	READ_OID_FIELD(inputcollid);
-	READ_ENUM_FIELD(op, MinMaxOp);
 	READ_NODE_FIELD(args);
 	READ_LOCATION_FIELD(location);
 
@@ -1948,8 +1910,6 @@ parseNodeString(void)
 		return_value = _readNamedArgExpr();
 	else if (MATCH("OPEXPR", 6))
 		return_value = _readOpExpr();
-	else if (MATCH("DISTINCTEXPR", 12))
-		return_value = _readDistinctExpr();
 	else if (MATCH("NULLIFEXPR", 10))
 		return_value = _readNullIfExpr();
 	else if (MATCH("SCALARARRAYOPEXPR", 17))
@@ -1984,8 +1944,6 @@ parseNodeString(void)
 		return_value = _readRowExpr();
 	else if (MATCH("COALESCE", 8))
 		return_value = _readCoalesceExpr();
-	else if (MATCH("MINMAX", 6))
-		return_value = _readMinMaxExpr();
 	else if (MATCH("SQLVALUEFUNCTION", 16))
 		return_value = _readSQLValueFunction();
 	else if (MATCH("NULLTEST", 8))

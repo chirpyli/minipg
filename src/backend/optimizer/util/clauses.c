@@ -329,12 +329,6 @@ contain_mutable_functions_walker(Node *node, void *context)
 		return true;
 	}
 
-	/*
-	 * It should be safe to treat MinMaxExpr as immutable, because it will
-	 * depend on a non-cross-type btree comparison function, and those should
-	 * always be immutable.
-	 */
-
 	/* Recurse to check arguments */
 	if (IsA(node, Query))
 	{
@@ -493,9 +487,7 @@ contain_volatile_functions_walker(Node *node, void *context)
 	}
 
 	/*
-	 * See notes in contain_mutable_functions_walker about why we treat
-	 * MinMaxExpr as immutable, while SQLValueFunction is stable.  Hence,
-	 * neither of them is of interest here.
+	 * SQLValueFunction is stable, so it is not of interest here.
 	 */
 
 	/* Recurse to check arguments */
@@ -665,8 +657,6 @@ max_parallel_hazard_walker(Node *node, max_parallel_hazard_context *context)
 		return true;
 
 	/*
-	 * It should be OK to treat MinMaxExpr as parallel-safe, since btree
-	 * opclass support functions are generally parallel-safe.
 	 * SQLValueFunction should be safe in all cases.  NextValueExpr is
 	 * parallel-unsafe.
 	 */
@@ -816,11 +806,6 @@ contain_nonstrict_functions_walker(Node *node, void *context)
 			return true;
 		/* else fall through to check args */
 	}
-	else if (IsA(node, DistinctExpr))
-	{
-		/* IS DISTINCT FROM is inherently non-strict */
-		return true;
-	}
 	else if (IsA(node, NullIfExpr))
 	{
 		/* NULLIF is inherently non-strict */
@@ -884,8 +869,6 @@ contain_nonstrict_functions_walker(Node *node, void *context)
 	else if (IsA(node, RowExpr))
 		return true;
 	else if (IsA(node, CoalesceExpr))
-		return true;
-	else if (IsA(node, MinMaxExpr))
 		return true;
 	else if (IsA(node, NullTest))
 		return true;
@@ -1085,7 +1068,6 @@ contain_leaked_vars_walker(Node *node, void *context)
 
 		case T_FuncExpr:
 		case T_OpExpr:
-		case T_DistinctExpr:
 		case T_NullIfExpr:
 		case T_ScalarArrayOpExpr:
 		case T_CoerceViaIO:
@@ -1118,36 +1100,6 @@ contain_leaked_vars_walker(Node *node, void *context)
 					if (contain_var_clause(node))
 						return true;
 				}
-			}
-			break;
-
-		case T_MinMaxExpr:
-			{
-				/*
-				 * MinMaxExpr is leakproof if the comparison function it calls
-				 * is leakproof.
-				 */
-				MinMaxExpr *minmaxexpr = (MinMaxExpr *) node;
-				TypeCacheEntry *typentry;
-				bool		leakproof;
-
-				/* Look up the btree comparison function for the datatype */
-				typentry = lookup_type_cache(minmaxexpr->minmaxtype,
-											 TYPECACHE_CMP_PROC);
-				if (OidIsValid(typentry->cmp_proc))
-					leakproof = get_func_leakproof(typentry->cmp_proc);
-				else
-				{
-					/*
-					 * The executor will throw an error, but here we just
-					 * treat the missing function as leaky.
-					 */
-					leakproof = false;
-				}
-
-				if (!leakproof &&
-					contain_var_clause((Node *) minmaxexpr->args))
-					return true;
 			}
 			break;
 
@@ -2271,107 +2223,6 @@ eval_const_expressions_mutator(Node *node,
 				newexpr->location = expr->location;
 				return (Node *) newexpr;
 			}
-		case T_DistinctExpr:
-			{
-				DistinctExpr *expr = (DistinctExpr *) node;
-				List	   *args;
-				ListCell   *arg;
-				bool		has_null_input = false;
-				bool		all_null_input = true;
-				bool		has_nonconst_input = false;
-				Expr	   *simple;
-				DistinctExpr *newexpr;
-
-				/*
-				 * Reduce constants in the DistinctExpr's arguments.  We know
-				 * args is either NIL or a List node, so we can call
-				 * expression_tree_mutator directly rather than recursing to
-				 * self.
-				 */
-				args = (List *) expression_tree_mutator((Node *) expr->args,
-														eval_const_expressions_mutator,
-														(void *) context);
-
-				/*
-				 * We must do our own check for NULLs because DistinctExpr has
-				 * different results for NULL input than the underlying
-				 * operator does.
-				 */
-				foreach(arg, args)
-				{
-					if (IsA(lfirst(arg), Const))
-					{
-						has_null_input |= ((Const *) lfirst(arg))->constisnull;
-						all_null_input &= ((Const *) lfirst(arg))->constisnull;
-					}
-					else
-						has_nonconst_input = true;
-				}
-
-				/* all constants? then can optimize this out */
-				if (!has_nonconst_input)
-				{
-					/* all nulls? then not distinct */
-					if (all_null_input)
-						return makeBoolConst(false, false);
-
-					/* one null? then distinct */
-					if (has_null_input)
-						return makeBoolConst(true, false);
-
-					/* otherwise try to evaluate the '=' operator */
-					/* (NOT okay to try to inline it, though!) */
-
-					/*
-					 * Need to get OID of underlying function.  Okay to
-					 * scribble on input to this extent.
-					 */
-					set_opfuncid((OpExpr *) expr);	/* rely on struct
-													 * equivalence */
-
-					/*
-					 * Code for op/func reduction is pretty bulky, so split it
-					 * out as a separate function.
-					 */
-					simple = simplify_function(expr->opfuncid,
-											   expr->opresulttype, -1,
-											   expr->opcollid,
-											   expr->inputcollid,
-											   &args,
-											   false,
-											   false,
-											   false,
-											   context);
-					if (simple) /* successfully simplified it */
-					{
-						/*
-						 * Since the underlying operator is "=", must negate
-						 * its result
-						 */
-						Const	   *csimple = castNode(Const, simple);
-
-						csimple->constvalue =
-							BoolGetDatum(!DatumGetBool(csimple->constvalue));
-						return (Node *) csimple;
-					}
-				}
-
-				/*
-				 * The expression cannot be simplified any further, so build
-				 * and return a replacement DistinctExpr node using the
-				 * possibly-simplified arguments.
-				 */
-				newexpr = makeNode(DistinctExpr);
-				newexpr->opno = expr->opno;
-				newexpr->opfuncid = expr->opfuncid;
-				newexpr->opresulttype = expr->opresulttype;
-				newexpr->opretset = expr->opretset;
-				newexpr->opcollid = expr->opcollid;
-				newexpr->inputcollid = expr->inputcollid;
-				newexpr->args = args;
-				newexpr->location = expr->location;
-				return (Node *) newexpr;
-			}
 		case T_NullIfExpr:
 			{
 				NullIfExpr *expr;
@@ -2827,7 +2678,6 @@ eval_const_expressions_mutator(Node *node,
 		case T_SubscriptingRef:
 		case T_ArrayExpr:
 		case T_RowExpr:
-		case T_MinMaxExpr:
 			{
 				/*
 				 * Generic handling for node types whose own processing is
@@ -2838,10 +2688,6 @@ eval_const_expressions_mutator(Node *node,
 				 * fetch and assignment are both immutable.  This constrains
 				 * type-specific subscripting implementations; maybe we should
 				 * relax it someday.
-				 *
-				 * Treating MinMaxExpr this way amounts to assuming that the
-				 * btree comparison function it calls is immutable; see the
-				 * reasoning in contain_mutable_functions_walker.
 				 */
 
 				/* Copy the node and const-simplify its arguments */

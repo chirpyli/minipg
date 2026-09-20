@@ -14,14 +14,14 @@ SELECT * FROM onek
 --
 SELECT onek.unique1, onek.stringu1 FROM onek
    WHERE onek.unique1 < 20
-   ORDER BY unique1 using >;
+   ORDER BY unique1 DESC;
 
 --
 -- awk '{if($1>980){print $1,$14;}else{next;}}' onek.data | sort +1d -2
 --
 SELECT onek.unique1, onek.stringu1 FROM onek
    WHERE onek.unique1 > 980
-   ORDER BY stringu1 using <;
+   ORDER BY stringu1;
 
 --
 -- awk '{if($1>980){print $1,$16;}else{next;}}' onek.data |
@@ -29,7 +29,7 @@ SELECT onek.unique1, onek.stringu1 FROM onek
 --
 SELECT onek.unique1, onek.string4 FROM onek
    WHERE onek.unique1 > 980
-   ORDER BY string4 using <, unique1 using >;
+   ORDER BY string4, unique1 DESC;
 
 --
 -- awk '{if($1>980){print $1,$16;}else{next;}}' onek.data |
@@ -37,7 +37,7 @@ SELECT onek.unique1, onek.string4 FROM onek
 --
 SELECT onek.unique1, onek.string4 FROM onek
    WHERE onek.unique1 > 980
-   ORDER BY string4 using >, unique1 using <;
+   ORDER BY string4 DESC, unique1;
 
 --
 -- awk '{if($1<20){print $1,$16;}else{next;}}' onek.data |
@@ -45,7 +45,7 @@ SELECT onek.unique1, onek.string4 FROM onek
 --
 SELECT onek.unique1, onek.string4 FROM onek
    WHERE onek.unique1 < 20
-   ORDER BY unique1 using >, string4 using <;
+   ORDER BY unique1 DESC, string4;
 
 --
 -- awk '{if($1<20){print $1,$16;}else{next;}}' onek.data |
@@ -53,7 +53,7 @@ SELECT onek.unique1, onek.string4 FROM onek
 --
 SELECT onek.unique1, onek.string4 FROM onek
    WHERE onek.unique1 < 20
-   ORDER BY unique1 using <, string4 using >;
+   ORDER BY unique1, string4 DESC;
 
 --
 -- test partial btree indexes
@@ -78,7 +78,7 @@ SELECT onek2.* FROM onek2 WHERE onek2.unique1 < 10;
 --
 SELECT onek2.unique1, onek2.stringu1 FROM onek2
     WHERE onek2.unique1 < 20
-    ORDER BY unique1 using >;
+    ORDER BY unique1 DESC;
 
 --
 -- awk '{if($1>980){print $1,$14;}else{next;}}' onek.data | sort +1d -2
@@ -109,7 +109,7 @@ SELECT p.name, p.age FROM person p;
 -- awk 'BEGIN{FS="      ";}{if(NF!=1){print $4,$5;}else{print;}}' - stud_emp.data |
 -- sort +1nr -2
 --
-SELECT p.name, p.age FROM person p ORDER BY age using >, name;
+SELECT p.name, p.age FROM person p ORDER BY age DESC, name;
 
 --
 -- Test some cases involving whole-row Var referencing a subquery

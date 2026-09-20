@@ -1715,18 +1715,6 @@ FigureColnameInternal(Node *node, char **name)
 			/* make coalesce() act like a regular function */
 			*name = "coalesce";
 			return 2;
-		case T_MinMaxExpr:
-			/* make greatest/least act like a regular function */
-			switch (((MinMaxExpr *) node)->op)
-			{
-				case IS_GREATEST:
-					*name = "greatest";
-					return 2;
-				case IS_LEAST:
-					*name = "least";
-					return 2;
-			}
-			break;
 		case T_SQLValueFunction:
 			/* make these act like a function or variable */
 			switch (((SQLValueFunction *) node)->op)

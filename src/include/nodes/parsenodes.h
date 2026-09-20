@@ -42,8 +42,7 @@ typedef enum SortByDir
 {
 	SORTBY_DEFAULT,
 	SORTBY_ASC,
-	SORTBY_DESC,
-	SORTBY_USING				/* not allowed in CREATE INDEX ... */
+	SORTBY_DESC
 } SortByDir;
 
 typedef enum SortByNulls
@@ -212,12 +211,9 @@ typedef enum A_Expr_Kind
 	AEXPR_OP,					/* normal operator */
 	AEXPR_OP_ANY,				/* scalar op ANY (array) */
 	AEXPR_OP_ALL,				/* scalar op ALL (array) */
-	AEXPR_DISTINCT,				/* IS DISTINCT FROM - name must be "=" */
-	AEXPR_NOT_DISTINCT,			/* IS NOT DISTINCT FROM - name must be "=" */
 	AEXPR_NULLIF,				/* NULLIF - name must be "=" */
 	AEXPR_IN,					/* [NOT] IN - name must be "=" or "<>" */
 	AEXPR_LIKE,					/* [NOT] LIKE - name must be "~~" or "!~~" */
-	AEXPR_ILIKE,				/* [NOT] ILIKE - name must be "~~*" or "!~~*" */
 	AEXPR_BETWEEN,				/* name must be "BETWEEN" */
 	AEXPR_NOT_BETWEEN			/* name must be "NOT BETWEEN" */
 } A_Expr_Kind;
@@ -276,7 +272,6 @@ typedef struct FuncCall
 	bool		agg_within_group;	/* ORDER BY appeared in WITHIN GROUP */
 	bool		agg_star;		/* argument was really '*' */
 	bool		agg_distinct;	/* arguments were labeled DISTINCT */
-	bool		func_variadic;	/* last argument was labeled VARIADIC */
 	CoercionForm funcformat;	/* how to display this node */
 	int			location;		/* token location, or -1 if unknown */
 } FuncCall;
@@ -372,10 +367,9 @@ typedef struct SortBy
 {
 	NodeTag		type;
 	Node	   *node;			/* expression to sort on */
-	SortByDir	sortby_dir;		/* ASC/DESC/USING/default */
+	SortByDir	sortby_dir;		/* ASC/DESC/default */
 	SortByNulls sortby_nulls;	/* NULLS FIRST/LAST */
-	List	   *useOp;			/* name of op to use, if SORTBY_USING */
-	int			location;		/* operator location, or -1 if none/unknown */
+	int			location;		/* token location, or -1 if unknown */
 } SortBy;
 
 /*

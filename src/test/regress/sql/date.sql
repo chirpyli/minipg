@@ -238,70 +238,70 @@ SELECT f1 as "date",
 --
 -- epoch
 --
-SELECT EXTRACT(EPOCH FROM DATE        '1970-01-01');     --  0
+SELECT extract('epoch', DATE        '1970-01-01');     --  0
 --
 -- century
 --
-SELECT EXTRACT(CENTURY FROM DATE '0101-12-31 BC'); -- -2
-SELECT EXTRACT(CENTURY FROM DATE '0100-12-31 BC'); -- -1
-SELECT EXTRACT(CENTURY FROM DATE '0001-12-31 BC'); -- -1
-SELECT EXTRACT(CENTURY FROM DATE '0001-01-01');    --  1
-SELECT EXTRACT(CENTURY FROM DATE '0001-01-01 AD'); --  1
-SELECT EXTRACT(CENTURY FROM DATE '1900-12-31');    -- 19
-SELECT EXTRACT(CENTURY FROM DATE '1901-01-01');    -- 20
-SELECT EXTRACT(CENTURY FROM DATE '2000-12-31');    -- 20
-SELECT EXTRACT(CENTURY FROM DATE '2001-01-01');    -- 21
-SELECT EXTRACT(CENTURY FROM CURRENT_DATE)>=21 AS True;     -- true
+SELECT extract('century', DATE '0101-12-31 BC'); -- -2
+SELECT extract('century', DATE '0100-12-31 BC'); -- -1
+SELECT extract('century', DATE '0001-12-31 BC'); -- -1
+SELECT extract('century', DATE '0001-01-01');    --  1
+SELECT extract('century', DATE '0001-01-01 AD'); --  1
+SELECT extract('century', DATE '1900-12-31');    -- 19
+SELECT extract('century', DATE '1901-01-01');    -- 20
+SELECT extract('century', DATE '2000-12-31');    -- 20
+SELECT extract('century', DATE '2001-01-01');    -- 21
+SELECT extract('century', CURRENT_DATE)>=21 AS True;     -- true
 --
 -- millennium
 --
-SELECT EXTRACT(MILLENNIUM FROM DATE '0001-12-31 BC'); -- -1
-SELECT EXTRACT(MILLENNIUM FROM DATE '0001-01-01 AD'); --  1
-SELECT EXTRACT(MILLENNIUM FROM DATE '1000-12-31');    --  1
-SELECT EXTRACT(MILLENNIUM FROM DATE '1001-01-01');    --  2
-SELECT EXTRACT(MILLENNIUM FROM DATE '2000-12-31');    --  2
-SELECT EXTRACT(MILLENNIUM FROM DATE '2001-01-01');    --  3
+SELECT extract('millennium', DATE '0001-12-31 BC'); -- -1
+SELECT extract('millennium', DATE '0001-01-01 AD'); --  1
+SELECT extract('millennium', DATE '1000-12-31');    --  1
+SELECT extract('millennium', DATE '1001-01-01');    --  2
+SELECT extract('millennium', DATE '2000-12-31');    --  2
+SELECT extract('millennium', DATE '2001-01-01');    --  3
 -- next test to be fixed on the turn of the next millennium;-)
-SELECT EXTRACT(MILLENNIUM FROM CURRENT_DATE);         --  3
+SELECT extract('millennium', CURRENT_DATE);         --  3
 --
 -- decade
 --
-SELECT EXTRACT(DECADE FROM DATE '1994-12-25');    -- 199
-SELECT EXTRACT(DECADE FROM DATE '0010-01-01');    --   1
-SELECT EXTRACT(DECADE FROM DATE '0009-12-31');    --   0
-SELECT EXTRACT(DECADE FROM DATE '0001-01-01 BC'); --   0
-SELECT EXTRACT(DECADE FROM DATE '0002-12-31 BC'); --  -1
-SELECT EXTRACT(DECADE FROM DATE '0011-01-01 BC'); --  -1
-SELECT EXTRACT(DECADE FROM DATE '0012-12-31 BC'); --  -2
+SELECT extract('decade', DATE '1994-12-25');    -- 199
+SELECT extract('decade', DATE '0010-01-01');    --   1
+SELECT extract('decade', DATE '0009-12-31');    --   0
+SELECT extract('decade', DATE '0001-01-01 BC'); --   0
+SELECT extract('decade', DATE '0002-12-31 BC'); --  -1
+SELECT extract('decade', DATE '0011-01-01 BC'); --  -1
+SELECT extract('decade', DATE '0012-12-31 BC'); --  -2
 --
 -- all possible fields
 --
-SELECT EXTRACT(MICROSECONDS  FROM DATE '2020-08-11');
-SELECT EXTRACT(MILLISECONDS  FROM DATE '2020-08-11');
-SELECT EXTRACT(SECOND        FROM DATE '2020-08-11');
-SELECT EXTRACT(MINUTE        FROM DATE '2020-08-11');
-SELECT EXTRACT(HOUR          FROM DATE '2020-08-11');
-SELECT EXTRACT(DAY           FROM DATE '2020-08-11');
-SELECT EXTRACT(MONTH         FROM DATE '2020-08-11');
-SELECT EXTRACT(YEAR          FROM DATE '2020-08-11');
-SELECT EXTRACT(YEAR          FROM DATE '2020-08-11 BC');
-SELECT EXTRACT(DECADE        FROM DATE '2020-08-11');
-SELECT EXTRACT(CENTURY       FROM DATE '2020-08-11');
-SELECT EXTRACT(MILLENNIUM    FROM DATE '2020-08-11');
-SELECT EXTRACT(ISOYEAR       FROM DATE '2020-08-11');
-SELECT EXTRACT(ISOYEAR       FROM DATE '2020-08-11 BC');
-SELECT EXTRACT(QUARTER       FROM DATE '2020-08-11');
-SELECT EXTRACT(WEEK          FROM DATE '2020-08-11');
-SELECT EXTRACT(DOW           FROM DATE '2020-08-11');
-SELECT EXTRACT(DOW           FROM DATE '2020-08-16');
-SELECT EXTRACT(ISODOW        FROM DATE '2020-08-11');
-SELECT EXTRACT(ISODOW        FROM DATE '2020-08-16');
-SELECT EXTRACT(DOY           FROM DATE '2020-08-11');
-SELECT EXTRACT(TIMEZONE      FROM DATE '2020-08-11');
-SELECT EXTRACT(TIMEZONE_M    FROM DATE '2020-08-11');
-SELECT EXTRACT(TIMEZONE_H    FROM DATE '2020-08-11');
-SELECT EXTRACT(EPOCH         FROM DATE '2020-08-11');
-SELECT EXTRACT(JULIAN        FROM DATE '2020-08-11');
+SELECT extract('microseconds',  DATE '2020-08-11');
+SELECT extract('milliseconds',  DATE '2020-08-11');
+SELECT extract('second',        DATE '2020-08-11');
+SELECT extract('minute',        DATE '2020-08-11');
+SELECT extract('hour',          DATE '2020-08-11');
+SELECT extract('day',           DATE '2020-08-11');
+SELECT extract('month',         DATE '2020-08-11');
+SELECT extract('year',          DATE '2020-08-11');
+SELECT extract('year',          DATE '2020-08-11 BC');
+SELECT extract('decade',        DATE '2020-08-11');
+SELECT extract('century',       DATE '2020-08-11');
+SELECT extract('millennium',    DATE '2020-08-11');
+SELECT extract('isoyear',       DATE '2020-08-11');
+SELECT extract('isoyear',       DATE '2020-08-11 BC');
+SELECT extract('quarter',       DATE '2020-08-11');
+SELECT extract('week',          DATE '2020-08-11');
+SELECT extract('dow',           DATE '2020-08-11');
+SELECT extract('dow',           DATE '2020-08-16');
+SELECT extract('isodow',        DATE '2020-08-11');
+SELECT extract('isodow',        DATE '2020-08-16');
+SELECT extract('doy',           DATE '2020-08-11');
+SELECT extract('timezone',      DATE '2020-08-11');
+SELECT extract('timezone_m',    DATE '2020-08-11');
+SELECT extract('timezone_h',    DATE '2020-08-11');
+SELECT extract('epoch',         DATE '2020-08-11');
+SELECT extract('julian',        DATE '2020-08-11');
 --
 -- test trunc function!
 --
@@ -325,33 +325,33 @@ select isfinite('infinity'::date), isfinite('-infinity'::date), isfinite('today'
 --
 -- oscillating fields from non-finite date:
 --
-SELECT EXTRACT(DAY FROM DATE 'infinity');      -- NULL
-SELECT EXTRACT(DAY FROM DATE '-infinity');     -- NULL
+SELECT extract('day', DATE 'infinity');      -- NULL
+SELECT extract('day', DATE '-infinity');     -- NULL
 -- all supported fields
-SELECT EXTRACT(DAY           FROM DATE 'infinity');    -- NULL
-SELECT EXTRACT(MONTH         FROM DATE 'infinity');    -- NULL
-SELECT EXTRACT(QUARTER       FROM DATE 'infinity');    -- NULL
-SELECT EXTRACT(WEEK          FROM DATE 'infinity');    -- NULL
-SELECT EXTRACT(DOW           FROM DATE 'infinity');    -- NULL
-SELECT EXTRACT(ISODOW        FROM DATE 'infinity');    -- NULL
-SELECT EXTRACT(DOY           FROM DATE 'infinity');    -- NULL
+SELECT extract('day',           DATE 'infinity');    -- NULL
+SELECT extract('month',         DATE 'infinity');    -- NULL
+SELECT extract('quarter',       DATE 'infinity');    -- NULL
+SELECT extract('week',          DATE 'infinity');    -- NULL
+SELECT extract('dow',           DATE 'infinity');    -- NULL
+SELECT extract('isodow',        DATE 'infinity');    -- NULL
+SELECT extract('doy',           DATE 'infinity');    -- NULL
 --
 -- monotonic fields from non-finite date:
 --
-SELECT EXTRACT(EPOCH FROM DATE 'infinity');         --  Infinity
-SELECT EXTRACT(EPOCH FROM DATE '-infinity');        -- -Infinity
+SELECT extract('epoch', DATE 'infinity');         --  Infinity
+SELECT extract('epoch', DATE '-infinity');        -- -Infinity
 -- all supported fields
-SELECT EXTRACT(YEAR       FROM DATE 'infinity');    --  Infinity
-SELECT EXTRACT(DECADE     FROM DATE 'infinity');    --  Infinity
-SELECT EXTRACT(CENTURY    FROM DATE 'infinity');    --  Infinity
-SELECT EXTRACT(MILLENNIUM FROM DATE 'infinity');    --  Infinity
-SELECT EXTRACT(JULIAN     FROM DATE 'infinity');    --  Infinity
-SELECT EXTRACT(ISOYEAR    FROM DATE 'infinity');    --  Infinity
-SELECT EXTRACT(EPOCH      FROM DATE 'infinity');    --  Infinity
+SELECT extract('year',       DATE 'infinity');    --  Infinity
+SELECT extract('decade',     DATE 'infinity');    --  Infinity
+SELECT extract('century',    DATE 'infinity');    --  Infinity
+SELECT extract('millennium', DATE 'infinity');    --  Infinity
+SELECT extract('julian',     DATE 'infinity');    --  Infinity
+SELECT extract('isoyear',    DATE 'infinity');    --  Infinity
+SELECT extract('epoch',      DATE 'infinity');    --  Infinity
 --
 -- wrong fields from non-finite date:
 --
-SELECT EXTRACT(MICROSEC  FROM DATE 'infinity');     -- error
+SELECT extract('microsec',  DATE 'infinity');     -- error
 
 -- test constructors
 select make_date(2013, 7, 15);

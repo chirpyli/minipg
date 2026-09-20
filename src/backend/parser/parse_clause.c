@@ -512,7 +512,6 @@ transformRangeFunction(ParseState *pstate, RangeFunction *r)
 				fc->agg_order == NIL &&
 				!fc->agg_star &&
 				!fc->agg_distinct &&
-				!fc->func_variadic &&
 				coldeflist == NIL)
 			{
 				ListCell   *lc;
@@ -2076,31 +2075,6 @@ addTargetToSortList(ParseState *pstate, TargetEntry *tle,
 									 NULL, &eqop, &sortop,
 									 &hashable);
 			reverse = true;
-			break;
-		case SORTBY_USING:
-			Assert(sortby->useOp != NIL);
-			sortop = compatible_oper_opid(sortby->useOp,
-										  restype,
-										  restype,
-										  false);
-
-			/*
-			 * Verify it's a valid ordering operator, fetch the corresponding
-			 * equality operator, and determine whether to consider it like
-			 * ASC or DESC.
-			 */
-			eqop = get_equality_op_for_ordering_op(sortop, &reverse);
-			if (!OidIsValid(eqop))
-				ereport(ERROR,
-						(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-						 errmsg("operator %s is not a valid ordering operator",
-								strVal(llast(sortby->useOp))),
-						 errhint("Ordering operators must be \"<\" or \">\" members of btree operator families.")));
-
-			/*
-			 * Also see if the equality operator is hashable.
-			 */
-			hashable = op_hashjoinable(eqop, restype);
 			break;
 		default:
 			elog(ERROR, "unrecognized sortby_dir: %d", sortby->sortby_dir);

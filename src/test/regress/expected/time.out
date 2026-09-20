@@ -130,43 +130,43 @@ HINT:  No operator matches the given name and argument types. You might need to 
 --
 -- test EXTRACT
 --
-SELECT EXTRACT(MICROSECOND FROM TIME '2020-05-26 13:30:25.575401');
+SELECT extract('microsecond', TIME '2020-05-26 13:30:25.575401');
  extract  
 ----------
  25575401
 (1 row)
 
-SELECT EXTRACT(MILLISECOND FROM TIME '2020-05-26 13:30:25.575401');
+SELECT extract('millisecond', TIME '2020-05-26 13:30:25.575401');
   extract  
 -----------
  25575.401
 (1 row)
 
-SELECT EXTRACT(SECOND      FROM TIME '2020-05-26 13:30:25.575401');
+SELECT extract('second',      TIME '2020-05-26 13:30:25.575401');
   extract  
 -----------
  25.575401
 (1 row)
 
-SELECT EXTRACT(MINUTE      FROM TIME '2020-05-26 13:30:25.575401');
+SELECT extract('minute',      TIME '2020-05-26 13:30:25.575401');
  extract 
 ---------
       30
 (1 row)
 
-SELECT EXTRACT(HOUR        FROM TIME '2020-05-26 13:30:25.575401');
+SELECT extract('hour',        TIME '2020-05-26 13:30:25.575401');
  extract 
 ---------
       13
 (1 row)
 
-SELECT EXTRACT(DAY         FROM TIME '2020-05-26 13:30:25.575401');  -- error
+SELECT extract('day',         TIME '2020-05-26 13:30:25.575401');  -- error
 ERROR:  "time" units "day" not recognized
-SELECT EXTRACT(FORTNIGHT   FROM TIME '2020-05-26 13:30:25.575401');  -- error
+SELECT extract('fortnight',   TIME '2020-05-26 13:30:25.575401');  -- error
 ERROR:  "time" units "fortnight" not recognized
-SELECT EXTRACT(TIMEZONE    FROM TIME '2020-05-26 13:30:25.575401');  -- error
+SELECT extract('timezone',    TIME '2020-05-26 13:30:25.575401');  -- error
 ERROR:  "time" units "timezone" not recognized
-SELECT EXTRACT(EPOCH       FROM TIME '2020-05-26 13:30:25.575401');
+SELECT extract('epoch',       TIME '2020-05-26 13:30:25.575401');
    extract    
 --------------
  48625.575401

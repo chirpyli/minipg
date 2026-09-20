@@ -1663,9 +1663,7 @@ operator_predicate_proof(Expr *predicate, Node *clause,
 	 * Both expressions must be binary opclauses, else we can't do anything.
 	 *
 	 * Note: in future we might extend this logic to other operator-based
-	 * constructs such as DistinctExpr.  But the planner isn't very smart
-	 * about DistinctExpr in general, and this probably isn't the first place
-	 * to fix if you want to improve that.
+	 * constructs.
 	 */
 	if (!is_opclause(predicate))
 		return false;

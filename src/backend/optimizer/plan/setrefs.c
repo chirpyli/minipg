@@ -1373,12 +1373,6 @@ fix_expr_common(PlannerInfo *root, Node *node)
 		record_plan_function_dependency(root,
 										((OpExpr *) node)->opfuncid);
 	}
-	else if (IsA(node, DistinctExpr))
-	{
-		set_opfuncid((OpExpr *) node);	/* rely on struct equivalence */
-		record_plan_function_dependency(root,
-										((DistinctExpr *) node)->opfuncid);
-	}
 	else if (IsA(node, NullIfExpr))
 	{
 		set_opfuncid((OpExpr *) node);	/* rely on struct equivalence */

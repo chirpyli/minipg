@@ -71,9 +71,6 @@ exprType(const Node *expr)
 		case T_OpExpr:
 			type = ((const OpExpr *) expr)->opresulttype;
 			break;
-		case T_DistinctExpr:
-			type = ((const DistinctExpr *) expr)->opresulttype;
-			break;
 		case T_NullIfExpr:
 			type = ((const NullIfExpr *) expr)->opresulttype;
 			break;
@@ -185,9 +182,6 @@ exprType(const Node *expr)
 			break;
 		case T_CoalesceExpr:
 			type = ((const CoalesceExpr *) expr)->coalescetype;
-			break;
-		case T_MinMaxExpr:
-			type = ((const MinMaxExpr *) expr)->minmaxtype;
 			break;
 		case T_SQLValueFunction:
 			type = ((const SQLValueFunction *) expr)->type;
@@ -389,34 +383,6 @@ exprTypmod(const Node *expr)
 					Node	   *e = (Node *) lfirst(arg);
 
 					if (exprType(e) != coalescetype)
-						return -1;
-					if (exprTypmod(e) != typmod)
-						return -1;
-				}
-				return typmod;
-			}
-			break;
-		case T_MinMaxExpr:
-			{
-				/*
-				 * If all the alternatives agree on type/typmod, return that
-				 * typmod, else use -1
-				 */
-				const MinMaxExpr *mexpr = (const MinMaxExpr *) expr;
-				Oid			minmaxtype = mexpr->minmaxtype;
-				int32		typmod;
-				ListCell   *arg;
-
-				if (exprType((Node *) linitial(mexpr->args)) != minmaxtype)
-					return -1;
-				typmod = exprTypmod((Node *) linitial(mexpr->args));
-				if (typmod < 0)
-					return -1;	/* no point in trying harder */
-				for_each_from(arg, mexpr->args, 1)
-				{
-					Node	   *e = (Node *) lfirst(arg);
-
-					if (exprType(e) != minmaxtype)
 						return -1;
 					if (exprTypmod(e) != typmod)
 						return -1;
@@ -732,9 +698,6 @@ exprCollation(const Node *expr)
 		case T_OpExpr:
 			coll = ((const OpExpr *) expr)->opcollid;
 			break;
-		case T_DistinctExpr:
-			coll = ((const DistinctExpr *) expr)->opcollid;
-			break;
 		case T_NullIfExpr:
 			coll = ((const NullIfExpr *) expr)->opcollid;
 			break;
@@ -836,9 +799,6 @@ exprCollation(const Node *expr)
 		case T_CoalesceExpr:
 			coll = ((const CoalesceExpr *) expr)->coalescecollid;
 			break;
-		case T_MinMaxExpr:
-			coll = ((const MinMaxExpr *) expr)->minmaxcollid;
-			break;
 		case T_SQLValueFunction:
 			/* Returns either NAME or a non-collatable type */
 			if (((const SQLValueFunction *) expr)->type == NAMEOID)
@@ -890,17 +850,11 @@ exprInputCollation(const Node *expr)
 		case T_OpExpr:
 			coll = ((const OpExpr *) expr)->inputcollid;
 			break;
-		case T_DistinctExpr:
-			coll = ((const DistinctExpr *) expr)->inputcollid;
-			break;
 		case T_NullIfExpr:
 			coll = ((const NullIfExpr *) expr)->inputcollid;
 			break;
 		case T_ScalarArrayOpExpr:
 			coll = ((const ScalarArrayOpExpr *) expr)->inputcollid;
-			break;
-		case T_MinMaxExpr:
-			coll = ((const MinMaxExpr *) expr)->inputcollid;
 			break;
 		default:
 			coll = InvalidOid;
@@ -944,9 +898,6 @@ exprSetCollation(Node *expr, Oid collation)
 			break;
 		case T_OpExpr:
 			((OpExpr *) expr)->opcollid = collation;
-			break;
-		case T_DistinctExpr:
-			((DistinctExpr *) expr)->opcollid = collation;
 			break;
 		case T_NullIfExpr:
 			((NullIfExpr *) expr)->opcollid = collation;
@@ -1018,9 +969,6 @@ exprSetCollation(Node *expr, Oid collation)
 		case T_CoalesceExpr:
 			((CoalesceExpr *) expr)->coalescecollid = collation;
 			break;
-		case T_MinMaxExpr:
-			((MinMaxExpr *) expr)->minmaxcollid = collation;
-			break;
 		case T_SQLValueFunction:
 			Assert((((SQLValueFunction *) expr)->type == NAMEOID) ?
 				   (collation == C_COLLATION_OID) :
@@ -1060,17 +1008,11 @@ exprSetInputCollation(Node *expr, Oid inputcollation)
 		case T_OpExpr:
 			((OpExpr *) expr)->inputcollid = inputcollation;
 			break;
-		case T_DistinctExpr:
-			((DistinctExpr *) expr)->inputcollid = inputcollation;
-			break;
 		case T_NullIfExpr:
 			((NullIfExpr *) expr)->inputcollid = inputcollation;
 			break;
 		case T_ScalarArrayOpExpr:
 			((ScalarArrayOpExpr *) expr)->inputcollid = inputcollation;
-			break;
-		case T_MinMaxExpr:
-			((MinMaxExpr *) expr)->inputcollid = inputcollation;
 			break;
 		default:
 			break;
@@ -1155,7 +1097,6 @@ exprLocation(const Node *expr)
 			}
 			break;
 		case T_OpExpr:
-		case T_DistinctExpr:	/* struct-equivalent to OpExpr */
 		case T_NullIfExpr:		/* struct-equivalent to OpExpr */
 			{
 				const OpExpr *opexpr = (const OpExpr *) expr;
@@ -1263,10 +1204,6 @@ exprLocation(const Node *expr)
 		case T_CoalesceExpr:
 			/* COALESCE keyword should always be the first thing */
 			loc = ((const CoalesceExpr *) expr)->location;
-			break;
-		case T_MinMaxExpr:
-			/* GREATEST/LEAST keyword should always be the first thing */
-			loc = ((const MinMaxExpr *) expr)->location;
 			break;
 		case T_SQLValueFunction:
 			/* function keyword should always be the first thing */
@@ -1426,8 +1363,6 @@ fix_opfuncids_walker(Node *node, void *context)
 		return false;
 	if (IsA(node, OpExpr))
 		set_opfuncid((OpExpr *) node);
-	else if (IsA(node, DistinctExpr))
-		set_opfuncid((OpExpr *) node);	/* rely on struct equivalence */
 	else if (IsA(node, NullIfExpr))
 		set_opfuncid((OpExpr *) node);	/* rely on struct equivalence */
 	else if (IsA(node, ScalarArrayOpExpr))
@@ -1441,7 +1376,7 @@ fix_opfuncids_walker(Node *node, void *context)
  *		if it hasn't been set already.
  *
  * Because of struct equivalence, this can also be used for
- * DistinctExpr and NullIfExpr nodes.
+ * NullIfExpr nodes.
  */
 void
 set_opfuncid(OpExpr *opexpr)
@@ -1476,7 +1411,7 @@ set_sa_opfuncid(ScalarArrayOpExpr *opexpr)
  * for themselves, in case additional checks should be made, or because they
  * have special rules about which parts of the tree need to be visited.
  *
- * Note: we ignore MinMaxExpr, SQLValueFunction,
+ * Note: we ignore SQLValueFunction,
  * and NextValueExpr nodes, because they do not contain SQL function OIDs.
  * However, they can invoke SQL-visible functions, so callers should take
  * thought about how to treat them.
@@ -1504,7 +1439,6 @@ check_functions_in_node(Node *node, check_function_callback checker,
 			}
 			break;
 		case T_OpExpr:
-		case T_DistinctExpr:	/* struct-equivalent to OpExpr */
 		case T_NullIfExpr:		/* struct-equivalent to OpExpr */
 			{
 				OpExpr	   *expr = (OpExpr *) node;
@@ -1724,7 +1658,6 @@ expression_tree_walker(Node *node,
 		case T_NamedArgExpr:
 			return walker(((NamedArgExpr *) node)->arg, context);
 		case T_OpExpr:
-		case T_DistinctExpr:	/* struct-equivalent to OpExpr */
 		case T_NullIfExpr:		/* struct-equivalent to OpExpr */
 			{
 				OpExpr	   *expr = (OpExpr *) node;
@@ -1838,8 +1771,6 @@ expression_tree_walker(Node *node,
 			return walker(((RowExpr *) node)->args, context);
 		case T_CoalesceExpr:
 			return walker(((CoalesceExpr *) node)->args, context);
-		case T_MinMaxExpr:
-			return walker(((MinMaxExpr *) node)->args, context);
 		case T_NullTest:
 			return walker(((NullTest *) node)->arg, context);
 		case T_BooleanTest:
@@ -2251,16 +2182,6 @@ expression_tree_mutator(Node *node,
 				return (Node *) newnode;
 			}
 			break;
-		case T_DistinctExpr:
-			{
-				DistinctExpr *expr = (DistinctExpr *) node;
-				DistinctExpr *newnode;
-
-				FLATCOPY(newnode, expr, DistinctExpr);
-				MUTATE(newnode->args, expr->args, List *);
-				return (Node *) newnode;
-			}
-			break;
 		case T_NullIfExpr:
 			{
 				NullIfExpr *expr = (NullIfExpr *) node;
@@ -2455,16 +2376,6 @@ expression_tree_mutator(Node *node,
 
 				FLATCOPY(newnode, coalesceexpr, CoalesceExpr);
 				MUTATE(newnode->args, coalesceexpr->args, List *);
-				return (Node *) newnode;
-			}
-			break;
-		case T_MinMaxExpr:
-			{
-				MinMaxExpr *minmaxexpr = (MinMaxExpr *) node;
-				MinMaxExpr *newnode;
-
-				FLATCOPY(newnode, minmaxexpr, MinMaxExpr);
-				MUTATE(newnode->args, minmaxexpr->args, List *);
 				return (Node *) newnode;
 			}
 			break;
@@ -2872,8 +2783,6 @@ raw_expression_tree_walker(Node *node,
 			return walker(((RowExpr *) node)->args, context);
 		case T_CoalesceExpr:
 			return walker(((CoalesceExpr *) node)->args, context);
-		case T_MinMaxExpr:
-			return walker(((MinMaxExpr *) node)->args, context);
 		case T_NullTest:
 			return walker(((NullTest *) node)->arg, context);
 		case T_BooleanTest:

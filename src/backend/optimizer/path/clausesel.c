@@ -750,7 +750,7 @@ clause_selectivity_ext(PlannerInfo *root,
 									   sjinfo,
 									   use_extended_stats);
 	}
-	else if (is_opclause(clause) || IsA(clause, DistinctExpr))
+	else if (is_opclause(clause))
 	{
 		OpExpr	   *opclause = (OpExpr *) clause;
 		Oid			opno = opclause->opno;
@@ -773,14 +773,6 @@ clause_selectivity_ext(PlannerInfo *root,
 										 varRelid);
 		}
 
-		/*
-		 * DistinctExpr has the same representation as OpExpr, but the
-		 * contained operator is "=" not "<>", so we must negate the result.
-		 * This estimation method doesn't give the right behavior for nulls,
-		 * but it's better than doing nothing.
-		 */
-		if (IsA(clause, DistinctExpr))
-			s1 = 1.0 - s1;
 	}
 	else if (is_funcclause(clause))
 	{

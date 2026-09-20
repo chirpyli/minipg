@@ -268,9 +268,6 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 %type <node>	join_qual
 %type <jtype>	join_type
 
-%type <list>	extract_list overlay_list position_list
-%type <list>	substr_list trim_list
-
 %type <boolean> opt_unique opt_concurrently opt_verbose opt_full
 %type <boolean> opt_freeze opt_analyze
 
@@ -293,7 +290,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 				columnref in_expr having_clause func_table array_expr
 %type <list>	rowsfrom_item rowsfrom_list opt_col_def_list
 %type <boolean> opt_ordinality
-%type <list>	func_arg_list func_arg_list_opt
+%type <list>	func_arg_list
 %type <node>	func_arg_expr
 %type <list>	array_expr_list
 %type <node>	case_expr case_arg when_clause case_default
@@ -313,12 +310,11 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 
 
 %type <typnam>	Typename SimpleTypename ConstTypename
-				GenericType Numeric opt_float
+				GenericType Numeric
 				Character ConstCharacter
 				CharacterWithLength CharacterWithoutLength
 				ConstDatetime
 %type <str>		character
-%type <str>		extract_arg
 %type <boolean> opt_varying opt_timezone
 
 %type <ival>	Iconst SignedIconst
@@ -364,10 +360,9 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 /* ordinary key words in alphabetical order */
 %token <keyword> ABORT_P ADD_P
 	ALL ALTER ANALYSE ANALYZE AND ANY ARRAY AS ASC
-	AT
 
 	BEGIN_P BETWEEN BIGINT
-	BOOLEAN_P BOTH BY
+	BOOLEAN_P BY
 
 	CASCADE CASE CAST CHAR_P
 	CHARACTER CHARACTERISTICS CHECKPOINT
@@ -378,23 +373,23 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 	CURRENT_CATALOG CURRENT_DATE CURRENT_SCHEMA
 	CURRENT_TIMESTAMP
 
-	DATA_P DATABASE DAY_P DEFAULT
+	DATA_P DATABASE DEFAULT
 	DEFERRABLE DELETE_P DESC
 	DISTINCT
 	DOUBLE_P DROP
 
-	ELSE ENCODING END_P ESCAPE
+	ELSE ENCODING END_P
 	EXISTS EXPLAIN
-	EXTENSION EXTRACT
+	EXTENSION
 
 	FALSE_P FIRST_P FLOAT_P FOR
 	FORCE FREEZE FROM FULL
 
-	GREATEST GROUP_P
+	GROUP_P
 
-	HAVING HOUR_P
+	HAVING
 
-	IF_P ILIKE IN_P INCLUDE
+	IF_P IN_P INCLUDE
 	INDEX
 	INNER_P INSERT INT_P INTEGER
 	INTO IS ISOLATION
@@ -404,10 +399,8 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 	KEY
 
 	LAST_P LATERAL_P
-	LEADING LEAST LEFT LEVEL LIKE LIMIT LOCAL
+	LEFT LEVEL LIKE LIMIT LOCAL
 	LOCALTIME LOCALTIMESTAMP
-
-	MINUTE_P MONTH_P
 
 	NAMES NATURAL NONE
 	NOT NULL_P NULLIF
@@ -415,10 +408,8 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 
 	ON ONLY OPERATOR OR
 	ORDER ORDINALITY OUTER_P
-	OVERLAY
 
-	PLACING
-	POSITION PRECISION PREPARE PREPARED PRIMARY
+	PRECISION PREPARE PREPARED PRIMARY
 
 
 
@@ -428,27 +419,23 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 	RESET RESTRICT RIGHT ROLLBACK
 	ROWS
 
-	SAVEPOINT SCHEMA SECOND_P SELECT
+	SAVEPOINT SCHEMA SELECT
 	SERIALIZABLE SESSION SET SHOW
 	SMALLINT SNAPSHOT SOME
 	START STATISTICS STORAGE
-	SUBSTRING
 
 	TABLE TABLESAMPLE TEMPLATE THEN
-	TIME TIMESTAMP TO TRAILING TRANSACTION
-	TRIM TRUE_P
+	TIME TIMESTAMP TO TRANSACTION
+	TRUE_P
 	TRUNCATE TYPE_P
 
 	UNCOMMITTED UNIQUE UNKNOWN
 	UPDATE USING
 
-	VACUUM VALUES VARCHAR VARIADIC VARYING
+	VACUUM VALUES VARCHAR VARYING
 	VERBOSE VERSION_P VIEW
 
 	WHEN WHERE WITH WITHOUT WORK WRITE
-
-
-	YEAR_P
 
 	ZONE
 
@@ -481,8 +468,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 %right		NOT
 %nonassoc	IS				/* IS sets precedence for IS NULL, etc */
 %nonassoc	'<' '>' '=' LESS_EQUALS GREATER_EQUALS NOT_EQUALS
-%nonassoc	BETWEEN IN_P LIKE ILIKE NOT_LA
-%nonassoc	ESCAPE			/* ESCAPE must be just above LIKE/ILIKE */
+%nonassoc	BETWEEN IN_P LIKE NOT_LA
 /*
  * To support target_el without AS, it used to be necessary to assign IDENT an
  * explicit precedence just less than Op.  While that's not really necessary
@@ -500,7 +486,6 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 %left		'*' '/' '%'
 %left		'^'
 /* Unary Operators */
-%left		AT				/* sets precedence for AT TIME ZONE */
 %right		UMINUS
 %left		'[' ']'
 %left		'(' ')'
@@ -2656,23 +2641,13 @@ sortby_list:
 			| sortby_list ',' sortby				{ $$ = lappend($1, $3); }
 		;
 
-sortby:		a_expr USING qual_all_Op opt_nulls_order
-				{
-					$$ = makeNode(SortBy);
-					$$->node = $1;
-					$$->sortby_dir = SORTBY_USING;
-					$$->sortby_nulls = $4;
-					$$->useOp = $3;
-					$$->location = @3;
-				}
-			| a_expr opt_asc_desc opt_nulls_order
+sortby:		a_expr opt_asc_desc opt_nulls_order
 				{
 					$$ = makeNode(SortBy);
 					$$->node = $1;
 					$$->sortby_dir = $2;
 					$$->sortby_nulls = $3;
-					$$->useOp = NIL;
-					$$->location = -1;		/* no operator */
+					$$->location = -1;
 				}
 		;
 
@@ -3340,9 +3315,9 @@ Numeric:	INT_P
 					$$ = SystemTypeName("float4");
 					$$->location = @1;
 				}
-			| FLOAT_P opt_float
+			| FLOAT_P
 				{
-					$$ = $2;
+					$$ = SystemTypeName("float8");
 					$$->location = @1;
 				}
 			| DOUBLE_P PRECISION
@@ -3354,33 +3329,6 @@ Numeric:	INT_P
 				{
 					$$ = SystemTypeName("bool");
 					$$->location = @1;
-				}
-		;
-
-opt_float:	'(' Iconst ')'
-				{
-					/*
-					 * Check FLOAT() precision limits assuming IEEE floating
-					 * types - thomas 1997-09-18
-					 */
-					if ($2 < 1)
-						ereport(ERROR,
-								(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-								 errmsg("precision for type float must be at least 1 bit"),
-								 parser_errposition(@2)));
-					else if ($2 <= 24)
-						$$ = SystemTypeName("float4");
-					else if ($2 <= 53)
-						$$ = SystemTypeName("float8");
-					else
-						ereport(ERROR,
-								(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-								 errmsg("precision for type float must be less than 54 bits"),
-								 parser_errposition(@2)));
-				}
-			| /*EMPTY*/
-				{
-					$$ = SystemTypeName("float8");
 				}
 		;
 
@@ -3532,14 +3480,7 @@ opt_timezone:
 a_expr:		c_expr									{ $$ = $1; }
 			| a_expr TYPECAST Typename
 					{ $$ = makeTypeCast($1, $3, @2); }
-			| a_expr AT TIME ZONE a_expr			%prec AT
-				{
-					$$ = (Node *) makeFuncCall(SystemFuncName("timezone"),
-											   list_make2($5, $1),
-											   COERCE_SQL_SYNTAX,
-											   @2);
-				}
-		/*
+			/*
 		 * These operators must be called out explicitly in order to make use
 		 * of bison's automatic operator-precedence handling.  All other
 		 * operator names are handled by the generic productions using "Op",
@@ -3596,58 +3537,11 @@ a_expr:		c_expr									{ $$ = $1; }
 					$$ = (Node *) makeSimpleA_Expr(AEXPR_LIKE, "~~",
 												   $1, $3, @2);
 				}
-			| a_expr LIKE a_expr ESCAPE a_expr					%prec LIKE
-				{
-					FuncCall *n = makeFuncCall(SystemFuncName("like_escape"),
-											   list_make2($3, $5),
-											   COERCE_EXPLICIT_CALL,
-											   @2);
-					$$ = (Node *) makeSimpleA_Expr(AEXPR_LIKE, "~~",
-												   $1, (Node *) n, @2);
-				}
 			| a_expr NOT_LA LIKE a_expr							%prec NOT_LA
 				{
 					$$ = (Node *) makeSimpleA_Expr(AEXPR_LIKE, "!~~",
 												   $1, $4, @2);
 				}
-			| a_expr NOT_LA LIKE a_expr ESCAPE a_expr			%prec NOT_LA
-				{
-					FuncCall *n = makeFuncCall(SystemFuncName("like_escape"),
-											   list_make2($4, $6),
-											   COERCE_EXPLICIT_CALL,
-											   @2);
-					$$ = (Node *) makeSimpleA_Expr(AEXPR_LIKE, "!~~",
-												   $1, (Node *) n, @2);
-				}
-			| a_expr ILIKE a_expr
-				{
-					$$ = (Node *) makeSimpleA_Expr(AEXPR_ILIKE, "~~*",
-												   $1, $3, @2);
-				}
-			| a_expr ILIKE a_expr ESCAPE a_expr					%prec ILIKE
-				{
-					FuncCall *n = makeFuncCall(SystemFuncName("like_escape"),
-											   list_make2($3, $5),
-											   COERCE_EXPLICIT_CALL,
-											   @2);
-					$$ = (Node *) makeSimpleA_Expr(AEXPR_ILIKE, "~~*",
-												   $1, (Node *) n, @2);
-				}
-			| a_expr NOT_LA ILIKE a_expr						%prec NOT_LA
-				{
-					$$ = (Node *) makeSimpleA_Expr(AEXPR_ILIKE, "!~~*",
-												   $1, $4, @2);
-				}
-			| a_expr NOT_LA ILIKE a_expr ESCAPE a_expr			%prec NOT_LA
-				{
-					FuncCall *n = makeFuncCall(SystemFuncName("like_escape"),
-											   list_make2($4, $6),
-											   COERCE_EXPLICIT_CALL,
-											   @2);
-					$$ = (Node *) makeSimpleA_Expr(AEXPR_ILIKE, "!~~*",
-												   $1, (Node *) n, @2);
-				}
-
 			/* NullTest clause
 			 * Define SQL-style Null test clause.
 			 * Allow two forms described in the standard:
@@ -3669,62 +3563,6 @@ a_expr:		c_expr									{ $$ = $1; }
 					n->nulltesttype = IS_NOT_NULL;
 					n->location = @2;
 					$$ = (Node *)n;
-				}
-			| a_expr IS TRUE_P							%prec IS
-				{
-					BooleanTest *b = makeNode(BooleanTest);
-					b->arg = (Expr *) $1;
-					b->booltesttype = IS_TRUE;
-					b->location = @2;
-					$$ = (Node *)b;
-				}
-			| a_expr IS NOT TRUE_P						%prec IS
-				{
-					BooleanTest *b = makeNode(BooleanTest);
-					b->arg = (Expr *) $1;
-					b->booltesttype = IS_NOT_TRUE;
-					b->location = @2;
-					$$ = (Node *)b;
-				}
-			| a_expr IS FALSE_P							%prec IS
-				{
-					BooleanTest *b = makeNode(BooleanTest);
-					b->arg = (Expr *) $1;
-					b->booltesttype = IS_FALSE;
-					b->location = @2;
-					$$ = (Node *)b;
-				}
-			| a_expr IS NOT FALSE_P						%prec IS
-				{
-					BooleanTest *b = makeNode(BooleanTest);
-					b->arg = (Expr *) $1;
-					b->booltesttype = IS_NOT_FALSE;
-					b->location = @2;
-					$$ = (Node *)b;
-				}
-			| a_expr IS UNKNOWN							%prec IS
-				{
-					BooleanTest *b = makeNode(BooleanTest);
-					b->arg = (Expr *) $1;
-					b->booltesttype = IS_UNKNOWN;
-					b->location = @2;
-					$$ = (Node *)b;
-				}
-			| a_expr IS NOT UNKNOWN						%prec IS
-				{
-					BooleanTest *b = makeNode(BooleanTest);
-					b->arg = (Expr *) $1;
-					b->booltesttype = IS_NOT_UNKNOWN;
-					b->location = @2;
-					$$ = (Node *)b;
-				}
-			| a_expr IS DISTINCT FROM a_expr			%prec IS
-				{
-					$$ = (Node *) makeSimpleA_Expr(AEXPR_DISTINCT, "=", $1, $5, @2);
-				}
-			| a_expr IS NOT DISTINCT FROM a_expr		%prec IS
-				{
-					$$ = (Node *) makeSimpleA_Expr(AEXPR_NOT_DISTINCT, "=", $1, $6, @2);
 				}
 			| a_expr BETWEEN b_expr AND a_expr		%prec BETWEEN
 				{
@@ -3846,14 +3684,6 @@ b_expr:		c_expr
 				{ $$ = (Node *) makeA_Expr(AEXPR_OP, $2, $1, $3, @2); }
 			| qual_Op b_expr					%prec Op
 				{ $$ = (Node *) makeA_Expr(AEXPR_OP, $1, NULL, $2, @1); }
-			| b_expr IS DISTINCT FROM b_expr		%prec IS
-				{
-					$$ = (Node *) makeSimpleA_Expr(AEXPR_DISTINCT, "=", $1, $5, @2);
-				}
-			| b_expr IS NOT DISTINCT FROM b_expr	%prec IS
-				{
-					$$ = (Node *) makeSimpleA_Expr(AEXPR_NOT_DISTINCT, "=", $1, $6, @2);
-				}
 		;
 
 /*
@@ -3973,24 +3803,6 @@ func_application: func_name '(' ')'
 					n->agg_order = $4;
 					$$ = (Node *)n;
 				}
-			| func_name '(' VARIADIC func_arg_expr opt_sort_clause ')'
-				{
-					FuncCall *n = makeFuncCall($1, list_make1($4),
-											   COERCE_EXPLICIT_CALL,
-											   @1);
-					n->func_variadic = true;
-					n->agg_order = $5;
-					$$ = (Node *)n;
-				}
-			| func_name '(' func_arg_list ',' VARIADIC func_arg_expr opt_sort_clause ')'
-				{
-					FuncCall *n = makeFuncCall($1, lappend($3, $6),
-											   COERCE_EXPLICIT_CALL,
-											   @1);
-					n->func_variadic = true;
-					n->agg_order = $7;
-					$$ = (Node *)n;
-				}
 			| func_name '(' ALL func_arg_list opt_sort_clause ')'
 				{
 					FuncCall *n = makeFuncCall($1, $4,
@@ -4094,97 +3906,6 @@ func_expr_common_subexpr:
 				}
 			| CAST '(' a_expr AS Typename ')'
 				{ $$ = makeTypeCast($3, $5, @1); }
-			| EXTRACT '(' extract_list ')'
-				{
-					$$ = (Node *) makeFuncCall(SystemFuncName("extract"),
-											   $3,
-											   COERCE_SQL_SYNTAX,
-											   @1);
-				}
-			| OVERLAY '(' overlay_list ')'
-				{
-					$$ = (Node *) makeFuncCall(SystemFuncName("overlay"),
-											   $3,
-											   COERCE_SQL_SYNTAX,
-											   @1);
-				}
-			| OVERLAY '(' func_arg_list_opt ')'
-				{
-					/*
-					 * allow functions named overlay() to be called without
-					 * special syntax
-					 */
-					$$ = (Node *) makeFuncCall(list_make1(makeString("overlay")),
-											   $3,
-											   COERCE_EXPLICIT_CALL,
-											   @1);
-				}
-			| POSITION '(' position_list ')'
-				{
-					/*
-					 * position(A in B) is converted to position(B, A)
-					 *
-					 * We deliberately don't offer a "plain syntax" option
-					 * for position(), because the reversal of the arguments
-					 * creates too much risk of confusion.
-					 */
-					$$ = (Node *) makeFuncCall(SystemFuncName("position"),
-											   $3,
-											   COERCE_SQL_SYNTAX,
-											   @1);
-				}
-			| SUBSTRING '(' substr_list ')'
-				{
-					/* substring(A from B for C) is converted to
-					 * substring(A, B, C) - thomas 2000-11-28
-					 */
-					$$ = (Node *) makeFuncCall(SystemFuncName("substring"),
-											   $3,
-											   COERCE_SQL_SYNTAX,
-											   @1);
-				}
-			| SUBSTRING '(' func_arg_list_opt ')'
-				{
-					/*
-					 * allow functions named substring() to be called without
-					 * special syntax
-					 */
-					$$ = (Node *) makeFuncCall(list_make1(makeString("substring")),
-											   $3,
-											   COERCE_EXPLICIT_CALL,
-											   @1);
-				}
-			| TRIM '(' BOTH trim_list ')'
-				{
-					/* various trim expressions are defined in SQL
-					 * - thomas 1997-07-19
-					 */
-					$$ = (Node *) makeFuncCall(SystemFuncName("btrim"),
-											   $4,
-											   COERCE_SQL_SYNTAX,
-											   @1);
-				}
-			| TRIM '(' LEADING trim_list ')'
-				{
-					$$ = (Node *) makeFuncCall(SystemFuncName("ltrim"),
-											   $4,
-											   COERCE_SQL_SYNTAX,
-											   @1);
-				}
-			| TRIM '(' TRAILING trim_list ')'
-				{
-					$$ = (Node *) makeFuncCall(SystemFuncName("rtrim"),
-											   $4,
-											   COERCE_SQL_SYNTAX,
-											   @1);
-				}
-			| TRIM '(' trim_list ')'
-				{
-					$$ = (Node *) makeFuncCall(SystemFuncName("btrim"),
-											   $3,
-											   COERCE_SQL_SYNTAX,
-											   @1);
-				}
 			| NULLIF '(' a_expr ',' a_expr ')'
 				{
 					$$ = (Node *) makeSimpleA_Expr(AEXPR_NULLIF, "=", $3, $5, @1);
@@ -4195,22 +3916,6 @@ func_expr_common_subexpr:
 					c->args = $3;
 					c->location = @1;
 					$$ = (Node *)c;
-				}
-			| GREATEST '(' expr_list ')'
-				{
-					MinMaxExpr *v = makeNode(MinMaxExpr);
-					v->args = $3;
-					v->op = IS_GREATEST;
-					v->location = @1;
-					$$ = (Node *)v;
-				}
-			| LEAST '(' expr_list ')'
-				{
-					MinMaxExpr *v = makeNode(MinMaxExpr);
-					v->args = $3;
-					v->op = IS_LEAST;
-					v->location = @1;
-					$$ = (Node *)v;
 				}
 		;
 
@@ -4270,10 +3975,6 @@ subquery_Op:
 					{ $$ = list_make1(makeString("~~")); }
 			| NOT_LA LIKE
 					{ $$ = list_make1(makeString("!~~")); }
-			| ILIKE
-					{ $$ = list_make1(makeString("~~*")); }
-			| NOT_LA ILIKE
-					{ $$ = list_make1(makeString("!~~*")); }
 			;
 
 expr_list:	a_expr
@@ -4321,11 +4022,6 @@ func_arg_expr:  a_expr
 				}
 		;
 
-func_arg_list_opt:	func_arg_list					{ $$ = $1; }
-			| /*EMPTY*/								{ $$ = NIL; }
-		;
-
-
 array_expr: '[' expr_list ']'
 				{
 					$$ = makeAArrayExpr($2, @1);
@@ -4344,95 +4040,6 @@ array_expr_list: array_expr							{ $$ = list_make1($1); }
 			| array_expr_list ',' array_expr		{ $$ = lappend($1, $3); }
 		;
 
-
-extract_list:
-			extract_arg FROM a_expr
-				{
-					$$ = list_make2(makeStringConst($1, @1), $3);
-				}
-		;
-
-/* Allow delimited string Sconst in extract_arg as an SQL extension.
- * - thomas 2001-04-12
- */
-extract_arg:
-			IDENT									{ $$ = $1; }
-			| YEAR_P								{ $$ = "year"; }
-			| MONTH_P								{ $$ = "month"; }
-			| DAY_P									{ $$ = "day"; }
-			| HOUR_P								{ $$ = "hour"; }
-			| MINUTE_P								{ $$ = "minute"; }
-			| SECOND_P								{ $$ = "second"; }
-			| Sconst								{ $$ = $1; }
-		;
-
-/* OVERLAY() arguments */
-overlay_list:
-			a_expr PLACING a_expr FROM a_expr FOR a_expr
-				{
-					/* overlay(A PLACING B FROM C FOR D) is converted to overlay(A, B, C, D) */
-					$$ = list_make4($1, $3, $5, $7);
-				}
-			| a_expr PLACING a_expr FROM a_expr
-				{
-					/* overlay(A PLACING B FROM C) is converted to overlay(A, B, C) */
-					$$ = list_make3($1, $3, $5);
-				}
-		;
-
-/* position_list uses b_expr not a_expr to avoid conflict with general IN */
-position_list:
-			b_expr IN_P b_expr						{ $$ = list_make2($3, $1); }
-		;
-
-/*
- * SUBSTRING() arguments
- *
- * Note that SQL:1999 has both
- *     text FROM int FOR int
- * and
- *     text FROM pattern FOR escape
- *
- * In the parser we map them both to a call to the substring() function and
- * rely on type resolution to pick the right one.
- */
-substr_list:
-			a_expr FROM a_expr FOR a_expr
-				{
-					$$ = list_make3($1, $3, $5);
-				}
-			| a_expr FOR a_expr FROM a_expr
-				{
-					/* not legal per SQL, but might as well allow it */
-					$$ = list_make3($1, $5, $3);
-				}
-			| a_expr FROM a_expr
-				{
-					$$ = list_make2($1, $3);
-				}
-			| a_expr FOR a_expr
-				{
-					/* not legal per SQL */
-
-					/*
-					 * Since there are no cases where this syntax allows
-					 * a textual FOR value, we forcibly cast the argument
-					 * to int4.  The possible matches in pg_proc are
-					 * substring(text,int4) and substring(text,text),
-					 * and we don't want the parser to choose the latter,
-					 * which it is likely to do if the second argument
-					 * is unknown or doesn't have an implicit cast to int4.
-					 */
-					$$ = list_make3($1, makeIntConst(1, -1),
-									makeTypeCast($3,
-												 SystemTypeName("int4"), -1));
-				}
-		;
-
-trim_list:	a_expr FROM expr_list					{ $$ = lappend($3, $1); }
-			| FROM expr_list						{ $$ = $2; }
-			| expr_list								{ $$ = $1; }
-		;
 
 in_expr:	select_with_parens
 				{
@@ -4823,7 +4430,6 @@ unreserved_keyword:
 			  ABORT_P
 			| ADD_P
 			| ALTER
-			| AT
 			| BEGIN_P
 			| BY
 			| CASCADE
@@ -4835,17 +4441,14 @@ unreserved_keyword:
 			| CURRENT_P
 			| DATA_P
 			| DATABASE
-			| DAY_P
 			| DELETE_P
 			| DOUBLE_P
 			| DROP
 			| ENCODING
-			| ESCAPE
 			| EXPLAIN
 			| EXTENSION
 			| FIRST_P
 			| FORCE
-			| HOUR_P
 			| IF_P
 			| INCLUDE
 			| INDEX
@@ -4855,8 +4458,6 @@ unreserved_keyword:
 			| LAST_P
 			| LEVEL
 			| LOCAL
-			| MINUTE_P
-			| MONTH_P
 			| NAMES
 			| NULLS_P
 			| OPERATOR
@@ -4873,7 +4474,6 @@ unreserved_keyword:
 			| ROWS
 			| SAVEPOINT
 			| SCHEMA
-			| SECOND_P
 			| SERIALIZABLE
 			| SESSION
 			| SET
@@ -4897,7 +4497,6 @@ unreserved_keyword:
 			| WITHOUT
 			| WORK
 			| WRITE
-			| YEAR_P
 			| ZONE
 		;
 
@@ -4919,23 +4518,16 @@ col_name_keyword:
 			| CHARACTER
 			| COALESCE
 			| EXISTS
-			| EXTRACT
 			| FLOAT_P
-			| GREATEST
 			| INT_P
 			| INTEGER
-			| LEAST
 			| NONE
 			| NULLIF
-			| OVERLAY
-			| POSITION
 			| PRECISION
 			| REAL
 			| SMALLINT
-			| SUBSTRING
 			| TIME
 			| TIMESTAMP
-			| TRIM
 			| VALUES
 			| VARCHAR
 		;
@@ -4956,7 +4548,6 @@ type_func_name_keyword:
 			| CURRENT_SCHEMA
 			| FREEZE
 			| FULL
-			| ILIKE
 			| INNER_P
 			| IS
 			| JOIN
@@ -4984,7 +4575,6 @@ reserved_keyword:
 			| ARRAY
 			| AS
 			| ASC
-			| BOTH
 			| CASE
 			| CAST
 			| COLUMN
@@ -5007,7 +4597,6 @@ reserved_keyword:
 			| IN_P
 			| INTO
 			| LATERAL_P
-			| LEADING
 			| LIMIT
 			| LOCALTIME
 			| LOCALTIMESTAMP
@@ -5017,18 +4606,15 @@ reserved_keyword:
 			| ONLY
 			| OR
 			| ORDER
-			| PLACING
 			| PRIMARY
 			| SELECT
 			| SOME
 			| TABLE
 			| THEN
 			| TO
-			| TRAILING
 			| TRUE_P
 			| UNIQUE
 			| USING
-			| VARIADIC
 			| WHEN
 			| WHERE
 			| WITH
@@ -5053,12 +4639,10 @@ bare_label_keyword:
 			| AND
 			| ANY
 			| ASC
-			| AT
 			| BEGIN_P
 			| BETWEEN
 			| BIGINT
 			| BOOLEAN_P
-			| BOTH
 			| BY
 			| CASCADE
 			| CASE
@@ -5090,20 +4674,16 @@ bare_label_keyword:
 			| ELSE
 			| ENCODING
 			| END_P
-			| ESCAPE
 			| EXISTS
 			| EXPLAIN
 			| EXTENSION
-			| EXTRACT
 			| FALSE_P
 			| FIRST_P
 			| FLOAT_P
 			| FORCE
 			| FREEZE
 			| FULL
-			| GREATEST
 			| IF_P
-			| ILIKE
 			| IN_P
 			| INCLUDE
 			| INDEX
@@ -5117,8 +4697,6 @@ bare_label_keyword:
 			| KEY
 			| LAST_P
 			| LATERAL_P
-			| LEADING
-			| LEAST
 			| LEFT
 			| LEVEL
 			| LIKE
@@ -5137,9 +4715,6 @@ bare_label_keyword:
 			| OR
 			| ORDINALITY
 			| OUTER_P
-			| OVERLAY
-			| PLACING
-			| POSITION
 			| PREPARE
 			| PREPARED
 			| PRIMARY
@@ -5167,7 +4742,6 @@ bare_label_keyword:
 			| START
 			| STATISTICS
 			| STORAGE
-			| SUBSTRING
 			| TABLE
 
 			| TABLESAMPLE
@@ -5175,9 +4749,7 @@ bare_label_keyword:
 			| THEN
 			| TIME
 			| TIMESTAMP
-			| TRAILING
 			| TRANSACTION
-			| TRIM
 			| TRUE_P
 			| TRUNCATE
 			| TYPE_P
@@ -5189,7 +4761,6 @@ bare_label_keyword:
 			| VACUUM
 			| VALUES
 			| VARCHAR
-			| VARIADIC
 			| VERBOSE
 			| VERSION_P
 			| VIEW

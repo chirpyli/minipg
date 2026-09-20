@@ -82,38 +82,38 @@ SELECT CAST(name 'namefield' AS varchar) AS "varchar(name)";
 --
 
 -- E021-09 trim function
-SELECT TRIM(BOTH FROM '  bunch o blanks  ') = 'bunch o blanks' AS "bunch o blanks";
+SELECT btrim('  bunch o blanks  ') = 'bunch o blanks' AS "bunch o blanks";
 
-SELECT TRIM(LEADING FROM '  bunch o blanks  ') = 'bunch o blanks  ' AS "bunch o blanks  ";
+SELECT ltrim('  bunch o blanks  ') = 'bunch o blanks  ' AS "bunch o blanks  ";
 
-SELECT TRIM(TRAILING FROM '  bunch o blanks  ') = '  bunch o blanks' AS "  bunch o blanks";
+SELECT rtrim('  bunch o blanks  ') = '  bunch o blanks' AS "  bunch o blanks";
 
-SELECT TRIM(BOTH 'x' FROM 'xxxxxsome Xsxxxxx') = 'some Xs' AS "some Xs";
+SELECT btrim('xxxxxsome Xsxxxxx', 'x') = 'some Xs' AS "some Xs";
 
 -- E021-06 substring expression
-SELECT SUBSTRING('1234567890' FROM 3) = '34567890' AS "34567890";
+SELECT substring('1234567890', 3) = '34567890' AS "34567890";
 
-SELECT SUBSTRING('1234567890' FROM 4 FOR 3) = '456' AS "456";
+SELECT substring('1234567890', 4, 3) = '456' AS "456";
 
 -- test overflow cases
-SELECT SUBSTRING('string' FROM 2 FOR 2147483646) AS "tring";
-SELECT SUBSTRING('string' FROM -10 FOR 2147483646) AS "string";
-SELECT SUBSTRING('string' FROM -10 FOR -2147483646) AS "error";
+SELECT substring('string', 2, 2147483646) AS "tring";
+SELECT substring('string', -10, 2147483646) AS "string";
+SELECT substring('string', -10, -2147483646) AS "error";
 
 
 -- E021-11 position expression
-SELECT POSITION('4' IN '1234567890') = '4' AS "4";
+SELECT position('1234567890', '4') = '4' AS "4";
 
-SELECT POSITION('5' IN '1234567890') = '5' AS "5";
+SELECT position('1234567890', '5') = '5' AS "5";
 
 -- T312 character overlay function
-SELECT OVERLAY('abcdef' PLACING '45' FROM 4) AS "abc45f";
+SELECT overlay('abcdef', '45', 4) AS "abc45f";
 
-SELECT OVERLAY('yabadoo' PLACING 'daba' FROM 5) AS "yabadaba";
+SELECT overlay('yabadoo', 'daba', 5) AS "yabadaba";
 
-SELECT OVERLAY('yabadoo' PLACING 'daba' FROM 5 FOR 0) AS "yabadabadoo";
+SELECT overlay('yabadoo', 'daba', 5, 0) AS "yabadabadoo";
 
-SELECT OVERLAY('babosa' PLACING 'ubb' FROM 2 FOR 4) AS "bubba";
+SELECT overlay('babosa', 'ubb', 2, 4) AS "bubba";
 
 --
 -- test LIKE
@@ -149,78 +149,27 @@ SELECT 'abc'::name NOT LIKE '_b_' AS "false";
 SELECT 'abc'::bytea LIKE '_b_'::bytea AS "true";
 SELECT 'abc'::bytea NOT LIKE '_b_'::bytea AS "false";
 
--- unused escape character
-SELECT 'hawkeye' LIKE 'h%' ESCAPE '#' AS "true";
-SELECT 'hawkeye' NOT LIKE 'h%' ESCAPE '#' AS "false";
-
-SELECT 'indio' LIKE 'ind_o' ESCAPE '$' AS "true";
-SELECT 'indio' NOT LIKE 'ind_o' ESCAPE '$' AS "false";
-
--- escape character
--- E061-05 like predicate with escape clause
-SELECT 'h%' LIKE 'h#%' ESCAPE '#' AS "true";
-SELECT 'h%' NOT LIKE 'h#%' ESCAPE '#' AS "false";
-
-SELECT 'h%wkeye' LIKE 'h#%' ESCAPE '#' AS "false";
-SELECT 'h%wkeye' NOT LIKE 'h#%' ESCAPE '#' AS "true";
-
-SELECT 'h%wkeye' LIKE 'h#%%' ESCAPE '#' AS "true";
-SELECT 'h%wkeye' NOT LIKE 'h#%%' ESCAPE '#' AS "false";
-
-SELECT 'h%awkeye' LIKE 'h#%a%k%e' ESCAPE '#' AS "true";
-SELECT 'h%awkeye' NOT LIKE 'h#%a%k%e' ESCAPE '#' AS "false";
-
-SELECT 'indio' LIKE '_ndio' ESCAPE '$' AS "true";
-SELECT 'indio' NOT LIKE '_ndio' ESCAPE '$' AS "false";
-
-SELECT 'i_dio' LIKE 'i$_d_o' ESCAPE '$' AS "true";
-SELECT 'i_dio' NOT LIKE 'i$_d_o' ESCAPE '$' AS "false";
-
-SELECT 'i_dio' LIKE 'i$_nd_o' ESCAPE '$' AS "false";
-SELECT 'i_dio' NOT LIKE 'i$_nd_o' ESCAPE '$' AS "true";
-
-SELECT 'i_dio' LIKE 'i$_d%o' ESCAPE '$' AS "true";
-SELECT 'i_dio' NOT LIKE 'i$_d%o' ESCAPE '$' AS "false";
-
-SELECT 'a_c'::bytea LIKE 'a$__'::bytea ESCAPE '$'::bytea AS "true";
-SELECT 'a_c'::bytea NOT LIKE 'a$__'::bytea ESCAPE '$'::bytea AS "false";
-
--- escape character same as pattern character
-SELECT 'maca' LIKE 'm%aca' ESCAPE '%' AS "true";
-SELECT 'maca' NOT LIKE 'm%aca' ESCAPE '%' AS "false";
-
-SELECT 'ma%a' LIKE 'm%a%%a' ESCAPE '%' AS "true";
-SELECT 'ma%a' NOT LIKE 'm%a%%a' ESCAPE '%' AS "false";
-
-SELECT 'bear' LIKE 'b_ear' ESCAPE '_' AS "true";
-SELECT 'bear' NOT LIKE 'b_ear' ESCAPE '_' AS "false";
-
-SELECT 'be_r' LIKE 'b_e__r' ESCAPE '_' AS "true";
-SELECT 'be_r' NOT LIKE 'b_e__r' ESCAPE '_' AS "false";
-
-SELECT 'be_r' LIKE '__e__r' ESCAPE '_' AS "false";
-SELECT 'be_r' NOT LIKE '__e__r' ESCAPE '_' AS "true";
 
 
 --
--- test ILIKE (case-insensitive LIKE)
--- Be sure to form every test as an ILIKE/NOT ILIKE pair.
+-- test ~~* (case-insensitive LIKE)
+-- Be sure to form every test as an ILIKE/NOT ~~* pair.
 --
 
-SELECT 'hawkeye' ILIKE 'h%' AS "true";
-SELECT 'hawkeye' NOT ILIKE 'h%' AS "false";
+SELECT 'hawkeye' ~~* 'h%' AS "true";
+SELECT 'hawkeye' !~~* 'h%' AS "false";
 
-SELECT 'hawkeye' ILIKE 'H%' AS "true";
-SELECT 'hawkeye' NOT ILIKE 'H%' AS "false";
+SELECT 'hawkeye' ~~* 'H%' AS "true";
+SELECT 'hawkeye' !~~* 'H%' AS "false";
 
-SELECT 'hawkeye' ILIKE 'H%Eye' AS "true";
-SELECT 'hawkeye' NOT ILIKE 'H%Eye' AS "false";
+SELECT 'hawkeye' ~~* 'H%Eye' AS "true";
+SELECT 'hawkeye' !~~* 'H%Eye' AS "false";
 
-SELECT 'Hawkeye' ILIKE 'h%' AS "true";
-SELECT 'Hawkeye' NOT ILIKE 'h%' AS "false";
+SELECT 'Hawkeye' ~~* 'h%' AS "true";
+SELECT 'Hawkeye' !~~* 'h%' AS "false";
 
-SELECT 'ABC'::name ILIKE '_b_' AS "true";
-SELECT 'ABC'::name NOT ILIKE '_b_' AS "false";
+SELECT 'ABC'::name ~~* '_b_' AS "true";
+SELECT 'ABC'::name !~~* '_b_' AS "false";
 
 --
 -- test %/_ combination cases, cf bugs #4821 and #5478
@@ -513,21 +462,21 @@ SELECT chr(0);
 SELECT repeat('Pg', 4);
 SELECT repeat('Pg', -4);
 
-SELECT SUBSTRING('1234567890'::bytea FROM 3) "34567890";
-SELECT SUBSTRING('1234567890'::bytea FROM 4 FOR 3) AS "456";
-SELECT SUBSTRING('string'::bytea FROM 2 FOR 2147483646) AS "tring";
-SELECT SUBSTRING('string'::bytea FROM -10 FOR 2147483646) AS "string";
-SELECT SUBSTRING('string'::bytea FROM -10 FOR -2147483646) AS "error";
+SELECT substring('1234567890'::bytea, 3) "34567890";
+SELECT substring('1234567890'::bytea, 4, 3) AS "456";
+SELECT substring('string'::bytea, 2, 2147483646) AS "tring";
+SELECT substring('string'::bytea, -10, 2147483646) AS "string";
+SELECT substring('string'::bytea, -10, -2147483646) AS "error";
 
-SELECT trim(E'\\000'::bytea from E'\\000Tom\\000'::bytea);
-SELECT trim(leading E'\\000'::bytea from E'\\000Tom\\000'::bytea);
-SELECT trim(trailing E'\\000'::bytea from E'\\000Tom\\000'::bytea);
+SELECT btrim(E'\\000Tom\\000'::bytea, E'\\000'::bytea);
+SELECT ltrim(E'\\000Tom\\000'::bytea, E'\\000'::bytea);
+SELECT rtrim(E'\\000Tom\\000'::bytea, E'\\000'::bytea);
 SELECT btrim(E'\\000trim\\000'::bytea, E'\\000'::bytea);
 SELECT btrim(''::bytea, E'\\000'::bytea);
 SELECT btrim(E'\\000trim\\000'::bytea, ''::bytea);
-SELECT encode(overlay(E'Th\\000omas'::bytea placing E'Th\\001omas'::bytea from 2),'escape');
-SELECT encode(overlay(E'Th\\000omas'::bytea placing E'\\002\\003'::bytea from 8),'escape');
-SELECT encode(overlay(E'Th\\000omas'::bytea placing E'\\002\\003'::bytea from 5 for 3),'escape');
+SELECT encode(overlay(E'Th\\000omas'::bytea, E'Th\\001omas'::bytea, 2),'escape');
+SELECT encode(overlay(E'Th\\000omas'::bytea, E'\\002\\003'::bytea, 8),'escape');
+SELECT encode(overlay(E'Th\\000omas'::bytea, E'\\002\\003'::bytea, 5, 3),'escape');
 
 SELECT bit_count('\x1234567890'::bytea);
 

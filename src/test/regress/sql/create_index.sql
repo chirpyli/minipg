@@ -423,9 +423,9 @@ explain (costs off)
 explain (costs off)
   select * from boolindex where not b order by i;
 explain (costs off)
-  select * from boolindex where b is true order by i desc;
+  select * from boolindex where b = true order by i desc;
 explain (costs off)
-  select * from boolindex where b is false order by i desc;
+  select * from boolindex where b = false order by i desc;
 
 --
 --

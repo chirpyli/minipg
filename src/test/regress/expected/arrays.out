@@ -1068,13 +1068,13 @@ select 'foo' not like all (array['%a', '%o']); -- f
  f
 (1 row)
 
-select 'foo' ilike any (array['%A', '%O']); -- t
+select 'foo' ~~* any (array['%A', '%O']); -- t
  ?column? 
 ----------
  t
 (1 row)
 
-select 'foo' ilike all (array['F%', '%O']); -- t
+select 'foo' ~~* all (array['F%', '%O']); -- t
  ?column? 
 ----------
  t

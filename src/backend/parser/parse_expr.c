@@ -46,7 +46,6 @@ static Node *transformParamRef(ParseState *pstate, ParamRef *pref);
 static Node *transformAExprOp(ParseState *pstate, A_Expr *a);
 static Node *transformAExprOpAny(ParseState *pstate, A_Expr *a);
 static Node *transformAExprOpAll(ParseState *pstate, A_Expr *a);
-static Node *transformAExprDistinct(ParseState *pstate, A_Expr *a);
 static Node *transformAExprNullIf(ParseState *pstate, A_Expr *a);
 static Node *transformAExprIn(ParseState *pstate, A_Expr *a);
 static Node *transformAExprBetween(ParseState *pstate, A_Expr *a);
@@ -57,21 +56,14 @@ static Node *transformSubLink(ParseState *pstate, SubLink *sublink);
 static Node *transformArrayExpr(ParseState *pstate, A_ArrayExpr *a,
 								Oid array_type, Oid element_type, int32 typmod);
 static Node *transformCoalesceExpr(ParseState *pstate, CoalesceExpr *c);
-static Node *transformMinMaxExpr(ParseState *pstate, MinMaxExpr *m);
 static Node *transformSQLValueFunction(ParseState *pstate,
 									   SQLValueFunction *svf);
-static Node *transformBooleanTest(ParseState *pstate, BooleanTest *b);
 static Node *transformColumnRef(ParseState *pstate, ColumnRef *cref);
 static Node *transformWholeRowRef(ParseState *pstate,
 								  ParseNamespaceItem *nsitem,
 								  int sublevels_up, int location);
 static Node *transformIndirection(ParseState *pstate, A_Indirection *ind);
 static Node *transformTypeCast(ParseState *pstate, TypeCast *tc);
-static Expr *make_distinct_op(ParseState *pstate, List *opname,
-							  Node *ltree, Node *rtree, int location);
-static Node *make_nulltest_from_distinct(ParseState *pstate,
-										 A_Expr *distincta, Node *arg);
-
 
 /*
  * transformExpr -
@@ -155,10 +147,6 @@ transformExprRecurse(ParseState *pstate, Node *expr)
 					case AEXPR_OP_ALL:
 						result = transformAExprOpAll(pstate, a);
 						break;
-					case AEXPR_DISTINCT:
-					case AEXPR_NOT_DISTINCT:
-						result = transformAExprDistinct(pstate, a);
-						break;
 					case AEXPR_NULLIF:
 						result = transformAExprNullIf(pstate, a);
 						break;
@@ -166,8 +154,7 @@ transformExprRecurse(ParseState *pstate, Node *expr)
 						result = transformAExprIn(pstate, a);
 						break;
 					case AEXPR_LIKE:
-					case AEXPR_ILIKE:
-						/* we can transform these just like AEXPR_OP */
+						/* we can transform this just like AEXPR_OP */
 						result = transformAExprOp(pstate, a);
 						break;
 					case AEXPR_BETWEEN:
@@ -211,10 +198,6 @@ transformExprRecurse(ParseState *pstate, Node *expr)
 			result = transformCoalesceExpr(pstate, (CoalesceExpr *) expr);
 			break;
 
-		case T_MinMaxExpr:
-			result = transformMinMaxExpr(pstate, (MinMaxExpr *) expr);
-			break;
-
 		case T_SQLValueFunction:
 			result = transformSQLValueFunction(pstate,
 											   (SQLValueFunction *) expr);
@@ -229,10 +212,6 @@ transformExprRecurse(ParseState *pstate, Node *expr)
 				result = expr;
 				break;
 			}
-
-		case T_BooleanTest:
-			result = transformBooleanTest(pstate, (BooleanTest *) expr);
-			break;
 
 			/*
 			 * CaseTestExpr doesn't require any processing; it is only
@@ -850,44 +829,6 @@ transformAExprOpAll(ParseState *pstate, A_Expr *a)
 										 lexpr,
 										 rexpr,
 										 a->location);
-}
-
-static Node *
-transformAExprDistinct(ParseState *pstate, A_Expr *a)
-{
-	Node	   *lexpr = a->lexpr;
-	Node	   *rexpr = a->rexpr;
-	Node	   *result;
-
-	/*
-	 * If either input is an undecorated NULL literal, transform to a NullTest
-	 * on the other input. That's simpler to process than a full DistinctExpr,
-	 * and it avoids needing to require that the datatype have an = operator.
-	 */
-	if (exprIsNullConstant(rexpr))
-		return make_nulltest_from_distinct(pstate, a, lexpr);
-	if (exprIsNullConstant(lexpr))
-		return make_nulltest_from_distinct(pstate, a, rexpr);
-
-	lexpr = transformExprRecurse(pstate, lexpr);
-	rexpr = transformExprRecurse(pstate, rexpr);
-
-	result = (Node *) make_distinct_op(pstate,
-									   a->name,
-									   lexpr,
-									   rexpr,
-									   a->location);
-
-	/*
-	 * If it's NOT DISTINCT, we first build a DistinctExpr and then stick a
-	 * NOT on top.
-	 */
-	if (a->kind == AEXPR_NOT_DISTINCT)
-		result = (Node *) makeBoolExpr(NOT_EXPR,
-									   list_make1(result),
-									   a->location);
-
-	return result;
 }
 
 static Node *
@@ -1739,45 +1680,6 @@ transformCoalesceExpr(ParseState *pstate, CoalesceExpr *c)
 }
 
 static Node *
-transformMinMaxExpr(ParseState *pstate, MinMaxExpr *m)
-{
-	MinMaxExpr *newm = makeNode(MinMaxExpr);
-	List	   *newargs = NIL;
-	List	   *newcoercedargs = NIL;
-	const char *funcname = (m->op == IS_GREATEST) ? "GREATEST" : "LEAST";
-	ListCell   *args;
-
-	newm->op = m->op;
-	foreach(args, m->args)
-	{
-		Node	   *e = (Node *) lfirst(args);
-		Node	   *newe;
-
-		newe = transformExprRecurse(pstate, e);
-		newargs = lappend(newargs, newe);
-	}
-
-	newm->minmaxtype = select_common_type(pstate, newargs, funcname, NULL);
-	/* minmaxcollid and inputcollid will be set by parse_collate.c */
-
-	/* Convert arguments if necessary */
-	foreach(args, newargs)
-	{
-		Node	   *e = (Node *) lfirst(args);
-		Node	   *newe;
-
-		newe = coerce_to_common_type(pstate, e,
-									 newm->minmaxtype,
-									 funcname);
-		newcoercedargs = lappend(newcoercedargs, newe);
-	}
-
-	newm->args = newcoercedargs;
-	newm->location = m->location;
-	return (Node *) newm;
-}
-
-static Node *
 transformSQLValueFunction(ParseState *pstate, SQLValueFunction *svf)
 {
 	/*
@@ -1819,46 +1721,6 @@ transformSQLValueFunction(ParseState *pstate, SQLValueFunction *svf)
 	return (Node *) svf;
 }
 
-
-static Node *
-transformBooleanTest(ParseState *pstate, BooleanTest *b)
-{
-	const char *clausename;
-
-	switch (b->booltesttype)
-	{
-		case IS_TRUE:
-			clausename = "IS TRUE";
-			break;
-		case IS_NOT_TRUE:
-			clausename = "IS NOT TRUE";
-			break;
-		case IS_FALSE:
-			clausename = "IS FALSE";
-			break;
-		case IS_NOT_FALSE:
-			clausename = "IS NOT FALSE";
-			break;
-		case IS_UNKNOWN:
-			clausename = "IS UNKNOWN";
-			break;
-		case IS_NOT_UNKNOWN:
-			clausename = "IS NOT UNKNOWN";
-			break;
-		default:
-			elog(ERROR, "unrecognized booltesttype: %d",
-				 (int) b->booltesttype);
-			clausename = NULL;	/* keep compiler quiet */
-	}
-
-	b->arg = (Expr *) transformExprRecurse(pstate, (Node *) b->arg);
-
-	b->arg = (Expr *) coerce_to_boolean(pstate,
-										(Node *) b->arg,
-										clausename);
-
-	return (Node *) b;
-}
 
 /*
  * Construct a whole-row reference to represent the notation "relation.*".
@@ -1985,59 +1847,6 @@ transformTypeCast(ParseState *pstate, TypeCast *tc)
 				 parser_coercion_errposition(pstate, location, expr)));
 
 	return result;
-}
-
-/*
- * make the node for an IS DISTINCT FROM operator
- */
-static Expr *
-make_distinct_op(ParseState *pstate, List *opname, Node *ltree, Node *rtree,
-				 int location)
-{
-	Expr	   *result;
-
-	result = make_op(pstate, opname, ltree, rtree,
-					 pstate->p_last_srf, location);
-	if (((OpExpr *) result)->opresulttype != BOOLOID)
-		ereport(ERROR,
-				(errcode(ERRCODE_DATATYPE_MISMATCH),
-				 errmsg("IS DISTINCT FROM requires = operator to yield boolean"),
-				 parser_errposition(pstate, location)));
-	if (((OpExpr *) result)->opretset)
-		ereport(ERROR,
-				(errcode(ERRCODE_DATATYPE_MISMATCH),
-		/* translator: %s is name of a SQL construct, eg NULLIF */
-				 errmsg("%s must not return a set", "IS DISTINCT FROM"),
-				 parser_errposition(pstate, location)));
-
-	/*
-	 * We rely on DistinctExpr and OpExpr being same struct
-	 */
-	NodeSetTag(result, T_DistinctExpr);
-
-	return result;
-}
-
-/*
- * Produce a NullTest node from an IS [NOT] DISTINCT FROM NULL construct
- *
- * "arg" is the untransformed other argument
- */
-static Node *
-make_nulltest_from_distinct(ParseState *pstate, A_Expr *distincta, Node *arg)
-{
-	NullTest   *nt = makeNode(NullTest);
-
-	nt->arg = (Expr *) transformExprRecurse(pstate, arg);
-	/* the argument can be any type, so don't coerce it */
-	if (distincta->kind == AEXPR_NOT_DISTINCT)
-		nt->nulltesttype = IS_NULL;
-	else
-		nt->nulltesttype = IS_NOT_NULL;
-	/* argisrow = false is correct whether or not arg is composite */
-	nt->argisrow = false;
-	nt->location = distincta->location;
-	return (Node *) nt;
 }
 
 /*

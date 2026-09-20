@@ -1273,8 +1273,6 @@ get_call_expr_argtype(Node *expr, int argnum)
 		args = ((FuncExpr *) expr)->args;
 	else if (IsA(expr, OpExpr))
 		args = ((OpExpr *) expr)->args;
-	else if (IsA(expr, DistinctExpr))
-		args = ((DistinctExpr *) expr)->args;
 	else if (IsA(expr, ScalarArrayOpExpr))
 		args = ((ScalarArrayOpExpr *) expr)->args;
 	else if (IsA(expr, NullIfExpr))
@@ -1336,8 +1334,6 @@ get_call_expr_arg_stable(Node *expr, int argnum)
 		args = ((FuncExpr *) expr)->args;
 	else if (IsA(expr, OpExpr))
 		args = ((OpExpr *) expr)->args;
-	else if (IsA(expr, DistinctExpr))
-		args = ((DistinctExpr *) expr)->args;
 	else if (IsA(expr, ScalarArrayOpExpr))
 		args = ((ScalarArrayOpExpr *) expr)->args;
 	else if (IsA(expr, NullIfExpr))

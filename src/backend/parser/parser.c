@@ -177,7 +177,6 @@ base_yylex(YYSTYPE *lvalp, YYLTYPE *llocp, core_yyscan_t yyscanner)
 				case BETWEEN:
 				case IN_P:
 				case LIKE:
-				case ILIKE:
 					cur_token = NOT_LA;
 					break;
 			}

@@ -428,22 +428,10 @@ typedef struct OpExpr
 } OpExpr;
 
 /*
- * DistinctExpr - expression node for "x IS DISTINCT FROM y"
- *
- * Except for the nodetag, this is represented identically to an OpExpr
- * referencing the "=" operator for x and y.
- * We use "=", not the more obvious "<>", because more datatypes have "="
- * than "<>".  This means the executor must invert the operator result.
- * Note that the operator function won't be called at all if either input
- * is NULL, since then the result can be determined directly.
- */
-typedef OpExpr DistinctExpr;
-
-/*
  * NullIfExpr - a NULLIF expression
  *
- * Like DistinctExpr, this is represented the same as an OpExpr referencing
- * the "=" operator for x and y.
+ * This is represented the same as an OpExpr referencing the "=" operator
+ * for x and y.
  */
 typedef OpExpr NullIfExpr;
 
@@ -948,26 +936,6 @@ typedef struct CoalesceExpr
 	List	   *args;			/* the arguments */
 	int			location;		/* token location, or -1 if unknown */
 } CoalesceExpr;
-
-/*
- * MinMaxExpr - a GREATEST or LEAST function
- */
-typedef enum MinMaxOp
-{
-	IS_GREATEST,
-	IS_LEAST
-} MinMaxOp;
-
-typedef struct MinMaxExpr
-{
-	Expr		xpr;
-	Oid			minmaxtype;		/* common type of arguments and result */
-	Oid			minmaxcollid;	/* OID of collation of result */
-	Oid			inputcollid;	/* OID of collation that function should use */
-	MinMaxOp	op;				/* function to execute */
-	List	   *args;			/* the arguments */
-	int			location;		/* token location, or -1 if unknown */
-} MinMaxExpr;
 
 /*
  * SQLValueFunction - parameterless functions with special grammar productions

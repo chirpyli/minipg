@@ -167,16 +167,12 @@ typedef enum ExprEvalOp
 
 	/* evaluate assorted special-purpose expression types */
 	EEOP_IOCOERCE,
-	EEOP_DISTINCT,
 	EEOP_NOT_DISTINCT,
 	EEOP_NULLIF,
 	EEOP_SQLVALUEFUNCTION,
 	EEOP_ARRAYEXPR,
 	EEOP_ARRAYCOERCE,
 	EEOP_ROW,
-
-	/* evaluate GREATEST() or LEAST() */
-	EEOP_MINMAX,
 
 	/* evaluate FieldSelect expression */
 	EEOP_FIELDSELECT,
@@ -428,20 +424,6 @@ typedef struct ExprEvalStep
 			bool	   *elemnulls;
 		}			row;
 
-		/* for EEOP_MINMAX */
-		struct
-		{
-			/* workspace for argument values */
-			Datum	   *values;
-			bool	   *nulls;
-			int			nelems;
-			/* is it GREATEST or LEAST? */
-			MinMaxOp	op;
-			/* lookup and call data for comparison function */
-			FmgrInfo   *finfo;
-			FunctionCallInfo fcinfo_data;
-		}			minmax;
-
 		/* for EEOP_FIELDSELECT */
 		struct
 		{
@@ -663,7 +645,6 @@ extern void ExecEvalArrayExpr(ExprState *state, ExprEvalStep *op);
 extern void ExecEvalArrayCoerce(ExprState *state, ExprEvalStep *op,
 								ExprContext *econtext);
 extern void ExecEvalRow(ExprState *state, ExprEvalStep *op);
-extern void ExecEvalMinMax(ExprState *state, ExprEvalStep *op);
 extern void ExecEvalFieldSelect(ExprState *state, ExprEvalStep *op,
 								ExprContext *econtext);
 extern void ExecEvalFieldStoreDeForm(ExprState *state, ExprEvalStep *op,

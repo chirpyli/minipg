@@ -452,14 +452,12 @@ ExecInterpExpr(ExprState *state, ExprContext *econtext, bool *isnull)
 		&&CASE_EEOP_CASE_TESTVAL,
 		&&CASE_EEOP_MAKE_READONLY,
 		&&CASE_EEOP_IOCOERCE,
-		&&CASE_EEOP_DISTINCT,
 		&&CASE_EEOP_NOT_DISTINCT,
 		&&CASE_EEOP_NULLIF,
 		&&CASE_EEOP_SQLVALUEFUNCTION,
 		&&CASE_EEOP_ARRAYEXPR,
 		&&CASE_EEOP_ARRAYCOERCE,
 		&&CASE_EEOP_ROW,
-		&&CASE_EEOP_MINMAX,
 		&&CASE_EEOP_FIELDSELECT,
 		&&CASE_EEOP_FIELDSTORE_DEFORM,
 		&&CASE_EEOP_FIELDSTORE_FORM,
@@ -1172,48 +1170,10 @@ ExecInterpExpr(ExprState *state, ExprContext *econtext, bool *isnull)
 			EEO_NEXT();
 		}
 
-		EEO_CASE(EEOP_DISTINCT)
-		{
-			/*
-			 * IS DISTINCT FROM must evaluate arguments (already done into
-			 * fcinfo->args) to determine whether they are NULL; if either is
-			 * NULL then the result is determined.  If neither is NULL, then
-			 * proceed to evaluate the comparison function, which is just the
-			 * type's standard equality operator.  We need not care whether
-			 * that function is strict.  Because the handling of nulls is
-			 * different, we can't just reuse EEOP_FUNCEXPR.
-			 */
-			FunctionCallInfo fcinfo = op->d.func.fcinfo_data;
-
-			/* check function arguments for NULLness */
-			if (fcinfo->args[0].isnull && fcinfo->args[1].isnull)
-			{
-				/* Both NULL? Then is not distinct... */
-				*op->resvalue = BoolGetDatum(false);
-				*op->resnull = false;
-			}
-			else if (fcinfo->args[0].isnull || fcinfo->args[1].isnull)
-			{
-				/* Only one is NULL? Then is distinct... */
-				*op->resvalue = BoolGetDatum(true);
-				*op->resnull = false;
-			}
-			else
-			{
-				/* Neither null, so apply the equality function */
-				Datum		eqresult;
-
-				fcinfo->isnull = false;
-				eqresult = op->d.func.fn_addr(fcinfo);
-				/* Must invert result of "="; safe to do even if null */
-				*op->resvalue = BoolGetDatum(!DatumGetBool(eqresult));
-				*op->resnull = fcinfo->isnull;
-			}
-
-			EEO_NEXT();
-		}
-
-		/* see EEOP_DISTINCT for comments, this is just inverted */
+		/*
+		 * Compare arguments (already evaluated into fcinfo->args) for
+		 * null-safe equality; this is used for group comparison.
+		 */
 		EEO_CASE(EEOP_NOT_DISTINCT)
 		{
 			FunctionCallInfo fcinfo = op->d.func.fcinfo_data;
@@ -1316,14 +1276,6 @@ ExecInterpExpr(ExprState *state, ExprContext *econtext, bool *isnull)
 		{
 			/* too complex for an inline implementation */
 			ExecEvalRow(state, op);
-
-			EEO_NEXT();
-		}
-
-		EEO_CASE(EEOP_MINMAX)
-		{
-			/* too complex for an inline implementation */
-			ExecEvalMinMax(state, op);
 
 			EEO_NEXT();
 		}
@@ -2739,60 +2691,6 @@ ExecEvalRow(ExprState *state, ExprEvalStep *op)
 
 	*op->resvalue = HeapTupleGetDatum(tuple);
 	*op->resnull = false;
-}
-
-/*
- * Evaluate GREATEST() or LEAST() expression (note this is *not* MIN()/MAX()).
- *
- * All of the to-be-compared expressions have already been evaluated into
- * op->d.minmax.values[]/nulls[].
- */
-void
-ExecEvalMinMax(ExprState *state, ExprEvalStep *op)
-{
-	Datum	   *values = op->d.minmax.values;
-	bool	   *nulls = op->d.minmax.nulls;
-	FunctionCallInfo fcinfo = op->d.minmax.fcinfo_data;
-	MinMaxOp	operator = op->d.minmax.op;
-
-	/* set at initialization */
-	Assert(fcinfo->args[0].isnull == false);
-	Assert(fcinfo->args[1].isnull == false);
-
-	/* default to null result */
-	*op->resnull = true;
-
-	for (int off = 0; off < op->d.minmax.nelems; off++)
-	{
-		/* ignore NULL inputs */
-		if (nulls[off])
-			continue;
-
-		if (*op->resnull)
-		{
-			/* first nonnull input, adopt value */
-			*op->resvalue = values[off];
-			*op->resnull = false;
-		}
-		else
-		{
-			int			cmpresult;
-
-			/* apply comparison function */
-			fcinfo->args[0].value = *op->resvalue;
-			fcinfo->args[1].value = values[off];
-
-			fcinfo->isnull = false;
-			cmpresult = DatumGetInt32(FunctionCallInvoke(fcinfo));
-			if (fcinfo->isnull) /* probably should not happen */
-				continue;
-
-			if (cmpresult > 0 && operator == IS_LEAST)
-				*op->resvalue = values[off];
-			else if (cmpresult < 0 && operator == IS_GREATEST)
-				*op->resvalue = values[off];
-		}
-	}
 }
 
 /*

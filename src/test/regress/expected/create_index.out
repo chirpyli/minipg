@@ -697,7 +697,7 @@ explain (costs off)
 (2 rows)
 
 explain (costs off)
-  select * from boolindex where b is true order by i desc;
+  select * from boolindex where b = true order by i desc;
                         QUERY PLAN                        
 ----------------------------------------------------------
  Index Scan Backward using boolindex_b_i_key on boolindex
@@ -705,7 +705,7 @@ explain (costs off)
 (2 rows)
 
 explain (costs off)
-  select * from boolindex where b is false order by i desc;
+  select * from boolindex where b = false order by i desc;
                         QUERY PLAN                        
 ----------------------------------------------------------
  Index Scan Backward using boolindex_b_i_key on boolindex

@@ -88,7 +88,7 @@ ParseFuncOrColumn(ParseState *pstate, List *funcname, List *fargs,
 	bool		agg_within_group = (fn ? fn->agg_within_group : false);
 	bool		agg_star = (fn ? fn->agg_star : false);
 	bool		agg_distinct = (fn ? fn->agg_distinct : false);
-	bool		func_variadic = (fn ? fn->func_variadic : false);
+	bool		func_variadic = false;
 	CoercionForm funcformat = (fn ? fn->funcformat : COERCE_EXPLICIT_CALL);
 	bool		could_be_projection;
 	Oid			rettype;
@@ -204,7 +204,7 @@ ParseFuncOrColumn(ParseState *pstate, List *funcname, List *fargs,
 	could_be_projection = (nargs == 1 &&
 						   agg_order == NIL &&
 						   !agg_star && !agg_distinct &&
-						   !func_variadic && argnames == NIL &&
+						   argnames == NIL &&
 						   list_length(funcname) == 1 &&
 						   (actual_arg_types[0] == RECORDOID ||
 							ISCOMPLEX(actual_arg_types[0])));
@@ -246,7 +246,7 @@ ParseFuncOrColumn(ParseState *pstate, List *funcname, List *fargs,
 
 	fdresult = func_get_detail(funcname, fargs, argnames, nargs,
 							   actual_arg_types,
-							   !func_variadic,
+							   true,
 							   &funcid, &rettype, &retset,
 							   &nvargs, &vatype,
 							   &declared_arg_types);
@@ -420,17 +420,6 @@ ParseFuncOrColumn(ParseState *pstate, List *funcname, List *fargs,
 	make_fn_arguments(pstate, fargs, actual_arg_types, declared_arg_types);
 
 	/*
-	 * If the function isn't actually variadic, forget any VARIADIC decoration
-	 * on the call.  (Perhaps we should throw an error instead, but
-	 * historically we've allowed people to write that.)
-	 */
-	if (!OidIsValid(vatype))
-	{
-		Assert(nvargs == 0);
-		func_variadic = false;
-	}
-
-	/*
 	 * If it's a variadic function call, transform the last nvargs arguments
 	 * into an array --- unless it's an "any" variadic.
 	 */
@@ -460,26 +449,8 @@ ParseFuncOrColumn(ParseState *pstate, List *funcname, List *fargs,
 
 		fargs = lappend(fargs, newa);
 
-		/* We could not have had VARIADIC marking before ... */
-		Assert(!func_variadic);
-		/* ... but now, it's a VARIADIC call */
+		/* now, it's a VARIADIC call */
 		func_variadic = true;
-	}
-
-	/*
-	 * If an "any" variadic is called with explicit VARIADIC marking, insist
-	 * that the variadic parameter be of some array type.
-	 */
-	if (nargs > 0 && vatype == ANYOID && func_variadic)
-	{
-		Oid			va_arr_typid = actual_arg_types[nargs - 1];
-
-		if (!OidIsValid(get_base_element_type(va_arr_typid)))
-			ereport(ERROR,
-					(errcode(ERRCODE_DATATYPE_MISMATCH),
-					 errmsg("VARIADIC argument must be an array"),
-					 parser_errposition(pstate,
-										exprLocation((Node *) llast(fargs)))));
 	}
 
 	/* if it returns a set, check that's OK */

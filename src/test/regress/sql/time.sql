@@ -54,15 +54,15 @@ SELECT f1 + time '00:01' AS "Illegal" FROM TIME_TBL;
 --
 -- test EXTRACT
 --
-SELECT EXTRACT(MICROSECOND FROM TIME '2020-05-26 13:30:25.575401');
-SELECT EXTRACT(MILLISECOND FROM TIME '2020-05-26 13:30:25.575401');
-SELECT EXTRACT(SECOND      FROM TIME '2020-05-26 13:30:25.575401');
-SELECT EXTRACT(MINUTE      FROM TIME '2020-05-26 13:30:25.575401');
-SELECT EXTRACT(HOUR        FROM TIME '2020-05-26 13:30:25.575401');
-SELECT EXTRACT(DAY         FROM TIME '2020-05-26 13:30:25.575401');  -- error
-SELECT EXTRACT(FORTNIGHT   FROM TIME '2020-05-26 13:30:25.575401');  -- error
-SELECT EXTRACT(TIMEZONE    FROM TIME '2020-05-26 13:30:25.575401');  -- error
-SELECT EXTRACT(EPOCH       FROM TIME '2020-05-26 13:30:25.575401');
+SELECT extract('microsecond', TIME '2020-05-26 13:30:25.575401');
+SELECT extract('millisecond', TIME '2020-05-26 13:30:25.575401');
+SELECT extract('second',      TIME '2020-05-26 13:30:25.575401');
+SELECT extract('minute',      TIME '2020-05-26 13:30:25.575401');
+SELECT extract('hour',        TIME '2020-05-26 13:30:25.575401');
+SELECT extract('day',         TIME '2020-05-26 13:30:25.575401');  -- error
+SELECT extract('fortnight',   TIME '2020-05-26 13:30:25.575401');  -- error
+SELECT extract('timezone',    TIME '2020-05-26 13:30:25.575401');  -- error
+SELECT extract('epoch',       TIME '2020-05-26 13:30:25.575401');
 
 -- date_part implementation is mostly the same as extract, so only
 -- test a few cases for additional coverage.

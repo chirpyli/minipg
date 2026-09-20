@@ -28,7 +28,7 @@ LINE 1: SELECT DISTINCT string4 FROM tmp ORDER BY 1;
 --
 SELECT DISTINCT two, string4, ten
    FROM tmp
-   ORDER BY two using <, string4 using <, ten using <;
+   ORDER BY two, string4, ten;
 ERROR:  relation "tmp" does not exist
 LINE 2:    FROM tmp
                 ^
@@ -39,7 +39,7 @@ LINE 2:    FROM tmp
 -- awk 'BEGIN{FS="      ";}{if(NF!=1){print $5;}else{print;}}' - stud_emp.data |
 -- sort -n -r | uniq
 --
-SELECT DISTINCT p.age FROM person p ORDER BY age using >;
+SELECT DISTINCT p.age FROM person p ORDER BY age DESC;
  age 
 -----
   98
@@ -145,99 +145,3 @@ DROP TABLE distinct_group_1;
 ERROR:  table "distinct_group_1" does not exist
 DROP TABLE distinct_group_2;
 ERROR:  table "distinct_group_2" does not exist
---
--- Also, some tests of IS DISTINCT FROM, which doesn't quite deserve its
--- very own regression file.
---
-CREATE TABLE disttable (f1 integer);
-INSERT INTO DISTTABLE VALUES(1);
-INSERT INTO DISTTABLE VALUES(2);
-INSERT INTO DISTTABLE VALUES(3);
-INSERT INTO DISTTABLE VALUES(NULL);
--- basic cases
-SELECT f1, f1 IS DISTINCT FROM 2 as "not 2" FROM disttable;
- f1 | not 2 
-----+-------
-  1 | t
-  2 | f
-  3 | t
-    | t
-(4 rows)
-
-SELECT f1, f1 IS DISTINCT FROM NULL as "not null" FROM disttable;
- f1 | not null 
-----+----------
-  1 | t
-  2 | t
-  3 | t
-    | f
-(4 rows)
-
-SELECT f1, f1 IS DISTINCT FROM f1 as "false" FROM disttable;
- f1 | false 
-----+-------
-  1 | f
-  2 | f
-  3 | f
-    | f
-(4 rows)
-
-SELECT f1, f1 IS DISTINCT FROM f1+1 as "not null" FROM disttable;
- f1 | not null 
-----+----------
-  1 | t
-  2 | t
-  3 | t
-    | f
-(4 rows)
-
--- check that optimizer constant-folds it properly
-SELECT 1 IS DISTINCT FROM 2 as "yes";
- yes 
------
- t
-(1 row)
-
-SELECT 2 IS DISTINCT FROM 2 as "no";
- no 
-----
- f
-(1 row)
-
-SELECT 2 IS DISTINCT FROM null as "yes";
- yes 
------
- t
-(1 row)
-
-SELECT null IS DISTINCT FROM null as "no";
- no 
-----
- f
-(1 row)
-
--- negated form
-SELECT 1 IS NOT DISTINCT FROM 2 as "no";
- no 
-----
- f
-(1 row)
-
-SELECT 2 IS NOT DISTINCT FROM 2 as "yes";
- yes 
------
- t
-(1 row)
-
-SELECT 2 IS NOT DISTINCT FROM null as "no";
- no 
-----
- f
-(1 row)
-
-SELECT null IS NOT DISTINCT FROM null as "yes";
- yes 
------
- t
-(1 row)
-

@@ -1063,28 +1063,6 @@ ExecInitExprRec(Expr *node, ExprState *state,
 				break;
 			}
 
-		case T_DistinctExpr:
-			{
-				DistinctExpr *op = (DistinctExpr *) node;
-
-				ExecInitFunc(&scratch, node,
-							 op->args, op->opfuncid, op->inputcollid,
-							 state);
-
-				/*
-				 * Change opcode of call instruction to EEOP_DISTINCT.
-				 *
-				 * XXX: historically we've not called the function usage
-				 * pgstat infrastructure - that seems inconsistent given that
-				 * we do so for normal function *and* operator evaluation.  If
-				 * we decided to do that here, we'd probably want separate
-				 * opcodes for FUSAGE or not.
-				 */
-				scratch.opcode = EEOP_DISTINCT;
-				ExprEvalPushStep(state, &scratch);
-				break;
-			}
-
 		case T_NullIfExpr:
 			{
 				NullIfExpr *op = (NullIfExpr *) node;
@@ -1929,69 +1907,6 @@ ExecInitExprRec(Expr *node, ExprState *state,
 					as->d.jump.jumpdone = state->steps_len;
 				}
 
-				break;
-			}
-
-		case T_MinMaxExpr:
-			{
-				MinMaxExpr *minmaxexpr = (MinMaxExpr *) node;
-				int			nelems = list_length(minmaxexpr->args);
-				TypeCacheEntry *typentry;
-				FmgrInfo   *finfo;
-				FunctionCallInfo fcinfo;
-				ListCell   *lc;
-				int			off;
-
-				/* Look up the btree comparison function for the datatype */
-				typentry = lookup_type_cache(minmaxexpr->minmaxtype,
-											 TYPECACHE_CMP_PROC);
-				if (!OidIsValid(typentry->cmp_proc))
-					ereport(ERROR,
-							(errcode(ERRCODE_UNDEFINED_FUNCTION),
-							 errmsg("could not identify a comparison function for type %s",
-									format_type_be(minmaxexpr->minmaxtype))));
-
-				/*
-				 * If we enforced permissions checks on index support
-				 * functions, we'd need to make a check here.  But the index
-				 * support machinery doesn't do that, and thus neither does
-				 * this code.
-				 */
-
-				/* Perform function lookup */
-				finfo = palloc0(sizeof(FmgrInfo));
-				fcinfo = palloc0(SizeForFunctionCallInfo(2));
-				fmgr_info(typentry->cmp_proc, finfo);
-				fmgr_info_set_expr((Node *) node, finfo);
-				InitFunctionCallInfoData(*fcinfo, finfo, 2,
-										 minmaxexpr->inputcollid, NULL, NULL);
-
-				scratch.opcode = EEOP_MINMAX;
-				/* allocate space to store arguments */
-				scratch.d.minmax.values =
-					(Datum *) palloc(sizeof(Datum) * nelems);
-				scratch.d.minmax.nulls =
-					(bool *) palloc(sizeof(bool) * nelems);
-				scratch.d.minmax.nelems = nelems;
-
-				scratch.d.minmax.op = minmaxexpr->op;
-				scratch.d.minmax.finfo = finfo;
-				scratch.d.minmax.fcinfo_data = fcinfo;
-
-				/* evaluate expressions into minmax->values/nulls */
-				off = 0;
-				foreach(lc, minmaxexpr->args)
-				{
-					Expr	   *e = (Expr *) lfirst(lc);
-
-					ExecInitExprRec(e, state,
-									&scratch.d.minmax.values[off],
-									&scratch.d.minmax.nulls[off]);
-					off++;
-				}
-
-				/* and push the final comparison */
-				ExprEvalPushStep(state, &scratch);
 				break;
 			}
 

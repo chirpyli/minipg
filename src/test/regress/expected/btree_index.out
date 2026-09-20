@@ -108,7 +108,7 @@ select proname from pg_proc where proname like E'RI\\_FKey%del' order by 1;
 (0 rows)
 
 explain (costs off)
-select proname from pg_proc where proname ilike '00%foo' order by 1;
+select proname from pg_proc where proname ~~* '00%foo' order by 1;
                              QUERY PLAN                             
 --------------------------------------------------------------------
  Index Only Scan using pg_proc_proname_args_nsp_index on pg_proc
@@ -116,13 +116,13 @@ select proname from pg_proc where proname ilike '00%foo' order by 1;
    Filter: (proname ~~* '00%foo'::text)
 (3 rows)
 
-select proname from pg_proc where proname ilike '00%foo' order by 1;
+select proname from pg_proc where proname ~~* '00%foo' order by 1;
  proname 
 ---------
 (0 rows)
 
 explain (costs off)
-select proname from pg_proc where proname ilike 'ri%foo' order by 1;
+select proname from pg_proc where proname ~~* 'ri%foo' order by 1;
                            QUERY PLAN                            
 -----------------------------------------------------------------
  Index Only Scan using pg_proc_proname_args_nsp_index on pg_proc
@@ -149,7 +149,7 @@ select proname from pg_proc where proname like E'RI\\_FKey%del' order by 1;
 (0 rows)
 
 explain (costs off)
-select proname from pg_proc where proname ilike '00%foo' order by 1;
+select proname from pg_proc where proname ~~* '00%foo' order by 1;
                                    QUERY PLAN                                   
 --------------------------------------------------------------------------------
  Sort
@@ -160,13 +160,13 @@ select proname from pg_proc where proname ilike '00%foo' order by 1;
                Index Cond: ((proname >= '00'::text) AND (proname < '01'::text))
 (6 rows)
 
-select proname from pg_proc where proname ilike '00%foo' order by 1;
+select proname from pg_proc where proname ~~* '00%foo' order by 1;
  proname 
 ---------
 (0 rows)
 
 explain (costs off)
-select proname from pg_proc where proname ilike 'ri%foo' order by 1;
+select proname from pg_proc where proname ~~* 'ri%foo' order by 1;
                            QUERY PLAN                            
 -----------------------------------------------------------------
  Index Only Scan using pg_proc_proname_args_nsp_index on pg_proc

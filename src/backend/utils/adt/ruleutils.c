@@ -4758,7 +4758,6 @@ isSimpleNode(Node *node, Node *parentNode, int prettyFlags)
 		case T_ArrayExpr:
 		case T_RowExpr:
 		case T_CoalesceExpr:
-		case T_MinMaxExpr:
 		case T_SQLValueFunction:
 		case T_NullIfExpr:
 		case T_Aggref:
@@ -4851,7 +4850,6 @@ isSimpleNode(Node *node, Node *parentNode, int prettyFlags)
 		case T_SubLink:
 		case T_NullTest:
 		case T_BooleanTest:
-		case T_DistinctExpr:
 			switch (nodeTag(parentNode))
 			{
 				case T_FuncExpr:
@@ -4870,7 +4868,6 @@ isSimpleNode(Node *node, Node *parentNode, int prettyFlags)
 				case T_ArrayExpr:	/* other separators */
 				case T_RowExpr: /* other separators */
 				case T_CoalesceExpr:	/* own parentheses */
-				case T_MinMaxExpr:	/* own parentheses */
 				case T_NullIfExpr:	/* other separators */
 				case T_Aggref:	/* own parentheses */
 				case T_CaseExpr:	/* other separators */
@@ -4919,7 +4916,6 @@ isSimpleNode(Node *node, Node *parentNode, int prettyFlags)
 				case T_ArrayExpr:	/* other separators */
 				case T_RowExpr: /* other separators */
 				case T_CoalesceExpr:	/* own parentheses */
-				case T_MinMaxExpr:	/* own parentheses */
 				case T_NullIfExpr:	/* other separators */
 				case T_Aggref:	/* own parentheses */
 				case T_CaseExpr:	/* other separators */
@@ -5169,23 +5165,6 @@ get_rule_expr(Node *node, deparse_context *context,
 
 		case T_OpExpr:
 			get_oper_expr((OpExpr *) node, context);
-			break;
-
-		case T_DistinctExpr:
-			{
-				DistinctExpr *expr = (DistinctExpr *) node;
-				List	   *args = expr->args;
-				Node	   *arg1 = (Node *) linitial(args);
-				Node	   *arg2 = (Node *) lsecond(args);
-
-				if (!PRETTY_PAREN(context))
-					appendStringInfoChar(buf, '(');
-				get_rule_expr_paren(arg1, context, true, node);
-				appendStringInfoString(buf, " IS DISTINCT FROM ");
-				get_rule_expr_paren(arg2, context, true, node);
-				if (!PRETTY_PAREN(context))
-					appendStringInfoChar(buf, ')');
-			}
 			break;
 
 		case T_NullIfExpr:
@@ -5669,24 +5648,6 @@ get_rule_expr(Node *node, deparse_context *context,
 			}
 			break;
 
-		case T_MinMaxExpr:
-			{
-				MinMaxExpr *minmaxexpr = (MinMaxExpr *) node;
-
-				switch (minmaxexpr->op)
-				{
-					case IS_GREATEST:
-						appendStringInfoString(buf, "GREATEST(");
-						break;
-					case IS_LEAST:
-						appendStringInfoString(buf, "LEAST(");
-						break;
-				}
-				get_rule_expr((Node *) minmaxexpr->args, context, true);
-				appendStringInfoChar(buf, ')');
-			}
-			break;
-
 		case T_SQLValueFunction:
 			{
 				SQLValueFunction *svf = (SQLValueFunction *) node;
@@ -5935,7 +5896,6 @@ looks_like_function(Node *node)
 					((FuncExpr *) node)->funcformat == COERCE_SQL_SYNTAX);
 		case T_NullIfExpr:
 		case T_CoalesceExpr:
-		case T_MinMaxExpr:
 		case T_SQLValueFunction:
 			/* these are all accepted by func_expr_common_subexpr */
 			return true;

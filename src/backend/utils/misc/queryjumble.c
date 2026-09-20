@@ -399,7 +399,6 @@ JumbleExpr(JumbleState *jstate, Node *node)
 			}
 			break;
 		case T_OpExpr:
-		case T_DistinctExpr:	/* struct-equivalent to OpExpr */
 		case T_NullIfExpr:		/* struct-equivalent to OpExpr */
 			{
 				OpExpr	   *expr = (OpExpr *) node;
@@ -521,14 +520,6 @@ JumbleExpr(JumbleState *jstate, Node *node)
 			break;
 		case T_CoalesceExpr:
 			JumbleExpr(jstate, (Node *) ((CoalesceExpr *) node)->args);
-			break;
-		case T_MinMaxExpr:
-			{
-				MinMaxExpr *mmexpr = (MinMaxExpr *) node;
-
-				APP_JUMB(mmexpr->op);
-				JumbleExpr(jstate, (Node *) mmexpr->args);
-			}
 			break;
 		case T_SQLValueFunction:
 			{

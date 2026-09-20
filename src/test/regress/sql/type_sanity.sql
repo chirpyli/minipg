@@ -112,8 +112,7 @@ AND case proargtypes[array_length(proargtypes, 1)-1]
 SELECT oid::regprocedure, proargmodes, provariadic
 FROM pg_proc
 WHERE (proargmodes IS NOT NULL AND 'v' = any(proargmodes))
-    IS DISTINCT FROM
-    (provariadic != 0);
+    <> (provariadic != 0);
 
 -- As of 8.0, this check finds refcursor, which is borrowing
 -- other types' I/O routines

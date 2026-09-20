@@ -1232,26 +1232,6 @@ _copyOpExpr(const OpExpr *from)
 }
 
 /*
- * _copyDistinctExpr (same as OpExpr)
- */
-static DistinctExpr *
-_copyDistinctExpr(const DistinctExpr *from)
-{
-	DistinctExpr *newnode = makeNode(DistinctExpr);
-
-	COPY_SCALAR_FIELD(opno);
-	COPY_SCALAR_FIELD(opfuncid);
-	COPY_SCALAR_FIELD(opresulttype);
-	COPY_SCALAR_FIELD(opretset);
-	COPY_SCALAR_FIELD(opcollid);
-	COPY_SCALAR_FIELD(inputcollid);
-	COPY_NODE_FIELD(args);
-	COPY_LOCATION_FIELD(location);
-
-	return newnode;
-}
-
-/*
  * _copyNullIfExpr (same as OpExpr)
  */
 static NullIfExpr *
@@ -1574,24 +1554,6 @@ _copyCoalesceExpr(const CoalesceExpr *from)
 
 	COPY_SCALAR_FIELD(coalescetype);
 	COPY_SCALAR_FIELD(coalescecollid);
-	COPY_NODE_FIELD(args);
-	COPY_LOCATION_FIELD(location);
-
-	return newnode;
-}
-
-/*
- * _copyMinMaxExpr
- */
-static MinMaxExpr *
-_copyMinMaxExpr(const MinMaxExpr *from)
-{
-	MinMaxExpr *newnode = makeNode(MinMaxExpr);
-
-	COPY_SCALAR_FIELD(minmaxtype);
-	COPY_SCALAR_FIELD(minmaxcollid);
-	COPY_SCALAR_FIELD(inputcollid);
-	COPY_SCALAR_FIELD(op);
 	COPY_NODE_FIELD(args);
 	COPY_LOCATION_FIELD(location);
 
@@ -2024,7 +1986,6 @@ _copyFuncCall(const FuncCall *from)
 	COPY_SCALAR_FIELD(agg_within_group);
 	COPY_SCALAR_FIELD(agg_star);
 	COPY_SCALAR_FIELD(agg_distinct);
-	COPY_SCALAR_FIELD(func_variadic);
 	COPY_SCALAR_FIELD(funcformat);
 	COPY_LOCATION_FIELD(location);
 
@@ -2110,7 +2071,6 @@ _copySortBy(const SortBy *from)
 	COPY_NODE_FIELD(node);
 	COPY_SCALAR_FIELD(sortby_dir);
 	COPY_SCALAR_FIELD(sortby_nulls);
-	COPY_NODE_FIELD(useOp);
 	COPY_LOCATION_FIELD(location);
 
 	return newnode;
@@ -2809,9 +2769,6 @@ copyObjectImpl(const void *from)
 		case T_OpExpr:
 			retval = _copyOpExpr(from);
 			break;
-		case T_DistinctExpr:
-			retval = _copyDistinctExpr(from);
-			break;
 		case T_NullIfExpr:
 			retval = _copyNullIfExpr(from);
 			break;
@@ -2868,9 +2825,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_CoalesceExpr:
 			retval = _copyCoalesceExpr(from);
-			break;
-		case T_MinMaxExpr:
-			retval = _copyMinMaxExpr(from);
 			break;
 		case T_SQLValueFunction:
 			retval = _copySQLValueFunction(from);

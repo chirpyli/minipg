@@ -996,21 +996,6 @@ _outOpExpr(StringInfo str, const OpExpr *node)
 }
 
 static void
-_outDistinctExpr(StringInfo str, const DistinctExpr *node)
-{
-	WRITE_NODE_TYPE("DISTINCTEXPR");
-
-	WRITE_OID_FIELD(opno);
-	WRITE_OID_FIELD(opfuncid);
-	WRITE_OID_FIELD(opresulttype);
-	WRITE_BOOL_FIELD(opretset);
-	WRITE_OID_FIELD(opcollid);
-	WRITE_OID_FIELD(inputcollid);
-	WRITE_NODE_FIELD(args);
-	WRITE_LOCATION_FIELD(location);
-}
-
-static void
 _outNullIfExpr(StringInfo str, const NullIfExpr *node)
 {
 	WRITE_NODE_TYPE("NULLIFEXPR");
@@ -1257,19 +1242,6 @@ _outCoalesceExpr(StringInfo str, const CoalesceExpr *node)
 
 	WRITE_OID_FIELD(coalescetype);
 	WRITE_OID_FIELD(coalescecollid);
-	WRITE_NODE_FIELD(args);
-	WRITE_LOCATION_FIELD(location);
-}
-
-static void
-_outMinMaxExpr(StringInfo str, const MinMaxExpr *node)
-{
-	WRITE_NODE_TYPE("MINMAX");
-
-	WRITE_OID_FIELD(minmaxtype);
-	WRITE_OID_FIELD(minmaxcollid);
-	WRITE_OID_FIELD(inputcollid);
-	WRITE_ENUM_FIELD(op, MinMaxOp);
 	WRITE_NODE_FIELD(args);
 	WRITE_LOCATION_FIELD(location);
 }
@@ -2153,7 +2125,6 @@ _outFuncCall(StringInfo str, const FuncCall *node)
 	WRITE_BOOL_FIELD(agg_within_group);
 	WRITE_BOOL_FIELD(agg_star);
 	WRITE_BOOL_FIELD(agg_distinct);
-	WRITE_BOOL_FIELD(func_variadic);
 	WRITE_ENUM_FIELD(funcformat, CoercionForm);
 	WRITE_LOCATION_FIELD(location);
 }
@@ -2400,14 +2371,6 @@ _outAExpr(StringInfo str, const A_Expr *node)
 			WRITE_NODE_FIELD(name);
 			appendStringInfoString(str, " ALL ");
 			break;
-		case AEXPR_DISTINCT:
-			appendStringInfoString(str, " DISTINCT ");
-			WRITE_NODE_FIELD(name);
-			break;
-		case AEXPR_NOT_DISTINCT:
-			appendStringInfoString(str, " NOT_DISTINCT ");
-			WRITE_NODE_FIELD(name);
-			break;
 		case AEXPR_NULLIF:
 			appendStringInfoString(str, " NULLIF ");
 			WRITE_NODE_FIELD(name);
@@ -2418,10 +2381,6 @@ _outAExpr(StringInfo str, const A_Expr *node)
 			break;
 		case AEXPR_LIKE:
 			appendStringInfoString(str, " LIKE ");
-			WRITE_NODE_FIELD(name);
-			break;
-		case AEXPR_ILIKE:
-			appendStringInfoString(str, " ILIKE ");
 			WRITE_NODE_FIELD(name);
 			break;
 		case AEXPR_BETWEEN:
@@ -2575,7 +2534,6 @@ _outSortBy(StringInfo str, const SortBy *node)
 	WRITE_NODE_FIELD(node);
 	WRITE_ENUM_FIELD(sortby_dir, SortByDir);
 	WRITE_ENUM_FIELD(sortby_nulls, SortByNulls);
-	WRITE_NODE_FIELD(useOp);
 	WRITE_LOCATION_FIELD(location);
 }
 
@@ -2831,9 +2789,6 @@ outNode(StringInfo str, const void *obj)
 			case T_OpExpr:
 				_outOpExpr(str, obj);
 				break;
-			case T_DistinctExpr:
-				_outDistinctExpr(str, obj);
-				break;
 			case T_NullIfExpr:
 				_outNullIfExpr(str, obj);
 				break;
@@ -2890,9 +2845,6 @@ outNode(StringInfo str, const void *obj)
 				break;
 			case T_CoalesceExpr:
 				_outCoalesceExpr(str, obj);
-				break;
-			case T_MinMaxExpr:
-				_outMinMaxExpr(str, obj);
 				break;
 			case T_SQLValueFunction:
 				_outSQLValueFunction(str, obj);

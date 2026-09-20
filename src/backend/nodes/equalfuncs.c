@@ -273,32 +273,6 @@ _equalOpExpr(const OpExpr *a, const OpExpr *b)
 }
 
 static bool
-_equalDistinctExpr(const DistinctExpr *a, const DistinctExpr *b)
-{
-	COMPARE_SCALAR_FIELD(opno);
-
-	/*
-	 * Special-case opfuncid: it is allowable for it to differ if one node
-	 * contains zero and the other doesn't.  This just means that the one node
-	 * isn't as far along in the parse/plan pipeline and hasn't had the
-	 * opfuncid cache filled yet.
-	 */
-	if (a->opfuncid != b->opfuncid &&
-		a->opfuncid != 0 &&
-		b->opfuncid != 0)
-		return false;
-
-	COMPARE_SCALAR_FIELD(opresulttype);
-	COMPARE_SCALAR_FIELD(opretset);
-	COMPARE_SCALAR_FIELD(opcollid);
-	COMPARE_SCALAR_FIELD(inputcollid);
-	COMPARE_NODE_FIELD(args);
-	COMPARE_LOCATION_FIELD(location);
-
-	return true;
-}
-
-static bool
 _equalNullIfExpr(const NullIfExpr *a, const NullIfExpr *b)
 {
 	COMPARE_SCALAR_FIELD(opno);
@@ -553,19 +527,6 @@ _equalCoalesceExpr(const CoalesceExpr *a, const CoalesceExpr *b)
 {
 	COMPARE_SCALAR_FIELD(coalescetype);
 	COMPARE_SCALAR_FIELD(coalescecollid);
-	COMPARE_NODE_FIELD(args);
-	COMPARE_LOCATION_FIELD(location);
-
-	return true;
-}
-
-static bool
-_equalMinMaxExpr(const MinMaxExpr *a, const MinMaxExpr *b)
-{
-	COMPARE_SCALAR_FIELD(minmaxtype);
-	COMPARE_SCALAR_FIELD(minmaxcollid);
-	COMPARE_SCALAR_FIELD(inputcollid);
-	COMPARE_SCALAR_FIELD(op);
 	COMPARE_NODE_FIELD(args);
 	COMPARE_LOCATION_FIELD(location);
 
@@ -1113,7 +1074,6 @@ _equalFuncCall(const FuncCall *a, const FuncCall *b)
 	COMPARE_SCALAR_FIELD(agg_within_group);
 	COMPARE_SCALAR_FIELD(agg_star);
 	COMPARE_SCALAR_FIELD(agg_distinct);
-	COMPARE_SCALAR_FIELD(func_variadic);
 	COMPARE_COERCIONFORM_FIELD(funcformat);
 	COMPARE_LOCATION_FIELD(location);
 
@@ -1195,7 +1155,6 @@ _equalSortBy(const SortBy *a, const SortBy *b)
 	COMPARE_NODE_FIELD(node);
 	COMPARE_SCALAR_FIELD(sortby_dir);
 	COMPARE_SCALAR_FIELD(sortby_nulls);
-	COMPARE_NODE_FIELD(useOp);
 	COMPARE_LOCATION_FIELD(location);
 
 	return true;
@@ -1521,9 +1480,6 @@ equal(const void *a, const void *b)
 		case T_OpExpr:
 			retval = _equalOpExpr(a, b);
 			break;
-		case T_DistinctExpr:
-			retval = _equalDistinctExpr(a, b);
-			break;
 		case T_NullIfExpr:
 			retval = _equalNullIfExpr(a, b);
 			break;
@@ -1580,9 +1536,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_CoalesceExpr:
 			retval = _equalCoalesceExpr(a, b);
-			break;
-		case T_MinMaxExpr:
-			retval = _equalMinMaxExpr(a, b);
 			break;
 		case T_SQLValueFunction:
 			retval = _equalSQLValueFunction(a, b);

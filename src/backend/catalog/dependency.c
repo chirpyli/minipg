@@ -1706,14 +1706,6 @@ find_expr_references_walker(Node *node,
 						   context->addrs);
 		/* fall through to examine arguments */
 	}
-	else if (IsA(node, DistinctExpr))
-	{
-		DistinctExpr *distinctexpr = (DistinctExpr *) node;
-
-		add_object_address(OCLASS_OPERATOR, distinctexpr->opno, 0,
-						   context->addrs);
-		/* fall through to examine arguments */
-	}
 	else if (IsA(node, NullIfExpr))
 	{
 		NullIfExpr *nullifexpr = (NullIfExpr *) node;
