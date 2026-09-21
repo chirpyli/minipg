@@ -1780,8 +1780,8 @@ typedef struct AggState
 	int			num_hashes;
 	MemoryContext hash_metacxt; /* memory for hash table itself */
 	struct HashTapeInfo *hash_tapeinfo; /* metadata for spill tapes */
-	struct HashAggSpill *hash_spills;	/* HashAggSpill for each grouping set,
-										 * exists only during first pass */
+	struct HashAggSpill *hash_spill;	/* spill info, exists only during
+										 * first pass */
 	TupleTableSlot *hash_spill_rslot;	/* for reading spill files */
 	TupleTableSlot *hash_spill_wslot;	/* for writing spill files */
 	List	   *hash_batches;	/* hash batches remaining to be processed */

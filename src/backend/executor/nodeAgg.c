@@ -1700,23 +1700,17 @@ hash_agg_enter_spill_mode(AggState *aggstate)
 	if (!aggstate->hash_ever_spilled)
 	{
 		Assert(aggstate->hash_tapeinfo == NULL);
-		Assert(aggstate->hash_spills == NULL);
+		Assert(aggstate->hash_spill == NULL);
 
 		aggstate->hash_ever_spilled = true;
 
 		hashagg_tapeinfo_init(aggstate);
 
-		aggstate->hash_spills = palloc(sizeof(HashAggSpill) * aggstate->num_hashes);
+		aggstate->hash_spill = palloc(sizeof(HashAggSpill));
 
-		for (int setno = 0; setno < aggstate->num_hashes; setno++)
-		{
-			AggStatePerHash perhash = &aggstate->perhash[setno];
-			HashAggSpill *spill = &aggstate->hash_spills[setno];
-
-			hashagg_spill_init(spill, aggstate->hash_tapeinfo, 0,
-							   perhash->aggnode->numGroups,
-							   aggstate->hashentrysize);
-		}
+		hashagg_spill_init(aggstate->hash_spill, aggstate->hash_tapeinfo, 0,
+						   aggstate->perhash[0].aggnode->numGroups,
+						   aggstate->hashentrysize);
 	}
 }
 
@@ -1939,7 +1933,7 @@ lookup_hash_entries(AggState *aggstate)
 		}
 		else
 		{
-			HashAggSpill *spill = &aggstate->hash_spills[setno];
+			HashAggSpill *spill = aggstate->hash_spill;
 			TupleTableSlot *slot = aggstate->tmpcontext->ecxt_outertuple;
 
 			if (spill->partitions == NULL)
@@ -2894,26 +2888,22 @@ hashagg_batch_read(HashAggBatch *batch, uint32 *hashp)
 static void
 hashagg_finish_initial_spills(AggState *aggstate)
 {
-	int			setno;
 	int			total_npartitions = 0;
 
-	if (aggstate->hash_spills != NULL)
+	if (aggstate->hash_spill != NULL)
 	{
-		for (setno = 0; setno < aggstate->num_hashes; setno++)
-		{
-			HashAggSpill *spill = &aggstate->hash_spills[setno];
+		HashAggSpill *spill = aggstate->hash_spill;
 
-			total_npartitions += spill->npartitions;
-			hashagg_spill_finish(aggstate, spill, setno);
-		}
+		total_npartitions += spill->npartitions;
+		hashagg_spill_finish(aggstate, spill, 0);
 
 		/*
 		 * We're not processing tuples from outer plan any more; only
 		 * processing batches of spilled tuples. The initial spill structures
 		 * are no longer needed.
 		 */
-		pfree(aggstate->hash_spills);
-		aggstate->hash_spills = NULL;
+		pfree(aggstate->hash_spill);
+		aggstate->hash_spill = NULL;
 	}
 
 	hash_agg_update_metrics(aggstate, false, total_npartitions);
@@ -2971,19 +2961,14 @@ static void
 hashagg_reset_spill_state(AggState *aggstate)
 {
 	/* free spills from initial pass */
-	if (aggstate->hash_spills != NULL)
+	if (aggstate->hash_spill != NULL)
 	{
-		int			setno;
+		HashAggSpill *spill = aggstate->hash_spill;
 
-		for (setno = 0; setno < aggstate->num_hashes; setno++)
-		{
-			HashAggSpill *spill = &aggstate->hash_spills[setno];
-
-			pfree(spill->ntuples);
-			pfree(spill->partitions);
-		}
-		pfree(aggstate->hash_spills);
-		aggstate->hash_spills = NULL;
+		pfree(spill->ntuples);
+		pfree(spill->partitions);
+		pfree(aggstate->hash_spill);
+		aggstate->hash_spill = NULL;
 	}
 
 	/* free batches */
