@@ -28,7 +28,6 @@
 #include "postmaster/bgwriter.h"
 #include "postmaster/postmaster.h"
 #include "storage/bufmgr.h"
-#include "storage/dsm.h"
 #include "storage/ipc.h"
 #include "storage/pg_shmem.h"
 #include "storage/pmsignal.h"
@@ -106,7 +105,6 @@ CreateSharedMemoryAndSemaphores(void)
 		size = add_size(size, SpinlockSemaSize());
 		size = add_size(size, hash_estimate_size(SHMEM_INDEX_SIZE,
 												 sizeof(ShmemIndexEnt)));
-		size = add_size(size, dsm_estimate_size());
 		size = add_size(size, BufferShmemSize());
 		size = add_size(size, LockShmemSize());
 		size = add_size(size, PredicateLockShmemSize());
@@ -179,8 +177,6 @@ CreateSharedMemoryAndSemaphores(void)
 	 */
 	InitShmemIndex();
 
-	dsm_shmem_init();
-
 	/*
 	 * Set up xlog, clog, and buffers
 	 */
@@ -227,10 +223,6 @@ CreateSharedMemoryAndSemaphores(void)
 	SnapMgrInit();
 	BTreeShmemInit();
 	SyncScanShmemInit();
-
-	/* Initialize dynamic shared memory facilities. */
-	if (!IsUnderPostmaster)
-		dsm_postmaster_startup(shim);
 
 	/*
 	 * Now give loadable modules a chance to set up their shmem allocations

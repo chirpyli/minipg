@@ -9,8 +9,6 @@ top_builddir = ../../../..
 include $(top_builddir)/src/Makefile.global
 
 OBJS = \
-	dsm.o \
-	dsm_impl.o \
 	ipc.o \
 	ipci.o \
 	latch.o \

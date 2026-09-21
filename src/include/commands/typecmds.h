@@ -24,10 +24,6 @@
 extern void RemoveTypeById(Oid typeOid);
 extern Oid	AssignTypeArrayOid(void);
 
-extern ObjectAddress AlterTypeOwner(List *names, Oid newOwnerId, ObjectType objecttype);
-extern void AlterTypeOwner_oid(Oid typeOid, Oid newOwnerId, bool hasDependEntry);
-extern void AlterTypeOwnerInternal(Oid typeOid, Oid newOwnerId);
-
 extern Oid	AlterTypeNamespaceInternal(Oid typeOid, Oid nspOid,
 									   bool isImplicitArray,
 									   bool errorOnTableType,

@@ -71,8 +71,6 @@ extern void ExplainOnePlan(PlannedStmt *plannedstmt, ExplainState *es,
 
 extern void ExplainPrintPlan(ExplainState *es, QueryDesc *queryDesc);
 
-extern void ExplainQueryText(ExplainState *es, QueryDesc *queryDesc);
-
 extern void ExplainPropertyList(const char *qlabel, List *data,
 								ExplainState *es);
 extern void ExplainPropertyText(const char *qlabel, const char *value,

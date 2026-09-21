@@ -27,7 +27,6 @@
 #ifdef PROFILE_PID_DIR
 
 #endif
-#include "storage/dsm.h"
 #include "storage/ipc.h"
 #include "storage/lwlock.h"
 #include "tcop/tcopprot.h"
@@ -249,24 +248,6 @@ shmem_exit(int code)
 	before_shmem_exit_index = 0;
 
 	/*
-	 * Call dynamic shared memory callbacks.
-	 *
-	 * These serve the same purpose as late callbacks, but for dynamic shared
-	 * memory segments rather than the main shared memory segment.
-	 * dsm_backend_shutdown() has the same kind of progressive logic we use
-	 * for the main shared memory segment; namely, it unregisters each
-	 * callback before invoking it, so that we don't get stuck in an infinite
-	 * loop if one of those callbacks itself throws an ERROR or FATAL.
-	 *
-	 * Note that explicitly calling this function here is quite different from
-	 * registering it as an on_shmem_exit callback for precisely this reason:
-	 * if one dynamic shared memory callback errors out, the remaining
-	 * callbacks will still be invoked.  Thus, hard-coding this call puts it
-	 * equal footing with callbacks for the main shared memory segment.
-	 */
-	dsm_backend_shutdown();
-
-	/*
 	 * Call on_shmem_exit callbacks.
 	 *
 	 * These are generally releasing low-level shared memory resources.  In
@@ -422,7 +403,6 @@ on_exit_reset(void)
 	before_shmem_exit_index = 0;
 	on_shmem_exit_index = 0;
 	on_proc_exit_index = 0;
-	reset_on_dsm_detach();
 }
 
 /* ----------------------------------------------------------------

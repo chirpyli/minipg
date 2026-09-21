@@ -48,20 +48,9 @@ extern Oid	ResolveOpClass(List *opclass, Oid attrType,
 /* commands/operatorcmds.c */
 extern void RemoveOperatorById(Oid operOid);
 
-/* commands/statscmds.c */
-
-extern Oid	StatisticsGetRelation(Oid statId, bool missing_ok);
-
 /* commands/opclasscmds.c */
-extern void IsThereOpClassInNamespace(const char *opcname, Oid opcmethod,
-									  Oid opcnamespace);
-extern void IsThereOpFamilyInNamespace(const char *opfname, Oid opfmethod,
-									   Oid opfnamespace);
 extern Oid	get_opclass_oid(Oid amID, List *opclassname, bool missing_ok);
 extern Oid	get_opfamily_oid(Oid amID, List *opfamilyname, bool missing_ok);
-
-extern text *serialize_deflist(List *deflist);
-extern List *deserialize_deflist(Datum txt);
 
 /* commands/amcmds.c */
 extern Oid	get_index_am_oid(const char *amname, bool missing_ok);

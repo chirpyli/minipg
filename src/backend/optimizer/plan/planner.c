@@ -53,7 +53,6 @@
 #include "parser/parse_agg.h"
 #include "parser/parsetree.h"
 #include "rewrite/rewriteManip.h"
-#include "storage/dsm_impl.h"
 #include "utils/lsyscache.h"
 #include "utils/rel.h"
 #include "utils/selfuncs.h"
@@ -2222,118 +2221,6 @@ expression_planner_with_deps(Expr *expr,
 	return (Expr *) result;
 }
 
-
-/*
- * plan_cluster_use_sort
- *		Use the planner to decide how CLUSTER should implement sorting
- *
- * tableOid is the OID of a table to be clustered on its index indexOid
- * (which is already known to be a btree index).  Decide whether it's
- * cheaper to do an indexscan or a seqscan-plus-sort to execute the CLUSTER.
- * Return true to use sorting, false to use an indexscan.
- *
- * Note: caller had better already hold some type of lock on the table.
- */
-bool
-plan_cluster_use_sort(Oid tableOid, Oid indexOid)
-{
-	PlannerInfo *root;
-	Query	   *query;
-	PlannerGlobal *glob;
-	RangeTblEntry *rte;
-	RelOptInfo *rel;
-	IndexOptInfo *indexInfo;
-	QualCost	indexExprCost;
-	Cost		comparisonCost;
-	Path	   *seqScanPath;
-	Path		seqScanAndSortPath;
-	IndexPath  *indexScanPath;
-	ListCell   *lc;
-
-	/* We can short-circuit the cost comparison if indexscans are disabled */
-	if (!enable_indexscan)
-		return true;			/* use sort */
-
-	/* Set up mostly-dummy planner state */
-	query = makeNode(Query);
-	query->commandType = CMD_SELECT;
-
-	glob = makeNode(PlannerGlobal);
-
-	root = makeNode(PlannerInfo);
-	root->parse = query;
-	root->glob = glob;
-	root->query_level = 1;
-	root->planner_cxt = CurrentMemoryContext;
-	root->wt_param_id = -1;
-
-	/* Build a minimal RTE for the rel */
-	rte = makeNode(RangeTblEntry);
-	rte->rtekind = RTE_RELATION;
-	rte->relid = tableOid;
-	rte->relkind = RELKIND_RELATION;	/* Don't be too picky. */
-	rte->rellockmode = AccessShareLock;
-	rte->lateral = false;
-	rte->inFromCl = true;
-	query->rtable = list_make1(rte);
-
-	/* Set up RTE/RelOptInfo arrays */
-	setup_simple_rel_arrays(root);
-
-	/* Build RelOptInfo；此处需要真实索引信息，不按继承父表处理 */
-	rel = build_simple_rel(root, 1, false);
-
-	/* Locate IndexOptInfo for the target index */
-	indexInfo = NULL;
-	foreach(lc, rel->indexlist)
-	{
-		indexInfo = lfirst_node(IndexOptInfo, lc);
-		if (indexInfo->indexoid == indexOid)
-			break;
-	}
-
-	/*
-	 * It's possible that get_relation_info did not generate an IndexOptInfo
-	 * for the desired index; this could happen if it's not yet reached its
-	 * indcheckxmin usability horizon, or if it's a system index and we're
-	 * ignoring system indexes.  In such cases we should tell CLUSTER to not
-	 * trust the index contents but use seqscan-and-sort.
-	 */
-	if (lc == NULL)				/* not in the list? */
-		return true;			/* use sort */
-
-	/*
-	 * Rather than doing all the pushups that would be needed to use
-	 * set_baserel_size_estimates, just do a quick hack for rows and width.
-	 */
-	rel->rows = rel->tuples;
-	rel->reltarget->width = get_relation_data_width(tableOid, NULL);
-
-	root->total_table_pages = rel->pages;
-
-	/*
-	 * Determine eval cost of the index expressions, if any.  We need to
-	 * charge twice that amount for each tuple comparison that happens during
-	 * the sort, since tuplesort.c will have to re-evaluate the index
-	 * expressions each time.  (XXX that's pretty inefficient...)
-	 */
-	cost_qual_eval(&indexExprCost, indexInfo->indexprs, root);
-	comparisonCost = 2.0 * (indexExprCost.startup + indexExprCost.per_tuple);
-
-	/* Estimate the cost of seq scan + sort */
-	seqScanPath = create_seqscan_path(root, rel, NULL);
-	cost_sort(&seqScanAndSortPath, root, NIL,
-			  seqScanPath->total_cost, rel->tuples, rel->reltarget->width,
-			  comparisonCost, maintenance_work_mem);
-
-	/* Estimate the cost of index scan */
-	indexScanPath = create_index_path(root, indexInfo,
-									  NIL, NIL, NIL, NIL,
-									  ForwardScanDirection, false,
-									  NULL, 1.0);
-
-	return (seqScanAndSortPath.total_cost < indexScanPath->path.total_cost);
-}
 
 /*
  * add_paths_to_grouping_rel

@@ -24,7 +24,6 @@
 #ifndef PG_SHMEM_H
 #define PG_SHMEM_H
 
-#include "storage/dsm_impl.h"
 
 typedef struct PGShmemHeader	/* standard header for all Postgres shmem */
 {
@@ -33,7 +32,6 @@ typedef struct PGShmemHeader	/* standard header for all Postgres shmem */
 	pid_t		creatorPID;		/* PID of creating process (set but unread) */
 	Size		totalsize;		/* total size of segment */
 	Size		freeoffset;		/* offset to first free space */
-	dsm_handle	dsm_control;	/* ID of dynamic shared memory control seg */
 	void	   *index;			/* pointer to ShmemIndex table */
 	dev_t		device;			/* device data directory is on */
 	ino_t		inode;			/* inode number of data directory */

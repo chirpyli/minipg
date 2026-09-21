@@ -501,9 +501,6 @@ pgstat_get_wait_io(WaitEventIO w)
 		case WAIT_EVENT_DATA_FILE_WRITE:
 			event_name = "DataFileWrite";
 			break;
-		case WAIT_EVENT_DSM_FILL_ZERO_WRITE:
-			event_name = "DSMFillZeroWrite";
-			break;
 		case WAIT_EVENT_LOCK_FILE_ADDTODATADIR_READ:
 			event_name = "LockFileAddToDataDirRead";
 			break;

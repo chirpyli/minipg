@@ -120,8 +120,11 @@ installcheck-parallel: all
 installcheck-tests: all
 	$(pg_regress_installcheck) $(REGRESS_OPTS) $(TESTS) $(EXTRA_TESTS)
 
-standbycheck: all
-	$(pg_regress_installcheck) $(REGRESS_OPTS) --schedule=$(srcdir)/standby_schedule --use-existing
+# minipg: standbycheck 目标已随 Hot Standby 测试用例一起移除。
+# 原用例（hs_standby_check/allowed/disallowed）依赖 hs_primary_setup.sql 在
+# 主库上预置数据、并要求由主库向备库持续传送 WAL 文件，而该 setup 脚本与
+# 驱动它的 src/test/recovery 目录均已裁剪；用例本身还使用了已裁剪的
+# GRANT/REVOKE。故连同 standby_schedule 一并删除。
 
 # old interfaces follow...
 
@@ -129,11 +132,8 @@ runcheck: check
 runtest: installcheck
 runtest-parallel: installcheck-parallel
 
-bigtest: all
-	$(pg_regress_installcheck) $(REGRESS_OPTS) --schedule=$(srcdir)/parallel_schedule --max-connections=1 numeric_big
-
-bigcheck: all | temp-install
-	$(pg_regress_check) $(REGRESS_OPTS) --schedule=$(srcdir)/parallel_schedule $(MAXCONNOPT) numeric_big
+# minipg: bigtest/bigcheck 目标已移除，其唯一的测试用例 numeric_big 随
+# numeric 数据类型一起被裁剪（无 sql/numeric_big.sql 与 expected/numeric_big.out）。
 
 
 ##

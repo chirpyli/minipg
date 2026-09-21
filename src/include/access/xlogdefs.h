@@ -62,8 +62,13 @@ typedef uint32 TimeLineID;
 /*
  * Replication origin id - this is located in this file to avoid having to
  * include origin.h in a bunch of xlog related places.
+ *
+ * minipg has cropped logical replication, so all that survives is the id
+ * type carried in the WAL commit records and the "no origin" marker.
  */
 typedef uint16 RepOriginId;
+
+#define InvalidRepOriginId 0
 
 /*
  *	Because O_DIRECT bypasses the kernel buffers, and because we never

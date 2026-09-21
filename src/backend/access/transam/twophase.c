@@ -92,7 +92,6 @@
 #include "miscadmin.h"
 #include "pg_trace.h"
 #include "pgstat.h"
-#include "replication/origin.h"
 #include "storage/fd.h"
 #include "storage/ipc.h"
 #include "storage/md.h"

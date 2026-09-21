@@ -22,7 +22,5 @@ extern Oid	CreateSchemaCommand(CreateSchemaStmt *parsetree,
 								const char *queryString,
 								int stmt_location, int stmt_len);
 
-extern ObjectAddress AlterSchemaOwner(const char *name, Oid newOwnerId);
-extern void AlterSchemaOwner_oid(Oid schemaOid, Oid newOwnerId);
 
 #endif							/* SCHEMACMDS_H */

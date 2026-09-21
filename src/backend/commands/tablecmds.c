@@ -147,7 +147,6 @@ typedef struct AlteredTableInfo
 	List	   *changedConstraintDefs;	/* string definitions of same */
 	List	   *changedIndexOids;	/* OIDs of indexes to rebuild */
 	List	   *changedIndexDefs;	/* string definitions of same */
-	char	   *clusterOnIndex; /* index to use for CLUSTER */
 } AlteredTableInfo;
 
 /*
@@ -3993,18 +3992,6 @@ ATExecAlterColumnType(AlteredTableInfo *tab, Relation rel,
 	return address;
 }
 
-static void
-RememberClusterOnForRebuilding(Oid indoid, AlteredTableInfo *tab)
-{
-	if (!get_index_isclustered(indoid))
-		return;
-
-	if (tab->clusterOnIndex)
-		elog(ERROR, "relation %u has multiple clustered indexes", tab->relid);
-
-	tab->clusterOnIndex = get_rel_name(indoid);
-}
-
 /*
  * Subroutine for ATExecAlterColumnType: remember that a constraint needs
  * to be rebuilt (which we might already know).
@@ -4023,24 +4010,11 @@ RememberConstraintForRebuilding(Oid conoid, AlteredTableInfo *tab)
 	{
 		/* OK, capture the constraint's existing definition string */
 		char	   *defstring = pg_get_constraintdef_command(conoid);
-		Oid			indoid;
 
 		tab->changedConstraintOids = lappend_oid(tab->changedConstraintOids,
 												 conoid);
 		tab->changedConstraintDefs = lappend(tab->changedConstraintDefs,
 											 defstring);
-
-		/*
-		 * For the index of a constraint, if any, remember if it is used for
-		 * the table's replica identity or if it is a clustered index, so that
-		 * ATPostAlterTypeCleanup() can queue up commands necessary to restore
-		 * those properties.
-		 */
-		indoid = get_constraint_index(conoid);
-		if (OidIsValid(indoid))
-		{
-			RememberClusterOnForRebuilding(indoid, tab);
-		}
 	}
 }
 
@@ -4083,13 +4057,6 @@ RememberIndexForRebuilding(Oid indoid, AlteredTableInfo *tab)
 												indoid);
 			tab->changedIndexDefs = lappend(tab->changedIndexDefs,
 											defstring);
-
-			/*
-			 * Remember if this index is used for the table's replica identity
-			 * or if it is a clustered index, so that ATPostAlterTypeCleanup()
-			 * can queue up commands necessary to restore those properties.
-			 */
-			RememberClusterOnForRebuilding(indoid, tab);
 		}
 	}
 }

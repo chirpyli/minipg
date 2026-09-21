@@ -52,7 +52,6 @@ typedef int (*AcquireSampleRowsFunc) (Relation onerel, int elevel,
 #include "parser/parse_relation.h"
 #include "pgstat.h"
 
-#include "statistics/extended_stats_internal.h"
 #include "storage/bufmgr.h"
 #include "storage/lmgr.h"
 #include "storage/proc.h"
@@ -78,6 +77,27 @@ typedef struct AnlIndexData
 	VacAttrStats **vacattrstats;	/* index attrs to analyze */
 	int			attr_cnt;
 } AnlIndexData;
+
+/*
+ * Data structures for per-column statistics collection.
+ *
+ * These used to live in statistics/extended_stats_internal.h, which also
+ * carried the multi-column (extended statistics) sorting machinery; the
+ * latter has been cropped along with extended statistics, and ANALYZE is
+ * the only remaining user, so the definitions live here now.
+ */
+typedef struct
+{
+	Oid			eqopr;			/* '=' operator for datatype, if any */
+	Oid			eqfunc;			/* and associated function */
+	Oid			ltopr;			/* '<' operator for datatype, if any */
+} StdAnalyzeData;
+
+typedef struct
+{
+	Datum		value;			/* a data value */
+	int			tupno;			/* position index for tuple it came from */
+} ScalarItem;
 
 
 /* Default statistics target (GUC parameter) */

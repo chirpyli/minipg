@@ -22,7 +22,4 @@ extern void ExecSortMarkPos(SortState *node);
 extern void ExecSortRestrPos(SortState *node);
 extern void ExecReScanSort(SortState *node);
 
-/* parallel instrumentation support */
-extern void ExecSortRetrieveInstrumentation(SortState *node);
-
 #endif							/* NODESORT_H */

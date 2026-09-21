@@ -1,7 +1,10 @@
 /*-------------------------------------------------------------------------
  *
  * timestamp.h
- *	  Definitions for the SQL "timestamp" and "interval" types.
+ *	  Definitions for the SQL "timestamp" and "timestamptz" types.
+ *
+ * Note: minipg has cropped the SQL "interval" type, so the interval
+ * support routines and macros that used to live here are gone too.
  *
  * Portions Copyright (c) 1996-2021, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
@@ -36,18 +39,6 @@
 #define PG_RETURN_TIMESTAMP(x) return TimestampGetDatum(x)
 #define PG_RETURN_TIMESTAMPTZ(x) return TimestampTzGetDatum(x)
 
-
-#define TIMESTAMP_MASK(b) (1 << (b))
-#define INTERVAL_MASK(b) (1 << (b))
-
-/* Macros to handle packing and unpacking the typmod field for intervals */
-#define INTERVAL_FULL_RANGE (0x7FFF)
-#define INTERVAL_RANGE_MASK (0x7FFF)
-#define INTERVAL_FULL_PRECISION (0xFFFF)
-#define INTERVAL_PRECISION_MASK (0xFFFF)
-#define INTERVAL_TYPMOD(p,r) ((((r) & INTERVAL_RANGE_MASK) << 16) | ((p) & INTERVAL_PRECISION_MASK))
-#define INTERVAL_PRECISION(t) ((t) & INTERVAL_PRECISION_MASK)
-#define INTERVAL_RANGE(t) (((t) >> 16) & INTERVAL_RANGE_MASK)
 
 #define TimestampTzPlusMilliseconds(tz,ms) ((tz) + ((ms) * (int64) 1000))
 

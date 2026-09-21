@@ -57,8 +57,8 @@
 
 
 
-static void rebuild_relation(Relation OldHeap, Oid indexOid, bool verbose);
-static void copy_table_data(Oid OIDNewHeap, Oid OIDOldHeap, Oid OIDOldIndex,
+static void rebuild_relation(Relation OldHeap, bool verbose);
+static void copy_table_data(Oid OIDNewHeap, Oid OIDOldHeap,
 							bool verbose, bool *pSwapToastByContent,
 							TransactionId *pFreezeXid, MultiXactId *pCutoffMulti);
 
@@ -67,46 +67,39 @@ static void copy_table_data(Oid OIDNewHeap, Oid OIDOldHeap, Oid OIDOldIndex,
 /*
  * cluster_rel
  *
- * This clusters the table by creating a new, clustered table and
- * swapping the relfilenodes of the new table and the old table, so
- * the OID of the original table is preserved.  Thus we do not lose
- * GRANT, inheritance nor references to this table (this was a bug
- * in releases through 7.3).
+ * This rewrites the table by creating a new one and swapping the
+ * relfilenodes of the new table and the old table, so the OID of the
+ * original table is preserved.  Thus we do not lose references to this
+ * table (this was a bug in releases through 7.3).
  *
  * Indexes are rebuilt too, via REINDEX. Since we are effectively bulk-loading
  * the new table, it's better to create the indexes afterwards than to fill
  * them incrementally while we load the table.
  *
- * If indexOid is InvalidOid, the table will be rewritten in physical order
- * instead of index order.  This is the new implementation of VACUUM FULL,
- * and error messages should refer to the operation as VACUUM not CLUSTER.
+ * minipg note: the CLUSTER command has been cropped, so this is now only the
+ * implementation of VACUUM FULL, which rewrites the table in physical order.
+ * The "cluster by an index" code paths (index ordered rewrite, marking an
+ * index as indisclustered, rechecking a previously chosen index) are gone.
  */
 void
-cluster_rel(Oid tableOid, Oid indexOid, ClusterParams *params)
+cluster_rel(Oid tableOid, ClusterParams *params)
 {
 	Relation	OldHeap;
 	Oid			save_userid;
 	int			save_sec_context;
 	int			save_nestlevel;
 	bool		verbose = ((params->options & CLUOPT_VERBOSE) != 0);
-	bool		recheck = ((params->options & CLUOPT_RECHECK) != 0);
 
 	/* Check for user-requested abort. */
 	CHECK_FOR_INTERRUPTS();
 
 	pgstat_progress_start_command(PROGRESS_COMMAND_CLUSTER, tableOid);
-	if (OidIsValid(indexOid))
-		pgstat_progress_update_param(PROGRESS_CLUSTER_COMMAND,
-									 PROGRESS_CLUSTER_COMMAND_CLUSTER);
-	else
-		pgstat_progress_update_param(PROGRESS_CLUSTER_COMMAND,
-									 PROGRESS_CLUSTER_COMMAND_VACUUM_FULL);
+	pgstat_progress_update_param(PROGRESS_CLUSTER_COMMAND,
+								 PROGRESS_CLUSTER_COMMAND_VACUUM_FULL);
 
 	/*
-	 * We grab exclusive access to the target rel and index for the duration
-	 * of the transaction.  (This is redundant for the single-transaction
-	 * case, since cluster() already did it.)  The index lock is taken inside
-	 * check_index_is_clusterable.
+	 * We grab exclusive access to the target rel for the duration of the
+	 * transaction.
 	 */
 	OldHeap = try_relation_open(tableOid, AccessExclusiveLock);
 
@@ -128,63 +121,10 @@ cluster_rel(Oid tableOid, Oid indexOid, ClusterParams *params)
 	save_nestlevel = NewGUCNestLevel();
 
 	/*
-	 * Since we may open a new transaction for each relation, we have to check
-	 * that the relation still is what we think it is.
-	 *
-	 * If this is a single-transaction CLUSTER, we can skip these tests. We
-	 * *must* skip the one on indisclustered since it would reject an attempt
-	 * to cluster a not-previously-clustered index.
-	 */
-	if (recheck)
-	{
-		/* Check that the user still owns the relation */
-		{
-			relation_close(OldHeap, AccessExclusiveLock);
-			goto out;
-		}
-
-		if (OidIsValid(indexOid))
-		{
-			/*
-			 * Check that the index still exists
-			 */
-			if (!SearchSysCacheExists1(RELOID, ObjectIdGetDatum(indexOid)))
-			{
-				relation_close(OldHeap, AccessExclusiveLock);
-				goto out;
-			}
-
-			/*
-			 * Check that the index is still the one with indisclustered set.
-			 */
-			if (!get_index_isclustered(indexOid))
-			{
-				relation_close(OldHeap, AccessExclusiveLock);
-				goto out;
-			}
-		}
-	}
-
-	/*
-	 * We allow VACUUM FULL, but not CLUSTER, on shared catalogs.  CLUSTER
-	 * would work in most respects, but the index would only get marked as
-	 * indisclustered in the current database, leading to unexpected behavior
-	 * if CLUSTER were later invoked in another database.
-	 */
-	if (OidIsValid(indexOid) && OldHeap->rd_rel->relisshared)
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot cluster a shared catalog")));
-
-	/*
 	 * Also check for active uses of the relation in the current transaction,
 	 * including open scans and pending AFTER trigger events.
 	 */
-	CheckTableNotInUse(OldHeap, OidIsValid(indexOid) ? "CLUSTER" : "VACUUM");
-
-	/* Check heap and index are valid to cluster on */
-	if (OidIsValid(indexOid))
-		check_index_is_clusterable(OldHeap, indexOid, recheck, AccessExclusiveLock);
+	CheckTableNotInUse(OldHeap, "VACUUM");
 
 	/*
 	 * All predicate locks on the tuples or pages are about to be made
@@ -195,11 +135,10 @@ cluster_rel(Oid tableOid, Oid indexOid, ClusterParams *params)
 	TransferPredicateLocksToHeapRelation(OldHeap);
 
 	/* rebuild_relation does all the dirty work */
-	rebuild_relation(OldHeap, indexOid, verbose);
+	rebuild_relation(OldHeap, verbose);
 
 	/* NB: rebuild_relation does table_close() on OldHeap */
 
-out:
 	/* Roll back any GUC changes executed by index functions */
 	AtEOXact_GUC(false, save_nestlevel);
 
@@ -210,142 +149,14 @@ out:
 }
 
 /*
- * Verify that the specified heap and index are valid to cluster on
- *
- * Side effect: obtains lock on the index.  The caller may
- * in some cases already have AccessExclusiveLock on the table, but
- * not in all cases so we can't rely on the table-level lock for
- * protection here.
- */
-void
-check_index_is_clusterable(Relation OldHeap, Oid indexOid, bool recheck, LOCKMODE lockmode)
-{
-	Relation	OldIndex;
-
-	OldIndex = index_open(indexOid, lockmode);
-
-	/*
-	 * Check that index is in fact an index on the given relation
-	 */
-	if (OldIndex->rd_index == NULL ||
-		OldIndex->rd_index->indrelid != RelationGetRelid(OldHeap))
-		ereport(ERROR,
-				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-				 errmsg("\"%s\" is not an index for table \"%s\"",
-						RelationGetRelationName(OldIndex),
-						RelationGetRelationName(OldHeap))));
-
-	/* Index AM must allow clustering */
-	if (!OldIndex->rd_indam->amclusterable)
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot cluster on index \"%s\" because access method does not support clustering",
-						RelationGetRelationName(OldIndex))));
-
-	/*
-	 * Disallow clustering on incomplete indexes (those that might not index
-	 * every row of the relation).  We could relax this by making a separate
-	 * seqscan pass over the table to copy the missing rows, but that seems
-	 * expensive and tedious.
-	 */
-	if (!heap_attisnull(OldIndex->rd_indextuple, Anum_pg_index_indpred, NULL))
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot cluster on partial index \"%s\"",
-						RelationGetRelationName(OldIndex))));
-
-	/*
-	 * Disallow if index is left over from a failed CREATE INDEX CONCURRENTLY;
-	 * it might well not contain entries for every heap row, or might not even
-	 * be internally consistent.  (But note that we don't check indcheckxmin;
-	 * the worst consequence of following broken HOT chains would be that we
-	 * might put recently-dead tuples out-of-order in the new table, and there
-	 * is little harm in that.)
-	 */
-	if (!OldIndex->rd_index->indisvalid)
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot cluster on invalid index \"%s\"",
-						RelationGetRelationName(OldIndex))));
-
-	/* Drop relcache refcnt on OldIndex, but keep lock */
-	index_close(OldIndex, NoLock);
-}
-
-/*
- * mark_index_clustered: mark the specified index as the one clustered on
- *
- * With indexOid == InvalidOid, will mark all indexes of rel not-clustered.
- */
-void
-mark_index_clustered(Relation rel, Oid indexOid, bool is_internal)
-{
-	HeapTuple	indexTuple;
-	Form_pg_index indexForm;
-	Relation	pg_index;
-	ListCell   *index;
-
-	/*
-	 * If the index is already marked clustered, no need to do anything.
-	 */
-	if (OidIsValid(indexOid))
-	{
-		if (get_index_isclustered(indexOid))
-			return;
-	}
-
-	/*
-	 * Check each index of the relation and set/clear the bit as needed.
-	 */
-	pg_index = table_open(IndexRelationId, RowExclusiveLock);
-
-	foreach(index, RelationGetIndexList(rel))
-	{
-		Oid			thisIndexOid = lfirst_oid(index);
-
-		indexTuple = SearchSysCacheCopy1(INDEXRELID,
-										 ObjectIdGetDatum(thisIndexOid));
-		if (!HeapTupleIsValid(indexTuple))
-			elog(ERROR, "cache lookup failed for index %u", thisIndexOid);
-		indexForm = (Form_pg_index) GETSTRUCT(indexTuple);
-
-		/*
-		 * Unset the bit if set.  We know it's wrong because we checked this
-		 * earlier.
-		 */
-		if (indexForm->indisclustered)
-		{
-			indexForm->indisclustered = false;
-			CatalogTupleUpdate(pg_index, &indexTuple->t_self, indexTuple);
-		}
-		else if (thisIndexOid == indexOid)
-		{
-			/* this was checked earlier, but let's be real sure */
-			if (!indexForm->indisvalid)
-				elog(ERROR, "cannot cluster on invalid index %u", indexOid);
-			indexForm->indisclustered = true;
-			CatalogTupleUpdate(pg_index, &indexTuple->t_self, indexTuple);
-		}
-
-		InvokeObjectPostAlterHookArg(IndexRelationId, thisIndexOid, 0,
-									 InvalidOid, is_internal);
-
-		heap_freetuple(indexTuple);
-	}
-
-	table_close(pg_index, RowExclusiveLock);
-}
-
-/*
- * rebuild_relation: rebuild an existing relation in index or physical order
+ * rebuild_relation: rebuild an existing relation in physical order
  *
  * OldHeap: table to rebuild --- must be opened and exclusive-locked!
- * indexOid: index to cluster by, or InvalidOid to rewrite in physical order.
  *
  * NB: this routine closes OldHeap at the right time; caller should not.
  */
 static void
-rebuild_relation(Relation OldHeap, Oid indexOid, bool verbose)
+rebuild_relation(Relation OldHeap, bool verbose)
 {
 	Oid			tableOid = RelationGetRelid(OldHeap);
 	Oid			tableSpace = OldHeap->rd_rel->reltablespace;
@@ -355,10 +166,6 @@ rebuild_relation(Relation OldHeap, Oid indexOid, bool verbose)
 	bool		swap_toast_by_content;
 	TransactionId frozenXid;
 	MultiXactId cutoffMulti;
-
-	/* Mark the correct index as clustered */
-	if (OidIsValid(indexOid))
-		mark_index_clustered(OldHeap, indexOid, true);
 
 	/* Remember info about rel before closing OldHeap */
 	relpersistence = OldHeap->rd_rel->relpersistence;
@@ -373,7 +180,7 @@ rebuild_relation(Relation OldHeap, Oid indexOid, bool verbose)
 							   AccessExclusiveLock);
 
 	/* Copy the heap data into the new table in the desired order */
-	copy_table_data(OIDNewHeap, tableOid, indexOid, verbose,
+	copy_table_data(OIDNewHeap, tableOid, verbose,
 					&swap_toast_by_content, &frozenXid, &cutoffMulti);
 
 	/*
@@ -491,13 +298,12 @@ make_new_heap(Oid OIDOldHeap, Oid NewTableSpace, char relpersistence,
  * *pCutoffMulti receives the MultiXactId used as a cutoff point.
  */
 static void
-copy_table_data(Oid OIDNewHeap, Oid OIDOldHeap, Oid OIDOldIndex, bool verbose,
+copy_table_data(Oid OIDNewHeap, Oid OIDOldHeap, bool verbose,
 				bool *pSwapToastByContent, TransactionId *pFreezeXid,
 				MultiXactId *pCutoffMulti)
 {
 	Relation	NewHeap,
-				OldHeap,
-				OldIndex;
+				OldHeap;
 	Relation	relRelation;
 	HeapTuple	reltup;
 	Form_pg_class relform;
@@ -506,7 +312,6 @@ copy_table_data(Oid OIDNewHeap, Oid OIDOldHeap, Oid OIDOldIndex, bool verbose,
 	TransactionId OldestXmin;
 	TransactionId FreezeXid;
 	MultiXactId MultiXactCutoff;
-	bool		use_sort;
 	double		num_tuples = 0,
 				tups_vacuumed = 0,
 				tups_recently_dead = 0;
@@ -521,10 +326,6 @@ copy_table_data(Oid OIDNewHeap, Oid OIDOldHeap, Oid OIDOldIndex, bool verbose,
 	 */
 	NewHeap = table_open(OIDNewHeap, AccessExclusiveLock);
 	OldHeap = table_open(OIDOldHeap, AccessExclusiveLock);
-	if (OidIsValid(OIDOldIndex))
-		OldIndex = index_open(OIDOldIndex, AccessExclusiveLock);
-	else
-		OldIndex = NULL;
 
 	/*
 	 * Their tuple descriptors should be exactly alike, but here we only need
@@ -608,43 +409,22 @@ copy_table_data(Oid OIDNewHeap, Oid OIDOldHeap, Oid OIDOldIndex, bool verbose,
 		MultiXactIdPrecedes(MultiXactCutoff, OldHeap->rd_rel->relminmxid))
 		MultiXactCutoff = OldHeap->rd_rel->relminmxid;
 
-	/*
-	 * Decide whether to use an indexscan or seqscan-and-optional-sort to scan
-	 * the OldHeap.  We know how to use a sort to duplicate the ordering of a
-	 * btree index, and will use seqscan-and-sort for that case if the planner
-	 * tells us it's cheaper.  Otherwise, always indexscan if an index is
-	 * provided, else plain seqscan.
-	 */
-	if (OldIndex != NULL && OldIndex->rd_rel->relam == BTREE_AM_OID)
-		use_sort = plan_cluster_use_sort(OIDOldHeap, OIDOldIndex);
-	else
-		use_sort = false;
-
 	/* Log what we're doing */
-	if (OldIndex != NULL && !use_sort)
-		ereport(elevel,
-				(errmsg("clustering \"%s.%s\" using index scan on \"%s\"",
-						get_namespace_name(RelationGetNamespace(OldHeap)),
-						RelationGetRelationName(OldHeap),
-						RelationGetRelationName(OldIndex))));
-	else if (use_sort)
-		ereport(elevel,
-				(errmsg("clustering \"%s.%s\" using sequential scan and sort",
-						get_namespace_name(RelationGetNamespace(OldHeap)),
-						RelationGetRelationName(OldHeap))));
-	else
-		ereport(elevel,
-				(errmsg("vacuuming \"%s.%s\"",
-						get_namespace_name(RelationGetNamespace(OldHeap)),
-						RelationGetRelationName(OldHeap))));
+	ereport(elevel,
+			(errmsg("vacuuming \"%s.%s\"",
+					get_namespace_name(RelationGetNamespace(OldHeap)),
+					RelationGetRelationName(OldHeap))));
 
 	/*
 	 * Hand of the actual copying to AM specific function, the generic code
 	 * cannot know how to deal with visibility across AMs. Note that this
 	 * routine is allowed to set FreezeXid / MultiXactCutoff to different
 	 * values (e.g. because the AM doesn't use freezing).
+	 *
+	 * minipg: the table is always rewritten in physical order (no index
+	 * ordered rewrite), so no index and no sort are requested.
 	 */
-	table_relation_copy_for_cluster(OldHeap, NewHeap, OldIndex, use_sort,
+	table_relation_copy_for_cluster(OldHeap, NewHeap, NULL, false,
 									OldestXmin, &FreezeXid, &MultiXactCutoff,
 									&num_tuples, &tups_vacuumed,
 									&tups_recently_dead);
@@ -669,8 +449,6 @@ copy_table_data(Oid OIDNewHeap, Oid OIDOldHeap, Oid OIDOldIndex, bool verbose,
 					   tups_recently_dead,
 					   pg_rusage_show(&ru0))));
 
-	if (OldIndex != NULL)
-		index_close(OldIndex, NoLock);
 	table_close(OldHeap, NoLock);
 	table_close(NewHeap, NoLock);
 

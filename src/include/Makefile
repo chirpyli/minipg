@@ -17,10 +17,12 @@ all: pg_config.h pg_config_ext.h pg_config_os.h
 
 
 # Subdirectories containing installable headers
+# minipg: replication/ and statistics/ have been cropped (the last headers
+# they held, origin.h and extended_stats_internal.h, are gone).
 SUBDIRS = access bootstrap catalog commands common datatype \
 	executor fe_utils \
 	lib libpq mb nodes optimizer parser postmaster \
-	replication rewrite \
+	rewrite \
 	storage tcop \
 	utils port port/atomics portability
 

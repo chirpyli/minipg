@@ -20,19 +20,15 @@
 
 
 /* flag bits for ClusterParams->flags */
-#define CLUOPT_RECHECK 0x01		/* recheck relation state */
 #define CLUOPT_VERBOSE 0x02		/* print progress info */
 
-/* options for CLUSTER */
+/* options for the VACUUM FULL table rewrite */
 typedef struct ClusterParams
 {
 	bits32		options;		/* bitmask of CLUOPT_* */
 } ClusterParams;
 
-extern void cluster_rel(Oid tableOid, Oid indexOid, ClusterParams *params);
-extern void check_index_is_clusterable(Relation OldHeap, Oid indexOid,
-									   bool recheck, LOCKMODE lockmode);
-extern void mark_index_clustered(Relation rel, Oid indexOid, bool is_internal);
+extern void cluster_rel(Oid tableOid, ClusterParams *params);
 
 extern Oid	make_new_heap(Oid OIDOldHeap, Oid NewTableSpace, char relpersistence,
 						  LOCKMODE lockmode);

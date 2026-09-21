@@ -14,7 +14,10 @@ override CPPFLAGS := -I$(libpq_srcdir) $(CPPFLAGS)
 LDFLAGS_INTERNAL += $(libpq_pgport)
 
 
-PROGS = testlibpq testlibpq3 testlibpq4
+# minipg: testlibpq3 has been cropped.  Its whole point was to demonstrate
+# PQexecParams() (out-of-line parameters + binary result format), and the
+# backend only implements the simple query protocol.
+PROGS = testlibpq testlibpq4
 
 all: $(PROGS)
 

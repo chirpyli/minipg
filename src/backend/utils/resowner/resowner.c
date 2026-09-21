@@ -124,7 +124,6 @@ typedef struct ResourceOwnerData
 	ResourceArray tupdescarr;	/* tupdesc references */
 	ResourceArray snapshotarr;	/* snapshot references */
 	ResourceArray filearr;		/* open temporary files */
-	ResourceArray dsmarr;		/* dynamic shmem segments */
 
 	/* We can remember up to MAX_RESOWNER_LOCKS references to local locks. */
 	int			nlocks;			/* number of owned locks */
@@ -170,7 +169,6 @@ static void PrintRelCacheLeakWarning(Relation rel);
 static void PrintTupleDescLeakWarning(TupleDesc tupdesc);
 static void PrintSnapshotLeakWarning(Snapshot snapshot);
 static void PrintFileLeakWarning(File file);
-static void PrintDSMLeakWarning(dsm_segment *seg);
 
 
 /*****************************************************************************
@@ -437,7 +435,6 @@ ResourceOwnerCreate(ResourceOwner parent, const char *name)
 	ResourceArrayInit(&(owner->tupdescarr), PointerGetDatum(NULL));
 	ResourceArrayInit(&(owner->snapshotarr), PointerGetDatum(NULL));
 	ResourceArrayInit(&(owner->filearr), FileGetDatum(-1));
-	ResourceArrayInit(&(owner->dsmarr), PointerGetDatum(NULL));
 
 	return owner;
 }
@@ -528,16 +525,6 @@ ResourceOwnerReleaseInternal(ResourceOwner owner,
 			if (isCommit)
 				PrintRelCacheLeakWarning(res);
 			RelationClose(res);
-		}
-
-		/* Ditto for dynamic shared memory segments */
-		while (ResourceArrayGetAny(&(owner->dsmarr), &foundres))
-		{
-			dsm_segment *res = (dsm_segment *) DatumGetPointer(foundres);
-
-			if (isCommit)
-				PrintDSMLeakWarning(res);
-			dsm_detach(res);
 		}
 	}
 	else if (phase == RESOURCE_RELEASE_LOCKS)
@@ -674,7 +661,6 @@ ResourceOwnerDelete(ResourceOwner owner)
 	Assert(owner->tupdescarr.nitems == 0);
 	Assert(owner->snapshotarr.nitems == 0);
 	Assert(owner->filearr.nitems == 0);
-	Assert(owner->dsmarr.nitems == 0);
 	Assert(owner->nlocks == 0 || owner->nlocks == MAX_RESOWNER_LOCKS + 1);
 
 	/*
@@ -699,7 +685,6 @@ ResourceOwnerDelete(ResourceOwner owner)
 	ResourceArrayFree(&(owner->tupdescarr));
 	ResourceArrayFree(&(owner->snapshotarr));
 	ResourceArrayFree(&(owner->filearr));
-	ResourceArrayFree(&(owner->dsmarr));
 
 	pfree(owner);
 }
@@ -1193,49 +1178,4 @@ PrintFileLeakWarning(File file)
 {
 	elog(WARNING, "temporary file leak: File %d still referenced",
 		 file);
-}
-
-/*
- * Make sure there is room for at least one more entry in a ResourceOwner's
- * dynamic shmem segment reference array.
- *
- * This is separate from actually inserting an entry because if we run out
- * of memory, it's critical to do so *before* acquiring the resource.
- */
-void
-ResourceOwnerEnlargeDSMs(ResourceOwner owner)
-{
-	ResourceArrayEnlarge(&(owner->dsmarr));
-}
-
-/*
- * Remember that a dynamic shmem segment is owned by a ResourceOwner
- *
- * Caller must have previously done ResourceOwnerEnlargeDSMs()
- */
-void
-ResourceOwnerRememberDSM(ResourceOwner owner, dsm_segment *seg)
-{
-	ResourceArrayAdd(&(owner->dsmarr), PointerGetDatum(seg));
-}
-
-/*
- * Forget that a dynamic shmem segment is owned by a ResourceOwner
- */
-void
-ResourceOwnerForgetDSM(ResourceOwner owner, dsm_segment *seg)
-{
-	if (!ResourceArrayRemove(&(owner->dsmarr), PointerGetDatum(seg)))
-		elog(ERROR, "dynamic shared memory segment %u is not owned by resource owner %s",
-			 dsm_segment_handle(seg), owner->name);
-}
-
-/*
- * Debugging subroutine
- */
-static void
-PrintDSMLeakWarning(dsm_segment *seg)
-{
-	elog(WARNING, "dynamic shared memory leak: segment %u still referenced",
-		 dsm_segment_handle(seg));
 }

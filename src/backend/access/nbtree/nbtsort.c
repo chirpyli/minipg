@@ -213,7 +213,6 @@ _bt_spools_heapscan(Relation heap, Relation index, BTBuildState *buildstate,
 					IndexInfo *indexInfo)
 {
 	BTSpool    *btspool = (BTSpool *) palloc0(sizeof(BTSpool));
-	SortCoordinate coordinate = NULL;
 	double		reltuples = 0;
 
 	/*
@@ -256,7 +255,7 @@ _bt_spools_heapscan(Relation heap, Relation index, BTBuildState *buildstate,
 	 */
 	buildstate->spool->sortstate =
 		tuplesort_begin_index_btree(heap, index, buildstate->isunique,
-									maintenance_work_mem, coordinate,
+									maintenance_work_mem,
 									false);
 
 	/*
@@ -267,7 +266,6 @@ _bt_spools_heapscan(Relation heap, Relation index, BTBuildState *buildstate,
 	if (indexInfo->ii_Unique)
 	{
 		BTSpool    *btspool2 = (BTSpool *) palloc0(sizeof(BTSpool));
-		SortCoordinate coordinate2 = NULL;
 
 		/* Initialize secondary spool */
 		btspool2->heap = heap;
@@ -282,7 +280,7 @@ _bt_spools_heapscan(Relation heap, Relation index, BTBuildState *buildstate,
 		 */
 		buildstate->spool2->sortstate =
 			tuplesort_begin_index_btree(heap, index, false, work_mem,
-										coordinate2, false);
+										false);
 	}
 
 	/* Fill spool using a serial heap scan */

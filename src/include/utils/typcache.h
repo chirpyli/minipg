@@ -18,7 +18,6 @@
 
 #include "access/tupdesc.h"
 #include "fmgr.h"
-#include "storage/dsm.h"
 
 typedef struct TypeCacheEntry
 {

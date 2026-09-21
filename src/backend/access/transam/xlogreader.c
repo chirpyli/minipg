@@ -25,7 +25,6 @@
 #include "access/xlogrecord.h"
 #include "catalog/pg_control.h"
 #include "common/pg_lzcompress.h"
-#include "replication/origin.h"
 
 #ifndef FRONTEND
 #include "miscadmin.h"

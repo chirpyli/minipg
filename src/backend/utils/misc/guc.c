@@ -60,7 +60,6 @@
 #include "postmaster/syslogger.h"
 #include "postmaster/walwriter.h"
 #include "storage/bufmgr.h"
-#include "storage/dsm_impl.h"
 #include "storage/fd.h"
 #include "storage/pg_shmem.h"
 #include "storage/predicate.h"
@@ -368,7 +367,6 @@ static struct config_enum_entry shared_memory_options[] = {
 extern const struct config_enum_entry wal_level_options[];
 extern const struct config_enum_entry recovery_target_action_options[];
 extern const struct config_enum_entry sync_method_options[];
-extern const struct config_enum_entry dynamic_shared_memory_options[];
 
 /*
  * GUC option variables that are exported from this module
@@ -1550,17 +1548,6 @@ static struct config_int ConfigureNamesInt[] =
 		&MaxConnections,
 		100, 1, MAX_BACKENDS,
 		check_maxconnections, NULL, NULL
-	},
-
-	{
-		{"min_dynamic_shared_memory", PGC_POSTMASTER, RESOURCES_MEM,
-			gettext_noop("Amount of dynamic shared memory reserved at startup."),
-			NULL,
-			GUC_UNIT_MB
-		},
-		&min_dynamic_shared_memory,
-		0, 0, (int) Min((size_t) INT_MAX, SIZE_MAX / (1024 * 1024)),
-		NULL, NULL, NULL
 	},
 
 	/*
@@ -3167,16 +3154,6 @@ static struct config_enum ConfigureNamesEnum[] =
 		},
 		&wal_level,
 		WAL_LEVEL_REPLICA, wal_level_options,
-		NULL, NULL, NULL
-	},
-
-	{
-		{"dynamic_shared_memory_type", PGC_POSTMASTER, RESOURCES_MEM,
-			gettext_noop("Selects the dynamic shared memory implementation used."),
-			NULL
-		},
-		&dynamic_shared_memory_type,
-		DEFAULT_DYNAMIC_SHARED_MEMORY_TYPE, dynamic_shared_memory_options,
 		NULL, NULL, NULL
 	},
 

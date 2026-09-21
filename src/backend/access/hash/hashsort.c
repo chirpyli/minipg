@@ -85,7 +85,6 @@ _h_spoolinit(Relation heap, Relation index, uint32 num_buckets)
 												   hspool->low_mask,
 												   hspool->max_buckets,
 												   maintenance_work_mem,
-												   NULL,
 												   false);
 
 	return hspool;

@@ -2,7 +2,11 @@
  *
  * opclasscmds.c
  *
- *	  Routines for opclass (and opfamily) manipulation commands
+ *	  Routines for opclass (and opfamily) name lookup.
+ *
+ * minipg note: the CREATE/ALTER/DROP OPERATOR CLASS and OPERATOR FAMILY
+ * DDL has been cropped (the parser no longer accepts it), so all that
+ * remains here are the name-to-OID lookups needed by the index AM code.
  *
  * Portions Copyright (c) 1996-2021, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
@@ -15,37 +19,13 @@
  */
 #include "postgres.h"
 
-#include <limits.h>
-
-#include "access/genam.h"
-#include "access/hash.h"
 #include "access/htup_details.h"
-#include "access/nbtree.h"
-#include "access/sysattr.h"
-#include "access/table.h"
-#include "catalog/catalog.h"
-#include "catalog/dependency.h"
-#include "catalog/indexing.h"
-#include "catalog/objectaccess.h"
+#include "catalog/namespace.h"
 #include "catalog/pg_am.h"
-#include "catalog/pg_amop.h"
-#include "catalog/pg_amproc.h"
-#include "catalog/pg_namespace.h"
 #include "catalog/pg_opclass.h"
-#include "catalog/pg_operator.h"
 #include "catalog/pg_opfamily.h"
-#include "catalog/pg_proc.h"
-#include "catalog/pg_type.h"
-#include "commands/alter.h"
 #include "commands/defrem.h"
-#include "miscadmin.h"
-#include "parser/parse_func.h"
-#include "parser/parse_oper.h"
-#include "parser/parse_type.h"
 #include "utils/builtins.h"
-#include "utils/fmgroids.h"
-#include "utils/lsyscache.h"
-#include "utils/rel.h"
 #include "utils/syscache.h"
 
 /*
@@ -210,48 +190,3 @@ get_opclass_oid(Oid amID, List *opclassname, bool missing_ok)
 	return opcID;
 }
 
-/*
- * Subroutine for ALTER OPERATOR CLASS SET SCHEMA/RENAME
- *
- * Is there an operator class with the given name and signature already
- * in the given namespace?	If so, raise an appropriate error message.
- */
-void
-IsThereOpClassInNamespace(const char *opcname, Oid opcmethod,
-						  Oid opcnamespace)
-{
-	/* make sure the new name doesn't exist */
-	if (SearchSysCacheExists3(CLAAMNAMENSP,
-							  ObjectIdGetDatum(opcmethod),
-							  CStringGetDatum(opcname),
-							  ObjectIdGetDatum(opcnamespace)))
-		ereport(ERROR,
-				(errcode(ERRCODE_DUPLICATE_OBJECT),
-				 errmsg("operator class \"%s\" for access method \"%s\" already exists in schema \"%s\"",
-						opcname,
-						get_am_name(opcmethod),
-						get_namespace_name(opcnamespace))));
-}
-
-/*
- * Subroutine for ALTER OPERATOR FAMILY SET SCHEMA/RENAME
- *
- * Is there an operator family with the given name and signature already
- * in the given namespace?	If so, raise an appropriate error message.
- */
-void
-IsThereOpFamilyInNamespace(const char *opfname, Oid opfmethod,
-						   Oid opfnamespace)
-{
-	/* make sure the new name doesn't exist */
-	if (SearchSysCacheExists3(OPFAMILYAMNAMENSP,
-							  ObjectIdGetDatum(opfmethod),
-							  CStringGetDatum(opfname),
-							  ObjectIdGetDatum(opfnamespace)))
-		ereport(ERROR,
-				(errcode(ERRCODE_DUPLICATE_OBJECT),
-				 errmsg("operator family \"%s\" for access method \"%s\" already exists in schema \"%s\"",
-						opfname,
-						get_am_name(opfmethod),
-						get_namespace_name(opfnamespace))));
-}

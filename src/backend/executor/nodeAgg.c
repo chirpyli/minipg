@@ -514,7 +514,7 @@ initialize_aggregate(AggState *aggstate, AggStatePerTrans pertrans,
 									  pertrans->sortOperators[0],
 									  pertrans->sortCollations[0],
 									  pertrans->sortNullsFirst[0],
-									  work_mem, NULL, false);
+									  work_mem, false);
 		}
 		else
 			pertrans->sortstate =
@@ -524,7 +524,7 @@ initialize_aggregate(AggState *aggstate, AggStatePerTrans pertrans,
 									 pertrans->sortOperators,
 									 pertrans->sortCollations,
 									 pertrans->sortNullsFirst,
-									 work_mem, NULL, false);
+									 work_mem, false);
 	}
 
 	/*
@@ -2613,7 +2613,7 @@ hashagg_tapeinfo_init(AggState *aggstate)
 	HashTapeInfo *tapeinfo = palloc(sizeof(HashTapeInfo));
 	int			init_tapes = 16;	/* expanded dynamically */
 
-	tapeinfo->tapeset = LogicalTapeSetCreate(init_tapes, true, NULL, NULL, -1);
+	tapeinfo->tapeset = LogicalTapeSetCreate(init_tapes, true);
 	tapeinfo->ntapes = init_tapes;
 	tapeinfo->nfreetapes = init_tapes;
 	tapeinfo->freetapes_alloc = init_tapes;

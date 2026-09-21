@@ -1,7 +1,14 @@
 /*-------------------------------------------------------------------------
  *
  * typecmds.c
- *	  Routines for SQL commands that manipulate types (and domains).
+ *	  Guts of type deletion and namespace movement.
+ *
+ * minipg note: CREATE/ALTER/DROP TYPE and CREATE/ALTER/DROP DOMAIN have been
+ * cropped (the parser no longer accepts them), so the "DefineFoo" routines
+ * that used to live here are gone.  What remains are the helpers still
+ * needed by generic object deletion (RemoveTypeById), by table creation
+ * (AssignTypeArrayOid) and by ALTER ... SET SCHEMA
+ * (AlterTypeNamespaceInternal).
  *
  * Portions Copyright (c) 1996-2021, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
@@ -9,23 +16,6 @@
  *
  * IDENTIFICATION
  *	  src/backend/commands/typecmds.c
- *
- * DESCRIPTION
- *	  The "DefineFoo" routines take the parse tree and pick out the
- *	  appropriate arguments/flags, passing the results to the
- *	  corresponding "FooDefine" routines (in src/catalog) that do
- *	  the actual catalog-munging.  These routines also verify permission
- *	  of the user to execute the command.
- *
- * NOTES
- *	  These things must be defined and committed in the following order:
- *		"create function":
- *				input/output, recv/send functions
- *		"create type":
- *				type
- *		"create operator":
- *				operators
- *
  *
  *-------------------------------------------------------------------------
  */
@@ -258,12 +248,3 @@ AlterTypeNamespaceInternal(Oid typeOid, Oid nspOid,
 
 	return oldNspOid;
 }
-
-/*
- * AlterType
- *		ALTER TYPE <type> SET (option = ...)
- *
- * NOTE: the set of changes that can be allowed here is constrained by many
- * non-obvious implementation restrictions.  Tread carefully when considering
- * adding new flexibility.
- */

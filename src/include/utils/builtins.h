@@ -81,21 +81,10 @@ extern void text_to_cstring_buffer(const text *src, char *dst, size_t dst_len);
 extern int	xidComparator(const void *arg1, const void *arg2);
 extern int	xidLogicalComparator(const void *arg1, const void *arg2);
 
-/* inet_cidr_ntop.c */
-extern char *pg_inet_cidr_ntop(int af, const void *src, int bits,
-							   char *dst, size_t size);
-
-/* inet_net_pton.c */
-extern int	pg_inet_net_pton(int af, const char *src,
-							 void *dst, size_t size);
-
-/* network.c */
-extern Datum network_scan_first(Datum in);
-extern Datum network_scan_last(Datum in);
-
-/* numeric.c */
-extern Datum numeric_float8_no_overflow(PG_FUNCTION_ARGS);
-extern Datum numeric_round(PG_FUNCTION_ARGS);
+/* minipg: the inet/cidr type helpers (pg_inet_cidr_ntop, pg_inet_net_pton,
+ * network_scan_first/last) and the numeric helpers (numeric_round,
+ * numeric_float8_no_overflow) used to be declared here; they went away with
+ * the inet/cidr and numeric data types. */
 
 /* format_type.c */
 

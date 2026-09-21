@@ -37,7 +37,7 @@ static int	DecodeNumber(int flen, char *field, bool haveTextMonth,
 static int	DecodeNumberField(int len, char *str,
 							  int fmask, int *tmask,
 							  struct pg_tm *tm, fsec_t *fsec, bool *is2digits);
-static int	DecodeTime(char *str, int fmask, int range,
+static int	DecodeTime(char *str, int fmask,
 					   int *tmask, struct pg_tm *tm, fsec_t *fsec);
 static const datetkn *datebsearch(const char *key, const datetkn *base, int nel);
 static int	DecodeDate(char *str, int fmask, int *tmask, bool *is2digits,
@@ -161,12 +161,10 @@ static const int szdatetktbl = sizeof datetktbl / sizeof datetktbl[0];
 
 /*
  * deltatktbl: same format as datetktbl, but holds keywords used to represent
- * time units (eg, for intervals, and for EXTRACT).
+ * time units (eg, for EXTRACT and date_trunc).
  */
 static const datetkn deltatktbl[] = {
 	/* token, type, value */
-	{"@", IGNORE_DTF, 0},		/* postgres relative prefix */
-	{DAGO, AGO, 0},				/* "ago" indicates negative time offset */
 	{"c", UNITS, DTK_CENTURY},	/* "century" relative */
 	{"cent", UNITS, DTK_CENTURY},	/* "century" relative */
 	{"centuries", UNITS, DTK_CENTURY},	/* "centuries" relative */
@@ -940,8 +938,7 @@ DecodeDateTime(char **field, int *ftype, int nf,
 						return DTERR_BAD_FORMAT;
 					ptype = 0;
 				}
-				dterr = DecodeTime(field[i], fmask, INTERVAL_FULL_RANGE,
-								   &tmask, tm, fsec);
+				dterr = DecodeTime(field[i], fmask, &tmask, tm, fsec);
 				if (dterr)
 					return dterr;
 
@@ -1831,7 +1828,6 @@ DecodeTimeOnly(char **field, int *ftype, int nf,
 
 			case DTK_TIME:
 				dterr = DecodeTime(field[i], (fmask | DTK_DATE_M),
-								   INTERVAL_FULL_RANGE,
 								   &tmask, tm, fsec);
 				if (dterr)
 					return dterr;
@@ -2515,12 +2511,9 @@ ValidateDate(int fmask, bool isjulian, bool is2digits, bool bc,
 /* DecodeTime()
  * Decode time string which includes delimiters.
  * Return 0 if okay, a DTERR code if not.
- *
- * Only check the lower limit on hours, since this same code can be
- * used to represent time spans.
  */
 static int
-DecodeTime(char *str, int fmask, int range,
+DecodeTime(char *str, int fmask,
 		   int *tmask, struct pg_tm *tm, fsec_t *fsec)
 {
 	char	   *cp;
@@ -2542,13 +2535,6 @@ DecodeTime(char *str, int fmask, int range,
 	{
 		tm->tm_sec = 0;
 		*fsec = 0;
-		/* If it's a MINUTE TO SECOND interval, take 2 fields as being mm:ss */
-		if (range == (INTERVAL_MASK(MINUTE) | INTERVAL_MASK(SECOND)))
-		{
-			tm->tm_sec = tm->tm_min;
-			tm->tm_min = tm->tm_hour;
-			tm->tm_hour = 0;
-		}
 	}
 	else if (*cp == '.')
 	{
@@ -3028,54 +3014,6 @@ DecodeSpecial(int field, char *lowtoken, int *val)
 }
 
 
-/* ClearPgTm
- *
- * Zero out a pg_tm and associated fsec_t
- */
-static inline void
-ClearPgTm(struct pg_tm *tm, fsec_t *fsec)
-{
-	tm->tm_year = 0;
-	tm->tm_mon = 0;
-	tm->tm_mday = 0;
-	tm->tm_hour = 0;
-	tm->tm_min = 0;
-	tm->tm_sec = 0;
-	*fsec = 0;
-}
-
-
-/* DecodeInterval()
- * Interpret previously parsed fields for general time interval.
- * Returns 0 if successful, DTERR code if bogus input detected.
- * dtype, tm, fsec are output parameters.
- *
- * Allow "date" field DTK_DATE since this could be just
- *	an unsigned floating point number. - thomas 1997-11-16
- *
- * Allow ISO-style time span, with implicit units on number of days
- *	preceding an hh:mm:ss field. - thomas 1998-04-30
- */
-
-
-/* DecodeISO8601Interval()
- *	Decode an ISO 8601 time interval of the "format with designators"
- *	(section 4.4.3.2) or "alternative format" (section 4.4.3.3)
- *	Examples:  P1D	for 1 day
- *			   PT1H for 1 hour
- *			   P2Y6M7DT1H30M for 2 years, 6 months, 7 days 1 hour 30 min
- *			   P0002-06-07T01:30:00 the same value in alternative format
- *
- * Returns 0 if successful, DTERR code if bogus input detected.
- * Note: error code should be DTERR_BAD_FORMAT if input doesn't look like
- * ISO8601, otherwise this could cause unexpected error messages.
- * dtype, tm, fsec are output parameters.
- *
- *	A couple exceptions from the spec:
- *	 - a week field ('W') may coexist with other units
- *	 - allows decimals in fields other than the least significant unit.
- */
-
 /* DecodeUnits()
  * Decode text string using lookup table.
  *
@@ -3141,12 +3079,6 @@ DateTimeParseError(int dterr, const char *str, const char *datatype)
 					 errmsg("date/time field value out of range: \"%s\"",
 							str),
 					 errhint("Perhaps you need a different \"datestyle\" setting.")));
-			break;
-		case DTERR_INTERVAL_OVERFLOW:
-			ereport(ERROR,
-					(errcode(ERRCODE_INTERVAL_FIELD_OVERFLOW),
-					 errmsg("interval field value out of range: \"%s\"",
-							str)));
 			break;
 		case DTERR_TZDISP_OVERFLOW:
 			ereport(ERROR,
@@ -3523,26 +3455,6 @@ EncodeDateTime(struct pg_tm *tm, fsec_t fsec, bool print_tz, int tz, const char 
 }
 
 
-
-/* EncodeInterval()
- * Interpret time structure as a delta time and convert to string.
- *
- * Support "traditional Postgres" and ISO-8601 styles.
- * Actually, afaik ISO does not address time interval formatting,
- *	but this looks similar to the spec for absolute date/time.
- * - thomas 1998-04-30
- *
- * Actually, afaik, ISO 8601 does specify formats for "time
- * intervals...[of the]...format with time-unit designators", which
- * are pretty ugly.  The format looks something like
- *	   P1Y1M1DT1H1M1.12345S
- * but useful for exchanging data with computers instead of humans.
- * - ron 2003-07-14
- *
- * And ISO's SQL 2008 standard specifies standards for
- * "year-month literal"s (that look like '2-3') and
- * "day-time literal"s (that look like ('4 5:6:7')
- */
 
 /*
  * We've been burnt by stupid errors in the ordering of the datetkn tables

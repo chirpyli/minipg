@@ -74,13 +74,9 @@
  * above.  Nonetheless, with large workMem we can have many tapes (but not
  * too many -- see the comments in tuplesort_merge_order).
  *
- * This module supports parallel sorting.  Parallel sorts involve coordination
- * among one or more worker processes, and a leader process, each with its own
- * tuplesort state.  The leader process (or, more accurately, the
- * Tuplesortstate associated with a leader process) creates a full tapeset
- * consisting of worker tapes with one run to merge; a run for every
- * worker process.  This is then merged.  Worker processes are guaranteed to
- * produce exactly one output run from their partial input.
+ * minipg note: the parallel sort support (coordinated sorting among several
+ * worker processes plus a leader, exchanging tapes through a shared fileset
+ * and DSM) has been cropped together with the rest of parallel query.
  *
  *
  * Portions Copyright (c) 1996-2021, PostgreSQL Global Development Group
@@ -119,10 +115,6 @@
 #define INDEX_SORT		1
 #define DATUM_SORT		2
 #define CLUSTER_SORT	3
-
-/* Sort parallel code from state for sort__start probes */
-#define PARALLEL_SORT(state)	((state)->shared == NULL ? 0 : \
-								 (state)->worker >= 0 ? 1 : 2)
 
 /*
  * Initial size of memtuples array.  We're trying to select this size so that
@@ -402,25 +394,6 @@ struct Tuplesortstate
 	bool		markpos_eof;	/* saved "eof_reached" */
 
 	/*
-	 * These variables are used during parallel sorting.
-	 *
-	 * worker is our worker identifier.  Follows the general convention that
-	 * -1 value relates to a leader tuplesort, and values >= 0 worker
-	 * tuplesorts. (-1 can also be a serial tuplesort.)
-	 *
-	 * shared is mutable shared memory state, which is used to coordinate
-	 * parallel sorts.
-	 *
-	 * nParticipants is the number of worker Tuplesortstates known by the
-	 * leader to have actually been launched, which implies that they must
-	 * finish a run leader can merge.  Typically includes a worker state held
-	 * by the leader process itself.  Set in the leader Tuplesortstate only.
-	 */
-	int			worker;
-	Sharedsort *shared;
-	int			nParticipants;
-
-	/*
 	 * The sortKeys variable is used by every case other than the hash index
 	 * case; it is set by tuplesort_begin_xxx.  tupDesc is only used by the
 	 * MinimalTuple and CLUSTER routines, though.
@@ -482,39 +455,6 @@ struct Tuplesortstate
 };
 
 /*
- * Private mutable state of tuplesort-parallel-operation.  This is allocated
- * in shared memory.
- */
-struct Sharedsort
-{
-	/* mutex protects all fields prior to tapes */
-	slock_t		mutex;
-
-	/*
-	 * currentWorker generates ordinal identifier numbers for parallel sort
-	 * workers.  These start from 0, and are always gapless.
-	 *
-	 * Workers increment workersFinished to indicate having finished.  If this
-	 * is equal to state.nParticipants within the leader, leader is ready to
-	 * merge worker runs.
-	 */
-	int			currentWorker;
-	int			workersFinished;
-
-	/* Temporary file space */
-	SharedFileSet fileset;
-
-	/* Size of tapes flexible array */
-	int			nTapes;
-
-	/*
-	 * Tapes array used by workers to report back information needed by the
-	 * leader to concatenate all worker tapes into one for merging
-	 */
-	TapeShare	tapes[FLEXIBLE_ARRAY_MEMBER];
-};
-
-/*
  * Is the given tuple allocated from the slab memory arena?
  */
 #define IS_SLAB_SLOT(state, tuple) \
@@ -544,9 +484,7 @@ struct Sharedsort
 #define LACKMEM(state)		((state)->availMem < 0 && !(state)->slabAllocatorUsed)
 #define USEMEM(state,amt)	((state)->availMem -= (amt))
 #define FREEMEM(state,amt)	((state)->availMem += (amt))
-#define SERIAL(state)		((state)->shared == NULL)
-#define WORKER(state)		((state)->shared && (state)->worker != -1)
-#define LEADER(state)		((state)->shared && (state)->worker == -1)
+
 
 /*
  * NOTES about on-tape representation of tuples:
@@ -606,12 +544,11 @@ struct Sharedsort
 
 
 static Tuplesortstate *tuplesort_begin_common(int workMem,
-											  SortCoordinate coordinate,
 											  bool randomAccess);
 static void tuplesort_begin_batch(Tuplesortstate *state);
 static void puttuple_common(Tuplesortstate *state, SortTuple *tuple);
 static bool consider_abort_common(Tuplesortstate *state);
-static void inittapes(Tuplesortstate *state, bool mergeruns);
+static void inittapes(Tuplesortstate *state);
 static void inittapestate(Tuplesortstate *state, int maxTapes);
 static void selectnewtape(Tuplesortstate *state);
 static void init_slab_allocator(Tuplesortstate *state, int numSlots);
@@ -660,10 +597,6 @@ static void writetup_datum(Tuplesortstate *state, int tapenum,
 						   SortTuple *stup);
 static void readtup_datum(Tuplesortstate *state, SortTuple *stup,
 						  int tapenum, unsigned int len);
-static int	worker_get_identifier(Tuplesortstate *state);
-static void worker_freeze_result_tape(Tuplesortstate *state);
-static void worker_nomergeruns(Tuplesortstate *state);
-static void leader_takeover_tapes(Tuplesortstate *state);
 static void free_sort_tuple(Tuplesortstate *state, SortTuple *stup);
 static void tuplesort_free(Tuplesortstate *state);
 static void tuplesort_updatemax(Tuplesortstate *state);
@@ -717,17 +650,12 @@ static void tuplesort_updatemax(Tuplesortstate *state);
  */
 
 static Tuplesortstate *
-tuplesort_begin_common(int workMem, SortCoordinate coordinate,
-					   bool randomAccess)
+tuplesort_begin_common(int workMem, bool randomAccess)
 {
 	Tuplesortstate *state;
 	MemoryContext maincontext;
 	MemoryContext sortcontext;
 	MemoryContext oldcontext;
-
-	/* See leader_takeover_tapes() remarks on randomAccess support */
-	if (coordinate && randomAccess)
-		elog(ERROR, "random access disallowed under parallel sort");
 
 	/*
 	 * Memory context surviving tuplesort_reset.  This memory context holds
@@ -768,9 +696,7 @@ tuplesort_begin_common(int workMem, SortCoordinate coordinate,
 
 	/*
 	 * workMem is forced to be at least 64KB, the current minimum valid value
-	 * for the work_mem GUC.  This is a defense against parallel sort callers
-	 * that divide out memory among many workers in a way that leaves each
-	 * with very little memory.
+	 * for the work_mem GUC.
 	 */
 	state->allowedMem = Max(workMem, 64) * (int64) 1024;
 	state->sortcontext = sortcontext;
@@ -784,37 +710,9 @@ tuplesort_begin_common(int workMem, SortCoordinate coordinate,
 	state->memtuples = NULL;
 
 	/*
-	 * After all of the other non-parallel-related state, we setup all of the
-	 * state needed for each batch.
+	 * Setup all of the state needed for each batch.
 	 */
 	tuplesort_begin_batch(state);
-
-	/*
-	 * Initialize parallel-related state based on coordination information
-	 * from caller
-	 */
-	if (!coordinate)
-	{
-		/* Serial sort */
-		state->shared = NULL;
-		state->worker = -1;
-		state->nParticipants = -1;
-	}
-	else if (coordinate->isWorker)
-	{
-		/* Parallel worker produces exactly one final run from all input */
-		state->shared = coordinate->sharedsort;
-		state->worker = worker_get_identifier(state);
-		state->nParticipants = -1;
-	}
-	else
-	{
-		/* Parallel leader state only used for final merge */
-		state->shared = coordinate->sharedsort;
-		state->worker = -1;
-		state->nParticipants = coordinate->nParticipants;
-		Assert(state->nParticipants >= 1);
-	}
 
 	MemoryContextSwitchTo(oldcontext);
 
@@ -897,10 +795,9 @@ tuplesort_begin_heap(TupleDesc tupDesc,
 					 int nkeys, AttrNumber *attNums,
 					 Oid *sortOperators, Oid *sortCollations,
 					 bool *nullsFirstFlags,
-					 int workMem, SortCoordinate coordinate, bool randomAccess)
+					 int workMem, bool randomAccess)
 {
-	Tuplesortstate *state = tuplesort_begin_common(workMem, coordinate,
-												   randomAccess);
+	Tuplesortstate *state = tuplesort_begin_common(workMem, randomAccess);
 	MemoryContext oldcontext;
 	int			i;
 
@@ -922,7 +819,7 @@ tuplesort_begin_heap(TupleDesc tupDesc,
 								nkeys,
 								workMem,
 								randomAccess,
-								PARALLEL_SORT(state));
+								0);		/* 0 = serial sort */
 
 	state->comparetup = comparetup_heap;
 	state->copytup = copytup_heap;
@@ -970,10 +867,9 @@ Tuplesortstate *
 tuplesort_begin_cluster(TupleDesc tupDesc,
 						Relation indexRel,
 						int workMem,
-						SortCoordinate coordinate, bool randomAccess)
+						bool randomAccess)
 {
-	Tuplesortstate *state = tuplesort_begin_common(workMem, coordinate,
-												   randomAccess);
+	Tuplesortstate *state = tuplesort_begin_common(workMem, randomAccess);
 	AttrNumber	leading;
 	BTScanInsert indexScanKey;
 	MemoryContext oldcontext;
@@ -998,7 +894,7 @@ tuplesort_begin_cluster(TupleDesc tupDesc,
 								state->nKeys,
 								workMem,
 								randomAccess,
-								PARALLEL_SORT(state));
+								0);		/* 0 = serial sort */
 
 	state->comparetup = comparetup_cluster;
 	state->copytup = copytup_cluster;
@@ -1068,11 +964,9 @@ tuplesort_begin_index_btree(Relation heapRel,
 							Relation indexRel,
 							bool enforceUnique,
 							int workMem,
-							SortCoordinate coordinate,
 							bool randomAccess)
 {
-	Tuplesortstate *state = tuplesort_begin_common(workMem, coordinate,
-												   randomAccess);
+	Tuplesortstate *state = tuplesort_begin_common(workMem, randomAccess);
 	BTScanInsert indexScanKey;
 	MemoryContext oldcontext;
 	int			i;
@@ -1094,7 +988,7 @@ tuplesort_begin_index_btree(Relation heapRel,
 								state->nKeys,
 								workMem,
 								randomAccess,
-								PARALLEL_SORT(state));
+								0);		/* 0 = serial sort */
 
 	state->comparetup = comparetup_index_btree;
 	state->copytup = copytup_index;
@@ -1148,11 +1042,9 @@ tuplesort_begin_index_hash(Relation heapRel,
 						   uint32 low_mask,
 						   uint32 max_buckets,
 						   int workMem,
-						   SortCoordinate coordinate,
 						   bool randomAccess)
 {
-	Tuplesortstate *state = tuplesort_begin_common(workMem, coordinate,
-												   randomAccess);
+	Tuplesortstate *state = tuplesort_begin_common(workMem, randomAccess);
 	MemoryContext oldcontext;
 
 	oldcontext = MemoryContextSwitchTo(state->maincontext);
@@ -1191,10 +1083,9 @@ tuplesort_begin_index_hash(Relation heapRel,
 Tuplesortstate *
 tuplesort_begin_datum(Oid datumType, Oid sortOperator, Oid sortCollation,
 					  bool nullsFirstFlag, int workMem,
-					  SortCoordinate coordinate, bool randomAccess)
+					  bool randomAccess)
 {
-	Tuplesortstate *state = tuplesort_begin_common(workMem, coordinate,
-												   randomAccess);
+	Tuplesortstate *state = tuplesort_begin_common(workMem, randomAccess);
 	MemoryContext oldcontext;
 	int16		typlen;
 	bool		typbyval;
@@ -1215,7 +1106,7 @@ tuplesort_begin_datum(Oid datumType, Oid sortOperator, Oid sortCollation,
 								1,
 								workMem,
 								randomAccess,
-								PARALLEL_SORT(state));
+								0);		/* 0 = serial sort */
 
 	state->comparetup = comparetup_datum;
 	state->copytup = copytup_datum;
@@ -1282,12 +1173,6 @@ tuplesort_set_bound(Tuplesortstate *state, int64 bound)
 	Assert(state->status == TSS_INITIAL && state->memtupcount == 0);
 	/* Can't set the bound twice, either */
 	Assert(!state->bounded);
-	/* Also, this shouldn't be called in a parallel worker */
-	Assert(!WORKER(state));
-
-	/* Parallel leader allows but ignores hint */
-	if (LEADER(state))
-		return;
 
 #ifdef DEBUG_BOUNDED_SORT
 	/* Honor GUC setting that disables the feature (for easy testing) */
@@ -1360,13 +1245,11 @@ tuplesort_free(Tuplesortstate *state)
 	if (trace_sort)
 	{
 		if (state->tapeset)
-			elog(LOG, "%s of worker %d ended, %ld disk blocks used: %s",
-				 SERIAL(state) ? "external sort" : "parallel external sort",
-				 state->worker, spaceUsed, pg_rusage_show(&state->ru_start));
+			elog(LOG, "external sort ended, %ld disk blocks used: %s",
+				 spaceUsed, pg_rusage_show(&state->ru_start));
 		else
-			elog(LOG, "%s of worker %d ended, %ld KB used: %s",
-				 SERIAL(state) ? "internal sort" : "unperformed parallel sort",
-				 state->worker, spaceUsed, pg_rusage_show(&state->ru_start));
+			elog(LOG, "internal sort ended, %ld KB used: %s",
+				 spaceUsed, pg_rusage_show(&state->ru_start));
 	}
 
 	TRACE_POSTGRESQL_SORT_DONE(state->tapeset != NULL, spaceUsed);
@@ -1831,8 +1714,6 @@ tuplesort_putdatum(Tuplesortstate *state, Datum val, bool isNull)
 static void
 puttuple_common(Tuplesortstate *state, SortTuple *tuple)
 {
-	Assert(!LEADER(state));
-
 	switch (state->status)
 	{
 		case TSS_INITIAL:
@@ -1886,7 +1767,7 @@ puttuple_common(Tuplesortstate *state, SortTuple *tuple)
 			/*
 			 * Nope; time to switch to tape-based operation.
 			 */
-			inittapes(state, true);
+			inittapes(state);
 
 			/*
 			 * Dump all tuples.
@@ -1988,8 +1869,8 @@ tuplesort_performsort(Tuplesortstate *state)
 
 #ifdef TRACE_SORT
 	if (trace_sort)
-		elog(LOG, "performsort of worker %d starting: %s",
-			 state->worker, pg_rusage_show(&state->ru_start));
+		elog(LOG, "performsort starting: %s",
+			 pg_rusage_show(&state->ru_start));
 #endif
 
 	switch (state->status)
@@ -1998,34 +1879,10 @@ tuplesort_performsort(Tuplesortstate *state)
 
 			/*
 			 * We were able to accumulate all the tuples within the allowed
-			 * amount of memory, or leader to take over worker tapes
+			 * amount of memory.
 			 */
-			if (SERIAL(state))
-			{
-				/* Just qsort 'em and we're done */
-				tuplesort_sort_memtuples(state);
-				state->status = TSS_SORTEDINMEM;
-			}
-			else if (WORKER(state))
-			{
-				/*
-				 * Parallel workers must still dump out tuples to tape.  No
-				 * merge is required to produce single output run, though.
-				 */
-				inittapes(state, false);
-				dumptuples(state, true);
-				worker_nomergeruns(state);
-				state->status = TSS_SORTEDONTAPE;
-			}
-			else
-			{
-				/*
-				 * Leader will take over worker tapes and merge worker runs.
-				 * Note that mergeruns sets the correct state->status.
-				 */
-				leader_takeover_tapes(state);
-				mergeruns(state);
-			}
+			tuplesort_sort_memtuples(state);
+			state->status = TSS_SORTEDINMEM;
 			state->current = 0;
 			state->eof_reached = false;
 			state->markpos_block = 0L;
@@ -2053,8 +1910,8 @@ tuplesort_performsort(Tuplesortstate *state)
 			/*
 			 * Finish tape-based sort.  First, flush all tuples remaining in
 			 * memory out to tape; then merge until we have a single remaining
-			 * run (or, if !randomAccess and !WORKER(), one run per tape).
-			 * Note that mergeruns sets the correct state->status.
+			 * run (or, if !randomAccess, one run per tape).  Note that
+			 * mergeruns sets the correct state->status.
 			 */
 			dumptuples(state, true);
 			mergeruns(state);
@@ -2073,12 +1930,12 @@ tuplesort_performsort(Tuplesortstate *state)
 	if (trace_sort)
 	{
 		if (state->status == TSS_FINALMERGE)
-			elog(LOG, "performsort of worker %d done (except %d-way final merge): %s",
-				 state->worker, state->activeTapes,
+			elog(LOG, "performsort done (except %d-way final merge): %s",
+				 state->activeTapes,
 				 pg_rusage_show(&state->ru_start));
 		else
-			elog(LOG, "performsort of worker %d done: %s",
-				 state->worker, pg_rusage_show(&state->ru_start));
+			elog(LOG, "performsort done: %s",
+				 pg_rusage_show(&state->ru_start));
 	}
 #endif
 
@@ -2098,8 +1955,6 @@ tuplesort_gettuple_common(Tuplesortstate *state, bool forward,
 {
 	unsigned int tuplen;
 	size_t		nmoved;
-
-	Assert(!WORKER(state));
 
 	switch (state->status)
 	{
@@ -2486,7 +2341,6 @@ tuplesort_skiptuples(Tuplesortstate *state, int64 ntuples, bool forward)
 	 */
 	Assert(forward);
 	Assert(ntuples >= 0);
-	Assert(!WORKER(state));
 
 	switch (state->status)
 	{
@@ -2584,37 +2438,23 @@ tuplesort_merge_order(int64 allowedMem)
  * This is called only if we have found we won't sort in memory.
  */
 static void
-inittapes(Tuplesortstate *state, bool mergeruns)
+inittapes(Tuplesortstate *state)
 {
 	int			maxTapes,
 				j;
 
-	Assert(!LEADER(state));
-
-	if (mergeruns)
-	{
-		/* Compute number of tapes to use: merge order plus 1 */
-		maxTapes = tuplesort_merge_order(state->allowedMem) + 1;
-	}
-	else
-	{
-		/* Workers can sometimes produce single run, output without merge */
-		Assert(WORKER(state));
-		maxTapes = MINORDER + 1;
-	}
+	/* Compute number of tapes to use: merge order plus 1 */
+	maxTapes = tuplesort_merge_order(state->allowedMem) + 1;
 
 #ifdef TRACE_SORT
 	if (trace_sort)
-		elog(LOG, "worker %d switching to external sort with %d tapes: %s",
-			 state->worker, maxTapes, pg_rusage_show(&state->ru_start));
+		elog(LOG, "switching to external sort with %d tapes: %s",
+			 maxTapes, pg_rusage_show(&state->ru_start));
 #endif
 
 	/* Create the tape set and allocate the per-tape data arrays */
 	inittapestate(state, maxTapes);
-	state->tapeset =
-		LogicalTapeSetCreate(maxTapes, false, NULL,
-							 state->shared ? &state->shared->fileset : NULL,
-							 state->worker);
+	state->tapeset = LogicalTapeSetCreate(maxTapes, false);
 
 	state->currentRun = 0;
 
@@ -2848,8 +2688,8 @@ mergeruns(Tuplesortstate *state)
 	 */
 #ifdef TRACE_SORT
 	if (trace_sort)
-		elog(LOG, "worker %d using " INT64_FORMAT " KB of memory for read buffers among %d input tapes",
-			 state->worker, state->availMem / 1024, numInputTapes);
+		elog(LOG, "using " INT64_FORMAT " KB of memory for read buffers among %d input tapes",
+			 state->availMem / 1024, numInputTapes);
 #endif
 
 	state->read_buffer_size = Max(state->availMem / numInputTapes, 0);
@@ -2867,7 +2707,7 @@ mergeruns(Tuplesortstate *state)
 		 * pass remains.  If we don't have to produce a materialized sorted
 		 * tape, we can stop at this point and do the final merge on-the-fly.
 		 */
-		if (!state->randomAccess && !WORKER(state))
+		if (!state->randomAccess)
 		{
 			bool		allOneRun = true;
 
@@ -2952,10 +2792,7 @@ mergeruns(Tuplesortstate *state)
 	 * a waste of cycles anyway...
 	 */
 	state->result_tape = state->tp_tapenum[state->tapeRange];
-	if (!WORKER(state))
-		LogicalTapeFreeze(state->tapeset, state->result_tape, NULL);
-	else
-		worker_freeze_result_tape(state);
+	LogicalTapeFreeze(state->tapeset, state->result_tape);
 	state->status = TSS_SORTEDONTAPE;
 
 	/* Release the read buffers of all the other tapes, by rewinding them. */
@@ -3023,7 +2860,7 @@ mergeonerun(Tuplesortstate *state)
 
 #ifdef TRACE_SORT
 	if (trace_sort)
-		elog(LOG, "worker %d finished %d-way merge step: %s", state->worker,
+		elog(LOG, "finished %d-way merge step: %s",
 			 state->activeTapes, pg_rusage_show(&state->ru_start));
 #endif
 }
@@ -3158,8 +2995,8 @@ dumptuples(Tuplesortstate *state, bool alltuples)
 
 #ifdef TRACE_SORT
 	if (trace_sort)
-		elog(LOG, "worker %d starting quicksort of run %d: %s",
-			 state->worker, state->currentRun,
+		elog(LOG, "starting quicksort of run %d: %s",
+			 state->currentRun,
 			 pg_rusage_show(&state->ru_start));
 #endif
 
@@ -3171,8 +3008,8 @@ dumptuples(Tuplesortstate *state, bool alltuples)
 
 #ifdef TRACE_SORT
 	if (trace_sort)
-		elog(LOG, "worker %d finished quicksort of run %d: %s",
-			 state->worker, state->currentRun,
+		elog(LOG, "finished quicksort of run %d: %s",
+			 state->currentRun,
 			 pg_rusage_show(&state->ru_start));
 #endif
 
@@ -3199,8 +3036,8 @@ dumptuples(Tuplesortstate *state, bool alltuples)
 
 #ifdef TRACE_SORT
 	if (trace_sort)
-		elog(LOG, "worker %d finished writing run %d to tape %d: %s",
-			 state->worker, state->currentRun, state->destTape,
+		elog(LOG, "finished writing run %d to tape %d: %s",
+			 state->currentRun, state->destTape,
 			 pg_rusage_show(&state->ru_start));
 #endif
 
@@ -3409,7 +3246,6 @@ make_bounded_heap(Tuplesortstate *state)
 	Assert(state->status == TSS_INITIAL);
 	Assert(state->bounded);
 	Assert(tupcount >= state->bound);
-	Assert(SERIAL(state));
 
 	/* Reverse sort direction so largest entry will be at root */
 	reversedirection(state);
@@ -3457,7 +3293,6 @@ sort_bounded_heap(Tuplesortstate *state)
 	Assert(state->status == TSS_BOUNDED);
 	Assert(state->bounded);
 	Assert(tupcount == state->bound);
-	Assert(SERIAL(state));
 
 	/*
 	 * We can unheapify in place because each delete-top call will remove the
@@ -3492,8 +3327,6 @@ sort_bounded_heap(Tuplesortstate *state)
 static void
 tuplesort_sort_memtuples(Tuplesortstate *state)
 {
-	Assert(!LEADER(state));
-
 	if (state->memtupcount > 1)
 	{
 		/* Can we use the single-key sort function? */
@@ -4479,230 +4312,6 @@ readtup_datum(Tuplesortstate *state, SortTuple *stup,
 	if (state->randomAccess)	/* need trailing length word? */
 		LogicalTapeReadExact(state->tapeset, tapenum,
 							 &tuplen, sizeof(tuplen));
-}
-
-/*
- * Parallel sort routines
- */
-
-/*
- * tuplesort_estimate_shared - estimate required shared memory allocation
- *
- * nWorkers is an estimate of the number of workers (it's the number that
- * will be requested).
- */
-Size
-tuplesort_estimate_shared(int nWorkers)
-{
-	Size		tapesSize;
-
-	Assert(nWorkers > 0);
-
-	/* Make sure that BufFile shared state is MAXALIGN'd */
-	tapesSize = mul_size(sizeof(TapeShare), nWorkers);
-	tapesSize = MAXALIGN(add_size(tapesSize, offsetof(Sharedsort, tapes)));
-
-	return tapesSize;
-}
-
-/*
- * tuplesort_initialize_shared - initialize shared tuplesort state
- *
- * Must be called from leader process before workers are launched, to
- * establish state needed up-front for worker tuplesortstates.  nWorkers
- * should match the argument passed to tuplesort_estimate_shared().
- */
-void
-tuplesort_initialize_shared(Sharedsort *shared, int nWorkers, dsm_segment *seg)
-{
-	int			i;
-
-	Assert(nWorkers > 0);
-
-	SpinLockInit(&shared->mutex);
-	shared->currentWorker = 0;
-	shared->workersFinished = 0;
-	SharedFileSetInit(&shared->fileset, seg);
-	shared->nTapes = nWorkers;
-	for (i = 0; i < nWorkers; i++)
-	{
-		shared->tapes[i].firstblocknumber = 0L;
-	}
-}
-
-/*
- * tuplesort_attach_shared - attach to shared tuplesort state
- *
- * Must be called by all worker processes.
- */
-void
-tuplesort_attach_shared(Sharedsort *shared, dsm_segment *seg)
-{
-	/* Attach to SharedFileSet */
-	SharedFileSetAttach(&shared->fileset, seg);
-}
-
-/*
- * worker_get_identifier - Assign and return ordinal identifier for worker
- *
- * The order in which these are assigned is not well defined, and should not
- * matter; worker numbers across parallel sort participants need only be
- * distinct and gapless.  logtape.c requires this.
- *
- * Note that the identifiers assigned from here have no relation to
- * ParallelWorkerNumber number, to avoid making any assumption about
- * caller's requirements.  However, we do follow the ParallelWorkerNumber
- * convention of representing a non-worker with worker number -1.  This
- * includes the leader, as well as serial Tuplesort processes.
- */
-static int
-worker_get_identifier(Tuplesortstate *state)
-{
-	Sharedsort *shared = state->shared;
-	int			worker;
-
-	Assert(WORKER(state));
-
-	SpinLockAcquire(&shared->mutex);
-	worker = shared->currentWorker++;
-	SpinLockRelease(&shared->mutex);
-
-	return worker;
-}
-
-/*
- * worker_freeze_result_tape - freeze worker's result tape for leader
- *
- * This is called by workers just after the result tape has been determined,
- * instead of calling LogicalTapeFreeze() directly.  They do so because
- * workers require a few additional steps over similar serial
- * TSS_SORTEDONTAPE external sort cases, which also happen here.  The extra
- * steps are around freeing now unneeded resources, and representing to
- * leader that worker's input run is available for its merge.
- *
- * There should only be one final output run for each worker, which consists
- * of all tuples that were originally input into worker.
- */
-static void
-worker_freeze_result_tape(Tuplesortstate *state)
-{
-	Sharedsort *shared = state->shared;
-	TapeShare	output;
-
-	Assert(WORKER(state));
-	Assert(state->result_tape != -1);
-	Assert(state->memtupcount == 0);
-
-	/*
-	 * Free most remaining memory, in case caller is sensitive to our holding
-	 * on to it.  memtuples may not be a tiny merge heap at this point.
-	 */
-	pfree(state->memtuples);
-	/* Be tidy */
-	state->memtuples = NULL;
-	state->memtupsize = 0;
-
-	/*
-	 * Parallel worker requires result tape metadata, which is to be stored in
-	 * shared memory for leader
-	 */
-	LogicalTapeFreeze(state->tapeset, state->result_tape, &output);
-
-	/* Store properties of output tape, and update finished worker count */
-	SpinLockAcquire(&shared->mutex);
-	shared->tapes[state->worker] = output;
-	shared->workersFinished++;
-	SpinLockRelease(&shared->mutex);
-}
-
-/*
- * worker_nomergeruns - dump memtuples in worker, without merging
- *
- * This called as an alternative to mergeruns() with a worker when no
- * merging is required.
- */
-static void
-worker_nomergeruns(Tuplesortstate *state)
-{
-	Assert(WORKER(state));
-	Assert(state->result_tape == -1);
-
-	state->result_tape = state->tp_tapenum[state->destTape];
-	worker_freeze_result_tape(state);
-}
-
-/*
- * leader_takeover_tapes - create tapeset for leader from worker tapes
- *
- * So far, leader Tuplesortstate has performed no actual sorting.  By now, all
- * sorting has occurred in workers, all of which must have already returned
- * from tuplesort_performsort().
- *
- * When this returns, leader process is left in a state that is virtually
- * indistinguishable from it having generated runs as a serial external sort
- * might have.
- */
-static void
-leader_takeover_tapes(Tuplesortstate *state)
-{
-	Sharedsort *shared = state->shared;
-	int			nParticipants = state->nParticipants;
-	int			workersFinished;
-	int			j;
-
-	Assert(LEADER(state));
-	Assert(nParticipants >= 1);
-
-	SpinLockAcquire(&shared->mutex);
-	workersFinished = shared->workersFinished;
-	SpinLockRelease(&shared->mutex);
-
-	if (nParticipants != workersFinished)
-		elog(ERROR, "cannot take over tapes before all workers finish");
-
-	/*
-	 * Create the tapeset from worker tapes, including a leader-owned tape at
-	 * the end.  Parallel workers are far more expensive than logical tapes,
-	 * so the number of tapes allocated here should never be excessive.
-	 *
-	 * We still have a leader tape, though it's not possible to write to it
-	 * due to restrictions in the shared fileset infrastructure used by
-	 * logtape.c.  It will never be written to in practice because
-	 * randomAccess is disallowed for parallel sorts.
-	 */
-	inittapestate(state, nParticipants + 1);
-	state->tapeset = LogicalTapeSetCreate(nParticipants + 1, false,
-										  shared->tapes, &shared->fileset,
-										  state->worker);
-
-	/* mergeruns() relies on currentRun for # of runs (in one-pass cases) */
-	state->currentRun = nParticipants;
-
-	/*
-	 * Initialize variables of Algorithm D to be consistent with runs from
-	 * workers having been generated in the leader.
-	 *
-	 * There will always be exactly 1 run per worker, and exactly one input
-	 * tape per run, because workers always output exactly 1 run, even when
-	 * there were no input tuples for workers to sort.
-	 */
-	for (j = 0; j < state->maxTapes; j++)
-	{
-		/* One real run; no dummy runs for worker tapes */
-		state->tp_fib[j] = 1;
-		state->tp_runs[j] = 1;
-		state->tp_dummy[j] = 0;
-		state->tp_tapenum[j] = j;
-	}
-	/* Leader tape gets one dummy run, and no real runs */
-	state->tp_fib[state->tapeRange] = 0;
-	state->tp_runs[state->tapeRange] = 0;
-	state->tp_dummy[state->tapeRange] = 1;
-
-	state->Level = 1;
-	state->destTape = 0;
-
-	state->status = TSS_BUILDRUNS;
 }
 
 /*

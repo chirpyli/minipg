@@ -18,7 +18,4 @@ extern IncrementalSortState *ExecInitIncrementalSort(IncrementalSort *node, ESta
 extern void ExecEndIncrementalSort(IncrementalSortState *node);
 extern void ExecReScanIncrementalSort(IncrementalSortState *node);
 
-/* parallel instrumentation support */
-extern void ExecIncrementalSortRetrieveInstrumentation(IncrementalSortState *node);
-
 #endif							/* NODEINCREMENTALSORT_H */

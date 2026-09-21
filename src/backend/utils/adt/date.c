@@ -987,18 +987,6 @@ extract_date(PG_FUNCTION_ARGS)
 	}
 	PG_RETURN_FLOAT8(intresult);
 }
-/* Add an interval to a date, giving a new date.
- * Must handle both positive and negative intervals.
- *
- * We implement this by promoting the date to timestamp (without time zone)
- * and then using the timestamp plus interval function.
- */
-/* Subtract an interval from a date, giving a new date.
- * Must handle both positive and negative intervals.
- *
- * We implement this by promoting the date to timestamp (without time zone)
- * and then using the timestamp minus interval function.
- */
 /* date_timestamp()
  * Convert date to timestamp data type.
  */
@@ -1481,26 +1469,6 @@ datetime_timestamp(PG_FUNCTION_ARGS)
 	}
 	PG_RETURN_TIMESTAMP(result);
 }
-/* time_interval()
- * Convert time to interval data type.
- */
-/* interval_time()
- * Convert interval to time data type.
- *
- * This is defined as producing the fractional-day portion of the interval.
- * Therefore, we can just ignore the months field.  It is not real clear
- * what to do with negative intervals, but we choose to subtract the floor,
- * so that, say, '-2 hours' becomes '22:00:00'.
- */
-/* time_mi_time()
- * Subtract two times to produce an interval.
- */
-/* time_pl_interval()
- * Add interval to time.
- */
-/* time_mi_interval()
- * Subtract interval from time.
- */
 /* time_part() and extract_time()
  * Extract specified field from time type.
  */

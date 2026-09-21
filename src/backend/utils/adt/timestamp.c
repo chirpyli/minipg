@@ -1668,94 +1668,10 @@ timestamp_larger(PG_FUNCTION_ARGS)
 }
 
 
-/*
- *	interval_justify_interval()
- *
- *	Adjust interval so 'month', 'day', and 'time' portions are within
- *	customary bounds.  Specifically:
- *
- *		0 <= abs(time) < 24 hours
- *		0 <= abs(day)  < 30 days
- *
- *	Also, the sign bit on all three fields is made equal, so either
- *	all three fields are negative or all are positive.
- */
-/*
- *	interval_justify_hours()
- *
- *	Adjust interval so 'time' contains less than a whole day, adding
- *	the excess to 'day'.  This is useful for
- *	situations (such as non-TZ) where '1 day' = '24 hours' is valid,
- *	e.g. interval subtraction and division.
- */
-/*
- *	interval_justify_days()
- *
- *	Adjust interval so 'day' contains less than 30 days, adding
- *	the excess to 'month'.
- */
-/* timestamp_pl_interval()
- * Add an interval to a timestamp data type.
- * Note that interval has provisions for qualitative year/month and day
- *	units, so try to do the right thing with them.
- * To add a month, increment the month, and use the same day of month.
- * Then, if the next month has fewer days, set the day of month
- *	to the last day of month.
- * To add a day, increment the mday, and use the same time of day.
- * Lastly, add in the "quantitative time".
- */
-
-/* timestamptz_pl_interval()
- * Add an interval to a timestamp with time zone data type.
- * Note that interval has provisions for qualitative year/month
- *	units, so try to do the right thing with them.
- * To add a month, increment the month, and use the same day of month.
- * Then, if the next month has fewer days, set the day of month
- *	to the last day of month.
- * Lastly, add in the "quantitative time".
- */
-
-
-/*
- *	There is no interval_abs():  it is unclear what value to return:
- *	  http://archives.postgresql.org/pgsql-general/2009-10/msg01031.php
- *	  http://archives.postgresql.org/pgsql-general/2009-11/msg00041.php
- */
-
-
-/*
- * interval_accum, interval_accum_inv, and interval_avg implement the
- * AVG(interval) aggregate.
- *
- * The transition datatype for this aggregate is a 2-element array of
- * intervals, where the first is the running sum and the second contains
- * the number of values so far in its 'time' field.  This is a bit ugly
- * but it beats inventing a specialized datatype for the purpose.
- */
-
-
-/* timestamp_age()
- * Calculate time difference while retaining year/month fields.
- * Note that this does not result in an accurate absolute time span
- *	since year and month are out of context once the arithmetic
- *	is done.
- */
-
-/* timestamptz_age()
- * Calculate time difference while retaining year/month fields.
- * Note that this does not result in an accurate absolute time span
- *	since year and month are out of context once the arithmetic
- *	is done.
- */
-
 /*----------------------------------------------------------
  *	Conversion operators.
  *---------------------------------------------------------*/
 
-
-/* timestamp_bin()
- * Bin timestamp into specified interval.
- */
 /* timestamp_trunc()
  * Truncate timestamp to specified units.
  */
@@ -2117,9 +2033,6 @@ timestamptz_trunc_zone(PG_FUNCTION_ARGS)
 	PG_RETURN_TIMESTAMPTZ(result);
 }
 
-/* interval_trunc()
- * Extract specified field from interval.
- */
 /* isoweek2j()
  *
  *	Return the Julian day which corresponds to the first day (Monday) of the given ISO 8601 year and week.
@@ -2896,9 +2809,6 @@ timestamp_zone(PG_FUNCTION_ARGS)
 	PG_RETURN_TIMESTAMPTZ(result);
 }
 
-/* timestamp_izone()
- * Encode timestamp type with specified time interval as time zone.
- */
 /* TimestampTimestampTzRequiresRewrite()
  *
  * Returns false if the TimeZone GUC setting causes timestamp_timestamptz and
@@ -3117,14 +3027,3 @@ timestamptz_zone(PG_FUNCTION_ARGS)
 
 	PG_RETURN_TIMESTAMP(result);
 }
-
-/* timestamptz_izone()
- * Encode timestamp with time zone type with specified time interval as time zone.
- * Returns a timestamp without time zone.
- */
-/* generate_series_timestamp()
- * Generate the set of timestamps from start to finish by step
- */
-/* generate_series_timestamptz()
- * Generate the set of timestamps from start to finish by step
- */

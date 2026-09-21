@@ -33,7 +33,6 @@ struct tzEntry;
  * ----------------------------------------------------------------
  */
 
-#define DAGO			"ago"
 #define DCURRENT		"current"
 #define EPOCH			"epoch"
 #define INVALID			"invalid"
@@ -83,8 +82,8 @@ struct tzEntry;
  * since these are turned into bit masks during parsing and decoding.
  *
  * Furthermore, the values for YEAR, MONTH, DAY, HOUR, MINUTE, SECOND
- * must be in the range 0..14 so that the associated bitmasks can fit
- * into the left half of an INTERVAL's typmod value.  Since those bits
+ * must be in the range 0..14 so that the associated bitmasks stay within
+ * the left half of the (former) interval typmod layout.  Since those bits
  * are stored in typmods, you can't change them without initdb!
  */
 
@@ -92,7 +91,6 @@ struct tzEntry;
 #define MONTH	1
 #define YEAR	2
 #define DAY		3
-#define JULIAN	4
 #define TZ		5				/* fixed-offset timezone abbreviation */
 #define DTZ		6				/* fixed-offset timezone abbrev, DST */
 #define DYNTZ	7				/* dynamic timezone abbreviation */
@@ -107,18 +105,8 @@ struct tzEntry;
 #define DOW		16
 #define UNITS	17
 #define ADBC	18
-/* these are only for relative dates */
-#define AGO		19
-#define ABS_BEFORE		20
-#define ABS_AFTER		21
 /* generic fields to help with parsing */
-#define ISODATE 22
 #define ISOTIME 23
-/* these are only for parsing intervals */
-#define WEEK		24
-#define DECADE		25
-#define CENTURY		26
-#define MILLENNIUM	27
 /* hack for parsing two-word timezone specs "MET DST" etc */
 #define DTZMOD	28				/* "DST" as a separate word */
 /* reserved for unrecognized string values */
@@ -145,7 +133,6 @@ struct tzEntry;
 #define DTK_DATE		2
 #define DTK_TIME		3
 #define DTK_TZ			4
-#define DTK_AGO			5
 
 #define DTK_SPECIAL		6
 #define DTK_EARLY		9
@@ -157,7 +144,6 @@ struct tzEntry;
 #define DTK_TOMORROW	15
 #define DTK_ZULU		16
 
-#define DTK_DELTA		17
 #define DTK_SECOND		18
 #define DTK_MINUTE		19
 #define DTK_HOUR		20
@@ -280,7 +266,6 @@ extern const int day_tab[2][13];
 #define DTERR_BAD_FORMAT		(-1)
 #define DTERR_FIELD_OVERFLOW	(-2)
 #define DTERR_MD_FIELD_OVERFLOW (-3)	/* triggers hint about DateStyle */
-#define DTERR_INTERVAL_OVERFLOW (-4)
 #define DTERR_TZDISP_OVERFLOW	(-5)
 
 

@@ -52,7 +52,6 @@
 #include "postmaster/interrupt.h"
 #include "postmaster/postmaster.h"
 #include "storage/backendid.h"
-#include "storage/dsm.h"
 #include "storage/fd.h"
 #include "storage/ipc.h"
 #include "storage/latch.h"
@@ -746,7 +745,7 @@ pgstat_start(void)
 			ClosePostmasterPorts(false);
 
 			/* Drop our connection to postmaster's shared memory, as well */
-			dsm_detach_all();
+
 			PGSharedMemoryDetach();
 
 			PgstatCollectorMain(0, NULL);

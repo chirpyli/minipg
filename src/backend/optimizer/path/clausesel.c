@@ -45,8 +45,7 @@ static Selectivity clauselist_selectivity_or(PlannerInfo *root,
 											 List *clauses,
 											 int varRelid,
 											 JoinType jointype,
-											 SpecialJoinInfo *sjinfo,
-											 bool use_extended_stats);
+											 SpecialJoinInfo *sjinfo);
 
 /****************************************************************************
  *		ROUTINES TO COMPUTE SELECTIVITIES
@@ -62,12 +61,14 @@ static Selectivity clauselist_selectivity_or(PlannerInfo *root,
  *
  * See clause_selectivity() for the meaning of the additional parameters.
  *
- * The basic approach is to apply extended statistics first, on as many
- * clauses as possible, in order to capture cross-column dependencies etc.
- * The remaining clauses are then estimated by taking the product of their
- * selectivities, but that's only right if they have independent
- * probabilities, and in reality they are often NOT independent even if they
- * only refer to a single column.  So, we want to be smarter where we can.
+ * The clauses are estimated by taking the product of their selectivities,
+ * but that's only right if they have independent probabilities, and in
+ * reality they are often NOT independent even if they only refer to a
+ * single column.  So, we want to be smarter where we can.
+ *
+ * minipg note: extended statistics have been cropped, so there is no
+ * cross-column statistics phase any more; only per-column statistics and
+ * the heuristics below are applied.
  *
  * We also recognize "range queries", such as "x > 34 AND x < 42".  Clauses
  * are recognized as possible range query components if they are restriction
@@ -102,42 +103,21 @@ clauselist_selectivity(PlannerInfo *root,
 					   JoinType jointype,
 					   SpecialJoinInfo *sjinfo)
 {
-	return clauselist_selectivity_ext(root, clauses, varRelid,
-									  jointype, sjinfo, true);
-}
-
-/*
- * clauselist_selectivity_ext -
- *	  Extended version of clauselist_selectivity().  If "use_extended_stats"
- *	  is false, all extended statistics will be ignored, and only per-column
- *	  statistics will be used.
- */
-Selectivity
-clauselist_selectivity_ext(PlannerInfo *root,
-						   List *clauses,
-						   int varRelid,
-						   JoinType jointype,
-						   SpecialJoinInfo *sjinfo,
-						   bool use_extended_stats)
-{
 	Selectivity s1 = 1.0;
-	Bitmapset  *estimatedclauses = NULL;
 	RangeQueryClause *rqlist = NULL;
 	ListCell   *l;
 	int			listidx;
 
 	/*
 	 * If there's exactly one clause, just go directly to
-	 * clause_selectivity_ext(). None of what we might do below is relevant.
+	 * clause_selectivity(). None of what we might do below is relevant.
 	 */
 	if (list_length(clauses) == 1)
-		return clause_selectivity_ext(root, (Node *) linitial(clauses),
-									  varRelid, jointype, sjinfo,
-									  use_extended_stats);
+		return clause_selectivity(root, (Node *) linitial(clauses),
+								  varRelid, jointype, sjinfo);
 
 	/*
-	 * Apply normal selectivity estimates for remaining clauses. We'll be
-	 * careful to skip any clauses which were already estimated above.
+	 * Apply normal selectivity estimates for remaining clauses.
 	 *
 	 * Anything that doesn't look like a potential rangequery clause gets
 	 * multiplied into s1 and forgotten. Anything that does gets inserted into
@@ -152,16 +132,8 @@ clauselist_selectivity_ext(PlannerInfo *root,
 
 		listidx++;
 
-		/*
-		 * Skip this clause if it's already been estimated by some other
-		 * statistics above.
-		 */
-		if (bms_is_member(listidx, estimatedclauses))
-			continue;
-
 		/* Compute the selectivity of this clause in isolation */
-		s2 = clause_selectivity_ext(root, clause, varRelid, jointype, sjinfo,
-									use_extended_stats);
+		s2 = clause_selectivity(root, clause, varRelid, jointype, sjinfo);
 
 		/*
 		 * Check for being passed a RestrictInfo.
@@ -340,38 +312,25 @@ clauselist_selectivity_or(PlannerInfo *root,
 						  List *clauses,
 						  int varRelid,
 						  JoinType jointype,
-						  SpecialJoinInfo *sjinfo,
-						  bool use_extended_stats)
+						  SpecialJoinInfo *sjinfo)
 {
 	Selectivity s1 = 0.0;
-	Bitmapset  *estimatedclauses = NULL;
 	ListCell   *lc;
-	int			listidx;
 
 	/*
-	 * Estimate the remaining clauses as if they were independent.
+	 * Estimate the clauses as if they were independent.
 	 *
 	 * Selectivities for an OR clause are computed as s1+s2 - s1*s2 to account
 	 * for the probable overlap of selected tuple sets.
 	 *
 	 * XXX is this too conservative?
 	 */
-	listidx = -1;
 	foreach(lc, clauses)
 	{
 		Selectivity s2;
 
-		listidx++;
-
-		/*
-		 * Skip this clause if it's already been estimated by some other
-		 * statistics above.
-		 */
-		if (bms_is_member(listidx, estimatedclauses))
-			continue;
-
-		s2 = clause_selectivity_ext(root, (Node *) lfirst(lc), varRelid,
-									jointype, sjinfo, use_extended_stats);
+		s2 = clause_selectivity(root, (Node *) lfirst(lc), varRelid,
+								jointype, sjinfo);
 
 		s1 = s1 + s2 - s1 * s2;
 	}
@@ -588,24 +547,6 @@ clause_selectivity(PlannerInfo *root,
 				   JoinType jointype,
 				   SpecialJoinInfo *sjinfo)
 {
-	return clause_selectivity_ext(root, clause, varRelid,
-								  jointype, sjinfo, true);
-}
-
-/*
- * clause_selectivity_ext -
- *	  Extended version of clause_selectivity().  If "use_extended_stats" is
- *	  false, all extended statistics will be ignored, and only per-column
- *	  statistics will be used.
- */
-Selectivity
-clause_selectivity_ext(PlannerInfo *root,
-					   Node *clause,
-					   int varRelid,
-					   JoinType jointype,
-					   SpecialJoinInfo *sjinfo,
-					   bool use_extended_stats)
-{
 	Selectivity s1 = 0.5;		/* default for any unhandled clause type */
 	RestrictInfo *rinfo = NULL;
 	bool		cacheable = false;
@@ -720,22 +661,20 @@ clause_selectivity_ext(PlannerInfo *root,
 	else if (is_notclause(clause))
 	{
 		/* inverse of the selectivity of the underlying clause */
-		s1 = 1.0 - clause_selectivity_ext(root,
-										  (Node *) get_notclausearg((Expr *) clause),
-										  varRelid,
-										  jointype,
-										  sjinfo,
-										  use_extended_stats);
+		s1 = 1.0 - clause_selectivity(root,
+									  (Node *) get_notclausearg((Expr *) clause),
+									  varRelid,
+									  jointype,
+									  sjinfo);
 	}
 	else if (is_andclause(clause))
 	{
 		/* share code with clauselist_selectivity() */
-		s1 = clauselist_selectivity_ext(root,
-										((BoolExpr *) clause)->args,
-										varRelid,
-										jointype,
-										sjinfo,
-										use_extended_stats);
+		s1 = clauselist_selectivity(root,
+									((BoolExpr *) clause)->args,
+									varRelid,
+									jointype,
+									sjinfo);
 	}
 	else if (is_orclause(clause))
 	{
@@ -747,8 +686,7 @@ clause_selectivity_ext(PlannerInfo *root,
 									   ((BoolExpr *) clause)->args,
 									   varRelid,
 									   jointype,
-									   sjinfo,
-									   use_extended_stats);
+									   sjinfo);
 	}
 	else if (is_opclause(clause))
 	{
@@ -823,12 +761,11 @@ clause_selectivity_ext(PlannerInfo *root,
 	else if (IsA(clause, RelabelType))
 	{
 		/* Not sure this case is needed, but it can't hurt */
-		s1 = clause_selectivity_ext(root,
-									(Node *) ((RelabelType *) clause)->arg,
-									varRelid,
-									jointype,
-									sjinfo,
-									use_extended_stats);
+		s1 = clause_selectivity(root,
+								(Node *) ((RelabelType *) clause)->arg,
+								varRelid,
+								jointype,
+								sjinfo);
 	}
 	else
 	{

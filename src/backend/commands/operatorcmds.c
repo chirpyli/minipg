@@ -2,7 +2,11 @@
  *
  * operatorcmds.c
  *
- *	  Routines for operator manipulation commands
+ *	  Guts of operator deletion.
+ *
+ * minipg note: CREATE/ALTER/DROP OPERATOR have been cropped (the parser no
+ * longer accepts them), so only the deletion helper used by generic object
+ * deletion is left here.
  *
  * Portions Copyright (c) 1996-2021, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
@@ -10,22 +14,6 @@
  *
  * IDENTIFICATION
  *	  src/backend/commands/operatorcmds.c
- *
- * DESCRIPTION
- *	  The "DefineFoo" routines take the parse tree and pick out the
- *	  appropriate arguments/flags, passing the results to the
- *	  corresponding "FooDefine" routines (in src/catalog) that do
- *	  the actual catalog-munging.  These routines also verify permission
- *	  of the user to execute the command.
- *
- * NOTES
- *	  These things must be defined and committed in the following order:
- *		"create function":
- *				input/output, recv/send functions
- *		"create type":
- *				type
- *		"create operator":
- *				operators
  *
  *-------------------------------------------------------------------------
  */

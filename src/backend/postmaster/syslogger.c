@@ -42,7 +42,6 @@
 #include "postmaster/interrupt.h"
 #include "postmaster/postmaster.h"
 #include "postmaster/syslogger.h"
-#include "storage/dsm.h"
 #include "storage/fd.h"
 #include "storage/ipc.h"
 #include "storage/latch.h"
@@ -519,7 +518,7 @@ SysLogger_Start(void)
 			ClosePostmasterPorts(true);
 
 			/* Drop our connection to postmaster's shared memory, as well */
-			dsm_detach_all();
+
 			PGSharedMemoryDetach();
 
 			/* do the work */

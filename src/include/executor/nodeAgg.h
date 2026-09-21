@@ -297,7 +297,4 @@ extern void hash_agg_set_limits(double hashentrysize, double input_groups,
 								int used_bits, Size *mem_limit,
 								uint64 *ngroups_limit, int *num_partitions);
 
-/* parallel instrumentation support */
-extern void ExecAggRetrieveInstrumentation(AggState *node);
-
 #endif							/* NODEAGG_H */

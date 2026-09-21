@@ -58,23 +58,11 @@ extern Selectivity clause_selectivity(PlannerInfo *root,
 									  int varRelid,
 									  JoinType jointype,
 									  SpecialJoinInfo *sjinfo);
-extern Selectivity clause_selectivity_ext(PlannerInfo *root,
-										  Node *clause,
-										  int varRelid,
-										  JoinType jointype,
-										  SpecialJoinInfo *sjinfo,
-										  bool use_extended_stats);
 extern Selectivity clauselist_selectivity(PlannerInfo *root,
 										  List *clauses,
 										  int varRelid,
 										  JoinType jointype,
 										  SpecialJoinInfo *sjinfo);
-extern Selectivity clauselist_selectivity_ext(PlannerInfo *root,
-											  List *clauses,
-											  int varRelid,
-											  JoinType jointype,
-											  SpecialJoinInfo *sjinfo,
-											  bool use_extended_stats);
 
 /* in path/costsize.c: */
 
@@ -104,7 +92,8 @@ extern Expr *expression_planner_with_deps(Expr *expr,
 										  List **relationOids,
 										  List **invalItems);
 
-extern bool plan_cluster_use_sort(Oid tableOid, Oid indexOid);
+/* minipg: plan_cluster_use_sort() is gone; VACUUM FULL always rewrites in
+ * physical order, so there is no index-vs-sort decision to make. */
 
 /* in plan/setrefs.c: */
 
