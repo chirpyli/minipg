@@ -1593,7 +1593,7 @@ create_grouping_paths(PlannerInfo *root,
 	AggClauseCosts agg_costs;
 
 	MemSet(&agg_costs, 0, sizeof(AggClauseCosts));
-	get_agg_clause_costs(root, AGGSPLIT_SIMPLE, &agg_costs);
+	get_agg_clause_costs(root, &agg_costs);
 
 	/*
 	 * Create grouping relation to hold fully aggregated grouping and/or
@@ -2393,7 +2393,6 @@ add_paths_to_grouping_rel(PlannerInfo *root, RelOptInfo *input_rel,
 											 path,
 											 grouped_rel->reltarget,
 											 parse->groupClause ? AGG_SORTED : AGG_PLAIN,
-											 AGGSPLIT_SIMPLE,
 											 parse->groupClause,
 											 havingQual,
 											 agg_costs,
@@ -2460,7 +2459,6 @@ add_paths_to_grouping_rel(PlannerInfo *root, RelOptInfo *input_rel,
 										 path,
 										 grouped_rel->reltarget,
 										 parse->groupClause ? AGG_SORTED : AGG_PLAIN,
-										 AGGSPLIT_SIMPLE,
 										 parse->groupClause,
 										 havingQual,
 										 agg_costs,
@@ -2501,7 +2499,6 @@ add_paths_to_grouping_rel(PlannerInfo *root, RelOptInfo *input_rel,
 									 cheapest_path,
 									 grouped_rel->reltarget,
 									 AGG_HASHED,
-									 AGGSPLIT_SIMPLE,
 									 parse->groupClause,
 									 havingQual,
 									 agg_costs,
@@ -2704,7 +2701,6 @@ create_distinct_paths(PlannerInfo *root,
 								 cheapest_input_path,
 								 cheapest_input_path->pathtarget,
 								 AGG_HASHED,
-								 AGGSPLIT_SIMPLE,
 								 parse->distinctClause,
 								 NIL,
 								 NULL,

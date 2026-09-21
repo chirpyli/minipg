@@ -412,7 +412,6 @@ _readAggref(void)
 	READ_BOOL_FIELD(aggvariadic);
 	READ_CHAR_FIELD(aggkind);
 	READ_UINT_FIELD(agglevelsup);
-	READ_ENUM_FIELD(aggsplit, AggSplit);
 	READ_INT_FIELD(aggno);
 	READ_INT_FIELD(aggtransno);
 	READ_LOCATION_FIELD(location);
@@ -1566,7 +1565,6 @@ _readAgg(void)
 	ReadCommonPlan(&local_node->plan);
 
 	READ_ENUM_FIELD(aggstrategy, AggStrategy);
-	READ_ENUM_FIELD(aggsplit, AggSplit);
 	READ_INT_FIELD(numCols);
 	READ_ATTRNUMBER_ARRAY(grpColIdx, local_node->numCols);
 	READ_OID_ARRAY(grpOperators, local_node->numCols);

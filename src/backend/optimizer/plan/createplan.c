@@ -1349,7 +1349,6 @@ create_unique_plan(PlannerInfo *root, UniquePath *best_path, int flags)
 		plan = (Plan *) make_agg(build_path_tlist(root, &best_path->path),
 								 NIL,
 								 AGG_HASHED,
-								 AGGSPLIT_SIMPLE,
 								 numGroupCols,
 								 groupColIdx,
 								 groupOperators,
@@ -1718,7 +1717,6 @@ create_agg_plan(PlannerInfo *root, AggPath *best_path)
 
 	plan = make_agg(tlist, quals,
 					best_path->aggstrategy,
-					best_path->aggsplit,
 					list_length(best_path->groupClause),
 					extract_grouping_cols(best_path->groupClause,
 										  subplan->targetlist),
@@ -4545,7 +4543,7 @@ make_memoize(Plan *lefttree, Oid *hashoperators, Oid *collations,
 
 Agg *
 make_agg(List *tlist, List *qual,
-		 AggStrategy aggstrategy, AggSplit aggsplit,
+		 AggStrategy aggstrategy,
 		 int numGroupCols, AttrNumber *grpColIdx, Oid *grpOperators, Oid *grpCollations,
 		 double dNumGroups,
 		 Size transitionSpace, Plan *lefttree)
@@ -4558,7 +4556,6 @@ make_agg(List *tlist, List *qual,
 	numGroups = (long) Min(dNumGroups, (double) LONG_MAX);
 
 	node->aggstrategy = aggstrategy;
-	node->aggsplit = aggsplit;
 	node->numCols = numGroupCols;
 	node->grpColIdx = grpColIdx;
 	node->grpOperators = grpOperators;

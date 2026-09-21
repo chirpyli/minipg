@@ -410,8 +410,6 @@ static void get_func_expr(FuncExpr *expr, deparse_context *context,
 						  bool showimplicit);
 static void get_agg_expr(Aggref *aggref, deparse_context *context,
 						 Aggref *original_aggref);
-static void get_agg_combine_expr(Node *node, deparse_context *context,
-								 void *callback_arg);
 static bool get_func_sql_syntax(FuncExpr *expr, deparse_context *context);
 static void get_coercion_expr(Node *arg, deparse_context *context,
 							  Oid resulttype, int32 resulttypmod,
@@ -5936,31 +5934,6 @@ get_agg_expr(Aggref *aggref, deparse_context *context,
 	int			nargs;
 	bool		use_variadic;
 
-	/*
-	 * For a combining aggregate, we look up and deparse the corresponding
-	 * partial aggregate instead.  This is necessary because our input
-	 * argument list has been replaced; the new argument list always has just
-	 * one element, which will point to a partial Aggref that supplies us with
-	 * transition states to combine.
-	 */
-	if (DO_AGGSPLIT_COMBINE(aggref->aggsplit))
-	{
-		TargetEntry *tle;
-
-		Assert(list_length(aggref->args) == 1);
-		tle = linitial_node(TargetEntry, aggref->args);
-		resolve_special_varno((Node *) tle->expr, context,
-							  get_agg_combine_expr, original_aggref);
-		return;
-	}
-
-	/*
-	 * Mark as PARTIAL, if appropriate.  We look to the original aggref so as
-	 * to avoid printing this when recursing from the code just above.
-	 */
-	if (DO_AGGSPLIT_SKIPFINAL(original_aggref->aggsplit))
-		appendStringInfoString(buf, "PARTIAL ");
-
 	/* Extract the argument types as seen by the parser */
 	nargs = get_aggregate_argtypes(aggref, argtypes);
 
@@ -6007,24 +5980,6 @@ get_agg_expr(Aggref *aggref, deparse_context *context,
 	}
 
 	appendStringInfoChar(buf, ')');
-}
-
-/*
- * This is a helper function for get_agg_expr().  It's used when we deparse
- * a combining Aggref; resolve_special_varno locates the corresponding partial
- * Aggref and then calls this.
- */
-static void
-get_agg_combine_expr(Node *node, deparse_context *context, void *callback_arg)
-{
-	Aggref	   *aggref;
-	Aggref	   *original_aggref = callback_arg;
-
-	if (!IsA(node, Aggref))
-		elog(ERROR, "combining Aggref does not point to an Aggref");
-
-	aggref = (Aggref *) node;
-	get_agg_expr(aggref, context, original_aggref);
 }
 
 

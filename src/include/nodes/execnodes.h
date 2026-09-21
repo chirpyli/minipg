@@ -1746,7 +1746,6 @@ typedef struct AggState
 	int			numaggs;		/* length of list (could be zero!) */
 	int			numtrans;		/* number of pertrans items */
 	AggStrategy aggstrategy;	/* strategy mode */
-	AggSplit	aggsplit;		/* agg-splitting mode, see nodes.h */
 	AggStatePerPhase phase;		/* pointer to current phase data */
 	int			numphases;		/* number of phases (including phase 0) */
 	int			current_phase;	/* current phase number */

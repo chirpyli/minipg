@@ -194,7 +194,6 @@ _equalAggref(const Aggref *a, const Aggref *b)
 	COMPARE_SCALAR_FIELD(aggvariadic);
 	COMPARE_SCALAR_FIELD(aggkind);
 	COMPARE_SCALAR_FIELD(agglevelsup);
-	COMPARE_SCALAR_FIELD(aggsplit);
 	COMPARE_SCALAR_FIELD(aggno);
 	COMPARE_SCALAR_FIELD(aggtransno);
 	COMPARE_LOCATION_FIELD(location);

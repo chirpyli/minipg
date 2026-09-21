@@ -41,7 +41,7 @@ extern PlanRowMark *get_plan_rowmark(List *rowmarks, Index rtindex);
 /*
  * prototypes for prepagg.c
  */
-extern void get_agg_clause_costs(PlannerInfo *root, AggSplit aggsplit,
+extern void get_agg_clause_costs(PlannerInfo *root,
 								 AggClauseCosts *agg_costs);
 extern void preprocess_aggrefs(PlannerInfo *root, Node *clause);
 

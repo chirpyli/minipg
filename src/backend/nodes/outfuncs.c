@@ -608,7 +608,6 @@ _outAgg(StringInfo str, const Agg *node)
 	_outPlanInfo(str, (const Plan *) node);
 
 	WRITE_ENUM_FIELD(aggstrategy, AggStrategy);
-	WRITE_ENUM_FIELD(aggsplit, AggSplit);
 	WRITE_INT_FIELD(numCols);
 	WRITE_ATTRNUMBER_ARRAY(grpColIdx, node->numCols);
 	WRITE_OID_ARRAY(grpOperators, node->numCols);
@@ -846,7 +845,6 @@ _outAggref(StringInfo str, const Aggref *node)
 	WRITE_BOOL_FIELD(aggvariadic);
 	WRITE_CHAR_FIELD(aggkind);
 	WRITE_UINT_FIELD(agglevelsup);
-	WRITE_ENUM_FIELD(aggsplit, AggSplit);
 	WRITE_INT_FIELD(aggno);
 	WRITE_INT_FIELD(aggtransno);
 	WRITE_LOCATION_FIELD(location);
@@ -1507,7 +1505,6 @@ _outAggPath(StringInfo str, const AggPath *node)
 
 	WRITE_NODE_FIELD(subpath);
 	WRITE_ENUM_FIELD(aggstrategy, AggStrategy);
-	WRITE_ENUM_FIELD(aggsplit, AggSplit);
 	WRITE_FLOAT_FIELD(numGroups, "%.0f");
 	WRITE_UINT64_FIELD(transitionSpace);
 	WRITE_NODE_FIELD(groupClause);

@@ -2659,7 +2659,6 @@ ExecBuildAggTrans(AggState *aggstate, AggStatePerPhase phase,
 	ExprState  *state = makeNode(ExprState);
 	PlanState  *parent = &aggstate->ss.ps;
 	ExprEvalStep scratch = {0};
-	bool		isCombine = DO_AGGSPLIT_COMBINE(aggstate->aggsplit);
 	ExprSetupInfo deform = {0, 0, 0};
 
 	state->expr = (Expr *) aggstate;
@@ -2704,75 +2703,7 @@ ExecBuildAggTrans(AggState *aggstate, AggStatePerPhase phase,
 		 * Evaluate arguments to aggregate/combine function.
 		 */
 		argno = 0;
-		if (isCombine)
-		{
-			/*
-			 * Combining two aggregate transition values. Instead of directly
-			 * coming from a tuple the input is a, potentially deserialized,
-			 * transition value.
-			 */
-			TargetEntry *source_tle;
-
-			Assert(pertrans->numSortCols == 0);
-			Assert(list_length(pertrans->aggref->args) == 1);
-
-			strictargs = trans_fcinfo->args + 1;
-			source_tle = (TargetEntry *) linitial(pertrans->aggref->args);
-
-			/*
-			 * deserialfn_oid will be set if we must deserialize the input
-			 * state before calling the combine function.
-			 */
-			if (!OidIsValid(pertrans->deserialfn_oid))
-			{
-				/*
-				 * Start from 1, since the 0th arg will be the transition
-				 * value
-				 */
-				ExecInitExprRec(source_tle->expr, state,
-								&trans_fcinfo->args[argno + 1].value,
-								&trans_fcinfo->args[argno + 1].isnull);
-			}
-			else
-			{
-				FunctionCallInfo ds_fcinfo = pertrans->deserialfn_fcinfo;
-
-				/* evaluate argument */
-				ExecInitExprRec(source_tle->expr, state,
-								&ds_fcinfo->args[0].value,
-								&ds_fcinfo->args[0].isnull);
-
-				/* Dummy second argument for type-safety reasons */
-				ds_fcinfo->args[1].value = PointerGetDatum(NULL);
-				ds_fcinfo->args[1].isnull = false;
-
-				/*
-				 * Don't call a strict deserialization function with NULL
-				 * input
-				 */
-				if (pertrans->deserialfn.fn_strict)
-					scratch.opcode = EEOP_AGG_STRICT_DESERIALIZE;
-				else
-					scratch.opcode = EEOP_AGG_DESERIALIZE;
-
-				scratch.d.agg_deserialize.fcinfo_data = ds_fcinfo;
-				scratch.d.agg_deserialize.jumpnull = -1;	/* adjust later */
-				scratch.resvalue = &trans_fcinfo->args[argno + 1].value;
-				scratch.resnull = &trans_fcinfo->args[argno + 1].isnull;
-
-				ExprEvalPushStep(state, &scratch);
-				/* don't add an adjustment unless the function is strict */
-				if (pertrans->deserialfn.fn_strict)
-					adjust_bailout = lappend_int(adjust_bailout,
-												 state->steps_len - 1);
-
-				/* restore normal settings of scratch fields */
-				scratch.resvalue = &state->resvalue;
-				scratch.resnull = &state->resnull;
-			}
-			argno++;
-		}
-		else if (pertrans->numSortCols == 0)
+		if (pertrans->numSortCols == 0)
 		{
 			ListCell   *arg;
 

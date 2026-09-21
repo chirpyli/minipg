@@ -516,24 +516,19 @@ GetAggInitVal(Datum textInitVal, Oid transtype)
  *	  Process the PlannerInfo's 'aggtransinfos' and 'agginfos' lists
  *	  accumulating the cost information about them.
  *
- * 'aggsplit' tells us the expected partial-aggregation mode, which affects
- * the cost estimates.
- *
  * NOTE that the costs are ADDED to those already in *costs ... so the caller
  * is responsible for zeroing the struct initially.
  *
- * For each AggTransInfo, we add the cost of an aggregate transition using
- * either the transfn or combinefn depending on the 'aggsplit' value.  We also
- * account for the costs of any serializations and
- * deserializations of the transition state and also estimate the total space
- * needed for the transition states as if each aggregate's state was stored in
- * memory concurrently (as would be done in a HashAgg plan).
+ * For each AggTransInfo, we add the cost of an aggregate transition.
+ * We also estimate the total space needed for the transition states as if
+ * each aggregate's state was stored in memory concurrently (as would be done
+ * in a HashAgg plan).
  *
  * For each AggInfo in the 'agginfos' list we add the cost of running the
  * final function and the direct args, if any.
  */
 void
-get_agg_clause_costs(PlannerInfo *root, AggSplit aggsplit, AggClauseCosts *costs)
+get_agg_clause_costs(PlannerInfo *root, AggClauseCosts *costs)
 {
 	ListCell   *lc;
 
@@ -545,29 +540,9 @@ get_agg_clause_costs(PlannerInfo *root, AggSplit aggsplit, AggClauseCosts *costs
 		 * Add the appropriate component function execution costs to
 		 * appropriate totals.
 		 */
-		if (DO_AGGSPLIT_COMBINE(aggsplit))
-		{
-			/* charge for combining previously aggregated states */
-			add_function_cost(root, transinfo->combinefn_oid, NULL,
-							  &costs->transCost);
-		}
-		else
-			add_function_cost(root, transinfo->transfn_oid, NULL,
-							  &costs->transCost);
-		if (DO_AGGSPLIT_DESERIALIZE(aggsplit) &&
-			OidIsValid(transinfo->deserialfn_oid))
-			add_function_cost(root, transinfo->deserialfn_oid, NULL,
-							  &costs->transCost);
-		if (DO_AGGSPLIT_SERIALIZE(aggsplit) &&
-			OidIsValid(transinfo->serialfn_oid))
-			add_function_cost(root, transinfo->serialfn_oid, NULL,
-							  &costs->finalCost);
+		add_function_cost(root, transinfo->transfn_oid, NULL,
+						  &costs->transCost);
 
-		/*
-		 * These costs are incurred only by the initial aggregate node, so we
-		 * mustn't include them again at upper levels.
-		 */
-		if (!DO_AGGSPLIT_COMBINE(aggsplit))
 		{
 			/* add the input expressions' cost to per-input-row costs */
 			QualCost	argcosts;
@@ -636,8 +611,7 @@ get_agg_clause_costs(PlannerInfo *root, AggSplit aggsplit, AggClauseCosts *costs
 		 * Add the appropriate component function execution costs to
 		 * appropriate totals.
 		 */
-		if (!DO_AGGSPLIT_SKIPFINAL(aggsplit) &&
-			OidIsValid(agginfo->finalfn_oid))
+		if (OidIsValid(agginfo->finalfn_oid))
 			add_function_cost(root, agginfo->finalfn_oid, NULL,
 							  &costs->finalCost);
 

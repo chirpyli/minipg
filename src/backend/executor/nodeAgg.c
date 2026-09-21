@@ -13,23 +13,6 @@
  *	  If a finalfunc is not supplied then the result is just the ending
  *	  value of transvalue.
  *
- *	  Other behaviors can be selected by the "aggsplit" mode, which exists
- *	  to support partial aggregation.  It is possible to:
- *	  * Skip running the finalfunc, so that the output is always the
- *	  final transvalue state.
- *	  * Substitute the combinefunc for the transfunc, so that transvalue
- *	  states (propagated up from a child partial-aggregation step) are merged
- *	  rather than processing raw input rows.  (The statements below about
- *	  the transfunc apply equally to the combinefunc, when it's selected.)
- *	  * Apply the serializefunc to the output values (this only makes sense
- *	  when skipping the finalfunc, since the serializefunc works on the
- *	  transvalue data type).
- *	  * Apply the deserializefunc to the input values (this only makes sense
- *	  when using the combinefunc, for similar reasons).
- *	  It is the planner's responsibility to connect up Agg nodes using these
- *	  alternate behaviors in a way that makes sense, with partial aggregation
- *	  results being fed to nodes that expect them.
- *
  *	  If a normal aggregate call specifies DISTINCT or ORDER BY, we sort the
  *	  input tuples and eliminate duplicates (if required) before performing
  *	  the above-depicted process.  (However, we don't do that for ordered-set
@@ -3144,7 +3127,6 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 	aggstate->numaggs = 0;
 	aggstate->numtrans = 0;
 	aggstate->aggstrategy = node->aggstrategy;
-	aggstate->aggsplit = node->aggsplit;
 	aggstate->maxsets = 0;
 	aggstate->projected_set = -1;
 	aggstate->current_set = 0;

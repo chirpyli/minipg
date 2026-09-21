@@ -657,7 +657,6 @@ typedef struct Agg
 {
 	Plan		plan;
 	AggStrategy aggstrategy;	/* basic strategy, see nodes.h */
-	AggSplit	aggsplit;		/* agg-splitting mode, see nodes.h */
 	int			numCols;		/* number of grouping columns */
 	AttrNumber *grpColIdx;		/* their indexes in the target list */
 	Oid		   *grpOperators;	/* equality operators to compare with */

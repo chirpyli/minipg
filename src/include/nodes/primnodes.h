@@ -232,17 +232,7 @@ typedef struct Param
  * This is determined during planning and is InvalidOid before that.
  *
  * aggargtypes is an OID list of the data types of the direct and regular
- * arguments.  Normally it's redundant with the aggdirectargs and args lists,
- * but in a combining aggregate, it's not because the args list has been
- * replaced with a single argument representing the partial-aggregate
- * transition values.
- *
- * aggsplit indicates the expected partial-aggregation mode for the Aggref's
- * parent plan node.  It's always set to AGGSPLIT_SIMPLE in the parser, but
- * the planner might change it to something else.  We use this mainly as
- * a crosscheck that the Aggrefs match the plan; but note that when aggsplit
- * indicates a non-final mode, aggtype reflects the transition data type
- * not the SQL-level output type of the aggregate.
+ * arguments.
  *
  * aggno and aggtransno are -1 in the parse stage, and are set in planning.
  * Aggregates with the same 'aggno' represent the same aggregate expression,
@@ -268,7 +258,6 @@ typedef struct Aggref
 								 * combined into an array last argument */
 	char		aggkind;		/* aggregate kind (see pg_aggregate.h) */
 	Index		agglevelsup;	/* > 0 if agg belongs to outer query */
-	AggSplit	aggsplit;		/* expected agg-splitting mode of parent Agg */
 	int			aggno;			/* unique ID within the Agg node */
 	int			aggtransno;		/* unique ID of transition state in the Agg */
 	int			location;		/* token location, or -1 if unknown */

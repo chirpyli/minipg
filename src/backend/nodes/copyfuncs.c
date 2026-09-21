@@ -744,7 +744,6 @@ _copyAgg(const Agg *from)
 	CopyPlanFields((const Plan *) from, (Plan *) newnode);
 
 	COPY_SCALAR_FIELD(aggstrategy);
-	COPY_SCALAR_FIELD(aggsplit);
 	COPY_SCALAR_FIELD(numCols);
 	COPY_POINTER_FIELD(grpColIdx, from->numCols * sizeof(AttrNumber));
 	COPY_POINTER_FIELD(grpOperators, from->numCols * sizeof(Oid));
@@ -996,7 +995,6 @@ _copyAggref(const Aggref *from)
 	COPY_SCALAR_FIELD(aggvariadic);
 	COPY_SCALAR_FIELD(aggkind);
 	COPY_SCALAR_FIELD(agglevelsup);
-	COPY_SCALAR_FIELD(aggsplit);
 	COPY_SCALAR_FIELD(aggno);
 	COPY_SCALAR_FIELD(aggtransno);
 	COPY_LOCATION_FIELD(location);

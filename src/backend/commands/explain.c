@@ -734,12 +734,8 @@ ExplainNode(PlanState *planstate, List *ancestors,
 						break;
 				}
 
-				if (DO_AGGSPLIT_SKIPFINAL(agg->aggsplit))
-					pname = psprintf("Partial %s", pname);
-				else if (DO_AGGSPLIT_COMBINE(agg->aggsplit))
-					pname = psprintf("Finalize %s", pname);
-			}
-			break;
+				}
+				break;
 		case T_Unique:
 			pname = "Unique";
 			break;
