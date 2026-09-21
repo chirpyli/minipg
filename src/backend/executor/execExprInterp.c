@@ -470,8 +470,6 @@ ExecInterpExpr(ExprState *state, ExprContext *econtext, bool *isnull)
 		&&CASE_EEOP_HASHED_SCALARARRAYOP,
 		&&CASE_EEOP_AGGREF,
 		&&CASE_EEOP_SUBPLAN,
-		&&CASE_EEOP_AGG_STRICT_DESERIALIZE,
-		&&CASE_EEOP_AGG_DESERIALIZE,
 		&&CASE_EEOP_AGG_STRICT_INPUT_CHECK_ARGS,
 		&&CASE_EEOP_AGG_STRICT_INPUT_CHECK_NULLS,
 		&&CASE_EEOP_AGG_PLAIN_PERGROUP_NULLCHECK,
@@ -1372,36 +1370,6 @@ ExecInterpExpr(ExprState *state, ExprContext *econtext, bool *isnull)
 		{
 			/* too complex for an inline implementation */
 			ExecEvalSubPlan(state, op, econtext);
-
-			EEO_NEXT();
-		}
-
-		/* evaluate a strict aggregate deserialization function */
-		EEO_CASE(EEOP_AGG_STRICT_DESERIALIZE)
-		{
-			/* Don't call a strict deserialization function with NULL input */
-			if (op->d.agg_deserialize.fcinfo_data->args[0].isnull)
-				EEO_JUMP(op->d.agg_deserialize.jumpnull);
-
-			/* fallthrough */
-		}
-
-		/* evaluate aggregate deserialization function (non-strict portion) */
-		EEO_CASE(EEOP_AGG_DESERIALIZE)
-		{
-			FunctionCallInfo fcinfo = op->d.agg_deserialize.fcinfo_data;
-			AggState   *aggstate = castNode(AggState, state->parent);
-			MemoryContext oldContext;
-
-			/*
-			 * We run the deserialization functions in per-input-tuple memory
-			 * context.
-			 */
-			oldContext = MemoryContextSwitchTo(aggstate->tmpcontext->ecxt_per_tuple_memory);
-			fcinfo->isnull = false;
-			*op->resvalue = FunctionCallInvoke(fcinfo);
-			*op->resnull = fcinfo->isnull;
-			MemoryContextSwitchTo(oldContext);
 
 			EEO_NEXT();
 		}

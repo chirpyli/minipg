@@ -61,29 +61,17 @@ typedef struct AggStatePerTransData
 	 */
 	int			numTransInputs;
 
-	/* Oid of the state transition or combine function */
+	/* Oid of the state transition function */
 	Oid			transfn_oid;
-
-	/* Oid of the serialization function or InvalidOid */
-	Oid			serialfn_oid;
-
-	/* Oid of the deserialization function or InvalidOid */
-	Oid			deserialfn_oid;
 
 	/* Oid of state value's datatype */
 	Oid			aggtranstype;
 
 	/*
-	 * fmgr lookup data for transition function or combine function.  Note in
+	 * fmgr lookup data for transition function.  Note in
 	 * particular that the fn_strict flag is kept here.
 	 */
 	FmgrInfo	transfn;
-
-	/* fmgr lookup data for serialization function */
-	FmgrInfo	serialfn;
-
-	/* fmgr lookup data for deserialization function */
-	FmgrInfo	deserialfn;
 
 	/* Input collation derived for aggregate */
 	Oid			aggCollation;
@@ -159,11 +147,6 @@ typedef struct AggStatePerTransData
 	 * worth the extra space consumption.
 	 */
 	FunctionCallInfo transfn_fcinfo;
-
-	/* Likewise for serialization and deserialization functions */
-	FunctionCallInfo serialfn_fcinfo;
-
-	FunctionCallInfo deserialfn_fcinfo;
 }			AggStatePerTransData;
 
 /*

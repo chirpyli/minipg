@@ -192,11 +192,11 @@
  *	  imposing a limit on the number of groups separately from the amount of
  *	  memory consumed.
  *
- *    Transition / Combine function invocation:
+ *    Transition function invocation:
  *
- *    For performance reasons transition functions, including combine
- *    functions, aren't invoked one-by-one from nodeAgg.c after computing
- *    arguments using the expression evaluation engine. Instead
+ *    For performance reasons transition functions aren't invoked one-by-one
+ *    from nodeAgg.c after computing arguments using the expression evaluation
+ *    engine. Instead
  *    ExecBuildAggTrans() builds one large expression that does both argument
  *    evaluation and transition function invocation. That avoids performance
  *    issues due to repeated uses of expression evaluation, complications due
@@ -431,7 +431,6 @@ static Datum GetAggInitVal(Datum textInitVal, Oid transtype);
 static void build_pertrans_for_aggref(AggStatePerTrans pertrans,
 									  AggState *aggstate, EState *estate,
 									  Aggref *aggref, Oid aggtransfn, Oid aggtranstype,
-									  Oid aggserialfn, Oid aggdeserialfn,
 									  Datum initValue, bool initValueIsNull,
 									  Oid *inputTypes, int numArguments);
 
@@ -2312,7 +2311,7 @@ agg_retrieve_direct(AggState *aggstate)
 				 */
 				for (;;)
 				{
-					/* Advance the aggregates (or combine functions) */
+					/* Advance the aggregates */
 					advance_aggregates(aggstate);
 
 					/* Reset per-input-tuple context after each tuple */
@@ -2415,7 +2414,7 @@ agg_fill_hash_table(AggState *aggstate)
 		/* Find or build hashtable entries */
 		lookup_hash_entries(aggstate);
 
-		/* Advance the aggregates (or combine functions) */
+		/* Advance the aggregates */
 		advance_aggregates(aggstate);
 
 		/*
@@ -3513,8 +3512,6 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 		HeapTuple	aggTuple;
 		Form_pg_aggregate aggform;
 		Oid			finalfn_oid;
-		Oid			serialfn_oid,
-					deserialfn_oid;
 		Expr	   *finalfnexpr;
 		Oid			aggtranstype;
 
@@ -3547,22 +3544,11 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 		/* Final function only required if we're finalizing the aggregates */
 		peragg->finalfn_oid = finalfn_oid = aggform->aggfinalfn;
 
-		serialfn_oid = InvalidOid;
-		deserialfn_oid = InvalidOid;
-
 		/* Check that aggregate owner has permission to call component fns */
 		{
 			if (OidIsValid(finalfn_oid))
 			{
 				InvokeFunctionExecuteHook(finalfn_oid);
-			}
-			if (OidIsValid(serialfn_oid))
-			{
-				InvokeFunctionExecuteHook(serialfn_oid);
-			}
-			if (OidIsValid(deserialfn_oid))
-			{
-				InvokeFunctionExecuteHook(deserialfn_oid);
 			}
 		}
 
@@ -3638,7 +3624,6 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 
 			build_pertrans_for_aggref(pertrans, aggstate, estate,
 									  aggref, transfn_oid, aggtranstype,
-									  serialfn_oid, deserialfn_oid,
 									  initValue, initValueIsNull,
 									  inputTypes, numArguments);
 		}
@@ -3723,13 +3708,10 @@ build_pertrans_for_aggref(AggStatePerTrans pertrans,
 						  AggState *aggstate, EState *estate,
 						  Aggref *aggref,
 						  Oid aggtransfn, Oid aggtranstype,
-						  Oid aggserialfn, Oid aggdeserialfn,
 						  Datum initValue, bool initValueIsNull,
 						  Oid *inputTypes, int numArguments)
 {
 	int			numGroupingSets = Max(aggstate->maxsets, 1);
-	Expr	   *serialfnexpr = NULL;
-	Expr	   *deserialfnexpr = NULL;
 	ListCell   *lc;
 	int			numInputs;
 	int			numDirectArgs;
@@ -3743,8 +3725,6 @@ build_pertrans_for_aggref(AggStatePerTrans pertrans,
 	pertrans->aggshared = false;
 	pertrans->aggCollation = aggref->inputcollid;
 	pertrans->transfn_oid = aggtransfn;
-	pertrans->serialfn_oid = aggserialfn;
-	pertrans->deserialfn_oid = aggdeserialfn;
 	pertrans->initValue = initValue;
 	pertrans->initValueIsNull = initValueIsNull;
 
@@ -3815,39 +3795,6 @@ build_pertrans_for_aggref(AggStatePerTrans pertrans,
 	get_typlenbyval(aggtranstype,
 					&pertrans->transtypeLen,
 					&pertrans->transtypeByVal);
-
-	if (OidIsValid(aggserialfn))
-	{
-		build_aggregate_serialfn_expr(aggserialfn,
-									  &serialfnexpr);
-		fmgr_info(aggserialfn, &pertrans->serialfn);
-		fmgr_info_set_expr((Node *) serialfnexpr, &pertrans->serialfn);
-
-		pertrans->serialfn_fcinfo =
-			(FunctionCallInfo) palloc(SizeForFunctionCallInfo(1));
-		InitFunctionCallInfoData(*pertrans->serialfn_fcinfo,
-								 &pertrans->serialfn,
-								 1,
-								 InvalidOid,
-								 (void *) aggstate, NULL);
-	}
-
-	if (OidIsValid(aggdeserialfn))
-	{
-		build_aggregate_deserialfn_expr(aggdeserialfn,
-										&deserialfnexpr);
-		fmgr_info(aggdeserialfn, &pertrans->deserialfn);
-		fmgr_info_set_expr((Node *) deserialfnexpr, &pertrans->deserialfn);
-
-		pertrans->deserialfn_fcinfo =
-			(FunctionCallInfo) palloc(SizeForFunctionCallInfo(2));
-		InitFunctionCallInfoData(*pertrans->deserialfn_fcinfo,
-								 &pertrans->deserialfn,
-								 2,
-								 InvalidOid,
-								 (void *) aggstate, NULL);
-
-	}
 
 	/*
 	 * If we're doing either DISTINCT or ORDER BY for a plain agg, then we

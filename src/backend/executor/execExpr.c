@@ -2839,11 +2839,6 @@ ExecBuildAggTrans(AggState *aggstate, AggStatePerPhase phase,
 				Assert(as->d.agg_strict_input_check.jumpnull == -1);
 				as->d.agg_strict_input_check.jumpnull = state->steps_len;
 			}
-			else if (as->opcode == EEOP_AGG_STRICT_DESERIALIZE)
-			{
-				Assert(as->d.agg_deserialize.jumpnull == -1);
-				as->d.agg_deserialize.jumpnull = state->steps_len;
-			}
 			else
 				Assert(false);
 		}

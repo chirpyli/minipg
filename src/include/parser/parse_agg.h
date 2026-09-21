@@ -40,11 +40,6 @@ extern void build_aggregate_transfn_expr(Oid *agg_input_types,
 										 Expr **invtransfnexpr);
 
 
-extern void build_aggregate_serialfn_expr(Oid serialfn_oid,
-										  Expr **serialfnexpr);
-
-extern void build_aggregate_deserialfn_expr(Oid deserialfn_oid,
-											Expr **deserialfnexpr);
 
 extern void build_aggregate_finalfn_expr(Oid *agg_input_types,
 										 int num_finalfn_inputs,

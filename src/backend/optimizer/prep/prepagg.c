@@ -59,8 +59,6 @@ static int	find_compatible_trans(PlannerInfo *root, Aggref *newagg,
 								  bool shareable,
 								  Oid aggtransfn, Oid aggtranstype,
 								  int transtypeLen, bool transtypeByVal,
-								  Oid aggcombinefn,
-								  Oid aggserialfn, Oid aggdeserialfn,
 								  Datum initValue, bool initValueIsNull,
 								  List *transnos);
 static Datum GetAggInitVal(Datum textInitVal, Oid transtype);
@@ -120,9 +118,6 @@ preprocess_aggref(Aggref *aggref, PlannerInfo *root)
 	Form_pg_aggregate aggform;
 	Oid			aggtransfn;
 	Oid			aggfinalfn;
-	Oid			aggcombinefn;
-	Oid			aggserialfn;
-	Oid			aggdeserialfn;
 	Oid			aggtranstype;
 	int32		aggtranstypmod;
 	int32		aggtransspace;
@@ -155,9 +150,6 @@ preprocess_aggref(Aggref *aggref, PlannerInfo *root)
 	aggform = (Form_pg_aggregate) GETSTRUCT(aggTuple);
 	aggtransfn = aggform->aggtransfn;
 	aggfinalfn = aggform->aggfinalfn;
-	aggcombinefn = aggform->aggcombinefn;
-	aggserialfn = aggform->aggserialfn;
-	aggdeserialfn = aggform->aggdeserialfn;
 	aggtranstype = aggform->aggtranstype;
 	aggtransspace = aggform->aggtransspace;
 
@@ -240,14 +232,10 @@ preprocess_aggref(Aggref *aggref, PlannerInfo *root)
 
 		/*
 		 * Count it, and check for cases requiring ordered input.  Note that
-		 * ordered-set aggs always have nonempty aggorder.  Any ordered-input
-		 * case also defeats partial aggregation.
+		 * ordered-set aggs always have nonempty aggorder.
 		 */
 		if (aggref->aggorder != NIL || aggref->aggdistinct != NIL)
-		{
 			root->numOrderedAggs++;
-			root->hasNonPartialAggs = true;
-		}
 
 		get_typlenbyval(aggtranstype,
 						&transtypeLen,
@@ -260,8 +248,6 @@ preprocess_aggref(Aggref *aggref, PlannerInfo *root)
 		transno = find_compatible_trans(root, aggref, shareable,
 										aggtransfn, aggtranstype,
 										transtypeLen, transtypeByVal,
-										aggcombinefn,
-										aggserialfn, aggdeserialfn,
 										initValue, initValueIsNull,
 										same_input_transnos);
 		if (transno == -1)
@@ -270,9 +256,6 @@ preprocess_aggref(Aggref *aggref, PlannerInfo *root)
 
 			transinfo->args = aggref->args;
 			transinfo->transfn_oid = aggtransfn;
-			transinfo->combinefn_oid = aggcombinefn;
-			transinfo->serialfn_oid = aggserialfn;
-			transinfo->deserialfn_oid = aggdeserialfn;
 			transinfo->aggtranstype = aggtranstype;
 			transinfo->aggtranstypmod = aggtranstypmod;
 			transinfo->transtypeLen = transtypeLen;
@@ -284,30 +267,6 @@ preprocess_aggref(Aggref *aggref, PlannerInfo *root)
 			transno = list_length(root->aggtransinfos);
 			root->aggtransinfos = lappend(root->aggtransinfos, transinfo);
 
-			/*
-			 * Check whether partial aggregation is feasible, unless we
-			 * already found out that we can't do it.
-			 */
-			if (!root->hasNonPartialAggs)
-			{
-				/*
-				 * If there is no combine function, then partial aggregation
-				 * is not possible.
-				 */
-				if (!OidIsValid(transinfo->combinefn_oid))
-					root->hasNonPartialAggs = true;
-
-				/*
-				 * If we have any aggs with transtype INTERNAL then we must
-				 * check whether they have serialization/deserialization
-				 * functions; if not, we can't serialize partial-aggregation
-				 * results.
-				 */
-				else if (transinfo->aggtranstype == INTERNALOID &&
-						 (!OidIsValid(transinfo->serialfn_oid) ||
-						  !OidIsValid(transinfo->deserialfn_oid)))
-					root->hasNonSerialAggs = true;
-			}
 		}
 		agginfo->transno = transno;
 	}
@@ -436,8 +395,6 @@ static int
 find_compatible_trans(PlannerInfo *root, Aggref *newagg, bool shareable,
 					  Oid aggtransfn, Oid aggtranstype,
 					  int transtypeLen, bool transtypeByVal,
-					  Oid aggcombinefn,
-					  Oid aggserialfn, Oid aggdeserialfn,
 					  Datum initValue, bool initValueIsNull,
 					  List *transnos)
 {
@@ -458,26 +415,6 @@ find_compatible_trans(PlannerInfo *root, Aggref *newagg, bool shareable,
 		 */
 		if (aggtransfn != pertrans->transfn_oid ||
 			aggtranstype != pertrans->aggtranstype)
-			continue;
-
-		/*
-		 * The serialization and deserialization functions must match, if
-		 * present, as we're unable to share the trans state for aggregates
-		 * which will serialize or deserialize into different formats.
-		 * Remember that these will be InvalidOid if they're not required for
-		 * this agg node.
-		 */
-		if (aggserialfn != pertrans->serialfn_oid ||
-			aggdeserialfn != pertrans->deserialfn_oid)
-			continue;
-
-		/*
-		 * Combine function must also match.  We only care about the combine
-		 * function with partial aggregates, but it's too early in the
-		 * planning to know if we will do partial aggregation, so be
-		 * conservative.
-		 */
-		if (aggcombinefn != pertrans->combinefn_oid)
 			continue;
 
 		/*

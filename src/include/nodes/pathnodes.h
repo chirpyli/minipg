@@ -325,8 +325,6 @@ struct PlannerInfo
 	List	   *agginfos;		/* AggInfo structs */
 	List	   *aggtransinfos;	/* AggTransInfo structs */
 	int			numOrderedAggs; /* number w/ DISTINCT/ORDER BY/WITHIN GROUP */
-	bool		hasNonPartialAggs;	/* does any agg not support partial mode? */
-	bool		hasNonSerialAggs;	/* is any partial agg non-serializable? */
 
 	/* These fields are used only when hasRecursion is true: */
 	int			wt_param_id;	/* PARAM_EXEC ID for the work table */
@@ -2196,15 +2194,6 @@ typedef struct AggTransInfo
 
 	/* Oid of the state transition function */
 	Oid			transfn_oid;
-
-	/* Oid of the serialization function or InvalidOid */
-	Oid			serialfn_oid;
-
-	/* Oid of the deserialization function or InvalidOid */
-	Oid			deserialfn_oid;
-
-	/* Oid of the combine function or InvalidOid */
-	Oid			combinefn_oid;
 
 	/* Oid of state value's datatype */
 	Oid			aggtranstype;

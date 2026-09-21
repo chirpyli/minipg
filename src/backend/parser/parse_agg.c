@@ -1074,53 +1074,6 @@ build_aggregate_transfn_expr(Oid *agg_input_types,
 
 /*
  * Like build_aggregate_transfn_expr, but creates an expression tree for the
- * serialization function of an aggregate.
- */
-void
-build_aggregate_serialfn_expr(Oid serialfn_oid,
-							  Expr **serialfnexpr)
-{
-	List	   *args;
-	FuncExpr   *fexpr;
-
-	/* serialfn always takes INTERNAL and returns BYTEA */
-	args = list_make1(make_agg_arg(INTERNALOID, InvalidOid));
-
-	fexpr = makeFuncExpr(serialfn_oid,
-						 BYTEAOID,
-						 args,
-						 InvalidOid,
-						 InvalidOid,
-						 COERCE_EXPLICIT_CALL);
-	*serialfnexpr = (Expr *) fexpr;
-}
-
-/*
- * Like build_aggregate_transfn_expr, but creates an expression tree for the
- * deserialization function of an aggregate.
- */
-void
-build_aggregate_deserialfn_expr(Oid deserialfn_oid,
-								Expr **deserialfnexpr)
-{
-	List	   *args;
-	FuncExpr   *fexpr;
-
-	/* deserialfn always takes BYTEA, INTERNAL and returns INTERNAL */
-	args = list_make2(make_agg_arg(BYTEAOID, InvalidOid),
-					  make_agg_arg(INTERNALOID, InvalidOid));
-
-	fexpr = makeFuncExpr(deserialfn_oid,
-						 INTERNALOID,
-						 args,
-						 InvalidOid,
-						 InvalidOid,
-						 COERCE_EXPLICIT_CALL);
-	*deserialfnexpr = (Expr *) fexpr;
-}
-
-/*
- * Like build_aggregate_transfn_expr, but creates an expression tree for the
  * final function of an aggregate, rather than the transition function.
  */
 void

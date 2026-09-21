@@ -214,8 +214,6 @@ typedef enum ExprEvalOp
 	EEOP_SUBPLAN,
 
 	/* aggregation related nodes */
-	EEOP_AGG_STRICT_DESERIALIZE,
-	EEOP_AGG_DESERIALIZE,
 	EEOP_AGG_STRICT_INPUT_CHECK_ARGS,
 	EEOP_AGG_STRICT_INPUT_CHECK_NULLS,
 	EEOP_AGG_PLAIN_PERGROUP_NULLCHECK,
@@ -523,13 +521,6 @@ typedef struct ExprEvalStep
 			/* out-of-line state, created by nodeSubplan.c */
 			SubPlanState *sstate;
 		}			subplan;
-
-		/* for EEOP_AGG_*DESERIALIZE */
-		struct
-		{
-			FunctionCallInfo fcinfo_data;
-			int			jumpnull;
-		}			agg_deserialize;
 
 		/* for EEOP_AGG_STRICT_INPUT_CHECK_NULLS / STRICT_INPUT_CHECK_ARGS */
 		struct
