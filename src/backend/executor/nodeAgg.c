@@ -504,8 +504,8 @@ initialize_aggregate(AggState *aggstate, AggStatePerTrans pertrans,
 		 * In case of rescan, maybe there could be an uncompleted sort
 		 * operation?  Clean it up if so.
 		 */
-		if (pertrans->sortstates[aggstate->current_set])
-			tuplesort_end(pertrans->sortstates[aggstate->current_set]);
+		if (pertrans->sortstate)
+			tuplesort_end(pertrans->sortstate);
 
 
 		/*
@@ -517,7 +517,7 @@ initialize_aggregate(AggState *aggstate, AggStatePerTrans pertrans,
 		{
 			Form_pg_attribute attr = TupleDescAttr(pertrans->sortdesc, 0);
 
-			pertrans->sortstates[aggstate->current_set] =
+			pertrans->sortstate =
 				tuplesort_begin_datum(attr->atttypid,
 									  pertrans->sortOperators[0],
 									  pertrans->sortCollations[0],
@@ -525,7 +525,7 @@ initialize_aggregate(AggState *aggstate, AggStatePerTrans pertrans,
 									  work_mem, NULL, false);
 		}
 		else
-			pertrans->sortstates[aggstate->current_set] =
+			pertrans->sortstate =
 				tuplesort_begin_heap(pertrans->sortdesc,
 									 pertrans->numSortCols,
 									 pertrans->sortColIdx,
@@ -782,7 +782,7 @@ process_ordered_aggregate_single(AggState *aggstate,
 
 	Assert(pertrans->numDistinctCols < 2);
 
-	tuplesort_performsort(pertrans->sortstates[aggstate->current_set]);
+	tuplesort_performsort(pertrans->sortstate);
 
 	/* Load the column into argument 1 (arg 0 will be transition value) */
 	newVal = &fcinfo->args[1].value;
@@ -794,7 +794,7 @@ process_ordered_aggregate_single(AggState *aggstate,
 	 * pfree them when they are no longer needed.
 	 */
 
-	while (tuplesort_getdatum(pertrans->sortstates[aggstate->current_set],
+	while (tuplesort_getdatum(pertrans->sortstate,
 							  true, newVal, isNull, &newAbbrevVal))
 	{
 		/*
@@ -839,8 +839,8 @@ process_ordered_aggregate_single(AggState *aggstate,
 	if (!oldIsNull && !pertrans->inputtypeByVal)
 		pfree(DatumGetPointer(oldVal));
 
-	tuplesort_end(pertrans->sortstates[aggstate->current_set]);
-	pertrans->sortstates[aggstate->current_set] = NULL;
+	tuplesort_end(pertrans->sortstate);
+	pertrans->sortstate = NULL;
 }
 
 /*
@@ -872,13 +872,13 @@ process_ordered_aggregate_multi(AggState *aggstate,
 	TupleTableSlot *save = aggstate->tmpcontext->ecxt_outertuple;
 	int			i;
 
-	tuplesort_performsort(pertrans->sortstates[aggstate->current_set]);
+	tuplesort_performsort(pertrans->sortstate);
 
 	ExecClearTuple(slot1);
 	if (slot2)
 		ExecClearTuple(slot2);
 
-	while (tuplesort_gettupleslot(pertrans->sortstates[aggstate->current_set],
+	while (tuplesort_gettupleslot(pertrans->sortstate,
 								  true, true, slot1, &newAbbrevVal))
 	{
 		CHECK_FOR_INTERRUPTS();
@@ -929,8 +929,8 @@ process_ordered_aggregate_multi(AggState *aggstate,
 	if (slot2)
 		ExecClearTuple(slot2);
 
-	tuplesort_end(pertrans->sortstates[aggstate->current_set]);
-	pertrans->sortstates[aggstate->current_set] = NULL;
+	tuplesort_end(pertrans->sortstate);
+	pertrans->sortstate = NULL;
 
 	/* restore previous slot, potentially in use for grouping sets */
 	tmpcontext->ecxt_outertuple = save;
@@ -3606,7 +3606,6 @@ build_pertrans_for_aggref(AggStatePerTrans pertrans,
 						  Datum initValue, bool initValueIsNull,
 						  Oid *inputTypes, int numArguments)
 {
-	int			numGroupingSets = Max(aggstate->maxsets, 1);
 	ListCell   *lc;
 	int			numInputs;
 	int			numDirectArgs;
@@ -3805,9 +3804,6 @@ build_pertrans_for_aggref(AggStatePerTrans pertrans,
 									   &aggstate->ss.ps);
 		pfree(ops);
 	}
-
-	pertrans->sortstates = (Tuplesortstate **)
-		palloc0(sizeof(Tuplesortstate *) * numGroupingSets);
 }
 
 
@@ -3849,11 +3845,8 @@ ExecEndAgg(AggState *node)
 	{
 		AggStatePerTrans pertrans = &node->pertrans[transno];
 
-		for (setno = 0; setno < numGroupingSets; setno++)
-		{
-			if (pertrans->sortstates[setno])
-				tuplesort_end(pertrans->sortstates[setno]);
-		}
+		if (pertrans->sortstate)
+			tuplesort_end(pertrans->sortstate);
 	}
 
 	/* And ensure any agg shutdown callbacks have been called */
@@ -3919,15 +3912,12 @@ ExecReScanAgg(AggState *node)
 	/* Make sure we have closed any open tuplesorts */
 	for (transno = 0; transno < node->numtrans; transno++)
 	{
-		for (setno = 0; setno < numGroupingSets; setno++)
-		{
-			AggStatePerTrans pertrans = &node->pertrans[transno];
+		AggStatePerTrans pertrans = &node->pertrans[transno];
 
-			if (pertrans->sortstates[setno])
-			{
-				tuplesort_end(pertrans->sortstates[setno]);
-				pertrans->sortstates[setno] = NULL;
-			}
+		if (pertrans->sortstate)
+		{
+			tuplesort_end(pertrans->sortstate);
+			pertrans->sortstate = NULL;
 		}
 	}
 

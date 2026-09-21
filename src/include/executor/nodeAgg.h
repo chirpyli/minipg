@@ -138,7 +138,7 @@ typedef struct AggStatePerTransData
 	 * We need a separate tuplesort for each grouping set.
 	 */
 
-	Tuplesortstate **sortstates;	/* sort objects, if DISTINCT or ORDER BY */
+	Tuplesortstate *sortstate;	/* sort state, if DISTINCT or ORDER BY */
 
 	/*
 	 * This field is a pre-initialized FunctionCallInfo struct used for

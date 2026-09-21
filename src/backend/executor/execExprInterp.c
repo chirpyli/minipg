@@ -3649,9 +3649,8 @@ ExecEvalAggOrderedTransDatum(ExprState *state, ExprEvalStep *op,
 							 ExprContext *econtext)
 {
 	AggStatePerTrans pertrans = op->d.agg_trans.pertrans;
-	int			setno = op->d.agg_trans.setno;
 
-	tuplesort_putdatum(pertrans->sortstates[setno],
+	tuplesort_putdatum(pertrans->sortstate,
 					   *op->resvalue, *op->resnull);
 }
 
@@ -3663,12 +3662,11 @@ ExecEvalAggOrderedTransTuple(ExprState *state, ExprEvalStep *op,
 							 ExprContext *econtext)
 {
 	AggStatePerTrans pertrans = op->d.agg_trans.pertrans;
-	int			setno = op->d.agg_trans.setno;
 
 	ExecClearTuple(pertrans->sortslot);
 	pertrans->sortslot->tts_nvalid = pertrans->numInputs;
 	ExecStoreVirtualTuple(pertrans->sortslot);
-	tuplesort_puttupleslot(pertrans->sortstates[setno], pertrans->sortslot);
+	tuplesort_puttupleslot(pertrans->sortstate, pertrans->sortslot);
 }
 
 /* implementation of transition function invocation for byval types */
