@@ -1752,7 +1752,6 @@ typedef struct AggState
 	AggStatePerAgg peragg;		/* per-Aggref information */
 	AggStatePerTrans pertrans;	/* per-Trans state information */
 	ExprContext *hashcontext;	/* econtexts for long-lived data (hashtable) */
-	ExprContext **aggcontexts;	/* econtexts for long-lived data (per GS) */
 	ExprContext *tmpcontext;	/* econtext for input expressions */
 #define FIELDNO_AGGSTATE_CURAGGCONTEXT 14
 	ExprContext *curaggcontext; /* currently active aggcontext */

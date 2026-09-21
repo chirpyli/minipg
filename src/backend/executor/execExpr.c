@@ -2872,7 +2872,7 @@ ExecBuildAggTransCall(ExprState *state, AggState *aggstate,
 	if (ishash)
 		aggcontext = aggstate->hashcontext;
 	else
-		aggcontext = aggstate->aggcontexts[setno];
+		aggcontext = aggstate->ss.ps.ps_ExprContext;
 
 	/* add check for NULL pointer? */
 	if (nullcheck)

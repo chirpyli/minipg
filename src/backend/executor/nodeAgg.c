@@ -51,11 +51,10 @@
  *	  once per input tuple, so when the transvalue datatype is
  *	  pass-by-reference, we have to be careful to copy it into a longer-lived
  *	  memory context, and free the prior value to avoid memory leakage.  We
- *	  store transvalues in another set of econtexts, aggstate->aggcontexts
- *	  (one per grouping set, see below), which are also used for the hashtable
- *	  structures in AGG_HASHED mode.  These econtexts are rescanned, not just
- *	  reset, at group boundaries so that aggregate transition functions can
- *	  register shutdown callbacks via AggRegisterCallback.
+ *	  store transvalues in another econtext, which is also used for the
+ *	  hashtable structures in AGG_HASHED mode.  This econtext is rescanned,
+ *	  not just reset, at group boundaries so that aggregate transition
+ *	  functions can register shutdown callbacks via AggRegisterCallback.
  *
  *	  The node's regular econtext (aggstate->ss.ps.ps_ExprContext) is used to
  *	  run finalize functions and compute the output tuple; this context can be
@@ -163,11 +162,9 @@
  *	  populating hashtables; however, we only need one context for all the
  *	  hashtables.
  *
- *	  So we create an array, aggcontexts, with an ExprContext for each grouping
- *	  set in the largest rollup that we're going to process, and use the
- *	  per-tuple memory context of those ExprContexts to store the aggregate
- *	  transition values.  hashcontext is the single context created to support
- *	  all hash tables.
+ *	  So we create an ExprContext for transition values and use its per-tuple
+ *	  memory context to store the aggregate transition values.  hashcontext
+ *	  is the single context created to support all hash tables.
  *
  *	  Spilling To Disk
  *
@@ -449,7 +446,7 @@ select_current_set(AggState *aggstate, int setno, bool is_hash)
 	if (is_hash)
 		aggstate->curaggcontext = aggstate->hashcontext;
 	else
-		aggstate->curaggcontext = aggstate->aggcontexts[setno];
+		aggstate->curaggcontext = aggstate->ss.ps.ps_ExprContext;
 
 	aggstate->current_set = setno;
 }
@@ -2078,7 +2075,7 @@ agg_retrieve_direct(AggState *aggstate)
 
 		for (i = 0; i < numReset; i++)
 		{
-			ReScanExprContext(aggstate->aggcontexts[i]);
+			ReScanExprContext(aggstate->ss.ps.ps_ExprContext);
 		}
 
 		/*
@@ -3083,31 +3080,24 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 	aggstate->maxsets = numGroupingSets;
 	aggstate->numphases = numPhases;
 
-	aggstate->aggcontexts = (ExprContext **)
-		palloc0(sizeof(ExprContext *) * numGroupingSets);
-
 	/*
-	 * Create expression contexts.  We need three or more, one for
-	 * per-input-tuple processing, one for per-output-tuple processing, one
-	 * for all the hashtables, and one for each grouping set.  The per-tuple
-	 * memory context of the per-grouping-set ExprContexts (aggcontexts)
-	 * replaces the standalone memory context formerly used to hold transition
-	 * values.  We cheat a little by using ExecAssignExprContext() to build
-	 * all of them.
+	 * Create expression contexts.  We need three, one for per-input-tuple
+	 * processing, one for per-output-tuple processing, and one for the
+	 * transition values.  The per-tuple memory context of the transition
+	 * value ExprContext replaces the standalone memory context formerly used
+	 * to hold transition values.  We cheat a little by using
+	 * ExecAssignExprContext() to build all of them.
 	 *
-	 * NOTE: the details of what is stored in aggcontexts and what is stored
-	 * in the regular per-query memory context are driven by a simple
-	 * decision: we want to reset the aggcontext at group boundaries (if not
-	 * hashing) and in ExecReScanAgg to recover no-longer-wanted space.
+	 * NOTE: the details of what is stored in the transition value context and
+	 * what is stored in the regular per-query memory context are driven by a
+	 * simple decision: we want to reset that context at group boundaries (if
+	 * not hashing) and in ExecReScanAgg to recover no-longer-wanted space.
 	 */
 	ExecAssignExprContext(estate, &aggstate->ss.ps);
 	aggstate->tmpcontext = aggstate->ss.ps.ps_ExprContext;
 
-	for (i = 0; i < numGroupingSets; ++i)
-	{
-		ExecAssignExprContext(estate, &aggstate->ss.ps);
-		aggstate->aggcontexts[i] = aggstate->ss.ps.ps_ExprContext;
-	}
+	/* This context is used for long-lived transition values */
+	ExecAssignExprContext(estate, &aggstate->ss.ps);
 
 	if (use_hashing)
 		aggstate->hashcontext = CreateWorkExprContext(estate);
@@ -3851,7 +3841,7 @@ ExecEndAgg(AggState *node)
 
 	/* And ensure any agg shutdown callbacks have been called */
 	for (setno = 0; setno < numGroupingSets; setno++)
-		ReScanExprContext(node->aggcontexts[setno]);
+		ReScanExprContext(node->ss.ps.ps_ExprContext);
 	if (node->hashcontext)
 		ReScanExprContext(node->hashcontext);
 
@@ -3931,7 +3921,7 @@ ExecReScanAgg(AggState *node)
 
 	for (setno = 0; setno < numGroupingSets; setno++)
 	{
-		ReScanExprContext(node->aggcontexts[setno]);
+		ReScanExprContext(node->ss.ps.ps_ExprContext);
 	}
 
 	/* Release first tuple of group, if we have made a copy */
