@@ -181,12 +181,6 @@ extern ModifyTablePath *create_modifytable_path(PlannerInfo *root,
 												List *rowMarks,
 												int epqParam);
 
-extern Path *reparameterize_path(PlannerInfo *root, Path *path,
-								 Relids required_outer,
-								 double loop_count);
-extern Path *reparameterize_path_by_child(PlannerInfo *root, Path *path,
-										  RelOptInfo *child_rel);
-
 /*
  * prototypes for relnode.c
  */

@@ -17,9 +17,6 @@
 #include "nodes/pathnodes.h"
 #include "utils/relcache.h"
 
-extern AppendRelInfo *make_append_rel_info(Relation parentrel,
-										   Relation childrel,
-										   Index parentRTindex, Index childRTindex);
 extern Node *adjust_appendrel_attrs(PlannerInfo *root, Node *node,
 									int nappinfos, AppendRelInfo **appinfos);
 extern Node *adjust_appendrel_attrs_multilevel(PlannerInfo *root, Node *node,
@@ -46,9 +43,6 @@ extern void add_row_identity_columns(PlannerInfo *root, Index rtindex,
 									 RangeTblEntry *target_rte,
 									 Relation target_relation);
 extern void distribute_row_identity_vars(PlannerInfo *root);
-
-extern void expand_appendrel_subquery(PlannerInfo *root, RelOptInfo *rel,
-									  RangeTblEntry *rte, Index rti);
 extern bool apply_child_basequals(PlannerInfo *root, RelOptInfo *parentrel,
 								  RelOptInfo *childrel, RangeTblEntry *childRTE,
 								  AppendRelInfo *appinfo);

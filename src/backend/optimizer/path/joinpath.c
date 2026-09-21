@@ -29,18 +29,9 @@
 /* Hook for plugins to get control in add_paths_to_joinrel() */
 set_join_pathlist_hook_type set_join_pathlist_hook = NULL;
 
-/*
- * Paths parameterized by the parent can be considered to be parameterized by
- * any of its child.
- */
-#define PATH_PARAM_BY_PARENT(path, rel)	\
-	((path)->param_info && bms_overlap(PATH_REQ_OUTER(path),	\
-									   (rel)->top_parent_relids))
-#define PATH_PARAM_BY_REL_SELF(path, rel)  \
-	((path)->param_info && bms_overlap(PATH_REQ_OUTER(path), (rel)->relids))
-
+/* Check if a path is parameterized by the given rel. */
 #define PATH_PARAM_BY_REL(path, rel)	\
-	(PATH_PARAM_BY_REL_SELF(path, rel) || PATH_PARAM_BY_PARENT(path, rel))
+	((path)->param_info && bms_overlap(PATH_REQ_OUTER(path), (rel)->relids))
 
 static void sort_inner_and_outer(PlannerInfo *root, RelOptInfo *joinrel,
 								 RelOptInfo *outerrel, RelOptInfo *innerrel,
@@ -668,27 +659,6 @@ try_nestloop_path(PlannerInfo *root,
 						  workspace.startup_cost, workspace.total_cost,
 						  pathkeys, required_outer))
 	{
-		/*
-		 * If the inner path is parameterized, it is parameterized by the
-		 * topmost parent of the outer rel, not the outer rel itself.  Fix
-		 * that.
-		 */
-		if (PATH_PARAM_BY_PARENT(inner_path, outer_path->parent))
-		{
-			inner_path = reparameterize_path_by_child(root, inner_path,
-													  outer_path->parent);
-
-			/*
-			 * If we could not translate the path, we can't create nest loop
-			 * path.
-			 */
-			if (!inner_path)
-			{
-				bms_free(required_outer);
-				return;
-			}
-		}
-
 		add_path(joinrel, (Path *)
 				 create_nestloop_path(root,
 									  joinrel,

@@ -1731,26 +1731,9 @@ generate_join_implied_equalities_broken(PlannerInfo *root,
 			!bms_is_subset(clause_relids, outer_relids) &&
 			!bms_is_subset(clause_relids, nominal_inner_relids))
 			result = lappend(result, restrictinfo);
-	}
+		}
 
-	/*
-	 * If we have to translate, just brute-force apply adjust_appendrel_attrs
-	 * to all the RestrictInfos at once.  This will result in returning
-	 * RestrictInfos that are not listed in ec_derives, but there shouldn't be
-	 * any duplication, and it's a sufficiently narrow corner case that we
-	 * shouldn't sweat too much over it anyway.
-	 *
-	 * Since inner_rel might be an indirect descendant of the baserel
-	 * mentioned in the ec_sources clauses, we have to be prepared to apply
-	 * multiple levels of Var translation.
-	 */
-	if (IS_OTHER_REL(inner_rel) && result != NIL)
-		result = (List *) adjust_appendrel_attrs_multilevel(root,
-															(Node *) result,
-															inner_rel->relids,
-															inner_rel->top_parent_relids);
-
-	return result;
+		return result;
 }
 
 
@@ -2405,139 +2388,6 @@ exprs_known_equal(PlannerInfo *root, Node *item1, Node *item2)
 
 
 
-/*
- * add_child_rel_equivalences
- *	  Search for EC members that reference the root parent of child_rel, and
- *	  add transformed members referencing the child_rel.
- *
- * Note that this function won't be called at all unless we have at least some
- * reason to believe that the EC members it generates will be useful.
- *
- * parent_rel and child_rel could be derived from appinfo, but since the
- * caller has already computed them, we might as well just pass them in.
- *
- * The passed-in AppendRelInfo is not used when the parent_rel is not a
- * top-level baserel, since it shows the mapping from the parent_rel but
- * we need to translate EC expressions that refer to the top-level parent.
- * Using it is faster than using adjust_appendrel_attrs_multilevel(), though,
- * so we prefer it when we can.
- */
-void
-add_child_rel_equivalences(PlannerInfo *root,
-						   AppendRelInfo *appinfo,
-						   RelOptInfo *parent_rel,
-						   RelOptInfo *child_rel)
-{
-	Relids		top_parent_relids = child_rel->top_parent_relids;
-	Relids		child_relids = child_rel->relids;
-	int			i;
-
-	/*
-	 * EC merging should be complete already, so we can use the parent rel's
-	 * eclass_indexes to avoid searching all of root->eq_classes.
-	 */
-	Assert(root->ec_merging_done);
-	Assert(IS_SIMPLE_REL(parent_rel));
-
-	i = -1;
-	while ((i = bms_next_member(parent_rel->eclass_indexes, i)) >= 0)
-	{
-		EquivalenceClass *cur_ec = (EquivalenceClass *) list_nth(root->eq_classes, i);
-		int			num_members;
-
-		/*
-		 * If this EC contains a volatile expression, then generating child
-		 * EMs would be downright dangerous, so skip it.  We rely on a
-		 * volatile EC having only one EM.
-		 */
-		if (cur_ec->ec_has_volatile)
-			continue;
-
-		/* Sanity check eclass_indexes only contain ECs for parent_rel */
-		Assert(bms_is_subset(top_parent_relids, cur_ec->ec_relids));
-
-		/*
-		 * We don't use foreach() here because there's no point in scanning
-		 * newly-added child members, so we can stop after the last
-		 * pre-existing EC member.
-		 */
-		num_members = list_length(cur_ec->ec_members);
-		for (int pos = 0; pos < num_members; pos++)
-		{
-			EquivalenceMember *cur_em = (EquivalenceMember *) list_nth(cur_ec->ec_members, pos);
-
-			if (cur_em->em_is_const)
-				continue;		/* ignore consts here */
-
-			/*
-			 * We consider only original EC members here, not
-			 * already-transformed child members.  Otherwise, if some original
-			 * member expression references more than one appendrel, we'd get
-			 * an O(N^2) explosion of useless derived expressions for
-			 * combinations of children.
-			 */
-			if (cur_em->em_is_child)
-				continue;		/* ignore children here */
-
-			/* Does this member reference child's topmost parent rel? */
-			if (bms_overlap(cur_em->em_relids, top_parent_relids))
-			{
-				/* Yes, generate transformed child version */
-				Expr	   *child_expr;
-				Relids		new_relids;
-				Relids		new_nullable_relids;
-
-				if (parent_rel->reloptkind == RELOPT_BASEREL)
-				{
-					/* Simple single-level transformation */
-					child_expr = (Expr *)
-						adjust_appendrel_attrs(root,
-											   (Node *) cur_em->em_expr,
-											   1, &appinfo);
-				}
-				else
-				{
-					/* Must do multi-level transformation */
-					child_expr = (Expr *)
-						adjust_appendrel_attrs_multilevel(root,
-														  (Node *) cur_em->em_expr,
-														  child_relids,
-														  top_parent_relids);
-				}
-
-				/*
-				 * Transform em_relids to match.  Note we do *not* do
-				 * pull_varnos(child_expr) here, as for example the
-				 * transformation might have substituted a constant, but we
-				 * don't want the child member to be marked as constant.
-				 */
-				new_relids = bms_difference(cur_em->em_relids,
-											top_parent_relids);
-				new_relids = bms_add_members(new_relids, child_relids);
-
-				/*
-				 * And likewise for nullable_relids.  Note this code assumes
-				 * parent and child relids are singletons.
-				 */
-				new_nullable_relids = cur_em->em_nullable_relids;
-				if (bms_overlap(new_nullable_relids, top_parent_relids))
-				{
-					new_nullable_relids = bms_difference(new_nullable_relids,
-														 top_parent_relids);
-					new_nullable_relids = bms_add_members(new_nullable_relids,
-														  child_relids);
-				}
-
-				(void) add_eq_member(cur_ec, child_expr,
-									 new_relids, new_nullable_relids,
-									 true, cur_em->em_datatype);
-
-				/* Record this EC index for the child rel */
-				child_rel->eclass_indexes = bms_add_member(child_rel->eclass_indexes, i);
-			}
-		}
-	}
-}
 
 
 
