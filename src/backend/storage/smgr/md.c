@@ -30,7 +30,7 @@
 #include "commands/tablespace.h"
 #include "miscadmin.h"
 #include "pg_trace.h"
-#include "pgstat.h"
+#include "utils/wait_event.h"
 #include "postmaster/bgwriter.h"
 #include "storage/bufmgr.h"
 #include "storage/fd.h"

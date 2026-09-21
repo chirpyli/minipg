@@ -2231,8 +2231,6 @@ RelationClearRelation(Relation relation, bool rebuild)
 	}
 	/* toast OID override must be preserved */
 		SWAPFIELD(Oid, rd_toastoid);
-		/* pgstat_info must be preserved */
-		SWAPFIELD(struct PgStat_TableStatus *, pgstat_info);
 
 		#undef SWAPFIELD
 
@@ -4740,7 +4738,6 @@ load_relcache_init_file(bool shared)
 		rel->rd_firstRelfilenodeSubid = InvalidSubTransactionId;
 		rel->rd_droppedSubid = InvalidSubTransactionId;
 		rel->rd_amcache = NULL;
-		MemSet(&rel->pgstat_info, 0, sizeof(rel->pgstat_info));
 
 		/*
 		 * Recompute lock and physical addressing info.  This is needed in

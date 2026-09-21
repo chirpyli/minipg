@@ -78,11 +78,6 @@ static const DestReceiver printsimpleDR = {
 	DestRemoteSimple
 };
 
-static const DestReceiver spi_printtupDR = {
-	spi_printtup, spi_dest_startup, donothingCleanup, donothingCleanup,
-	DestSPI
-};
-
 /*
  * Globally available receiver for DestNone.
  *
@@ -127,9 +122,6 @@ CreateDestReceiver(CommandDest dest)
 
 		case DestDebug:
 			return unconstify(DestReceiver *, &debugtupDR);
-
-		case DestSPI:
-			return unconstify(DestReceiver *, &spi_printtupDR);
 
 		case DestTuplestore:
 			return CreateTuplestoreDestReceiver();
@@ -184,7 +176,6 @@ EndCommand(const QueryCompletion *qc, CommandDest dest, bool force_undecorated_o
 
 		case DestNone:
 		case DestDebug:
-		case DestSPI:
 		case DestTuplestore:
 		
 		case DestSQLFunction:
@@ -226,7 +217,6 @@ NullCommand(CommandDest dest)
 
 		case DestNone:
 		case DestDebug:
-		case DestSPI:
 		case DestTuplestore:
 		
 		case DestSQLFunction:
@@ -266,7 +256,6 @@ ReadyForQuery(CommandDest dest)
 
 		case DestNone:
 		case DestDebug:
-		case DestSPI:
 		case DestTuplestore:
 		
 		case DestSQLFunction:

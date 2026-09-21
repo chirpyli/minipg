@@ -50,7 +50,7 @@ typedef int (*AcquireSampleRowsFunc) (Relation onerel, int elevel,
 #include "nodes/nodeFuncs.h"
 #include "parser/parse_oper.h"
 #include "parser/parse_relation.h"
-#include "pgstat.h"
+#include "utils/backend_progress.h"
 
 #include "storage/bufmgr.h"
 #include "storage/lmgr.h"
@@ -251,8 +251,8 @@ do_analyze_rel(Relation onerel, VacuumParams *params,
 	int64		AnalyzePageHit = VacuumPageHit;
 	int64		AnalyzePageMiss = VacuumPageMiss;
 	int64		AnalyzePageDirty = VacuumPageDirty;
-	PgStat_Counter startreadtime = 0;
-	PgStat_Counter startwritetime = 0;
+	instr_time	startreadtime = pgBufferUsage.blk_read_time;
+	instr_time	startwritetime = pgBufferUsage.blk_write_time;
 
 	ereport(elevel,
 			(errmsg("analyzing \"%s.%s\"",
@@ -281,12 +281,6 @@ do_analyze_rel(Relation onerel, VacuumParams *params,
 	/* measure elapsed time iff logging requires it */
 	if (params->log_min_duration >= 0)
 	{
-		if (track_io_timing)
-		{
-			startreadtime = pgStatBlockReadTime;
-			startwritetime = pgStatBlockWriteTime;
-		}
-
 		pg_rusage_init(&ru0);
 		if (params->log_min_duration >= 0)
 			starttime = GetCurrentTimestamp();
@@ -555,17 +549,6 @@ do_analyze_rel(Relation onerel, VacuumParams *params,
 	}
 
 	/*
-	 * Now report ANALYZE to the stats collector.  For regular tables, we do
-	 * it only if not doing inherited stats.
-	 *
-	 * Reset the changes_since_analyze counter only if we analyzed all
-	 * columns; otherwise, there is still work for auto-analyze to do.
-	 */
-	if (!inh)
-		pgstat_report_analyze(onerel, totalrows, totaldeadrows,
-							  (va_cols == NIL));
-
-	/*
 	 * If this isn't part of VACUUM ANALYZE, let index AMs do cleanup.
 	 *
 	 * Note that most index AMs perform a no-op as a matter of policy for
@@ -661,8 +644,17 @@ do_analyze_rel(Relation onerel, VacuumParams *params,
 							 RelationGetRelationName(onerel));
 			if (track_io_timing)
 			{
-				double		read_ms = (double) (pgStatBlockReadTime - startreadtime) / 1000;
-				double		write_ms = (double) (pgStatBlockWriteTime - startwritetime) / 1000;
+				instr_time	read_delta;
+				instr_time	write_delta;
+				double		read_ms;
+				double		write_ms;
+
+				read_delta = pgBufferUsage.blk_read_time;
+				INSTR_TIME_SUBTRACT(read_delta, startreadtime);
+				read_ms = INSTR_TIME_GET_MILLISEC(read_delta);
+				write_delta = pgBufferUsage.blk_write_time;
+				INSTR_TIME_SUBTRACT(write_delta, startwritetime);
+				write_ms = INSTR_TIME_GET_MILLISEC(write_delta);
 
 				appendStringInfo(&buf, _("I/O timings: read: %.3f ms, write: %.3f ms\n"),
 								 read_ms, write_ms);

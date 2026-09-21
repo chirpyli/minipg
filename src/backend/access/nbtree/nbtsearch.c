@@ -19,7 +19,6 @@
 #include "access/relscan.h"
 #include "access/xact.h"
 #include "miscadmin.h"
-#include "pgstat.h"
 #include "storage/predicate.h"
 #include "utils/lsyscache.h"
 #include "utils/rel.h"
@@ -880,8 +879,6 @@ _bt_first(IndexScanDesc scan, ScanDirection dir)
 	BTScanPosItem *currItem;
 
 	Assert(!BTScanPosIsValid(so->currPos));
-
-	pgstat_count_index_scan(rel);
 
 	/*
 	 * Examine the scan keys and eliminate any redundant keys; also mark the

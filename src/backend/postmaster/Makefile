@@ -17,7 +17,6 @@ OBJS = \
 	checkpointer.o \
 	fork_process.o \
 	interrupt.o \
-	pgstat.o \
 	postmaster.o \
 	startup.o \
 	syslogger.o \

@@ -33,7 +33,8 @@
 #include "miscadmin.h"
 #include "nodes/makefuncs.h"
 #include "pg_getopt.h"
-#include "pgstat.h"
+#include "utils/backend_status.h"
+#include "utils/wait_event.h"
 #include "postmaster/bgwriter.h"
 #include "postmaster/startup.h"
 #include "postmaster/walwriter.h"
@@ -389,9 +390,6 @@ AuxiliaryProcessMain(int argc, char *argv[])
 		 * transactions (and, perhaps, other things in future).
 		 */
 		CreateAuxProcessResourceOwner();
-
-		/* Initialize statistics reporting */
-		pgstat_initialize();
 
 		/* Initialize backend status information */
 		pgstat_beinit();

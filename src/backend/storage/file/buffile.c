@@ -43,7 +43,7 @@
 
 #include "executor/instrument.h"
 #include "miscadmin.h"
-#include "pgstat.h"
+#include "utils/wait_event.h"
 #include "storage/buf_internals.h"
 #include "storage/buffile.h"
 #include "storage/fd.h"

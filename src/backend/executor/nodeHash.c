@@ -33,7 +33,6 @@
 #include "executor/nodeHash.h"
 #include "executor/nodeHashjoin.h"
 #include "miscadmin.h"
-#include "pgstat.h"
 #include "port/atomics.h"
 #include "port/pg_bitutils.h"
 #include "utils/dynahash.h"

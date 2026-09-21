@@ -24,7 +24,6 @@
 #include "access/xact.h"
 #include "catalog/namespace.h"
 #include "miscadmin.h"
-#include "pgstat.h"
 #include "storage/lmgr.h"
 #include "utils/inval.h"
 #include "utils/syscache.h"
@@ -69,8 +68,6 @@ relation_open(Oid relationId, LOCKMODE lockmode)
 		   IsBootstrapProcessingMode() ||
 		   CheckRelationLockedByMe(r, AccessShareLock, true));
 
-	pgstat_initstats(r);
-
 	return r;
 }
 
@@ -114,8 +111,6 @@ try_relation_open(Oid relationId, LOCKMODE lockmode)
 	/* If we didn't get the lock ourselves, assert that caller holds one */
 	Assert(lockmode != NoLock ||
 		   CheckRelationLockedByMe(r, AccessShareLock, true));
-
-	pgstat_initstats(r);
 
 	return r;
 }

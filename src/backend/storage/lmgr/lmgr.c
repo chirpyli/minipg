@@ -21,7 +21,7 @@
 #include "catalog/catalog.h"
 #include "commands/progress.h"
 #include "miscadmin.h"
-#include "pgstat.h"
+#include "utils/backend_progress.h"
 #include "storage/lmgr.h"
 #include "storage/proc.h"
 #include "storage/procarray.h"

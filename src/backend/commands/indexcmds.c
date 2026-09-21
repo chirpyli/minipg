@@ -45,7 +45,7 @@
 #include "parser/parse_coerce.h"
 #include "parser/parse_func.h"
 #include "parser/parse_oper.h"
-#include "pgstat.h"
+#include "utils/backend_progress.h"
 #include "postgres_ext.h"
 #include "rewrite/rewriteManip.h"
 #include "storage/lmgr.h"

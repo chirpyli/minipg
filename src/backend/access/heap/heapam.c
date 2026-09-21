@@ -54,7 +54,6 @@
 #include "catalog/pg_database.h"
 #include "catalog/pg_database_d.h"
 #include "miscadmin.h"
-#include "pgstat.h"
 #include "port/atomics.h"
 #include "port/pg_bitutils.h"
 #include "storage/bufmgr.h"
@@ -340,14 +339,6 @@ initscan(HeapScanDesc scan, ScanKey key, bool keep_startblock)
 	 */
 	if (key != NULL && scan->rs_base.rs_nkeys > 0)
 		memcpy(scan->rs_base.rs_key, key, scan->rs_base.rs_nkeys * sizeof(ScanKeyData));
-
-	/*
-	 * Currently, we only have a stats counter for sequential heap scans (but
-	 * e.g for bitmap scans the underlying bitmap index scans will be counted,
-	 * and for sample scans we update stats for tuple fetches).
-	 */
-	if (scan->rs_base.rs_flags & SO_TYPE_SEQSCAN)
-		pgstat_count_heap_scan(scan->rs_base.rs_rd);
 }
 
 /*
@@ -1392,8 +1383,6 @@ heap_getnext(TableScanDesc sscan, ScanDirection direction)
 	 * the proper return buffer and return the tuple.
 	 */
 
-	pgstat_count_heap_getnext(scan->rs_base.rs_rd);
-
 	return &scan->rs_ctup;
 }
 
@@ -1419,8 +1408,6 @@ heap_getnextslot(TableScanDesc sscan, ScanDirection direction, TupleTableSlot *s
 	 * if we get here it means we have a new current scan tuple, so point to
 	 * the proper return buffer and return the tuple.
 	 */
-
-	pgstat_count_heap_getnext(scan->rs_base.rs_rd);
 
 	ExecStoreBufferHeapTuple(&scan->rs_ctup, slot,
 							 scan->rs_cbuf);
@@ -1568,7 +1555,6 @@ heap_getnextslot_tidrange(TableScanDesc sscan, ScanDirection direction,
 	 * if we get here it means we have a new current scan tuple, so point to
 	 * the proper return buffer and return the tuple.
 	 */
-	pgstat_count_heap_getnext(scan->rs_base.rs_rd);
 
 	ExecStoreBufferHeapTuple(&scan->rs_ctup, slot, scan->rs_cbuf);
 	return true;
@@ -2235,8 +2221,6 @@ heap_insert(Relation relation, HeapTuple tup, CommandId cid,
 	 */
 	CacheInvalidateHeapTuple(relation, heaptup, NULL);
 
-	pgstat_count_heap_insert(relation, 1);
-
 	/*
 	 * If heaptup is a private copy, release it.  Don't forget to copy t_self
 	 * back to the caller's image, too.
@@ -2622,8 +2606,6 @@ heap_multi_insert(Relation relation, TupleTableSlot **slots, int ntuples,
 	/* copy t_self fields back to the caller's slots */
 	for (i = 0; i < ntuples; i++)
 		slots[i]->tts_tid = heaptuples[i]->t_self;
-
-	pgstat_count_heap_insert(relation, ntuples);
 }
 
 /*
@@ -3041,8 +3023,6 @@ l1:
 	 */
 	if (have_tuple_lock)
 		UnlockTupleTuplock(relation, &(tp.t_self), LockTupleExclusive);
-
-	pgstat_count_heap_delete(relation);
 
 	return TM_Ok;
 }
@@ -3998,8 +3978,6 @@ l2:
 	 */
 	if (have_tuple_lock)
 		UnlockTupleTuplock(relation, &(oldtup.t_self), *lockmode);
-
-	pgstat_count_heap_update(relation, use_hot_update);
 
 	/*
 	 * If heaptup is a private copy, release it.  Don't forget to copy t_self

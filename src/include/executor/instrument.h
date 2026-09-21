@@ -41,8 +41,6 @@ typedef struct BufferUsage
  * WalUsage tracks only WAL activity like WAL records generation that
  * can be measured per query and is displayed by EXPLAIN command,
  * pg_stat_statements extension, etc. It does not track other WAL activity
- * like WAL writes that it's not worth measuring per query. That's tracked
- * by WAL global statistics counters in WalStats, instead.
  */
 typedef struct WalUsage
 {

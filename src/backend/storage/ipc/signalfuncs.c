@@ -17,7 +17,7 @@
 #include <signal.h>
 
 #include "miscadmin.h"
-#include "pgstat.h"
+#include "utils/wait_event.h"
 #include "postmaster/syslogger.h"
 #include "storage/pmsignal.h"
 #include "storage/proc.h"

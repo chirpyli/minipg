@@ -47,7 +47,7 @@
 #include "access/xlog.h"
 #include "libpq/pqsignal.h"
 #include "miscadmin.h"
-#include "pgstat.h"
+#include "utils/wait_event.h"
 #include "postmaster/interrupt.h"
 #include "postmaster/walwriter.h"
 #include "storage/bufmgr.h"
@@ -257,9 +257,6 @@ WalWriterMain(void)
 		else if (left_till_hibernate > 0)
 			left_till_hibernate--;
 
-		/* Send WAL statistics to the stats collector */
-		pgstat_send_wal(false);
-
 		/*
 		 * Sleep until we are signaled or WalWriterDelay has elapsed.  If we
 		 * haven't done anything useful for quite some time, lengthen the
@@ -294,16 +291,6 @@ HandleWalWriterInterrupts(void)
 
 	if (ShutdownRequestPending)
 	{
-		/*
-		 * Force to send remaining WAL statistics to the stats collector at
-		 * process exit.
-		 *
-		 * Since pgstat_send_wal is invoked with 'force' is false in main loop
-		 * to avoid overloading to the stats collector, there may exist unsent
-		 * stats counters for the WAL writer.
-		 */
-		pgstat_send_wal(true);
-
 		proc_exit(0);
 	}
 }

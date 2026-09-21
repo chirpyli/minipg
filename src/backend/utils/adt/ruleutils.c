@@ -20,6 +20,7 @@
 #include <fcntl.h>
 
 #include "access/amapi.h"
+#include "access/genam.h"
 #include "access/htup_details.h"
 #include "access/relation.h"
 #include "access/sysattr.h"
@@ -32,11 +33,11 @@
 #include "catalog/pg_opclass.h"
 #include "catalog/pg_operator.h"
 #include "catalog/pg_proc.h"
+#include "catalog/pg_rewrite.h"
 #include "catalog/pg_type.h"
 #include "commands/defrem.h"
 #include "commands/tablespace.h"
 #include "common/keywords.h"
-#include "executor/spi.h"
 #include "funcapi.h"
 #include "mb/pg_wchar.h"
 #include "miscadmin.h"
@@ -299,7 +300,6 @@ typedef void (*rsv_callback) (Node *node, deparse_context *context,
  * Global data
  * ----------
  */
-static const char *query_getviewrule = "SELECT * FROM pg_catalog.pg_rewrite WHERE ev_class = $1 AND rulename = $2";
 
 /* GUC parameters */
 bool		quote_all_identifiers = false;
@@ -558,79 +558,57 @@ pg_get_viewdef_name_ext(PG_FUNCTION_ARGS)
 
 /*
  * Common code for by-OID and by-name variants of pg_get_viewdef
+ *
+ * minipg: this used to look up pg_rewrite over SPI (for read-access checking,
+ * which no longer exists).  It now scans the catalog directly, same as
+ * RelationBuildRuleLock() does.
  */
 static char *
 pg_get_viewdef_worker(Oid viewoid, int prettyFlags, int wrapColumn)
 {
-	Datum		args[2];
-	char		nulls[2];
-	int			spirc;
 	HeapTuple	ruletup;
 	TupleDesc	rulettc;
 	StringInfoData buf;
+	Relation	rewrite_rel;
+	SysScanDesc scan;
+	ScanKeyData skey[2];
+	HeapTuple	tuple;
 
-	/*
-	 * Do this first so that string is alloc'd in outer context not SPI's.
-	 */
+	/* Do this first so that string survives until we return it. */
 	initStringInfo(&buf);
 
 	/*
-	 * Connect to SPI manager
+	 * Get the pg_rewrite tuple for the view's SELECT rule
 	 */
-	if (SPI_connect() != SPI_OK_CONNECT)
-		elog(ERROR, "SPI_connect failed");
+	rewrite_rel = table_open(RewriteRelationId, AccessShareLock);
 
-	/*
-	 * Prepare the plan to look up pg_rewrite. We read pg_rewrite over the
-	 * SPI manager instead of using the syscache to be checked for read
-	 * access on pg_rewrite.
-	 *
-	 * minipg: 同上，plancache 已裁剪，改为每次调用重新 prepare 并释放。
-	 */
-	{
-		Oid			argtypes[2];
-		SPIPlanPtr	plan;
+	ScanKeyInit(&skey[0],
+				Anum_pg_rewrite_ev_class,
+				BTEqualStrategyNumber, F_OIDEQ,
+				ObjectIdGetDatum(viewoid));
+	ScanKeyInit(&skey[1],
+				Anum_pg_rewrite_rulename,
+				BTEqualStrategyNumber, F_NAMEEQ,
+				CStringGetDatum(ViewSelectRuleName));
 
-		argtypes[0] = OIDOID;
-		argtypes[1] = NAMEOID;
-		plan = SPI_prepare(query_getviewrule, 2, argtypes);
-		if (plan == NULL)
-			elog(ERROR, "SPI_prepare failed for \"%s\"", query_getviewrule);
+	scan = systable_beginscan(rewrite_rel, RewriteRelRulenameIndexId, true,
+							  NULL, 2, skey);
 
-		/*
-		 * Get the pg_rewrite tuple for the view's SELECT rule
-		 */
-		args[0] = ObjectIdGetDatum(viewoid);
-		args[1] = DirectFunctionCall1(namein, CStringGetDatum(ViewSelectRuleName));
-		nulls[0] = ' ';
-		nulls[1] = ' ';
-		spirc = SPI_execute_plan(plan, args, nulls, true, 0);
-		SPI_freeplan(plan);
-	}
-	if (spirc != SPI_OK_SELECT)
-		elog(ERROR, "failed to get pg_rewrite tuple for view %u", viewoid);
-	if (SPI_processed != 1)
+	tuple = systable_getnext(scan);
+	if (HeapTupleIsValid(tuple))
 	{
 		/*
-		 * There is no tuple data available here, just keep the output buffer
-		 * empty.
+		 * Copy the tuple into the current memory context: make_viewdef must
+		 * be able to rely on it staying valid for the duration.
 		 */
-	}
-	else
-	{
-		/*
-		 * Get the rule's definition and put it into executor's memory
-		 */
-		ruletup = SPI_tuptable->vals[0];
-		rulettc = SPI_tuptable->tupdesc;
+		ruletup = heap_copytuple(tuple);
+		rulettc = RelationGetDescr(rewrite_rel);
 		make_viewdef(&buf, ruletup, rulettc, prettyFlags, wrapColumn);
+		heap_freetuple(ruletup);
 	}
 
-	/*
-	 * Disconnect from SPI manager
-	 */
-	if (SPI_finish() != SPI_OK_FINISH)
-		elog(ERROR, "SPI_finish failed");
+	systable_endscan(scan);
+	table_close(rewrite_rel, AccessShareLock);
 
 	if (buf.len == 0)
 		return NULL;
@@ -2840,40 +2818,38 @@ make_viewdef(StringInfo buf, HeapTuple ruletup, TupleDesc rulettc,
 	char	   *ev_action;
 	List	   *actions;
 	Relation	ev_relation;
-	int			fno;
 	Datum		dat;
 	bool		isnull;
 
 	/*
 	 * Get the attribute values from the rules tuple
 	 */
-	fno = SPI_fnumber(rulettc, "ev_type");
-	dat = SPI_getbinval(ruletup, rulettc, fno, &isnull);
+	dat = heap_getattr(ruletup, Anum_pg_rewrite_ev_type, rulettc, &isnull);
 	Assert(!isnull);
 	ev_type = DatumGetChar(dat);
 
-	fno = SPI_fnumber(rulettc, "ev_class");
-	dat = SPI_getbinval(ruletup, rulettc, fno, &isnull);
+	dat = heap_getattr(ruletup, Anum_pg_rewrite_ev_class, rulettc, &isnull);
 	Assert(!isnull);
 	ev_class = DatumGetObjectId(dat);
 
-	fno = SPI_fnumber(rulettc, "is_instead");
-	dat = SPI_getbinval(ruletup, rulettc, fno, &isnull);
+	dat = heap_getattr(ruletup, Anum_pg_rewrite_is_instead, rulettc, &isnull);
 	Assert(!isnull);
 	is_instead = DatumGetBool(dat);
 
-	fno = SPI_fnumber(rulettc, "ev_qual");
-	ev_qual = SPI_getvalue(ruletup, rulettc, fno);
-	Assert(ev_qual != NULL);
+	dat = heap_getattr(ruletup, Anum_pg_rewrite_ev_qual, rulettc, &isnull);
+	Assert(!isnull);
+	ev_qual = TextDatumGetCString(dat);
 
-	fno = SPI_fnumber(rulettc, "ev_action");
-	ev_action = SPI_getvalue(ruletup, rulettc, fno);
-	Assert(ev_action != NULL);
+	dat = heap_getattr(ruletup, Anum_pg_rewrite_ev_action, rulettc, &isnull);
+	Assert(!isnull);
+	ev_action = TextDatumGetCString(dat);
 	actions = (List *) stringToNode(ev_action);
 
 	if (list_length(actions) != 1)
 	{
 		/* keep output buffer empty and leave */
+		pfree(ev_qual);
+		pfree(ev_action);
 		return;
 	}
 
@@ -2883,6 +2859,8 @@ make_viewdef(StringInfo buf, HeapTuple ruletup, TupleDesc rulettc,
 		strcmp(ev_qual, "<>") != 0 || query->commandType != CMD_SELECT)
 	{
 		/* keep output buffer empty and leave */
+		pfree(ev_qual);
+		pfree(ev_action);
 		return;
 	}
 
@@ -2893,6 +2871,9 @@ make_viewdef(StringInfo buf, HeapTuple ruletup, TupleDesc rulettc,
 	appendStringInfoChar(buf, ';');
 
 	table_close(ev_relation, AccessShareLock);
+
+	pfree(ev_qual);
+	pfree(ev_action);
 }
 
 

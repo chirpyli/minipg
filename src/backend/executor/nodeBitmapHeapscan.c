@@ -44,7 +44,6 @@
 #include "executor/execdebug.h"
 #include "executor/nodeBitmapHeapscan.h"
 #include "miscadmin.h"
-#include "pgstat.h"
 #include "storage/bufmgr.h"
 #include "storage/predicate.h"
 #include "utils/memutils.h"

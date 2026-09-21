@@ -29,7 +29,6 @@
 #include "funcapi.h"
 #include "miscadmin.h"
 #include "parser/scansup.h"
-#include "pgstat.h"
 #include "postmaster/syslogger.h"
 #include "rewrite/rewriteHandler.h"
 #include "storage/fd.h"

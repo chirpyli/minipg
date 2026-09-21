@@ -25,7 +25,6 @@
 #include "miscadmin.h"
 #include "nodes/nodeFuncs.h"
 #include "parser/parse_coerce.h"
-#include "pgstat.h"
 #include "utils/builtins.h"
 #include "utils/lsyscache.h"
 #include "utils/memutils.h"
@@ -114,7 +113,6 @@ ExecMakeFunctionResultSet(SetExprState *fcache,
 	List	   *arguments;
 	Datum		result;
 	FunctionCallInfo fcinfo;
-	PgStat_FunctionCallUsage fcusage;
 	ReturnSetInfo rsinfo;
 	bool		callit;
 	int			i;
@@ -228,16 +226,12 @@ restart:
 
 	if (callit)
 	{
-		pgstat_init_function_usage(fcinfo, &fcusage);
-
 		fcinfo->isnull = false;
 		rsinfo.isDone = ExprSingleResult;
 		result = FunctionCallInvoke(fcinfo);
 		*isNull = fcinfo->isnull;
 		*isDone = rsinfo.isDone;
 
-		pgstat_end_function_usage(&fcusage,
-								  rsinfo.isDone != ExprMultipleResult);
 	}
 	else
 	{

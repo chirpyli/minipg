@@ -24,7 +24,7 @@
 #include "access/xlogutils.h"
 #include "commands/tablespace.h"
 #include "miscadmin.h"
-#include "pgstat.h"
+#include "utils/wait_event.h"
 #include "portability/instr_time.h"
 #include "postmaster/bgwriter.h"
 #include "storage/bufmgr.h"

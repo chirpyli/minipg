@@ -28,7 +28,7 @@
 #include "access/hash.h"
 #include "commands/progress.h"
 #include "miscadmin.h"
-#include "pgstat.h"
+#include "utils/backend_progress.h"
 #include "port/pg_bitutils.h"
 #include "utils/tuplesort.h"
 

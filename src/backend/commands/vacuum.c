@@ -40,7 +40,7 @@
 #include "commands/vacuum.h"
 #include "miscadmin.h"
 #include "nodes/makefuncs.h"
-#include "pgstat.h"
+#include "utils/wait_event.h"
 
 #include "storage/bufmgr.h"
 #include "storage/lmgr.h"
@@ -311,12 +311,6 @@ vacuum(List *relations, VacuumParams *params,
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 				 errmsg("PROCESS_TOAST required with VACUUM FULL")));
-
-	/*
-	 * Send info about dead objects to the statistics collector.
-	 */
-	if (params->options & VACOPT_VACUUM)
-		pgstat_vacuum_stat();
 
 	/*
 	 * Create special memory context for cross-transaction storage.

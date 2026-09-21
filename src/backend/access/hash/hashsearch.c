@@ -17,7 +17,6 @@
 #include "access/hash.h"
 #include "access/relscan.h"
 #include "miscadmin.h"
-#include "pgstat.h"
 #include "storage/predicate.h"
 #include "utils/rel.h"
 
@@ -300,8 +299,6 @@ _hash_first(IndexScanDesc scan, ScanDirection dir)
 	Page		page;
 	HashPageOpaque opaque;
 	HashScanPosItem *currItem;
-
-	pgstat_count_index_scan(rel);
 
 	/*
 	 * We do not support hash scans with no index qualification, because we

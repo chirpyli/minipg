@@ -78,7 +78,7 @@
 
 #include "miscadmin.h"
 #include "pg_trace.h"
-#include "pgstat.h"
+#include "utils/wait_event.h"
 #include "postmaster/postmaster.h"
 #include "storage/ipc.h"
 #include "storage/predicate.h"

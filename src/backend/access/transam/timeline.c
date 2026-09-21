@@ -39,7 +39,7 @@
 #include "access/xlog_internal.h"
 #include "access/xlogarchive.h"
 #include "access/xlogdefs.h"
-#include "pgstat.h"
+#include "utils/wait_event.h"
 #include "storage/fd.h"
 
 /*

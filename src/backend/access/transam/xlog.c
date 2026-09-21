@@ -48,7 +48,7 @@
 #include "executor/instrument.h"
 #include "miscadmin.h"
 #include "pg_trace.h"
-#include "pgstat.h"
+#include "utils/wait_event.h"
 #include "port/atomics.h"
 #include "port/pg_iovec.h"
 #include "postmaster/bgwriter.h"
@@ -2200,7 +2200,6 @@ AdvanceXLInsertBuffer(XLogRecPtr upto, bool opportunistic)
 					WriteRqst.Flush = 0;
 					XLogWrite(WriteRqst, false);
 					LWLockRelease(WALWriteLock);
-					WalStats.m_wal_buffers_full++;
 					TRACE_POSTGRESQL_WAL_BUFFER_WRITE_DIRTY_DONE();
 				}
 				/* Re-acquire WALBufMappingLock and retry */
@@ -2568,10 +2567,8 @@ XLogWrite(XLogwrtRqst WriteRqst, bool flexible)
 
 					INSTR_TIME_SET_CURRENT(duration);
 					INSTR_TIME_SUBTRACT(duration, start);
-					WalStats.m_wal_write_time += INSTR_TIME_GET_MICROSEC(duration);
 				}
 
-				WalStats.m_wal_write++;
 
 				if (written <= 0)
 				{
@@ -6968,7 +6965,6 @@ StartupXLOG(void)
 		/*
 		 * Reset pgstat data, because it may be invalid after recovery.
 		 */
-		pgstat_reset_all();
 
 		/*
 		 * If there was a backup label file, it's done its job and the info
@@ -8556,8 +8552,6 @@ LogCheckpointEnd(bool restartpoint)
 												 CheckpointStats.ckpt_sync_end_t);
 
 	/* Accumulate checkpoint timing summary data, in milliseconds. */
-	BgWriterStats.m_checkpoint_write_time += write_msecs;
-	BgWriterStats.m_checkpoint_sync_time += sync_msecs;
 
 	/*
 	 * All of the published timing statistics are accounted for.  Only
@@ -10459,10 +10453,8 @@ issue_xlog_fsync(int fd, XLogSegNo segno)
 
 		INSTR_TIME_SET_CURRENT(duration);
 		INSTR_TIME_SUBTRACT(duration, start);
-		WalStats.m_wal_sync_time += INSTR_TIME_GET_MICROSEC(duration);
 	}
 
-	WalStats.m_wal_sync++;
 }
 
 /*

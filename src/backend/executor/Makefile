@@ -47,7 +47,6 @@ OBJS = \
 	nodeProjectSet.o \
 	nodeResult.o \
 	nodeSeqscan.o \
-	spi.o \
 	nodeSort.o \
 	nodeSubplan.o \
 	nodeSubqueryscan.o \

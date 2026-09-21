@@ -91,7 +91,7 @@
 #include "common/file_perm.h"
 #include "common/file_utils.h"
 #include "miscadmin.h"
-#include "pgstat.h"
+#include "utils/wait_event.h"
 #include "port/pg_iovec.h"
 #include "portability/mem.h"
 #include "storage/fd.h"
@@ -1399,7 +1399,6 @@ FileAccess(File file)
 static void
 ReportTemporaryFileUsage(const char *path, off_t size)
 {
-	pgstat_report_tempfile(size);
 
 	if (log_temp_files >= 0)
 	{
@@ -1760,7 +1759,7 @@ PathNameDeleteTemporaryFile(const char *path, bool error_on_failure)
 	struct stat filestats;
 	int			stat_errno;
 
-	/* Get the final size for pgstat reporting. */
+	/* Get the final size for temp file logging. */
 	if (stat(path, &filestats) != 0)
 		stat_errno = errno;
 	else

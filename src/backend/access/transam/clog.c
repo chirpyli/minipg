@@ -40,7 +40,7 @@
 #include "access/xlogutils.h"
 #include "miscadmin.h"
 #include "pg_trace.h"
-#include "pgstat.h"
+#include "utils/wait_event.h"
 #include "storage/proc.h"
 #include "storage/sync.h"
 

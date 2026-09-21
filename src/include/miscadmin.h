@@ -323,7 +323,6 @@ typedef enum BackendType
 	B_WAL_RECEIVER,
 	B_WAL_SENDER,
 	B_WAL_WRITER,
-	B_STATS_COLLECTOR,
 	B_LOGGER,
 } BackendType;
 

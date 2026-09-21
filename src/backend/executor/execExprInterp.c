@@ -64,7 +64,6 @@
 #include "miscadmin.h"
 #include "nodes/nodeFuncs.h"
 #include "parser/parsetree.h"
-#include "pgstat.h"
 #include "utils/array.h"
 #include "utils/builtins.h"
 #include "utils/date.h"
@@ -2120,17 +2119,13 @@ ExecEvalFuncExprFusage(ExprState *state, ExprEvalStep *op,
 					   ExprContext *econtext)
 {
 	FunctionCallInfo fcinfo = op->d.func.fcinfo_data;
-	PgStat_FunctionCallUsage fcusage;
 	Datum		d;
-
-	pgstat_init_function_usage(fcinfo, &fcusage);
 
 	fcinfo->isnull = false;
 	d = op->d.func.fn_addr(fcinfo);
 	*op->resvalue = d;
 	*op->resnull = fcinfo->isnull;
 
-	pgstat_end_function_usage(&fcusage, true);
 }
 
 /*
@@ -2142,7 +2137,6 @@ ExecEvalFuncExprStrictFusage(ExprState *state, ExprEvalStep *op,
 {
 
 	FunctionCallInfo fcinfo = op->d.func.fcinfo_data;
-	PgStat_FunctionCallUsage fcusage;
 	NullableDatum *args = fcinfo->args;
 	int			nargs = op->d.func.nargs;
 	Datum		d;
@@ -2157,14 +2151,11 @@ ExecEvalFuncExprStrictFusage(ExprState *state, ExprEvalStep *op,
 		}
 	}
 
-	pgstat_init_function_usage(fcinfo, &fcusage);
-
 	fcinfo->isnull = false;
 	d = op->d.func.fn_addr(fcinfo);
 	*op->resvalue = d;
 	*op->resnull = fcinfo->isnull;
 
-	pgstat_end_function_usage(&fcusage, true);
 }
 
 /*

@@ -36,7 +36,7 @@
 #include "libpq/pqsignal.h"
 #include "miscadmin.h"
 #include "nodes/pg_list.h"
-#include "pgstat.h"
+#include "utils/wait_event.h"
 #include "pgtime.h"
 #include "postmaster/fork_process.h"
 #include "postmaster/interrupt.h"

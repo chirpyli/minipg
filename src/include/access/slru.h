@@ -97,8 +97,6 @@ typedef struct SlruSharedData
 	 */
 	int			latest_page_number;
 
-	/* SLRU's index for statistics purposes (might not be unique) */
-	int			slru_stats_idx;
 } SlruSharedData;
 
 typedef SlruSharedData *SlruShared;

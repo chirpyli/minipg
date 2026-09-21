@@ -39,7 +39,7 @@
 #include "access/twophase.h"
 #include "access/xact.h"
 #include "miscadmin.h"
-#include "pgstat.h"
+#include "utils/wait_event.h"
 
 #include "storage/condition_variable.h"
 #include "storage/ipc.h"

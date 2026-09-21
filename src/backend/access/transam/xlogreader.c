@@ -28,7 +28,7 @@
 
 #ifndef FRONTEND
 #include "miscadmin.h"
-#include "pgstat.h"
+#include "utils/wait_event.h"
 #include "utils/memutils.h"
 #endif
 

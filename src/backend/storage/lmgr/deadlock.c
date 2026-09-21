@@ -27,7 +27,7 @@
 
 #include "miscadmin.h"
 #include "pg_trace.h"
-#include "pgstat.h"
+#include "utils/backend_status.h"
 #include "storage/lmgr.h"
 #include "storage/proc.h"
 #include "utils/memutils.h"
@@ -1093,8 +1093,6 @@ DeadLockReport(void)
 						 info->pid,
 						 pgstat_get_backend_current_activity(info->pid, false));
 	}
-
-	pgstat_report_deadlock();
 
 	ereport(ERROR,
 			(errcode(ERRCODE_T_R_DEADLOCK_DETECTED),

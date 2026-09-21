@@ -26,7 +26,7 @@
 #include "commands/vacuum.h"
 #include "miscadmin.h"
 #include "nodes/execnodes.h"
-#include "pgstat.h"
+#include "utils/backend_progress.h"
 
 #include "storage/condition_variable.h"
 #include "storage/indexfsm.h"

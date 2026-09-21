@@ -29,7 +29,6 @@
 #include "catalog/pg_type.h"
 #include "common/pg_lzcompress.h"
 #include "executor/executor.h"
-#include "executor/spi.h"
 #include "funcapi.h"
 #include "mb/pg_wchar.h"
 #include "miscadmin.h"

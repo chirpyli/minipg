@@ -22,7 +22,7 @@
 #include "access/xlog.h"
 #include "access/xloginsert.h"
 #include "miscadmin.h"
-#include "pgstat.h"
+#include "utils/wait_event.h"
 #include "storage/bufmgr.h"
 #include "storage/lmgr.h"
 #include "storage/proc.h"

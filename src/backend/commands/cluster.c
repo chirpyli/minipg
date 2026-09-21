@@ -41,7 +41,7 @@
 #include "commands/vacuum.h"
 #include "miscadmin.h"
 #include "optimizer/optimizer.h"
-#include "pgstat.h"
+#include "utils/backend_progress.h"
 #include "storage/bufmgr.h"
 #include "storage/lmgr.h"
 #include "storage/predicate.h"

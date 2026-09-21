@@ -23,7 +23,7 @@
 #include <sys/stat.h>
 
 #include "miscadmin.h"
-#include "pgstat.h"
+#include "utils/wait_event.h"
 #include "storage/copydir.h"
 #include "storage/fd.h"
 

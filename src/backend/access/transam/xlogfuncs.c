@@ -25,7 +25,7 @@
 #include "catalog/pg_type.h"
 #include "funcapi.h"
 #include "miscadmin.h"
-#include "pgstat.h"
+#include "utils/wait_event.h"
 #include "storage/fd.h"
 #include "storage/latch.h"
 #include "storage/ipc.h"

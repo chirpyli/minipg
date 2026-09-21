@@ -56,7 +56,7 @@
 #include "catalog/catalog.h"
 #include "commands/dbcommands.h"
 #include "miscadmin.h"
-#include "pgstat.h"
+#include "utils/wait_event.h"
 #include "storage/proc.h"
 #include "storage/procarray.h"
 #include "storage/spin.h"

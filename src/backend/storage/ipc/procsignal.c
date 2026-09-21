@@ -19,7 +19,7 @@
 
 #include "port/pg_bitutils.h"
 #include "miscadmin.h"
-#include "pgstat.h"
+#include "utils/wait_event.h"
 #include "storage/condition_variable.h"
 #include "storage/ipc.h"
 #include "storage/latch.h"

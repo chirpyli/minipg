@@ -39,7 +39,6 @@
 #include "access/xlog.h"
 #include "miscadmin.h"
 #include "pg_trace.h"
-#include "pgstat.h"
 #include "storage/proc.h"
 #include "storage/procarray.h"
 #include "storage/sinvaladt.h"

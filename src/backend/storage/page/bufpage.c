@@ -17,7 +17,6 @@
 #include "access/htup_details.h"
 #include "access/itup.h"
 #include "access/xlog.h"
-#include "pgstat.h"
 #include "utils/memdebug.h"
 #include "utils/memutils.h"
 

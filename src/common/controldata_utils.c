@@ -34,7 +34,7 @@
 #include "port/pg_crc32c.h"
 
 #ifndef FRONTEND
-#include "pgstat.h"
+#include "utils/wait_event.h"
 #include "storage/fd.h"
 #endif
 

@@ -23,7 +23,6 @@
 #include "miscadmin.h"
 #include "nodes/makefuncs.h"
 #include "nodes/nodeFuncs.h"
-#include "pgstat.h"
 #include "utils/builtins.h"
 #include "utils/fmgrtab.h"
 #include "utils/guc.h"

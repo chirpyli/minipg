@@ -60,7 +60,6 @@
 #include "executor/execdebug.h"
 #include "executor/nodeAppend.h"
 #include "miscadmin.h"
-#include "pgstat.h"
 #include "storage/latch.h"
 
 #define INVALID_SUBPLAN_INDEX		-1

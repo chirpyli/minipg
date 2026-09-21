@@ -55,7 +55,7 @@
 #include "commands/progress.h"
 #include "executor/instrument.h"
 #include "miscadmin.h"
-#include "pgstat.h"
+#include "utils/backend_progress.h"
 #include "storage/smgr.h"
 #include "tcop/tcopprot.h"		/* pgrminclude ignore */
 #include "utils/rel.h"

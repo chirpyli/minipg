@@ -52,7 +52,7 @@
 
 #include "libpq/pqsignal.h"
 #include "miscadmin.h"
-#include "pgstat.h"
+#include "utils/wait_event.h"
 #include "port/atomics.h"
 #include "portability/instr_time.h"
 #include "postmaster/postmaster.h"

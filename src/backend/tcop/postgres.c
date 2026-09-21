@@ -52,7 +52,7 @@
 #include "parser/parser.h"
 #include "pg_getopt.h"
 #include "pg_trace.h"
-#include "pgstat.h"
+#include "utils/backend_status.h"
 
 #include "postmaster/interrupt.h"
 #include "postmaster/postmaster.h"
@@ -1163,9 +1163,6 @@ die(SIGNAL_ARGS)
 		ProcDiePending = true;
 	}
 
-	/* for the statistics collector */
-	pgStatSessionEndCause = DISCONNECT_KILLED;
-
 	/* If we're still here, waken anything waiting on the process latch */
 	SetLatch(MyLatch);
 
@@ -1383,7 +1380,6 @@ ProcessInterrupts(void)
 					 errmsg("canceling authentication due to timeout")));
 		else if (RecoveryConflictPending && RecoveryConflictRetryable)
 		{
-			pgstat_report_recovery_conflict(RecoveryConflictReason);
 			ereport(FATAL,
 					(errcode(ERRCODE_T_R_SERIALIZATION_FAILURE),
 					 errmsg("terminating connection due to conflict with recovery"),
@@ -1393,7 +1389,6 @@ ProcessInterrupts(void)
 		{
 			/* Currently there is only one non-retryable recovery conflict */
 			Assert(RecoveryConflictReason == PROCSIG_RECOVERY_CONFLICT_DATABASE);
-			pgstat_report_recovery_conflict(RecoveryConflictReason);
 			ereport(FATAL,
 					(errcode(ERRCODE_DATABASE_DROPPED),
 					 errmsg("terminating connection due to conflict with recovery"),
@@ -1427,7 +1422,6 @@ ProcessInterrupts(void)
 		QueryCancelPending = false; /* this trumps QueryCancel */
 		RecoveryConflictPending = false;
 		LockErrorCleanup();
-		pgstat_report_recovery_conflict(RecoveryConflictReason);
 		ereport(FATAL,
 				(errcode(ERRCODE_T_R_SERIALIZATION_FAILURE),
 				 errmsg("terminating connection due to conflict with recovery"),
@@ -1496,7 +1490,6 @@ ProcessInterrupts(void)
 		{
 			RecoveryConflictPending = false;
 			LockErrorCleanup();
-			pgstat_report_recovery_conflict(RecoveryConflictReason);
 			ereport(ERROR,
 					(errcode(ERRCODE_T_R_SERIALIZATION_FAILURE),
 					 errmsg("canceling statement due to conflict with recovery"),
@@ -2313,8 +2306,6 @@ PostgresMain(int argc, char *argv[],
 	 */
 	BeginReportingGUCOptions();
 
-	pgstat_report_connect(MyDatabaseId);
-
 	/*
 	 * process any libraries that should be preloaded at backend start (this
 	 * likewise can't be done until GUC settings are complete)
@@ -2547,7 +2538,6 @@ PostgresMain(int argc, char *argv[],
 				 * any, and send relevant messages to the client.  Doing it
 				 * here helps ensure stable behavior in tests.
 				 */
-				pgstat_report_stat(false);
 
 				set_ps_display("idle");
 				pgstat_report_activity(STATE_IDLE, NULL);
@@ -2647,9 +2637,6 @@ PostgresMain(int argc, char *argv[],
 				 * perform normal shutdown.
 				 */
 			case EOF:
-
-				/* for the statistics collector */
-				pgStatSessionEndCause = DISCONNECT_CLIENT_EOF;
 
 				/* FALLTHROUGH */
 

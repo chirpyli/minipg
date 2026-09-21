@@ -21,7 +21,6 @@
 #include "access/xlog.h"
 #include "catalog/catalog.h"
 #include "miscadmin.h"
-#include "pgstat.h"
 #include "storage/bufmgr.h"
 #include "utils/snapmgr.h"
 #include "utils/rel.h"
@@ -205,7 +204,7 @@ heap_page_prune_opt(Relation relation, Buffer buffer)
 			(void) heap_page_prune(relation, buffer, InvalidTransactionId,
 								   vistest,
 								   limited_xmin, limited_ts,
-								   true, NULL);
+								   NULL);
 		}
 
 		/* And release buffer lock */
@@ -228,11 +227,6 @@ heap_page_prune_opt(Relation relation, Buffer buffer)
  * TransactionIdLimitedForOldSnapshots, or InvalidTransactionId/0
  * respectively.
  *
- * If report_stats is true then we send the number of reclaimed heap-only
- * tuples to pgstats.  (This must be false during vacuum, since vacuum will
- * send its own new total to pgstats, and we don't want this delta applied
- * on top of that.)
- *
  * off_loc is the offset location required by the caller to use in error
  * callback.
  *
@@ -244,7 +238,6 @@ heap_page_prune(Relation relation, Buffer buffer,
 				GlobalVisState *vistest,
 				TransactionId old_snap_xmin,
 				TimestampTz old_snap_ts,
-				bool report_stats,
 				OffsetNumber *off_loc)
 {
 	int			ndeleted = 0;
@@ -448,14 +441,6 @@ heap_page_prune(Relation relation, Buffer buffer,
 	}
 
 	END_CRIT_SECTION();
-
-	/*
-	 * If requested, report the number of tuples reclaimed to pgstats. This is
-	 * ndeleted minus ndead, because we don't want to count a now-DEAD root
-	 * item as a deletion for this purpose.
-	 */
-	if (report_stats && ndeleted > prstate.ndead)
-		pgstat_update_heap_dead_tuples(relation, ndeleted - prstate.ndead);
 
 	/*
 	 * XXX Should we update the FSM information of this page ?

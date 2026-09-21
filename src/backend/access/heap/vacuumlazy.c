@@ -47,7 +47,7 @@
 #include "executor/instrument.h"
 #include "miscadmin.h"
 #include "optimizer/paths.h"
-#include "pgstat.h"
+#include "utils/backend_progress.h"
 #include "portability/instr_time.h"
 
 #include "storage/bufmgr.h"
@@ -334,8 +334,8 @@ heap_vacuum_rel(Relation rel, VacuumParams *params,
 	TransactionId new_frozen_xid;
 	MultiXactId new_min_multi;
 	ErrorContextCallback errcallback;
-	PgStat_Counter startreadtime = 0;
-	PgStat_Counter startwritetime = 0;
+	instr_time	startreadtime = pgBufferUsage.blk_read_time;
+	instr_time	startwritetime = pgBufferUsage.blk_write_time;
 	TransactionId OldestXmin;
 	TransactionId FreezeLimit;
 	MultiXactId MultiXactCutoff;
@@ -345,11 +345,6 @@ heap_vacuum_rel(Relation rel, VacuumParams *params,
 	{
 		pg_rusage_init(&ru0);
 		starttime = GetCurrentTimestamp();
-		if (track_io_timing)
-		{
-			startreadtime = pgStatBlockReadTime;
-			startwritetime = pgStatBlockWriteTime;
-		}
 	}
 
 	if (params->options & VACOPT_VERBOSE)
@@ -542,20 +537,6 @@ heap_vacuum_rel(Relation rel, VacuumParams *params,
 						new_min_multi,
 						false);
 
-	/*
-	 * Report results to the stats collector, too.
-	 *
-	 * Deliberately avoid telling the stats collector about LP_DEAD items that
-	 * remain in the table due to VACUUM bypassing index and heap vacuuming.
-	 * ANALYZE will consider the remaining LP_DEAD items to be dead tuples. It
-	 * seems like a good idea to err on the side of not vacuuming again too
-	 * soon in cases where the failsafe prevented significant amounts of heap
-	 * vacuuming.
-	 */
-	pgstat_report_vacuum(RelationGetRelid(rel),
-						 rel->rd_rel->relisshared,
-						 Max(new_live_tuples, 0),
-						 vacrel->new_dead_tuples);
 	pgstat_progress_end_command();
 
 	/* and log the action if appropriate */
@@ -670,8 +651,17 @@ heap_vacuum_rel(Relation rel, VacuumParams *params,
 			}
 			if (track_io_timing)
 			{
-				double		read_ms = (double) (pgStatBlockReadTime - startreadtime) / 1000;
-				double		write_ms = (double) (pgStatBlockWriteTime - startwritetime) / 1000;
+				instr_time	read_delta;
+				instr_time	write_delta;
+				double		read_ms;
+				double		write_ms;
+
+				read_delta = pgBufferUsage.blk_read_time;
+				INSTR_TIME_SUBTRACT(read_delta, startreadtime);
+				read_ms = INSTR_TIME_GET_MILLISEC(read_delta);
+				write_delta = pgBufferUsage.blk_write_time;
+				INSTR_TIME_SUBTRACT(write_delta, startwritetime);
+				write_ms = INSTR_TIME_GET_MILLISEC(write_delta);
 
 				appendStringInfo(&buf, _("I/O timings: read: %.3f ms, write: %.3f ms\n"),
 								 read_ms, write_ms);
@@ -1569,7 +1559,7 @@ retry:
 	 * that were deleted from indexes.
 	 */
 	tuples_deleted = heap_page_prune(rel, buf, vacrel->OldestXmin, vistest,
-									 InvalidTransactionId, 0, false,
+									 InvalidTransactionId, 0,
 									 &vacrel->offnum);
 
 	/*
@@ -1663,7 +1653,7 @@ retry:
 		 * them as dead_tuples at all (we only consider new_dead_tuples).  The
 		 * outcome is no different because we assume that any LP_DEAD items we
 		 * encounter here will become LP_UNUSED inside lazy_vacuum_heap_page()
-		 * before we report anything to the stats collector. (Cases where we
+		 * before the VACUUM finishes. (Cases where we
 		 * bypass index vacuuming will violate our assumption, but the overall
 		 * impact of that should be negligible.)
 		 */
@@ -1973,12 +1963,12 @@ lazy_vacuum(LVRelState *vacrel)
 		 * dead_tuples space is not CPU cache resident.
 		 *
 		 * We don't take any special steps to remember the LP_DEAD items (such
-		 * as counting them in new_dead_tuples report to the stats collector)
-		 * when the optimization is applied.  Though the accounting used in
-		 * analyze.c's acquire_sample_rows() will recognize the same LP_DEAD
-		 * items as dead rows in its own stats collector report, that's okay.
-		 * The discrepancy should be negligible.  If this optimization is ever
-		 * expanded to cover more cases then this may need to be reconsidered.
+		 * as counting them in new_dead_tuples) when the optimization is
+		 * applied.  Though the accounting used in analyze.c's
+		 * acquire_sample_rows() will recognize the same LP_DEAD items as dead
+		 * rows, that's okay.  The discrepancy should be negligible.  If this
+		 * optimization is ever expanded to cover more cases then this may
+		 * need to be reconsidered.
 		 */
 		threshold = (double) vacrel->rel_pages * BYPASS_THRESHOLD_PAGES;
 		bypass = (vacrel->lpdead_item_pages < threshold &&

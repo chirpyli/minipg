@@ -53,7 +53,6 @@
 #include "parser/parse_type.h"
 #include "parser/parser.h"
 #include "parser/scansup.h"
-#include "pgstat.h"
 
 #include "postmaster/bgwriter.h"
 #include "postmaster/postmaster.h"
@@ -151,7 +150,6 @@ static bool check_maxconnections(int *newval, void **extra, GucSource source);
 static bool check_effective_io_concurrency(int *newval, void **extra, GucSource source);
 static bool check_maintenance_io_concurrency(int *newval, void **extra, GucSource source);
 static bool check_huge_page_size(int *newval, void **extra, GucSource source);
-static void assign_pgstat_temp_directory(const char *newval, void *extra);
 static bool check_application_name(char **newval, void **extra, GucSource source);
 static void assign_application_name(const char *newval, void *extra);
 static bool check_cluster_name(char **newval, void **extra, GucSource source);
@@ -400,7 +398,6 @@ int			num_temp_buffers = 1024;
 char	   *cluster_name = "";
 char	   *ConfigFileName;
 
-char	   *pgstat_temp_directory;
 
 char	   *application_name;
 
@@ -1071,15 +1068,6 @@ static struct config_bool ConfigureNamesBool[] =
 						 "the time at which that command began execution.")
 		},
 		&pgstat_track_activities,
-		true,
-		NULL, NULL, NULL
-	},
-	{
-		{"track_counts", PGC_SUSET, STATS_COLLECTOR,
-			gettext_noop("Collects statistics on database activity."),
-			NULL
-		},
-		&pgstat_track_counts,
 		true,
 		NULL, NULL, NULL
 	},
@@ -2917,17 +2905,6 @@ static struct config_string ConfigureNamesString[] =
 		&ConfigFileName,
 		NULL,
 		NULL, NULL, NULL
-	},
-
-	{
-		{"stats_temp_directory", PGC_SIGHUP, STATS_COLLECTOR,
-			gettext_noop("Writes temporary statistics files to the specified directory."),
-			NULL,
-			GUC_SUPERUSER_ONLY
-		},
-		&pgstat_temp_directory,
-		PG_STAT_TMP_DIR,
-		check_canonical_path, assign_pgstat_temp_directory, NULL
 	},
 
 	{
@@ -9118,34 +9095,6 @@ check_huge_page_size(int *newval, void **extra, GucSource source)
 	return true;
 }
 
-static void
-assign_pgstat_temp_directory(const char *newval, void *extra)
-{
-	/* check_canonical_path already canonicalized newval for us */
-	char	   *dname;
-	char	   *tname;
-	char	   *fname;
-
-	/* directory */
-	dname = guc_malloc(ERROR, strlen(newval) + 1);	/* runtime dir */
-	sprintf(dname, "%s", newval);
-
-	/* global stats */
-	tname = guc_malloc(ERROR, strlen(newval) + 12); /* /global.tmp */
-	sprintf(tname, "%s/global.tmp", newval);
-	fname = guc_malloc(ERROR, strlen(newval) + 13); /* /global.stat */
-	sprintf(fname, "%s/global.stat", newval);
-
-	if (pgstat_stat_directory)
-		free(pgstat_stat_directory);
-	pgstat_stat_directory = dname;
-	if (pgstat_stat_tmpname)
-		free(pgstat_stat_tmpname);
-	pgstat_stat_tmpname = tname;
-	if (pgstat_stat_filename)
-		free(pgstat_stat_filename);
-	pgstat_stat_filename = fname;
-}
 
 static bool
 check_application_name(char **newval, void **extra, GucSource source)

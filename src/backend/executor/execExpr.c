@@ -41,7 +41,6 @@
 #include "nodes/nodeFuncs.h"
 #include "nodes/subscripting.h"
 #include "optimizer/optimizer.h"
-#include "pgstat.h"
 #include "utils/array.h"
 #include "utils/builtins.h"
 #include "utils/datum.h"

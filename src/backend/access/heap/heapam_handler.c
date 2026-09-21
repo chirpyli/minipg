@@ -34,7 +34,7 @@
 #include "commands/progress.h"
 #include "executor/executor.h"
 #include "miscadmin.h"
-#include "pgstat.h"
+#include "utils/backend_progress.h"
 #include "storage/bufmgr.h"
 #include "storage/bufpage.h"
 #include "storage/lmgr.h"
@@ -1021,9 +1021,7 @@ heapam_scan_analyze_next_tuple(TableScanDesc scan, TransactionId OldestXmin,
 				 * A special case is that the inserting transaction might be
 				 * our own.  In this case we should count and sample the row,
 				 * to accommodate users who load a table and analyze it in one
-				 * transaction.  (pgstat_report_analyze has to adjust the
-				 * numbers we send to the stats collector to make this come
-				 * out right.)
+				 * transaction.
 				 */
 				if (TransactionIdIsCurrentTransactionId(HeapTupleHeaderGetXmin(targtuple->t_data)))
 				{
@@ -1041,8 +1039,8 @@ heapam_scan_analyze_next_tuple(TableScanDesc scan, TransactionId OldestXmin,
 				 * reasoning given above.
 				 *
 				 * If the delete was done by our own transaction, however, we
-				 * must count the row as dead to make pgstat_report_analyze's
-				 * stats adjustments come out right.  (Note: this works out
+				 * must count the row as dead so that the dead-tuple counts
+				 * come out right.  (Note: this works out
 				 * properly when the row was both inserted and deleted in our
 				 * xact.)
 				 *
@@ -2182,8 +2180,6 @@ heapam_scan_bitmap_next_tuple(TableScanDesc scan,
 	hscan->rs_ctup.t_len = ItemIdGetLength(lp);
 	hscan->rs_ctup.t_tableOid = scan->rs_rd->rd_id;
 	ItemPointerSet(&hscan->rs_ctup.t_self, hscan->rs_cblock, targoffset);
-
-	pgstat_count_heap_fetch(scan->rs_rd);
 
 	/*
 	 * Set up the result slot to point to this tuple.  Note that the slot

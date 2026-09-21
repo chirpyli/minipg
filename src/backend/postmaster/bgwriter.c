@@ -38,7 +38,7 @@
 #include "access/xlog_internal.h"
 #include "libpq/pqsignal.h"
 #include "miscadmin.h"
-#include "pgstat.h"
+#include "utils/wait_event.h"
 #include "postmaster/bgwriter.h"
 #include "postmaster/interrupt.h"
 #include "storage/buf_internals.h"
@@ -242,12 +242,6 @@ BackgroundWriterMain(void)
 		 * Do one cycle of dirty-buffer writing.
 		 */
 		can_hibernate = BgBufferSync(&wb_context);
-
-		/*
-		 * Send off activity statistics to the stats collector
-		 */
-		pgstat_send_bgwriter();
-		pgstat_send_wal(true);
 
 		if (FirstCallSinceLastCheckpoint())
 		{

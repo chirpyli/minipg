@@ -34,7 +34,7 @@
 #include "libpq/libpq-be.h"
 #include "mb/pg_wchar.h"
 #include "miscadmin.h"
-#include "pgstat.h"
+#include "utils/backend_status.h"
 
 #include "postmaster/postmaster.h"
 #include "storage/bufmgr.h"
@@ -545,10 +545,6 @@ InitPostgres(const char *in_dbname, Oid dboid, const char *username,
 
 	/* Initialize portal manager */
 	EnablePortalManager();
-
-	/* Initialize stats collection --- must happen before first xact */
-	if (!bootstrap)
-		pgstat_initialize();
 
 	/* Initialize status reporting */
 	if (!bootstrap)

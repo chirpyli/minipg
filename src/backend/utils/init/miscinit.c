@@ -34,7 +34,7 @@
 #include "libpq/pqsignal.h"
 #include "mb/pg_wchar.h"
 #include "miscadmin.h"
-#include "pgstat.h"
+#include "utils/wait_event.h"
 
 #include "postmaster/interrupt.h"
 #include "postmaster/postmaster.h"
@@ -255,9 +255,6 @@ GetBackendTypeDesc(BackendType backendType)
 			break;
 		case B_WAL_WRITER:
 			backendDesc = "walwriter";
-			break;
-		case B_STATS_COLLECTOR:
-			backendDesc = "stats collector";
 			break;
 		case B_LOGGER:
 			backendDesc = "logger";

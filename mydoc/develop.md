@@ -380,3 +380,54 @@ PQsendQueryGuts/PQsendQueryParams/PQsendPrepare/PQsendQueryPrepared/PQexecParams
 PQprepare/PQexecPrepared/PQdescribePrepared/PQdescribePortal/PQsendDescribe*、
 libpq-fe.h 对应声明、libpq-int.h 的 cmd_queue 与 CONNSTATE_PARSE/BIND/EXECUTE、
 fe-protocol3.c 的 '1'/'2'/'3'/'t'/'n'/'s' 分支；每步需全量重编译 + check-world。
+
+
+======================================================================
+裁剪记录：SPI 服务器编程接口彻底裁剪（含 DestSPI 与事务钩子）
+======================================================================
+裁剪范围
+--------
+- 删除文件：src/backend/executor/spi.c（2130 行）、
+  src/include/executor/spi.h、src/include/executor/spi_priv.h；
+  executor/Makefile 的 OBJS 去掉 spi.o。
+- ruleutils.c（唯一实际消费者）：
+  * pg_get_viewdef_worker 不再用 SPI 查询 pg_rewrite，改为
+    table_open(RewriteRelationId) + systable_beginscan(RewriteRelRulenameIndexId)
+    直接目录扫描（与 relcache.c 的 RelationBuildRuleLock 同模式），
+    命中元组 heap_copytuple 后交给 make_viewdef；
+  * make_viewdef 中 SPI_fnumber/SPI_getbinval/SPI_getvalue 全部替换为
+    Anum_pg_rewrite_* + heap_getattr + TextDatumGetCString，并补 pfree；
+  * 删除 query_getviewrule SQL 串与 spi.h include，补 include
+    access/genam.h、catalog/pg_rewrite.h。
+- xact.c：删除 5 处 AtEOXact_SPI/AtEOSubXact_SPI 钩子调用
+  （CommitTransaction/PrepareTransaction/AbortTransaction/CommitSubTransaction/
+  AbortSubTransaction）；StartTransaction 中 SPI_inside_nonatomic_context()
+  判断删除（非原子 SPI 上下文已不存在，xactStartTimestamp 恒取
+  stmtStartTimestamp）；补 include utils/portal.h —— 原先 PreCommit_Portals
+  等声明是从 spi.h 间接获得的，删除 spi.h 后若不加会退化为隐式声明警告。
+- tcop/dest.c 与 include/tcop/dest.h：删除 DestSPI 目标端
+  （spi_printtupDR、CreateDestReceiver 分支，以及 EndCommand/NullCommand/
+  ReadyForQuery 的 case DestSPI）；include/access/printtup.h 删除
+  spi_dest_startup/spi_printtup 声明。
+- src/test/regress/regress.c：删除 spi.h include（原本无 SPI 调用）。
+
+为什么可裁剪
+------------
+1. SPI 是面向扩展编程（plpgsql、CREATE FUNCTION、contrib 扩展）的服务器
+   编程接口；而 CREATE FUNCTION/PROCEDURE、plpgsql、contrib 均已裁剪，
+   SPI 失去全部目标用户，属于"消费者已消失"的孤岛模块。
+2. 全树唯一实际消费者是 ruleutils.c 的 pg_get_viewdef 查 pg_rewrite 一行 SQL；
+   pg_rewrite 上有 (ev_class, rulename) 唯一索引，直接目录扫描等价且更简单。
+   上游用 SPI 的原注释理由是"借 SPI 做 pg_rewrite 读权限检查"，而 minipg
+   权限系统已裁，该理由不复存在。
+3. 随主模块一并消失的死件：事务结束钩子（AtEOXact_SPI/AtEOSubXact_SPI）、
+   DestSPI 结果接收器、非原子上下文判断，均无其他语义。
+
+测试与验证
+----------
+- 全量干净重编译：0 error、0 warning（顺带修复 xact.c 因删 spi.h 暴露的
+  6 处 Implicit declaration of Portals 警告）。
+- make check-world 全部通过（regress 66/66、isolation 23/23）。
+- 手工验证 pg_get_viewdef 四条路径（regclass / name / pretty / psql \d+）
+  输出正确。
+- 净删除约 2400 行（10 个文件，-2462/+56）。

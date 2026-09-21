@@ -16,7 +16,6 @@
 #include "mb/pg_wchar.h"			/* for pg_mbcliplen */
 #include "miscadmin.h"
 #include "pg_trace.h"
-#include "pgstat.h"
 #include "port/atomics.h"		/* for memory barriers */
 #include "storage/ipc.h"
 #include "storage/proc.h"		/* for MyProc */
@@ -453,28 +452,6 @@ pgstat_report_activity(BackendState state, const char *cmd_str)
 		len = Min(strlen(cmd_str), pgstat_track_activity_query_size - 1);
 	}
 	current_timestamp = GetCurrentTimestamp();
-
-	/*
-	 * If the state has changed from "active" or "idle in transaction",
-	 * calculate the duration.
-	 */
-	if ((beentry->st_state == STATE_RUNNING ||
-		 beentry->st_state == STATE_IDLEINTRANSACTION ||
-		 beentry->st_state == STATE_IDLEINTRANSACTION_ABORTED) &&
-		state != beentry->st_state)
-	{
-		long		secs;
-		int			usecs;
-
-		TimestampDifference(beentry->st_state_start_timestamp,
-							current_timestamp,
-							&secs, &usecs);
-
-		if (beentry->st_state == STATE_RUNNING)
-			pgstat_count_conn_active_time((PgStat_Counter) secs * 1000000 + usecs);
-		else
-			pgstat_count_conn_txn_idle_time((PgStat_Counter) secs * 1000000 + usecs);
-	}
 
 	/*
 	 * Now update the status entry

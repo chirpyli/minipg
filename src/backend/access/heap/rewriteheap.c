@@ -115,7 +115,6 @@
 #include "catalog/catalog.h"
 #include "lib/ilist.h"
 #include "miscadmin.h"
-#include "pgstat.h"
 #include "storage/bufmgr.h"
 #include "storage/fd.h"
 #include "storage/procarray.h"

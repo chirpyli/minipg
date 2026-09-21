@@ -90,7 +90,6 @@ typedef enum
 	DestRemote,					/* results sent to frontend process */
 	DestRemoteExecute,			/* sent to frontend, in Execute command */
 	DestRemoteSimple,			/* sent to frontend, w/no catalog access */
-	DestSPI,					/* results sent to SPI manager */
 	DestTuplestore,				/* results sent to Tuplestore */
 	DestSQLFunction				/* results sent to SQL-language func mgr */
 } CommandDest;

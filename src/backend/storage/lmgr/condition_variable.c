@@ -91,7 +91,7 @@ ConditionVariablePrepareToSleep(ConditionVariable *cv)
  *	 ConditionVariableCancelSleep();
  *
  * wait_event_info should be a value from one of the WaitEventXXX enums
- * defined in pgstat.h.  This controls the contents of pg_stat_activity's
+ * defined in wait_event.h.  This controls the contents of pg_stat_activity's
  * wait_event_type and wait_event columns while waiting.
  */
 void

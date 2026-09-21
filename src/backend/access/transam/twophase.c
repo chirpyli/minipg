@@ -91,7 +91,7 @@
 #include "funcapi.h"
 #include "miscadmin.h"
 #include "pg_trace.h"
-#include "pgstat.h"
+#include "utils/wait_event.h"
 #include "storage/fd.h"
 #include "storage/ipc.h"
 #include "storage/md.h"
@@ -1592,9 +1592,6 @@ FinishPreparedTransaction(const char *gid, bool isCommit)
 	 * is done.
 	 */
 	LWLockRelease(TwoPhaseStateLock);
-
-	/* Count the prepared xact as committed or aborted */
-	AtEOXact_PgStat(isCommit);
 
 	/*
 	 * And now we can clean up any files we may have left.

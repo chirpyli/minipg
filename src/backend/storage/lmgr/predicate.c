@@ -194,7 +194,7 @@
 #include "access/xact.h"
 #include "access/xlog.h"
 #include "miscadmin.h"
-#include "pgstat.h"
+#include "utils/wait_event.h"
 #include "storage/bufmgr.h"
 #include "storage/predicate.h"
 #include "storage/predicate_internals.h"

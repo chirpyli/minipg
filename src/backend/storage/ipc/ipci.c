@@ -23,7 +23,7 @@
 #include "access/syncscan.h"
 #include "access/twophase.h"
 #include "miscadmin.h"
-#include "pgstat.h"
+#include "utils/backend_status.h"
 
 #include "postmaster/bgwriter.h"
 #include "postmaster/postmaster.h"

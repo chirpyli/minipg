@@ -32,11 +32,9 @@
 #include "catalog/namespace.h"
 #include "catalog/storage.h"
 #include "commands/tablecmds.h"
-#include "executor/spi.h"
 #include "libpq/pqsignal.h"
 #include "miscadmin.h"
 #include "pg_trace.h"
-#include "pgstat.h"
 #include "storage/condition_variable.h"
 #include "storage/fd.h"
 #include "storage/lmgr.h"
@@ -46,16 +44,20 @@
 #include "storage/procarray.h"
 #include "storage/sinvaladt.h"
 #include "storage/smgr.h"
+#include "utils/backend_progress.h"
+#include "utils/backend_status.h"
 #include "utils/builtins.h"
 #include "utils/catcache.h"
 #include "utils/combocid.h"
 #include "utils/guc.h"
 #include "utils/inval.h"
 #include "utils/memutils.h"
+#include "utils/portal.h"
 #include "utils/relmapper.h"
 #include "utils/snapmgr.h"
 #include "utils/timeout.h"
 #include "utils/timestamp.h"
+#include "utils/wait_event.h"
 
 /*
  *	User-tweakable parameters
@@ -1798,16 +1800,14 @@ StartTransaction(void)
 	TRACE_POSTGRESQL_TRANSACTION_START(vxid.localTransactionId);
 
 	/*
-	 * set transaction_timestamp() (a/k/a now()).  Normally, we want this to
-	 * be the same as the first command's statement_timestamp(), so don't do a
-	 * fresh GetCurrentTimestamp() call (which'd be expensive anyway).  But
-	 * for transactions started inside procedures (i.e., nonatomic SPI
-	 * contexts), we do need to advance the timestamp.
+	 * set transaction_timestamp() (a/k/a now()).  We want this to be the same
+	 * as the first command's statement_timestamp(), so don't do a fresh
+	 * GetCurrentTimestamp() call (which'd be expensive anyway).
+	 *
+	 * (minipg: the nonatomic SPI context case, i.e. transactions started
+	 * inside procedures, no longer exists.)
 	 */
-	if (!SPI_inside_nonatomic_context())
-		xactStartTimestamp = stmtStartTimestamp;
-	else
-		xactStartTimestamp = GetCurrentTimestamp();
+	xactStartTimestamp = stmtStartTimestamp;
 	pgstat_report_xact_timestamp(xactStartTimestamp);
 	/* Mark xactStopTimestamp as unset. */
 	xactStopTimestamp = 0;
@@ -1966,13 +1966,11 @@ CommitTransaction(void)
 	 * cleanup.
 	 */
 	AtEOXact_GUC(true, 1);
-	AtEOXact_SPI(true);
 	AtEOXact_Namespace(true);
 	AtEOXact_SMgr();
 	AtEOXact_Files(true);
 	AtEOXact_ComboCid();
 	AtEOXact_HashTables(true);
-	AtEOXact_PgStat(true);
 	AtEOXact_Snapshot(true, false);
 	pgstat_report_xact_timestamp(0);
 
@@ -2107,7 +2105,6 @@ PrepareTransaction(void)
 
 	AtPrepare_Locks();
 	AtPrepare_PredicateLocks();
-	AtPrepare_PgStat();
 	AtPrepare_MultiXact();
 	AtPrepare_RelationMap();
 
@@ -2165,7 +2162,6 @@ PrepareTransaction(void)
 
 	/* notify doesn't need a postprepare call */
 
-	PostPrepare_PgStat();
 
 	PostPrepare_Inval();
 
@@ -2191,13 +2187,11 @@ PrepareTransaction(void)
 
 	/* PREPARE acts the same as COMMIT as far as GUC is concerned */
 	AtEOXact_GUC(true, 1);
-	AtEOXact_SPI(true);
 	AtEOXact_Namespace(true);
 	AtEOXact_SMgr();
 	AtEOXact_Files(true);
 	AtEOXact_ComboCid();
 	AtEOXact_HashTables(true);
-	/* don't call AtEOXact_PgStat here; we fixed pgstat state above */
 	AtEOXact_Snapshot(true, true);
 	pgstat_report_xact_timestamp(0);
 
@@ -2365,13 +2359,11 @@ AbortTransaction(void)
 		smgrDoPendingDeletes(false);
 
 		AtEOXact_GUC(false, 1);
-		AtEOXact_SPI(false);
 		AtEOXact_Namespace(false);
 		AtEOXact_SMgr();
 		AtEOXact_Files(false);
 		AtEOXact_ComboCid();
 		AtEOXact_HashTables(false);
-		AtEOXact_PgStat(false);
 		pgstat_report_xact_timestamp(0);
 	}
 
@@ -4323,13 +4315,11 @@ CommitSubTransaction(void)
 						 true, false);
 
 	AtEOXact_GUC(true, s->gucNestLevel);
-	AtEOSubXact_SPI(true, s->subTransactionId);
 	AtEOSubXact_Namespace(true, s->subTransactionId,
 						  s->parent->subTransactionId);
 	AtEOSubXact_Files(true, s->subTransactionId,
 					  s->parent->subTransactionId);
 	AtEOSubXact_HashTables(true, s->nestingLevel);
-	AtEOSubXact_PgStat(true, s->nestingLevel);
 	AtSubCommit_Snapshot(s->nestingLevel);
 
 	/*
@@ -4471,13 +4461,11 @@ AbortSubTransaction(void)
 		AtSubAbort_smgr();
 
 		AtEOXact_GUC(false, s->gucNestLevel);
-		AtEOSubXact_SPI(false, s->subTransactionId);
 		AtEOSubXact_Namespace(false, s->subTransactionId,
 							  s->parent->subTransactionId);
 		AtEOSubXact_Files(false, s->subTransactionId,
 						  s->parent->subTransactionId);
 		AtEOSubXact_HashTables(false, s->nestingLevel);
-		AtEOSubXact_PgStat(false, s->nestingLevel);
 		AtSubAbort_Snapshot(s->nestingLevel);
 	}
 

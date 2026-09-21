@@ -50,7 +50,7 @@
 #include "catalog/pg_tablespace.h"
 #include "catalog/storage.h"
 #include "miscadmin.h"
-#include "pgstat.h"
+#include "utils/wait_event.h"
 #include "storage/fd.h"
 #include "storage/lwlock.h"
 #include "utils/inval.h"

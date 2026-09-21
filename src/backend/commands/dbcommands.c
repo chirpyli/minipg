@@ -44,7 +44,6 @@
 #include "common/file_perm.h"
 #include "mb/pg_wchar.h"
 #include "miscadmin.h"
-#include "pgstat.h"
 #include "postmaster/bgwriter.h"
 #include "storage/copydir.h"
 #include "storage/fd.h"
@@ -787,11 +786,6 @@ dropdb(const char *dbname, bool missing_ok, bool force)
 	 * dirty buffer to the dead database later...
 	 */
 	DropDatabaseBuffers(db_id);
-
-	/*
-	 * Tell the stats collector to forget it immediately, too.
-	 */
-	pgstat_drop_database(db_id);
 
 	/*
 	 * Tell checkpointer to forget any pending fsync and unlink requests for

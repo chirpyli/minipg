@@ -98,7 +98,7 @@
 #include "libpq/pqformat.h"
 #include "libpq/pqsignal.h"
 #include "pg_getopt.h"
-#include "pgstat.h"
+#include "utils/backend_status.h"
 #include "port/pg_bswap.h"
 
 #include "postmaster/fork_process.h"
@@ -185,7 +185,6 @@ static pid_t StartupPID = 0,
 			BgWriterPID = 0,
 			CheckpointerPID = 0,
 			WalWriterPID = 0,
-			PgStatPID = 0,
 			SysLoggerPID = 0;
 
 /* Startup process's status */
@@ -427,7 +426,7 @@ PostmasterMain(int argc, char *argv[])
 	 * CAUTION: when changing this list, check for side-effects on the signal
 	 * handling setup of child processes.  See tcop/postgres.c,
 	 * bootstrap/bootstrap.c, postmaster/bgwriter.c, postmaster/walwriter.c,
-	 * postmaster/pgstat.c, postmaster/syslogger.c and
+	 * postmaster/syslogger.c and
 	 * postmaster/checkpointer.c.
 	 */
 	pqinitmask();
@@ -900,12 +899,6 @@ PostmasterMain(int argc, char *argv[])
 	RemovePgTempFiles();
 
 	/*
-	 * Initialize stats collection subsystem (this does NOT start the
-	 * collector process!)
-	 */
-	pgstat_init();
-
-	/*
 	 * Remember postmaster startup time
 	 */
 	PgStartTime = GetCurrentTimestamp();
@@ -1195,11 +1188,6 @@ ServerLoop(void)
 		 */
 		if (WalWriterPID == 0 && pmState == PM_RUN)
 			WalWriterPID = StartWalWriter();
-
-		/* If we have lost the stats collector, try to start a new one */
-		if (PgStatPID == 0 &&
-			(pmState == PM_RUN || pmState == PM_HOT_STANDBY))
-			PgStatPID = pgstat_start();
 
 		/*
 		 * Lastly, check to see if it's time to do some things that we don't
@@ -1919,8 +1907,6 @@ SIGHUP_handler(SIGNAL_ARGS)
 			signal_child(WalWriterPID, SIGHUP);
 		if (SysLoggerPID != 0)
 			signal_child(SysLoggerPID, SIGHUP);
-		if (PgStatPID != 0)
-			signal_child(PgStatPID, SIGHUP);
 
 		/* minipg: pg_hba.conf / pg_ident.conf 已移除，无需重载认证配置文件 */
 	}
@@ -2186,14 +2172,6 @@ reaper(SIGNAL_ARGS)
 			if (WalWriterPID == 0)
 				WalWriterPID = StartWalWriter();
 
-			/*
-			 * Likewise, start other special children as needed.  In a restart
-			 * situation, some of them may be alive already.
-			 */
-			if (PgStatPID == 0)
-				PgStatPID = pgstat_start();
-
-			/* at this point we are really open for business */
 			ereport(LOG,
 					(errmsg("database system is ready to accept connections")));
 
@@ -2247,13 +2225,6 @@ reaper(SIGNAL_ARGS)
 				SignalSomeChildren(SIGUSR2);
 
 				pmState = PM_SHUTDOWN_2;
-
-				/*
-				 * We can also shut down the stats collector now; there's
-				 * nothing left for it to do.
-				 */
-				if (PgStatPID != 0)
-					signal_child(PgStatPID, SIGQUIT);
 			}
 			else
 			{
@@ -2279,22 +2250,6 @@ reaper(SIGNAL_ARGS)
 			if (!EXIT_STATUS_0(exitstatus))
 				HandleChildCrash(pid, exitstatus,
 								 _("WAL writer process"));
-			continue;
-		}
-
-		/*
-		 * Was it the statistics collector?  If so, just try to start a new
-		 * one; no need to force reset of the rest of the system.  (If fail,
-		 * we'll try again in future cycles of the main loop.)
-		 */
-		if (pid == PgStatPID)
-		{
-			PgStatPID = 0;
-			if (!EXIT_STATUS_0(exitstatus))
-				LogChildExit(LOG, _("statistics collector process"),
-							 pid, exitstatus);
-			if (pmState == PM_RUN || pmState == PM_HOT_STANDBY)
-				PgStatPID = pgstat_start();
 			continue;
 		}
 
@@ -2504,22 +2459,6 @@ HandleChildCrash(int pid, int exitstatus, const char *procname)
 		signal_child(WalWriterPID, (SendStop ? SIGSTOP : SIGQUIT));
 	}
 
-	/*
-	 * Force a power-cycle of the pgstat process too.  (This isn't absolutely
-	 * necessary, but it seems like a good idea for robustness, and it
-	 * simplifies the state-machine logic in the case where a shutdown request
-	 * arrives during crash processing.)
-	 */
-	if (PgStatPID != 0 && take_action)
-	{
-		ereport(DEBUG2,
-				(errmsg_internal("sending %s to process %d",
-								 "SIGQUIT",
-								 (int) PgStatPID)));
-		signal_child(PgStatPID, SIGQUIT);
-		allow_immediate_pgstat_restart();
-	}
-
 	/* We do NOT restart the syslogger */
 
 	if (Shutdown != ImmediateShutdown)
@@ -2711,10 +2650,8 @@ PostmasterStateMachine(void)
 					FatalError = true;
 					pmState = PM_WAIT_DEAD_END;
 
-					/* Kill the walsenders and stats collector too */
+					/* Kill the walsenders too */
 					SignalSomeChildren(SIGQUIT);
-					if (PgStatPID != 0)
-						signal_child(PgStatPID, SIGQUIT);
 				}
 			}
 		}
@@ -2737,10 +2674,9 @@ PostmasterStateMachine(void)
 	{
 		/*
 		 * PM_WAIT_DEAD_END state ends when the BackendList is entirely empty
-		 * (ie, no dead_end children remain), and the stats
-		 * collector is gone too.
+		 * (ie, no dead_end children remain).
 		 *
-		 * The reason we wait for these is to protect them against a new
+		 * The reason we wait for this is to protect against a new
 		 * postmaster starting conflicting subprocesses; this isn't an
 		 * ironclad protection, but it at least helps in the
 		 * shutdown-and-immediately-restart scenario.  Note that they have
@@ -2748,8 +2684,7 @@ PostmasterStateMachine(void)
 		 * normal state transition leading up to PM_WAIT_DEAD_END, or during
 		 * FatalError processing.
 		 */
-		if (dlist_is_empty(&BackendList) &&
-			PgStatPID == 0)
+		if (dlist_is_empty(&BackendList))
 		{
 			/* These other guys should be dead already */
 			Assert(StartupPID == 0);
@@ -2940,8 +2875,6 @@ TerminateChildren(int signal)
 		signal_child(CheckpointerPID, signal);
 	if (WalWriterPID != 0)
 		signal_child(WalWriterPID, signal);
-	if (PgStatPID != 0)
-		signal_child(PgStatPID, signal);
 }
 
 /*
@@ -3330,12 +3263,6 @@ sigusr1_handler(SIGNAL_ARGS)
 	if (CheckPostmasterSignal(PMSIGNAL_BEGIN_HOT_STANDBY) &&
 		pmState == PM_RECOVERY && Shutdown == NoShutdown)
 	{
-		/*
-		 * Likewise, start other special children as needed.
-		 */
-		Assert(PgStatPID == 0);
-		PgStatPID = pgstat_start();
-
 		ereport(LOG,
 				(errmsg("database system is ready to accept read-only connections")));
 

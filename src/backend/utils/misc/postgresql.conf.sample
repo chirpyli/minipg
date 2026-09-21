@@ -418,10 +418,8 @@
 
 #track_activities = on
 #track_activity_query_size = 1024	# (change requires restart)
-#track_counts = on
 #track_io_timing = off
 #track_wal_io_timing = off
-#stats_temp_directory = 'pg_stat_tmp'
 
 
 # - Monitoring -

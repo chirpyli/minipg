@@ -43,7 +43,7 @@
 #include "access/xlog_internal.h"
 #include "libpq/pqsignal.h"
 #include "miscadmin.h"
-#include "pgstat.h"
+#include "utils/wait_event.h"
 #include "postmaster/bgwriter.h"
 #include "postmaster/interrupt.h"
 #include "storage/bufmgr.h"
@@ -351,7 +351,6 @@ CheckpointerMain(void)
 		 */
 		AbsorbSyncRequests();
 		HandleCheckpointerInterrupts();
-
 		/*
 		 * Detect a pending checkpoint request by checking whether the flags
 		 * word in shared memory is nonzero.  We shouldn't need to acquire the
@@ -360,7 +359,6 @@ CheckpointerMain(void)
 		if (((volatile CheckpointerShmemStruct *) CheckpointerShmem)->ckpt_flags)
 		{
 			do_checkpoint = true;
-			BgWriterStats.m_requested_checkpoints++;
 		}
 
 		/*
@@ -374,7 +372,6 @@ CheckpointerMain(void)
 		if (elapsed_secs >= CheckPointTimeout)
 		{
 			if (!do_checkpoint)
-				BgWriterStats.m_timed_checkpoints++;
 			do_checkpoint = true;
 			flags |= CHECKPOINT_CAUSE_TIME;
 		}
@@ -496,18 +493,6 @@ CheckpointerMain(void)
 		}
 
 		/*
-		 * Send off activity statistics to the stats collector.  (The reason
-		 * why we re-use bgwriter-related code for this is that the bgwriter
-		 * and checkpointer used to be just one process.  It's probably not
-		 * worth the trouble to split the stats support into two independent
-		 * stats message types.)
-		 */
-		pgstat_send_bgwriter();
-
-		/* Send WAL statistics to the stats collector. */
-		pgstat_send_wal(true);
-
-		/*
 		 * If any checkpoint flags have been set, redo the loop to handle the
 		 * checkpoint without sleeping.
 		 */
@@ -568,15 +553,8 @@ HandleCheckpointerInterrupts(void)
 
 		/*
 		 * Close down the database.
-		 *
-		 * Since ShutdownXLOG() creates restartpoint or checkpoint, and
-		 * updates the statistics, increment the checkpoint request and send
-		 * the statistics to the stats collector.
 		 */
-		BgWriterStats.m_requested_checkpoints++;
 		ShutdownXLOG(0, 0);
-		pgstat_send_bgwriter();
-		pgstat_send_wal(true);
 
 		/* Normal exit from the checkpointer is here */
 		proc_exit(0);			/* done */
@@ -619,7 +597,6 @@ void
 CheckpointWriteDelay(int flags, double progress)
 {
 	static int	absorb_counter = WRITES_PER_ABSORB;
-
 	/* Do nothing if checkpoint is being executed by non-checkpointer process */
 	if (!AmCheckpointerProcess())
 		return;
@@ -642,12 +619,6 @@ CheckpointWriteDelay(int flags, double progress)
 		}
 
 		AbsorbSyncRequests();
-		absorb_counter = WRITES_PER_ABSORB;
-
-		/*
-		 * Report interim activity statistics to the stats collector.
-		 */
-		pgstat_send_bgwriter();
 
 		/*
 		 * This sleep used to be connected to bgwriter_delay, typically 200ms.
@@ -1199,10 +1170,6 @@ AbsorbSyncRequests(void)
 		return;
 
 	LWLockAcquire(CheckpointerCommLock, LW_EXCLUSIVE);
-
-	/* Transfer stats counts into pending pgstats message */
-	BgWriterStats.m_buf_written_backend += CheckpointerShmem->num_backend_writes;
-	BgWriterStats.m_buf_fsync_backend += CheckpointerShmem->num_backend_fsync;
 
 	CheckpointerShmem->num_backend_writes = 0;
 	CheckpointerShmem->num_backend_fsync = 0;
