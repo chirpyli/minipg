@@ -1772,9 +1772,6 @@ typedef struct AggState
 	/* These fields are for grouping set phase data */
 	int			maxsets;		/* The max number of sets in any phase */
 	AggStatePerPhase phases;	/* array of all phases */
-	Tuplesortstate *sort_in;	/* sorted input to phases > 1 */
-	Tuplesortstate *sort_out;	/* input is copied here for next phase */
-	TupleTableSlot *sort_slot;	/* slot for sort results */
 	/* these fields are used in AGG_PLAIN and AGG_SORTED modes: */
 	AggStatePerGroup *pergroups;	/* grouping set indexed array of per-group
 									 * pointers */

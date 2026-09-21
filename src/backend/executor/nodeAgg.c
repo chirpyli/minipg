@@ -456,77 +456,19 @@ select_current_set(AggState *aggstate, int setno, bool is_hash)
 
 /*
  * Switch to phase "newphase", which must either be 0 or 1 (to reset) or
- * current_phase + 1. Juggle the tuplesorts accordingly.
- *
- * Phase 0 is for hashing, so when entering phase 0, all we need to do is
- * drop open sorts.
+ * current_phase + 1.
  */
 static void
 initialize_phase(AggState *aggstate, int newphase)
 {
 	Assert(newphase <= 1 || newphase == aggstate->current_phase + 1);
 
-	/*
-	 * Whatever the previous state, we're now done with whatever input
-	 * tuplesort was in use.
-	 */
-	if (aggstate->sort_in)
-	{
-		tuplesort_end(aggstate->sort_in);
-		aggstate->sort_in = NULL;
-	}
-
-	if (newphase <= 1)
-	{
-		/*
-		 * Discard any existing output tuplesort.
-		 */
-		if (aggstate->sort_out)
-		{
-			tuplesort_end(aggstate->sort_out);
-			aggstate->sort_out = NULL;
-		}
-	}
-	else
-	{
-		/*
-		 * The old output tuplesort becomes the new input one, and this is the
-		 * right time to actually sort it.
-		 */
-		aggstate->sort_in = aggstate->sort_out;
-		aggstate->sort_out = NULL;
-		Assert(aggstate->sort_in);
-		tuplesort_performsort(aggstate->sort_in);
-	}
-
-	/*
-	 * If this isn't the last phase, we need to sort appropriately for the
-	 * next phase in sequence.
-	 */
-	if (newphase > 0 && newphase < aggstate->numphases - 1)
-	{
-		Sort	   *sortnode = aggstate->phases[newphase + 1].sortnode;
-		PlanState  *outerNode = outerPlanState(aggstate);
-		TupleDesc	tupDesc = ExecGetResultType(outerNode);
-
-		aggstate->sort_out = tuplesort_begin_heap(tupDesc,
-												  sortnode->numCols,
-												  sortnode->sortColIdx,
-												  sortnode->sortOperators,
-												  sortnode->collations,
-												  sortnode->nullsFirst,
-												  work_mem,
-												  NULL, false);
-	}
-
 	aggstate->current_phase = newphase;
 	aggstate->phase = &aggstate->phases[newphase];
 }
 
 /*
- * Fetch a tuple from either the outer plan (for phase 1) or from the sorter
- * populated by the previous phase.  Copy it to the sorter for the next phase
- * if any.
+ * Fetch a tuple from the outer plan.
  *
  * Callers cannot rely on memory for tuple in returned slot remaining valid
  * past any subsequently fetched tuple.
@@ -536,20 +478,7 @@ fetch_input_tuple(AggState *aggstate)
 {
 	TupleTableSlot *slot;
 
-	if (aggstate->sort_in)
-	{
-		/* make sure we check for interrupts in either path through here */
-		CHECK_FOR_INTERRUPTS();
-		if (!tuplesort_gettupleslot(aggstate->sort_in, true, false,
-									aggstate->sort_slot, NULL))
-			return NULL;
-		slot = aggstate->sort_slot;
-	}
-	else
-		slot = ExecProcNode(outerPlanState(aggstate));
-
-	if (!TupIsNull(slot) && aggstate->sort_out)
-		tuplesort_puttupleslot(aggstate->sort_out, slot);
+	slot = ExecProcNode(outerPlanState(aggstate));
 
 	return slot;
 }
@@ -3137,8 +3066,6 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 	aggstate->agg_done = false;
 	aggstate->pergroups = NULL;
 	aggstate->grp_firstTuple = NULL;
-	aggstate->sort_in = NULL;
-	aggstate->sort_out = NULL;
 
 	/*
 	 * phases[0] always exists, but is dummy in sorted/plain mode
@@ -3211,34 +3138,6 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 	scanDesc = aggstate->ss.ss_ScanTupleSlot->tts_tupleDescriptor;
 
 	/*
-	 * If there are more than two phases (including a potential dummy phase
-	 * 0), input will be resorted using tuplesort. Need a slot for that.
-	 */
-	if (numPhases > 2)
-	{
-		aggstate->sort_slot = ExecInitExtraTupleSlot(estate, scanDesc,
-													 &TTSOpsMinimalTuple);
-
-		/*
-		 * The output of the tuplesort, and the output from the outer child
-		 * might not use the same type of slot. In most cases the child will
-		 * be a Sort, and thus return a TTSOpsMinimalTuple type slot - but the
-		 * input can also be presorted due an index, in which case it could be
-		 * a different type of slot.
-		 *
-		 * XXX: For efficiency it would be good to instead/additionally
-		 * generate expressions with corresponding settings of outerops* for
-		 * the individual phases - deforming is often a bottleneck for
-		 * aggregations with lots of rows per group. If there's multiple
-		 * sorts, we know that all but the first use TTSOpsMinimalTuple (via
-		 * the nodeAgg.c internal tuplesort).
-		 */
-		if (aggstate->ss.ps.outeropsfixed &&
-			aggstate->ss.ps.outerops != &TTSOpsMinimalTuple)
-			aggstate->ss.ps.outeropsfixed = false;
-	}
-
-	/*
 	 * Initialize result type, slot and projection.
 	 */
 	ExecInitResultTupleSlotTL(&aggstate->ss.ps, &TTSOpsVirtual);
@@ -3295,9 +3194,6 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 	for (phaseidx = 0; phaseidx <= 0; ++phaseidx)
 	{
 		Agg		   *aggnode = node;
-		Sort	   *sortnode = NULL;
-
-		Assert(phase <= 1 || sortnode);
 
 		if (aggnode->aggstrategy == AGG_HASHED)
 		{
@@ -3386,9 +3282,8 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 
 			phasedata->aggnode = aggnode;
 			phasedata->aggstrategy = aggnode->aggstrategy;
-			phasedata->sortnode = sortnode;
-		}
-	}
+			}
+			}
 
 	/*
 	 * Convert all_grouped_cols to a descending-order list.
@@ -3941,11 +3836,6 @@ ExecEndAgg(AggState *node)
 	int			setno;
 
 	/* Make sure we have closed any open tuplesorts */
-
-	if (node->sort_in)
-		tuplesort_end(node->sort_in);
-	if (node->sort_out)
-		tuplesort_end(node->sort_out);
 
 	hashagg_reset_spill_state(node);
 

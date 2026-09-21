@@ -241,15 +241,10 @@ typedef struct AggStatePerGroupData
 }			AggStatePerGroupData;
 
 /*
- * AggStatePerPhaseData - per-grouping-set-phase state
+ * AggStatePerPhaseData - per-phase state
  *
- * Grouping sets are divided into "phases", where a single phase can be
- * processed in one pass over the input. If there is more than one phase, then
- * at the end of input from the current phase, state is reset and another pass
- * taken over the data which has been re-sorted in the mean time.
- *
- * Accordingly, each phase specifies a list of grouping sets and group clause
- * information, plus each phase after the first also has a sort order.
+ * A phase specifies the plan node and grouping set information used while
+ * processing the input in one pass.
  */
 typedef struct AggStatePerPhaseData
 {
@@ -260,7 +255,6 @@ typedef struct AggStatePerPhaseData
 	ExprState **eqfunctions;	/* expression returning equality, indexed by
 								 * nr of cols to compare */
 	Agg		   *aggnode;		/* Agg node for phase data */
-	Sort	   *sortnode;		/* Sort node for input ordering for phase */
 
 	ExprState  *evaltrans;		/* evaluation of transition functions  */
 
