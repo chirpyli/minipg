@@ -221,12 +221,6 @@ pgstat_get_wait_activity(WaitEventActivity w)
 		case WAIT_EVENT_CHECKPOINTER_MAIN:
 			event_name = "CheckpointerMain";
 			break;
-		case WAIT_EVENT_LOGICAL_APPLY_MAIN:
-			event_name = "LogicalApplyMain";
-			break;
-		case WAIT_EVENT_LOGICAL_LAUNCHER_MAIN:
-			event_name = "LogicalLauncherMain";
-			break;
 		case WAIT_EVENT_PGSTAT_MAIN:
 			event_name = "PgStatMain";
 			break;
@@ -235,12 +229,6 @@ pgstat_get_wait_activity(WaitEventActivity w)
 			break;
 		case WAIT_EVENT_SYSLOGGER_MAIN:
 			event_name = "SysLoggerMain";
-			break;
-		case WAIT_EVENT_WAL_RECEIVER_MAIN:
-			event_name = "WalReceiverMain";
-			break;
-		case WAIT_EVENT_WAL_SENDER_MAIN:
-			event_name = "WalSenderMain";
 			break;
 		case WAIT_EVENT_WAL_WRITER_MAIN:
 			event_name = "WalWriterMain";
@@ -275,12 +263,6 @@ pgstat_get_wait_client(WaitEventClient w)
 			break;
 		case WAIT_EVENT_LIBPQWALRECEIVER_RECEIVE:
 			event_name = "LibPQWalReceiverReceive";
-			break;
-		case WAIT_EVENT_WAL_SENDER_WAIT_WAL:
-			event_name = "WalSenderWaitForWAL";
-			break;
-		case WAIT_EVENT_WAL_SENDER_WRITE_DATA:
-			event_name = "WalSenderWriteData";
 			break;
 			/* no default case, so that compiler will warn */
 	}
@@ -370,12 +352,6 @@ pgstat_get_wait_ipc(WaitEventIPC w)
 		case WAIT_EVENT_HASH_GROW_BUCKETS_REINSERT:
 			event_name = "HashGrowBucketsReinsert";
 			break;
-		case WAIT_EVENT_LOGICAL_SYNC_DATA:
-			event_name = "LogicalSyncData";
-			break;
-		case WAIT_EVENT_LOGICAL_SYNC_STATE_CHANGE:
-			event_name = "LogicalSyncStateChange";
-			break;
 		case WAIT_EVENT_MQ_INTERNAL:
 			event_name = "MessageQueueInternal";
 			break;
@@ -387,15 +363,6 @@ pgstat_get_wait_ipc(WaitEventIPC w)
 			break;
 		case WAIT_EVENT_MQ_SEND:
 			event_name = "MessageQueueSend";
-			break;
-		case WAIT_EVENT_PARALLEL_BITMAP_SCAN:
-			event_name = "ParallelBitmapScan";
-			break;
-		case WAIT_EVENT_PARALLEL_CREATE_INDEX_SCAN:
-			event_name = "ParallelCreateIndexScan";
-			break;
-		case WAIT_EVENT_PARALLEL_FINISH:
-			event_name = "ParallelFinish";
 			break;
 		case WAIT_EVENT_PROCARRAY_GROUP_UPDATE:
 			event_name = "ProcArrayGroupUpdate";
@@ -415,20 +382,8 @@ pgstat_get_wait_ipc(WaitEventIPC w)
 		case WAIT_EVENT_SAFE_SNAPSHOT:
 			event_name = "SafeSnapshot";
 			break;
-		case WAIT_EVENT_SYNC_REP:
-			event_name = "SyncRep";
-			break;
-		case WAIT_EVENT_WAL_RECEIVER_EXIT:
-			event_name = "WalReceiverExit";
-			break;
-		case WAIT_EVENT_WAL_RECEIVER_WAIT_START:
-			event_name = "WalReceiverWaitStart";
-			break;
 		case WAIT_EVENT_XACT_GROUP_UPDATE:
 			event_name = "XactGroupUpdate";
-			break;
-		case WAIT_EVENT_WAL_RECEIVER_UPSTREAM_CATCHUP:
-			event_name = "WalReceiverUpstreamCatchup";
 			break;
 			/* no default case, so that compiler will warn */
 	}
@@ -570,24 +525,6 @@ pgstat_get_wait_io(WaitEventIO w)
 		case WAIT_EVENT_LOCK_FILE_RECHECKDATADIR_READ:
 			event_name = "LockFileReCheckDataDirRead";
 			break;
-		case WAIT_EVENT_LOGICAL_REWRITE_CHECKPOINT_SYNC:
-			event_name = "LogicalRewriteCheckpointSync";
-			break;
-		case WAIT_EVENT_LOGICAL_REWRITE_MAPPING_SYNC:
-			event_name = "LogicalRewriteMappingSync";
-			break;
-		case WAIT_EVENT_LOGICAL_REWRITE_MAPPING_WRITE:
-			event_name = "LogicalRewriteMappingWrite";
-			break;
-		case WAIT_EVENT_LOGICAL_REWRITE_SYNC:
-			event_name = "LogicalRewriteSync";
-			break;
-		case WAIT_EVENT_LOGICAL_REWRITE_TRUNCATE:
-			event_name = "LogicalRewriteTruncate";
-			break;
-		case WAIT_EVENT_LOGICAL_REWRITE_WRITE:
-			event_name = "LogicalRewriteWrite";
-			break;
 		case WAIT_EVENT_RELATION_MAP_READ:
 			event_name = "RelationMapRead";
 			break;
@@ -617,15 +554,6 @@ pgstat_get_wait_io(WaitEventIO w)
 			break;
 		case WAIT_EVENT_SLRU_WRITE:
 			event_name = "SLRUWrite";
-			break;
-		case WAIT_EVENT_SNAPBUILD_READ:
-			event_name = "SnapbuildRead";
-			break;
-		case WAIT_EVENT_SNAPBUILD_SYNC:
-			event_name = "SnapbuildSync";
-			break;
-		case WAIT_EVENT_SNAPBUILD_WRITE:
-			event_name = "SnapbuildWrite";
 			break;
 		case WAIT_EVENT_TIMELINE_HISTORY_FILE_SYNC:
 			event_name = "TimelineHistoryFileSync";
@@ -686,18 +614,6 @@ pgstat_get_wait_io(WaitEventIO w)
 			break;
 		case WAIT_EVENT_WAL_WRITE:
 			event_name = "WALWrite";
-			break;
-		case WAIT_EVENT_LOGICAL_CHANGES_READ:
-			event_name = "LogicalChangesRead";
-			break;
-		case WAIT_EVENT_LOGICAL_CHANGES_WRITE:
-			event_name = "LogicalChangesWrite";
-			break;
-		case WAIT_EVENT_LOGICAL_SUBXACT_READ:
-			event_name = "LogicalSubxactRead";
-			break;
-		case WAIT_EVENT_LOGICAL_SUBXACT_WRITE:
-			event_name = "LogicalSubxactWrite";
 			break;
 
 			/* no default case, so that compiler will warn */
