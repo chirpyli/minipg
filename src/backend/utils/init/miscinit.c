@@ -239,9 +239,6 @@ GetBackendTypeDesc(BackendType backendType)
 		case B_BACKEND:
 			backendDesc = "client backend";
 			break;
-		case B_BG_WORKER:
-			backendDesc = "background worker";
-			break;
 		case B_BG_WRITER:
 			backendDesc = "background writer";
 			break;
@@ -692,10 +689,9 @@ void
 InitializeSessionUserIdStandalone(void)
 {
 	/*
-	 * This function should only be called in single-user mode, in background
-	 * workers.
+	 * This function should only be called in single-user mode.
 	 */
-	AssertState(!IsUnderPostmaster || IsBackgroundWorker);
+	AssertState(!IsUnderPostmaster);
 
 	/* call only once */
 	AssertState(!OidIsValid(AuthenticatedUserId));

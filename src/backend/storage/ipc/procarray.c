@@ -3571,8 +3571,6 @@ CountDBConnections(Oid databaseid)
 
 		if (proc->pid == 0)
 			continue;			/* do not count prepared xacts */
-		if (proc->isBackgroundWorker)
-			continue;			/* do not count background workers */
 		if (!OidIsValid(databaseid) ||
 			proc->databaseId == databaseid)
 			count++;
@@ -3643,8 +3641,6 @@ CountUserBackends(Oid roleid)
 
 		if (proc->pid == 0)
 			continue;			/* do not count prepared xacts */
-		if (proc->isBackgroundWorker)
-			continue;			/* do not count background workers */
 		if (proc->roleId == roleid)
 			count++;
 	}
@@ -3779,15 +3775,8 @@ TerminateOtherDBBackends(Oid databaseId)
 		ListCell   *lc;
 
 		/*
-		 * Permissions checks relax the pg_terminate_backend checks in two
-		 * ways, both by omitting the !OidIsValid(proc->roleId) check:
-		 *
-		 * - Accept terminating autovacuum workers, since DROP DATABASE
-		 * without FORCE terminates them.
-		 *
-		 * - Accept terminating bgworkers.  For bgworker authors, it's
-		 * convenient to be able to recommend FORCE if a worker is blocking
-		 * DROP DATABASE unexpectedly.
+		 * Permissions checks relax the pg_terminate_backend checks, by
+		 * omitting the !OidIsValid(proc->roleId) check.
 		 *
 		 * Unlike pg_terminate_backend, we don't raise some warnings - like
 		 * "PID %d is not a PostgreSQL server process", because for us already

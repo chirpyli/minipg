@@ -139,8 +139,8 @@ ProcGlobalSemas(void)
  *	  running out when trying to start another backend is a common failure.
  *	  So, now we grab enough semaphores to support the desired max number
  *	  of backends immediately at initialization --- if the sysadmin has set
- *	  MaxConnections, max_worker_processes, max_wal_senders higher than his
- *	  kernel will support, he'll find out sooner rather than later.
+ *	  MaxConnections higher than his kernel will support, he'll find out
+ *	  sooner rather than later.
  *
  *	  Another reason for creating semaphores here is that the semaphore
  *	  implementation typically requires us to create semaphores in the
@@ -167,7 +167,6 @@ InitProcGlobal(void)
 	 */
 	ProcGlobal->spins_per_delay = DEFAULT_SPINS_PER_DELAY;
 	ProcGlobal->freeProcs = NULL;
-	ProcGlobal->bgworkerFreeProcs = NULL;
 	ProcGlobal->walsenderFreeProcs = NULL;
 	ProcGlobal->startupProc = NULL;
 	ProcGlobal->startupProcPid = 0;
@@ -179,11 +178,10 @@ InitProcGlobal(void)
 
 	/*
 	 * Create and initialize all the PGPROC structures we'll need.  There are
-	 * five separate consumers: (1) normal backends, (2) autovacuum workers
-	 * and the autovacuum launcher, (3) background workers, (4) auxiliary
-	 * processes, and (5) prepared transactions.  Each PGPROC structure is
-	 * dedicated to exactly one of these purposes, and they do not move
-	 * between groups.
+	 * four separate consumers: (1) normal backends, (2) walsenders,
+	 * (3) auxiliary processes, and (4) prepared transactions.  Each PGPROC
+	 * structure is dedicated to exactly one of these purposes, and they do
+	 * not move between groups.
 	 */
 	procs = (PGPROC *) ShmemAlloc(TotalProcs * sizeof(PGPROC));
 	MemSet(procs, 0, TotalProcs * sizeof(PGPROC));
@@ -224,12 +222,12 @@ InitProcGlobal(void)
 		procs[i].pgprocno = i;
 
 		/*
-		 * Newly created PGPROCs for normal backends, autovacuum and bgworkers
-		 * must be queued up on the appropriate free list.  Because there can
-		 * only ever be a small, fixed number of auxiliary processes, no free
-		 * list is used in that case; InitAuxiliaryProcess() instead uses a
-		 * linear search.   PGPROCs for prepared transactions are added to a
-		 * free list by TwoPhaseShmemInit().
+		 * Newly created PGPROCs for normal backends and walsenders must be
+		 * queued up on the appropriate free list.  Because there can only
+		 * ever be a small, fixed number of auxiliary processes, no free list
+		 * is used in that case; InitAuxiliaryProcess() instead uses a linear
+		 * search.  PGPROCs for prepared transactions are added to a free
+		 * list by TwoPhaseShmemInit().
 		 */
 		if (i < MaxConnections)
 		{
@@ -237,13 +235,6 @@ InitProcGlobal(void)
 			procs[i].links.next = (SHM_QUEUE *) ProcGlobal->freeProcs;
 			ProcGlobal->freeProcs = &procs[i];
 			procs[i].procgloballist = &ProcGlobal->freeProcs;
-		}
-		else if (i < MaxConnections + 1 + max_worker_processes)
-		{
-			/* PGPROC for bgworker, add to bgworkerFreeProcs list */
-			procs[i].links.next = (SHM_QUEUE *) ProcGlobal->bgworkerFreeProcs;
-			ProcGlobal->bgworkerFreeProcs = &procs[i];
-			procs[i].procgloballist = &ProcGlobal->bgworkerFreeProcs;
 		}
 		else if (i < MaxBackends)
 		{
@@ -300,10 +291,7 @@ InitProcess(void)
 		elog(ERROR, "you already exist");
 
 	/* Decide which list should supply our PGPROC. */
-	if (IsBackgroundWorker)
-		procgloballist = &ProcGlobal->bgworkerFreeProcs;
-	else
-		procgloballist = &ProcGlobal->freeProcs;
+	procgloballist = &ProcGlobal->freeProcs;
 
 	/*
 	 * Try to get a proc struct from the appropriate free list.  If this
@@ -367,7 +355,6 @@ InitProcess(void)
 	MyProc->backendId = InvalidBackendId;
 	MyProc->databaseId = InvalidOid;
 	MyProc->roleId = InvalidOid;
-	MyProc->isBackgroundWorker = !AmRegularBackendProcess();
 	MyProc->delayChkpt = false;
 	MyProc->delayChkptEnd = false;
 	MyProc->statusFlags = 0;
@@ -544,7 +531,6 @@ InitAuxiliaryProcess(void)
 	MyProc->backendId = InvalidBackendId;
 	MyProc->databaseId = InvalidOid;
 	MyProc->roleId = InvalidOid;
-	MyProc->isBackgroundWorker = true;
 	MyProc->delayChkpt = false;
 	MyProc->delayChkptEnd = false;
 	MyProc->statusFlags = 0;

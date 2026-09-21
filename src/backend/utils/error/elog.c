@@ -70,7 +70,6 @@
 #include "mb/pg_wchar.h"
 #include "miscadmin.h"
 #include "pgstat.h"
-#include "postmaster/bgworker.h"
 #include "postmaster/postmaster.h"
 #include "postmaster/syslogger.h"
 #include "storage/ipc.h"
@@ -2140,8 +2139,6 @@ log_line_prefix(StringInfo buf, ErrorData *edata)
 
 					if (MyProcPid == PostmasterPid)
 						backend_type_str = "postmaster";
-					else if (MyBackendType == B_BG_WORKER)
-						backend_type_str = MyBgworkerEntry->bgw_type;
 					else
 						backend_type_str = GetBackendTypeDesc(MyBackendType);
 

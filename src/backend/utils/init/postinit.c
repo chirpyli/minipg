@@ -378,9 +378,7 @@ pg_split_opts(char **argv, int *argcp, const char *optstr)
 /*
  * Initialize MaxBackends value from config options.
  *
- * This must be called after modules have had the chance to register background
- * workers in shared_preload_libraries, and before shared memory size is
- * determined.
+ * This must be called before shared memory size is determined.
  *
  * Note that the value is inherited by postmaster subprocesses via fork(); only
  * postmaster itself and processes not under postmaster control should call
@@ -391,8 +389,7 @@ InitializeMaxBackends(void)
 {
 	Assert(MaxBackends == 0);
 
-	MaxBackends = MaxConnections + 1 +
-		max_worker_processes;
+	MaxBackends = MaxConnections + 1;
 
 	/* internal error because the values were all checked previously */
 	if (MaxBackends > MAX_BACKENDS)

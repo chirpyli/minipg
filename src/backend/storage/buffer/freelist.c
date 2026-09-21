@@ -54,7 +54,7 @@ typedef struct
 	pg_atomic_uint32 numBufferAllocs;	/* Buffers allocated since last reset */
 
 	/*
-	 * Bgworker process to be notified upon activity or -1 if none. See
+	 * Bgwriter process to be notified upon activity or -1 if none. See
 	 * StrategyNotifyBgWriter.
 	 */
 	int			bgwprocno;

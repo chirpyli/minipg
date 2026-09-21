@@ -41,8 +41,6 @@ extern void InitProcessGlobals(void);
 
 extern int	MaxLivePostmasterChildren(void);
 
-extern bool PostmasterMarkPIDForWorkerNotify(int);
-
 /*
  * Note: MAX_BACKENDS is limited to 2^18-1 because that's the width reserved
  * for buffer references in buf_internals.h.  This limitation could be lifted
@@ -51,7 +49,7 @@ extern bool PostmasterMarkPIDForWorkerNotify(int);
  * were removed, we still could not a) exceed 2^23-1 because inval.c stores
  * the backend ID as a 3-byte signed integer, b) INT_MAX/4 because some places
  * compute 4*MaxBackends without any overflow check.  This is rechecked in the
- * relevant GUC check hooks and in RegisterBackgroundWorker().
+ * relevant GUC check hooks.
  */
 #define MAX_BACKENDS	0x3FFFF
 

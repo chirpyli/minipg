@@ -55,7 +55,6 @@
 #include "parser/scansup.h"
 #include "pgstat.h"
 
-#include "postmaster/bgworker_internals.h"
 #include "postmaster/bgwriter.h"
 #include "postmaster/postmaster.h"
 #include "postmaster/syslogger.h"
@@ -158,7 +157,6 @@ static const char *show_tcp_keepalives_interval(void);
 static const char *show_tcp_keepalives_count(void);
 static const char *show_tcp_user_timeout(void);
 static bool check_maxconnections(int *newval, void **extra, GucSource source);
-static bool check_max_worker_processes(int *newval, void **extra, GucSource source);
 
 static bool check_effective_io_concurrency(int *newval, void **extra, GucSource source);
 static bool check_maintenance_io_concurrency(int *newval, void **extra, GucSource source);
@@ -2216,18 +2214,6 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 	{
-		{"max_worker_processes",
-			PGC_POSTMASTER,
-			RESOURCES_ASYNCHRONOUS,
-			gettext_noop("Maximum number of concurrent worker processes."),
-			NULL,
-		},
-		&max_worker_processes,
-		8, 0, MAX_BACKENDS,
-		check_max_worker_processes, NULL, NULL
-	},
-
-	{
 		{"log_rotation_age", PGC_SIGHUP, LOGGING_WHERE,
 			gettext_noop("Automatic log file rotation will occur after N minutes."),
 			NULL,
@@ -2369,19 +2355,6 @@ static struct config_int ConfigureNamesInt[] =
 		400000000, 10000, 2000000000,
 		NULL, NULL, NULL
 	},
-
-
-	{
-		{"max_parallel_workers", PGC_USERSET, RESOURCES_ASYNCHRONOUS,
-			gettext_noop("Sets the maximum number of parallel workers that can be active at one time."),
-			NULL,
-			GUC_EXPLAIN
-		},
-		&max_parallel_workers,
-		8, 0, MAX_PARALLEL_WORKER_LIMIT,
-		NULL, NULL, NULL
-	},
-
 
 
 	{
@@ -9191,17 +9164,7 @@ show_tcp_user_timeout(void)
 static bool
 check_maxconnections(int *newval, void **extra, GucSource source)
 {
-	if (*newval + 1 +
-		max_worker_processes > MAX_BACKENDS)
-		return false;
-	return true;
-}
-
-static bool
-check_max_worker_processes(int *newval, void **extra, GucSource source)
-{
-	if (MaxConnections + 1 +
-		*newval > MAX_BACKENDS)
+	if (*newval + 1 > MAX_BACKENDS)
 		return false;
 	return true;
 }

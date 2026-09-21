@@ -20,7 +20,6 @@
 
 #include "access/parallel.h"
 #include "miscadmin.h"
-#include "postmaster/bgworker.h"
 
 /*
  * State for the current parallel worker, if any.  With the framework removed
@@ -66,15 +65,4 @@ AtEOSubXact_Parallel(bool isCommit, SubTransactionId mySubId)
 void
 ParallelWorkerReportLastRecEnd(XLogRecPtr last_xlog_end)
 {
-}
-
-/*
- * Entry point used by the background worker machinery (see bgworker.c).
- * Parallel workers cannot be launched without the framework, so reaching
- * this means something went wrong.
- */
-void
-ParallelWorkerMain(Datum main_arg)
-{
-	elog(ERROR, "parallel workers are not supported");
 }

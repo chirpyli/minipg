@@ -310,12 +310,6 @@ pgstat_get_wait_ipc(WaitEventIPC w)
 		case WAIT_EVENT_BACKUP_WAIT_WAL_ARCHIVE:
 			event_name = "BackupWaitWalArchive";
 			break;
-		case WAIT_EVENT_BGWORKER_SHUTDOWN:
-			event_name = "BgWorkerShutdown";
-			break;
-		case WAIT_EVENT_BGWORKER_STARTUP:
-			event_name = "BgWorkerStartup";
-			break;
 		case WAIT_EVENT_BTREE_PAGE:
 			event_name = "BtreePage";
 			break;

@@ -104,7 +104,6 @@ pid_t		PostmasterPid = 0;
 bool		IsPostmasterEnvironment = false;
 bool		IsUnderPostmaster = false;
 bool		IsBinaryUpgrade = false;
-bool		IsBackgroundWorker = false;
 
 bool		ExitOnAnyError = false;
 
@@ -121,13 +120,10 @@ int			maintenance_work_mem = 65536;
 /*
  * Primary determinants of sizes of shared-memory structures.
  *
- * MaxBackends is computed by PostmasterMain after modules have had a chance to
- * register background workers.
+ * MaxBackends is computed by PostmasterMain.
  */
 int			NBuffers = 1000;
 int			MaxConnections = 90;
-int			max_worker_processes = 8;
-int			max_parallel_workers = 8;
 int			MaxBackends = 0;
 
 int			VacuumCostPageHit = 1;	/* GUC parameters for vacuum */

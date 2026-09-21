@@ -113,7 +113,7 @@ typedef enum
  * 是有效的。
  *
  * 我们允许在没有锁的情况下访问该结构体的许多字段，例如 delayChkpt 和
- * isBackgroundWorker。但是请注意，写入那些被镜像的字段（见下文）需要至少以
+ * recoveryConflictPending。但是请注意，写入那些被镜像的字段（见下文）需要至少以
  * 共享模式持有 ProcArrayLock 或 XidGenLock，以免 pgxactoff 被并发地修改。
  *
  * 镜像字段（Mirrored fields）：
@@ -161,8 +161,6 @@ struct PGPROC
 	BackendId	backendId;		/* This backend's backend ID (if assigned) */
 	Oid			databaseId;		/* OID of database this backend is using */
 	Oid			roleId;			/* OID of role using this backend */
-
-	bool		isBackgroundWorker; /* true if not a regular backend. */
 
 	/*
 	 * While in hot standby mode, shows that a conflict signal has been sent
@@ -342,8 +340,6 @@ typedef struct PROC_HDR
 	uint32		allProcCount;
 	/* Head of list of free PGPROC structures */
 	PGPROC	   *freeProcs;
-	/* Head of list of bgworker free PGPROC structures */
-	PGPROC	   *bgworkerFreeProcs;
 	/* Head of list of walsender free PGPROC structures */
 	PGPROC	   *walsenderFreeProcs;
 	/* First pgproc waiting for group XID clear */

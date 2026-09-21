@@ -13,7 +13,6 @@ top_builddir = ../../..
 include $(top_builddir)/src/Makefile.global
 
 OBJS = \
-	bgworker.o \
 	bgwriter.o \
 	checkpointer.o \
 	fork_process.o \

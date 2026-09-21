@@ -267,10 +267,9 @@ pgstat_bestart(void)
 	lbeentry.st_xact_start_timestamp = 0;
 	lbeentry.st_databaseid = MyDatabaseId;
 
-	/* We have userid for client-backends, wal-sender and bgworker processes */
+	/* We have userid for client-backends and wal-sender processes */
 	if (lbeentry.st_backendType == B_BACKEND
-		|| lbeentry.st_backendType == B_WAL_SENDER
-		|| lbeentry.st_backendType == B_BG_WORKER)
+		|| lbeentry.st_backendType == B_WAL_SENDER)
 		lbeentry.st_userid = GetSessionUserId();
 	else
 		lbeentry.st_userid = InvalidOid;

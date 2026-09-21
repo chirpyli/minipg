@@ -1041,9 +1041,9 @@ dsm_segment_map_length(dsm_segment *seg)
  * one of them should first call dsm_create() to establish a new shared
  * memory mapping.  That process should then call dsm_segment_handle() to
  * obtain a handle for the mapping, and pass that handle to the
- * coordinating backend via some means (e.g. bgw_main_arg, or via the
- * main shared memory segment).  The recipient, once in possession of the
- * handle, should call dsm_attach().
+ * coordinating backend via some means (e.g. via the main shared memory
+ * segment).  The recipient, once in possession of the handle, should call
+ * dsm_attach().
  */
 dsm_handle
 dsm_segment_handle(dsm_segment *seg)

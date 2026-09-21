@@ -34,7 +34,7 @@ SerializableFinishedListLock		29
 SerializablePredicateListLock		30
 SerialSLRULock						31
 SyncRepLock							32
-BackgroundWorkerLock				33
+# 33 was BackgroundWorkerLock
 DynamicSharedMemoryControlLock		34
 AutoFileLock						35
 MultiXactTruncationLock				41

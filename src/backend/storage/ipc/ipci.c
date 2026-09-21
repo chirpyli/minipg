@@ -25,7 +25,6 @@
 #include "miscadmin.h"
 #include "pgstat.h"
 
-#include "postmaster/bgworker_internals.h"
 #include "postmaster/bgwriter.h"
 #include "postmaster/postmaster.h"
 #include "storage/bufmgr.h"
@@ -116,7 +115,6 @@ CreateSharedMemoryAndSemaphores(void)
 		size = add_size(size, CLOGShmemSize());
 		size = add_size(size, SUBTRANSShmemSize());
 		size = add_size(size, TwoPhaseShmemSize());
-		size = add_size(size, BackgroundWorkerShmemSize());
 		size = add_size(size, MultiXactShmemSize());
 		size = add_size(size, LWLockShmemSize());
 		size = add_size(size, ProcArrayShmemSize());
@@ -210,7 +208,6 @@ CreateSharedMemoryAndSemaphores(void)
 	CreateSharedProcArray();
 	CreateSharedBackendStatus();
 	TwoPhaseShmemInit();
-	BackgroundWorkerShmemInit();
 
 	/*
 	 * Set up shared-inval messaging

@@ -130,9 +130,6 @@
 #backend_flush_after = 0		# measured in pages, 0 disables
 #effective_io_concurrency = 1		# 1-1000; 0 disables prefetching
 #maintenance_io_concurrency = 10	# 1-1000; 0 disables prefetching
-#max_worker_processes = 8		# (change requires restart)
-#max_parallel_workers = 8		# number of max_worker_processes that
-					# can be used in parallel operations
 #old_snapshot_threshold = -1		# 1min-60d; -1 disables; 0 is immediate
 					# (change requires restart)
 
@@ -262,14 +259,6 @@
 #wal_retrieve_retry_interval = 5s	# time to wait before retrying to
 					# retrieve WAL after a failed attempt
 #recovery_min_apply_delay = 0		# minimum delay for applying changes during recovery
-
-# - Subscribers -
-
-# These settings are ignored on a publisher.
-
-#max_logical_replication_workers = 4	# taken from max_worker_processes
-					# (change requires restart)
-#max_sync_workers_per_subscription = 2	# taken from max_logical_replication_workers
 
 
 #------------------------------------------------------------------------------

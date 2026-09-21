@@ -37,7 +37,4 @@ extern void AtEOXact_Parallel(bool isCommit);
 extern void AtEOSubXact_Parallel(bool isCommit, SubTransactionId mySubId);
 extern void ParallelWorkerReportLastRecEnd(XLogRecPtr last_xlog_end);
 
-/* 背景 worker 机制的入口（框架裁剪后只会报错） */
-extern void ParallelWorkerMain(Datum main_arg);
-
 #endif							/* PARALLEL_H */
