@@ -243,28 +243,6 @@ libpqsrv_exec(PGconn *conn, const char *query, uint32 wait_event_info)
 }
 
 /*
- * PQexecParams() wrapper that processes interrupts.
- *
- * See notes at libpqsrv_exec().
- */
-static inline PGresult *
-libpqsrv_exec_params(PGconn *conn,
-					 const char *command,
-					 int nParams,
-					 const Oid *paramTypes,
-					 const char *const *paramValues,
-					 const int *paramLengths,
-					 const int *paramFormats,
-					 int resultFormat,
-					 uint32 wait_event_info)
-{
-	if (!PQsendQueryParams(conn, command, nParams, paramTypes, paramValues,
-						   paramLengths, paramFormats, resultFormat))
-		return NULL;
-	return libpqsrv_get_result_last(conn, wait_event_info);
-}
-
-/*
  * Like PQexec(), loop over PQgetResult() until it returns NULL or another
  * terminal state.  Return the last non-NULL result or the terminal state.
  */

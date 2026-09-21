@@ -32,8 +32,6 @@ extern "C"
  * These symbols may be used in compile-time #ifdef tests for the availability
  * of newer libpq features.
  */
-/* Indicates presence of PQenterPipelineMode and friends */
-#define LIBPQ_HAS_PIPELINING 1
 /* Indicates presence of PQsetTraceFlags; also new PQtrace output format */
 #define LIBPQ_HAS_TRACE_FLAGS 1
 
@@ -101,10 +99,7 @@ typedef enum
 								 * backend */
 	PGRES_NONFATAL_ERROR,		/* notice or warning message */
 	PGRES_FATAL_ERROR,			/* query failed */
-	PGRES_SINGLE_TUPLE,			/* single tuple from larger resultset */
-	PGRES_PIPELINE_SYNC,		/* pipeline synchronization point */
-	PGRES_PIPELINE_ABORTED		/* Command didn't run because of an abort
-								 * earlier in a pipeline */
+	PGRES_SINGLE_TUPLE			/* single tuple from larger resultset */
 } ExecStatusType;
 
 typedef enum
@@ -145,14 +140,9 @@ typedef enum
 } PGPing;
 
 /*
- * PGpipelineStatus - Current status of pipeline mode
+ * minipg: libpq 仅保留简单查询协议。扩展查询协议（Parse/Bind/Execute）与
+ * 流水线模式（pipeline mode）已从后端与客户端一并裁剪，相关 API 与类型一并移除。
  */
-typedef enum
-{
-	PQ_PIPELINE_OFF,
-	PQ_PIPELINE_ON,
-	PQ_PIPELINE_ABORTED
-} PGpipelineStatus;
 
 /* PGconn encapsulates a connection to the backend.
  * The contents of this struct are not supposed to be known to applications.
@@ -315,7 +305,6 @@ extern int	PQserverVersion(const PGconn *conn);
 extern char *PQerrorMessage(const PGconn *conn);
 extern int	PQsocket(const PGconn *conn);
 extern int	PQbackendPID(const PGconn *conn);
-extern PGpipelineStatus PQpipelineStatus(const PGconn *conn);
 extern int	PQconnectionNeedsPassword(const PGconn *conn);
 extern int	PQconnectionUsedPassword(const PGconn *conn);
 extern int	PQclientEncoding(const PGconn *conn);
@@ -362,59 +351,15 @@ extern void PQsetTraceFlags(PGconn *conn, int flags);
 
 /* Simple synchronous query */
 extern PGresult *PQexec(PGconn *conn, const char *query);
-extern PGresult *PQexecParams(PGconn *conn,
-							  const char *command,
-							  int nParams,
-							  const Oid *paramTypes,
-							  const char *const *paramValues,
-							  const int *paramLengths,
-							  const int *paramFormats,
-							  int resultFormat);
-extern PGresult *PQprepare(PGconn *conn, const char *stmtName,
-						   const char *query, int nParams,
-						   const Oid *paramTypes);
-extern PGresult *PQexecPrepared(PGconn *conn,
-								const char *stmtName,
-								int nParams,
-								const char *const *paramValues,
-								const int *paramLengths,
-								const int *paramFormats,
-								int resultFormat);
 
 /* Interface for multiple-result or asynchronous queries */
-#define PQ_QUERY_PARAM_MAX_LIMIT 65535
-
 extern int	PQsendQuery(PGconn *conn, const char *query);
-extern int	PQsendQueryParams(PGconn *conn,
-							  const char *command,
-							  int nParams,
-							  const Oid *paramTypes,
-							  const char *const *paramValues,
-							  const int *paramLengths,
-							  const int *paramFormats,
-							  int resultFormat);
-extern int	PQsendPrepare(PGconn *conn, const char *stmtName,
-						  const char *query, int nParams,
-						  const Oid *paramTypes);
-extern int	PQsendQueryPrepared(PGconn *conn,
-								const char *stmtName,
-								int nParams,
-								const char *const *paramValues,
-								const int *paramLengths,
-								const int *paramFormats,
-								int resultFormat);
 extern int	PQsetSingleRowMode(PGconn *conn);
 extern PGresult *PQgetResult(PGconn *conn);
 
 /* Routines for managing an asynchronous query */
 extern int	PQisBusy(PGconn *conn);
 extern int	PQconsumeInput(PGconn *conn);
-
-/* Routines for pipeline mode management */
-extern int	PQenterPipelineMode(PGconn *conn);
-extern int	PQexitPipelineMode(PGconn *conn);
-extern int	PQpipelineSync(PGconn *conn);
-extern int	PQsendFlushRequest(PGconn *conn);
 
 /* Set blocking/nonblocking connection to the backend */
 extern int	PQsetnonblocking(PGconn *conn, int arg);
@@ -453,14 +398,6 @@ extern char *PQcmdTuples(PGresult *res);
 extern char *PQgetvalue(const PGresult *res, int tup_num, int field_num);
 extern int	PQgetlength(const PGresult *res, int tup_num, int field_num);
 extern int	PQgetisnull(const PGresult *res, int tup_num, int field_num);
-extern int	PQnparams(const PGresult *res);
-extern Oid	PQparamtype(const PGresult *res, int param_num);
-
-/* Describe prepared statements and portals */
-extern PGresult *PQdescribePrepared(PGconn *conn, const char *stmt);
-extern PGresult *PQdescribePortal(PGconn *conn, const char *portal);
-extern int	PQsendDescribePrepared(PGconn *conn, const char *stmt);
-extern int	PQsendDescribePortal(PGconn *conn, const char *portal);
 
 /* Delete a PGresult */
 extern void PQclear(PGresult *res);

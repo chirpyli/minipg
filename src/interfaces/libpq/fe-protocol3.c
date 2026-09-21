@@ -40,7 +40,6 @@
 
 static void handleSyncLoss(PGconn *conn, char id, int msgLength);
 static int	getRowDescriptions(PGconn *conn, int msgLength);
-static int	getParamDescriptions(PGconn *conn, int msgLength);
 static int	getAnotherTuple(PGconn *conn, int msgLength);
 static int	getParameterStatus(PGconn *conn);
 static int	getReadyForQuery(PGconn *conn);
@@ -213,28 +212,9 @@ pqParseInput3(PGconn *conn)
 								 * query */
 					if (getReadyForQuery(conn))
 						return;
-					if (conn->pipelineStatus != PQ_PIPELINE_OFF)
-					{
-						conn->result = PQmakeEmptyPGresult(conn,
-														   PGRES_PIPELINE_SYNC);
-						if (!conn->result)
-						{
-							appendPQExpBufferStr(&conn->errorMessage,
-												 libpq_gettext("out of memory"));
-							pqSaveErrorResult(conn);
-						}
-						else
-						{
-							conn->pipelineStatus = PQ_PIPELINE_ON;
-							conn->asyncStatus = PGASYNC_READY;
-						}
-					}
-					else
-					{
-						/* Advance the command queue and set us idle */
-						pqCommandQueueAdvance(conn, true, false);
-						conn->asyncStatus = PGASYNC_IDLE;
-					}
+					/* Advance the command queue and set us idle */
+					pqCommandQueueAdvance(conn, true);
+					conn->asyncStatus = PGASYNC_IDLE;
 					break;
 				case 'I':		/* empty query */
 					if (conn->result == NULL)
@@ -249,46 +229,6 @@ pqParseInput3(PGconn *conn)
 						}
 					}
 					conn->asyncStatus = PGASYNC_READY;
-					break;
-				case '1':		/* Parse Complete */
-					/* If we're doing PQprepare, we're done; else ignore */
-					if (conn->cmd_queue_head &&
-						conn->cmd_queue_head->queryclass == PGQUERY_PREPARE)
-					{
-						if (conn->result == NULL)
-						{
-							conn->result = PQmakeEmptyPGresult(conn,
-															   PGRES_COMMAND_OK);
-							if (!conn->result)
-							{
-								appendPQExpBufferStr(&conn->errorMessage,
-													 libpq_gettext("out of memory"));
-								pqSaveErrorResult(conn);
-							}
-						}
-						conn->asyncStatus = PGASYNC_READY;
-					}
-					break;
-				case '2':		/* Bind Complete */
-					/* Nothing to do for this message type */
-					break;
-				case '3':		/* Close Complete */
-
-					/*
-					 * If we get CloseComplete when waiting for it, consume
-					 * the queue element and keep going.  A result is not
-					 * expected from this message; it is just there so that we
-					 * know to wait for it when PQsendQuery is used in
-					 * pipeline mode, before going in IDLE state.  Failing to
-					 * do this makes us receive CloseComplete when IDLE, which
-					 * creates problems.
-					 */
-					if (conn->cmd_queue_head &&
-						conn->cmd_queue_head->queryclass == PGQUERY_CLOSE)
-					{
-						pqCommandQueueAdvance(conn, false, false);
-					}
-
 					break;
 				case 'S':		/* parameter status */
 					if (getParameterStatus(conn))
@@ -316,9 +256,7 @@ pqParseInput3(PGconn *conn)
 						 */
 						conn->inCursor += msgLength;
 					}
-					else if (conn->result == NULL ||
-							 (conn->cmd_queue_head &&
-							  conn->cmd_queue_head->queryclass == PGQUERY_DESCRIBE))
+					else if (conn->result == NULL)
 					{
 						/* First 'T' in a query sequence */
 						if (getRowDescriptions(conn, msgLength))
@@ -337,38 +275,7 @@ pqParseInput3(PGconn *conn)
 						return;
 					}
 					break;
-				case 'n':		/* No Data */
-
-					/*
-					 * NoData indicates that we will not be seeing a
-					 * RowDescription message because the statement or portal
-					 * inquired about doesn't return rows.
-					 *
-					 * If we're doing a Describe, we have to pass something
-					 * back to the client, so set up a COMMAND_OK result,
-					 * instead of PGRES_TUPLES_OK.  Otherwise we can just
-					 * ignore this message.
-					 */
-					if (conn->cmd_queue_head &&
-						conn->cmd_queue_head->queryclass == PGQUERY_DESCRIBE)
-					{
-						if (conn->result == NULL)
-						{
-							conn->result = PQmakeEmptyPGresult(conn,
-															   PGRES_COMMAND_OK);
-							if (!conn->result)
-							{
-								appendPQExpBufferStr(&conn->errorMessage,
-													 libpq_gettext("out of memory"));
-								pqSaveErrorResult(conn);
-							}
-						}
-						conn->asyncStatus = PGASYNC_READY;
-					}
-					break;
-				case 't':		/* Parameter Description */
-					if (getParamDescriptions(conn, msgLength))
-						return;
+				case 'n':		/* No Data (simple protocol never sends it) */
 					break;
 				case 'D':		/* Data Row */
 					if (conn->result != NULL &&
@@ -469,22 +376,8 @@ getRowDescriptions(PGconn *conn, int msgLength)
 	const char *errmsg;
 	int			i;
 
-	/*
-	 * When doing Describe for a prepared statement, there'll already be a
-	 * PGresult created by getParamDescriptions, and we should fill data into
-	 * that.  Otherwise, create a new, empty PGresult.
-	 */
-	if (!conn->cmd_queue_head ||
-		(conn->cmd_queue_head &&
-		 conn->cmd_queue_head->queryclass == PGQUERY_DESCRIBE))
-	{
-		if (conn->result)
-			result = conn->result;
-		else
-			result = PQmakeEmptyPGresult(conn, PGRES_COMMAND_OK);
-	}
-	else
-		result = PQmakeEmptyPGresult(conn, PGRES_TUPLES_OK);
+	/* Create a new, empty PGresult for the row descriptions. */
+	result = PQmakeEmptyPGresult(conn, PGRES_TUPLES_OK);
 	if (!result)
 	{
 		errmsg = NULL;			/* means "out of memory", see below */
@@ -569,23 +462,6 @@ getRowDescriptions(PGconn *conn, int msgLength)
 	/* Success! */
 	conn->result = result;
 
-	/*
-	 * If we're doing a Describe, we're done, and ready to pass the result
-	 * back to the client.
-	 */
-	if ((!conn->cmd_queue_head) ||
-		(conn->cmd_queue_head &&
-		 conn->cmd_queue_head->queryclass == PGQUERY_DESCRIBE))
-	{
-		conn->asyncStatus = PGASYNC_READY;
-		return 0;
-	}
-
-	/*
-	 * We could perform additional setup for the new result set here, but for
-	 * now there's nothing else to do.
-	 */
-
 	/* And we're done. */
 	return 0;
 
@@ -622,94 +498,6 @@ advance_and_error:
 	 * Return zero to allow input parsing to continue.  Subsequent "D"
 	 * messages will be ignored until we get to end of data, since an error
 	 * result is already set up.
-	 */
-	return 0;
-}
-
-/*
- * parseInput subroutine to read a 't' (ParameterDescription) message.
- * We'll build a new PGresult structure containing the parameter data.
- * Returns: 0 if processed message successfully, EOF to suspend parsing
- * (the latter case is not actually used currently).
- */
-static int
-getParamDescriptions(PGconn *conn, int msgLength)
-{
-	PGresult   *result;
-	const char *errmsg = NULL;	/* means "out of memory", see below */
-	int			nparams;
-	int			i;
-
-	result = PQmakeEmptyPGresult(conn, PGRES_COMMAND_OK);
-	if (!result)
-		goto advance_and_error;
-
-	/* parseInput already read the 't' label and message length. */
-	/* the next two bytes are the number of parameters */
-	if (pqGetInt(&(result->numParameters), 2, conn))
-		goto not_enough_data;
-	nparams = result->numParameters;
-
-	/* allocate space for the parameter descriptors */
-	if (nparams > 0)
-	{
-		result->paramDescs = (PGresParamDesc *)
-			pqResultAlloc(result, nparams * sizeof(PGresParamDesc), true);
-		if (!result->paramDescs)
-			goto advance_and_error;
-		MemSet(result->paramDescs, 0, nparams * sizeof(PGresParamDesc));
-	}
-
-	/* get parameter info */
-	for (i = 0; i < nparams; i++)
-	{
-		int			typid;
-
-		if (pqGetInt(&typid, 4, conn))
-			goto not_enough_data;
-		result->paramDescs[i].typid = typid;
-	}
-
-	/* Success! */
-	conn->result = result;
-
-	return 0;
-
-not_enough_data:
-	errmsg = libpq_gettext("insufficient data in \"t\" message");
-
-advance_and_error:
-	/* Discard unsaved result, if any */
-	if (result && result != conn->result)
-		PQclear(result);
-
-	/*
-	 * Replace partially constructed result with an error result. First
-	 * discard the old result to try to win back some memory.
-	 */
-	pqClearAsyncResult(conn);
-
-	/*
-	 * If preceding code didn't provide an error message, assume "out of
-	 * memory" was meant.  The advantage of having this special case is that
-	 * freeing the old result first greatly improves the odds that gettext()
-	 * will succeed in providing a translation.
-	 */
-	if (!errmsg)
-		errmsg = libpq_gettext("out of memory");
-	appendPQExpBuffer(&conn->errorMessage, "%s\n", errmsg);
-	pqSaveErrorResult(conn);
-
-	/*
-	 * Show the message as fully consumed, else pqParseInput3 will overwrite
-	 * our error with a complaint about that.
-	 */
-	conn->inCursor = conn->inStart + 5 + msgLength;
-
-	/*
-	 * Return zero to allow input parsing to continue.  Essentially, we've
-	 * replaced the COMMAND_OK result with an error result, but since this
-	 * doesn't affect the protocol state, it's fine.
 	 */
 	return 0;
 }
@@ -847,10 +635,6 @@ pqGetErrorNotice3(PGconn *conn, bool isError)
 	bool		have_position = false;
 	PQExpBufferData workBuf;
 	char		id;
-
-	/* If in pipeline mode, set error indicator for it */
-	if (isError && conn->pipelineStatus != PQ_PIPELINE_OFF)
-		conn->pipelineStatus = PQ_PIPELINE_ABORTED;
 
 	/*
 	 * If this is an error message, pre-emptively clear any incomplete query

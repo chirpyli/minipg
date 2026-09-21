@@ -63,14 +63,7 @@ union pgresult_data
 	char		space[1];		/* dummy for accessing block as bytes */
 };
 
-/* Data about a single parameter of a prepared statement */
-typedef struct pgresParamDesc
-{
-	Oid			typid;			/* type id */
-} PGresParamDesc;
-
-/*
- * Data for a single attribute of a single tuple
+/* Data for a single attribute of a single tuple
  *
  * We use char* for Attribute values.
  *
@@ -129,8 +122,6 @@ struct pg_result
 	PGresAttValue **tuples;		/* each PGresult tuple is an array of
 								 * PGresAttValue's */
 	int			tupArrSize;		/* allocated size of tuples array */
-	int			numParameters;
-	PGresParamDesc *paramDescs;
 	ExecStatusType resultStatus;
 	char		cmdStatus[CMDSTATUS_LEN];	/* cmd status from the query */
 	int			binary;			/* binary tuple values if binary == 1,
@@ -179,7 +170,6 @@ typedef enum
 	PGASYNC_READY_MORE,			/* query done, waiting for client to fetch
 								 * result, more results expected from this
 								 * query */
-	PGASYNC_PIPELINE_IDLE,		/* "Idle" between commands in pipeline mode */
 } PGAsyncStatusType;
 
 /* Target server type (decoded value of target_session_attrs) */
@@ -238,16 +228,11 @@ typedef enum pg_conn_host_type
 
 /*
  * PGQueryClass tracks which query protocol is in use for each command queue
- * entry, or special operation in execution
+ * entry.  minipg only supports the simple Query protocol.
  */
 typedef enum
 {
-	PGQUERY_SIMPLE,				/* simple Query protocol (PQexec) */
-	PGQUERY_EXTENDED,			/* full Extended protocol (PQexecParams) */
-	PGQUERY_PREPARE,			/* Parse only (PQprepare) */
-	PGQUERY_DESCRIBE,			/* Describe Statement or Portal */
-	PGQUERY_SYNC,				/* Sync (at end of a pipeline) */
-	PGQUERY_CLOSE
+	PGQUERY_SIMPLE				/* simple Query protocol (PQexec) */
 } PGQueryClass;
 
 /*
@@ -334,7 +319,6 @@ struct pg_conn
 	bool		options_valid;	/* true if OK to attempt connection */
 	bool		nonblocking;	/* whether this connection is using nonblock
 								 * sending semantics */
-	PGpipelineStatus pipelineStatus;	/* status of pipeline mode */
 	bool		singleRowMode;	/* return current query result row-by-row? */
 
 	/* Support for multiple hosts in connection string */
@@ -500,8 +484,7 @@ extern void pqSaveMessageField(PGresult *res, char code,
 extern void pqSaveParameterStatus(PGconn *conn, const char *name,
 								  const char *value);
 extern int	pqRowProcessor(PGconn *conn, const char **errmsgp);
-extern void pqCommandQueueAdvance(PGconn *conn, bool isReadyForQuery,
-								  bool gotSync);
+extern void pqCommandQueueAdvance(PGconn *conn, bool isReadyForQuery);
 extern int	PQsendQueryContinue(PGconn *conn, const char *query);
 
 /* === in fe-protocol3.c === */
@@ -569,11 +552,6 @@ extern void pqTraceOutputNoTypeByteMessage(PGconn *conn, const char *message);
  * without the overhead of a function call
  */
 #define pqIsnonblocking(conn)	((conn)->nonblocking)
-
-/*
- * Connection's outbuffer threshold, for pipeline mode.
- */
-#define OUTBUFFER_THRESHOLD	65536
 
 /*
  * minipg 已移除 Native Language Support（ENABLE_NLS），libpq 的翻译函数
