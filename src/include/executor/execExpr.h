@@ -545,7 +545,6 @@ typedef struct ExprEvalStep
 		/* for EEOP_AGG_PLAIN_PERGROUP_NULLCHECK */
 		struct
 		{
-			int			setoff;
 			int			jumpnull;
 		}			agg_plain_pergroup_nullcheck;
 
@@ -556,7 +555,6 @@ typedef struct ExprEvalStep
 			AggStatePerTrans pertrans;
 			ExprContext *aggcontext;
 			int			transno;
-			int			setoff;
 		}			agg_trans;
 	}			d;
 } ExprEvalStep;

@@ -77,7 +77,7 @@ static bool isAssignmentIndirectionExpr(Expr *expr);
 static void ExecBuildAggTransCall(ExprState *state, AggState *aggstate,
 								  ExprEvalStep *scratch,
 								  FunctionCallInfo fcinfo, AggStatePerTrans pertrans,
-								  int transno, int setoff, bool ishash,
+								  int transno, bool ishash,
 								  bool nullcheck);
 
 
@@ -2792,24 +2792,16 @@ ExecBuildAggTrans(AggState *aggstate, AggStatePerPhase phase,
 		if (doSort)
 		{
 			ExecBuildAggTransCall(state, aggstate, &scratch, trans_fcinfo,
-								  pertrans, transno, 0, false,
+								  pertrans, transno, false,
 								  nullcheck);
-		}
+								  }
 
-		if (doHash)
-		{
-			int			setoff;
-
-			/* in MIXED mode, there'll be preceding transition values */
-			if (aggstate->aggstrategy != AGG_HASHED)
-				setoff = aggstate->maxsets;
-			else
-				setoff = 0;
-
-			ExecBuildAggTransCall(state, aggstate, &scratch, trans_fcinfo,
-								  pertrans, transno, setoff, true,
-								  nullcheck);
-		}
+								  if (doHash)
+								  {
+								  ExecBuildAggTransCall(state, aggstate, &scratch, trans_fcinfo,
+								  				  pertrans, transno, true,
+								  				  nullcheck);
+								  }
 
 		/* adjust early bail out jump target(s) */
 		foreach(bail, adjust_bailout)
@@ -2851,7 +2843,7 @@ static void
 ExecBuildAggTransCall(ExprState *state, AggState *aggstate,
 					  ExprEvalStep *scratch,
 					  FunctionCallInfo fcinfo, AggStatePerTrans pertrans,
-					  int transno, int setoff, bool ishash,
+					  int transno, bool ishash,
 					  bool nullcheck)
 {
 	ExprContext *aggcontext;
@@ -2866,7 +2858,6 @@ ExecBuildAggTransCall(ExprState *state, AggState *aggstate,
 	if (nullcheck)
 	{
 		scratch->opcode = EEOP_AGG_PLAIN_PERGROUP_NULLCHECK;
-		scratch->d.agg_plain_pergroup_nullcheck.setoff = setoff;
 		/* adjust later */
 		scratch->d.agg_plain_pergroup_nullcheck.jumpnull = -1;
 		ExprEvalPushStep(state, scratch);
@@ -2935,7 +2926,6 @@ ExecBuildAggTransCall(ExprState *state, AggState *aggstate,
 		scratch->opcode = EEOP_AGG_ORDERED_TRANS_TUPLE;
 
 	scratch->d.agg_trans.pertrans = pertrans;
-	scratch->d.agg_trans.setoff = setoff;
 	scratch->d.agg_trans.transno = transno;
 	scratch->d.agg_trans.aggcontext = aggcontext;
 	ExprEvalPushStep(state, scratch);

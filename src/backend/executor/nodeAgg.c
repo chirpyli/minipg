@@ -2955,7 +2955,6 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 	AggState   *aggstate;
 	AggStatePerAgg peraggs;
 	AggStatePerTrans pertransstates;
-	AggStatePerGroup *pergroups;
 	Plan	   *outerPlan;
 	ExprContext *econtext;
 	TupleDesc	scanDesc;
@@ -3234,20 +3233,14 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 
 
 	aggstate->all_pergroups =
-		(AggStatePerGroup *) palloc0(sizeof(AggStatePerGroup)
-									 * (numGroupingSets + numHashes));
-	pergroups = aggstate->all_pergroups;
+		(AggStatePerGroup *) palloc0(sizeof(AggStatePerGroup));
 
 	if (node->aggstrategy != AGG_HASHED)
 	{
-		for (i = 0; i < numGroupingSets; i++)
-		{
-			pergroups[i] = (AggStatePerGroup) palloc0(sizeof(AggStatePerGroupData)
-													  * numaggs);
-		}
+		aggstate->all_pergroups[0] = (AggStatePerGroup) palloc0(sizeof(AggStatePerGroupData)
+																* numaggs);
 
-		aggstate->pergroups = pergroups;
-		pergroups += numGroupingSets;
+		aggstate->pergroups = aggstate->all_pergroups;
 	}
 
 	/*
@@ -3267,7 +3260,7 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 															&TTSOpsVirtual);
 
 		/* this is an array of pointers, not structures */
-		aggstate->hash_pergroup = pergroups;
+		aggstate->hash_pergroup = aggstate->all_pergroups;
 
 		aggstate->hashentrysize = hash_agg_entry_size(aggstate->numtrans,
 													  outerplan->plan_width,
