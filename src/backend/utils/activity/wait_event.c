@@ -99,9 +99,6 @@ pgstat_get_wait_event_type(uint32 wait_event_info)
 		case PG_WAIT_CLIENT:
 			event_type = "Client";
 			break;
-		case PG_WAIT_EXTENSION:
-			event_type = "Extension";
-			break;
 		case PG_WAIT_IPC:
 			event_type = "IPC";
 			break;
@@ -164,9 +161,6 @@ pgstat_get_wait_event(uint32 wait_event_info)
 				event_name = pgstat_get_wait_client(w);
 				break;
 			}
-		case PG_WAIT_EXTENSION:
-			event_name = "Extension";
-			break;
 		case PG_WAIT_IPC:
 			{
 				WaitEventIPC w = (WaitEventIPC) wait_event_info;

@@ -49,11 +49,7 @@ DROP SCHEMA IF EXISTS test_schema_exists;
 DROP SCHEMA test_schema_exists;
 
 -- minipg: CREATE/DROP TYPE、角色、COLLATION、全文检索对象均已裁剪，相关用例移除
-
--- extension
-
-DROP EXTENSION test_extension_exists;
-DROP EXTENSION IF EXISTS test_extension_exists;
+-- minipg: EXTENSION 机制已裁剪，DROP EXTENSION 用例移除
 
 -- minipg: CREATE/DROP FUNCTION 与 CREATE/DROP TRIGGER 已裁剪，相关用例移除
 

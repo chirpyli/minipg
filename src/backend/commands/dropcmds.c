@@ -211,34 +211,6 @@ does_not_exist_skipping(ObjectType objtype, Node *object)
 			msg = gettext_noop("schema \"%s\" does not exist, skipping");
 			name = strVal((Value *) object);
 			break;
-			if (!schema_does_not_exist_skipping(castNode(List, object), &msg, &name))
-			{
-				msg = gettext_noop("text search parser \"%s\" does not exist, skipping");
-				name = NameListToString(castNode(List, object));
-			}
-			break;
-			if (!schema_does_not_exist_skipping(castNode(List, object), &msg, &name))
-			{
-				msg = gettext_noop("text search dictionary \"%s\" does not exist, skipping");
-				name = NameListToString(castNode(List, object));
-			}
-			break;
-			if (!schema_does_not_exist_skipping(castNode(List, object), &msg, &name))
-			{
-				msg = gettext_noop("text search template \"%s\" does not exist, skipping");
-				name = NameListToString(castNode(List, object));
-			}
-			break;
-			if (!schema_does_not_exist_skipping(castNode(List, object), &msg, &name))
-			{
-				msg = gettext_noop("text search configuration \"%s\" does not exist, skipping");
-				name = NameListToString(castNode(List, object));
-			}
-			break;
-		case OBJECT_EXTENSION:
-			msg = gettext_noop("extension \"%s\" does not exist, skipping");
-			name = strVal((Value *) object);
-			break;
 		case OBJECT_FUNCTION:
 			{
 				ObjectWithArgs *owa = castNode(ObjectWithArgs, object);

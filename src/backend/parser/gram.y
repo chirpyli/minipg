@@ -186,7 +186,6 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 		AlterObjectSchemaStmt
 		AlterTableStmt
 		AnalyzeStmt
-		CreateExtensionStmt
 		CreateSchemaStmt CreateStmt
 		CreatedbStmt DeleteStmt
 		DropdbStmt DropStmt
@@ -211,10 +210,8 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 
 %type <list>	createdb_opt_list createdb_opt_items
 				transaction_mode_list
-				create_extension_opt_list
 				%type <defelt>	createdb_opt_item
 				transaction_mode_item
-				create_extension_opt_item
 
 %type <str>		utility_option_name
 %type <defelt>	utility_option_elem
@@ -375,7 +372,6 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 
 	ELSE ENCODING END_P
 	EXISTS EXPLAIN
-	EXTENSION
 
 	FALSE_P FIRST_P FLOAT_P FOR
 	FORCE FROM FULL
@@ -555,7 +551,6 @@ stmt:	AlterObjectSchemaStmt
 			| AlterTableStmt
 			| AnalyzeStmt
 			| CheckPointStmt
-			| CreateExtensionStmt
 			| CreateSchemaStmt
 			| CreateStmt
 			| CreatedbStmt
@@ -1348,54 +1343,6 @@ NumericOnly:
 
 /*****************************************************************************
  *
- *		QUERY:
- *             CREATE EXTENSION extension
- *             [ WITH ] [ SCHEMA schema ] [ VERSION version ]
- *
- *****************************************************************************/
-
-CreateExtensionStmt: CREATE EXTENSION name opt_with create_extension_opt_list
-				{
-					CreateExtensionStmt *n = makeNode(CreateExtensionStmt);
-					n->extname = $3;
-					n->if_not_exists = false;
-					n->options = $5;
-					$$ = (Node *) n;
-				}
-				| CREATE EXTENSION IF_P NOT EXISTS name opt_with create_extension_opt_list
-				{
-					CreateExtensionStmt *n = makeNode(CreateExtensionStmt);
-					n->extname = $6;
-					n->if_not_exists = true;
-					n->options = $8;
-					$$ = (Node *) n;
-				}
-		;
-
-create_extension_opt_list:
-			create_extension_opt_list create_extension_opt_item
-				{ $$ = lappend($1, $2); }
-			| /* EMPTY */
-				{ $$ = NIL; }
-		;
-
-create_extension_opt_item:
-			SCHEMA name
-				{
-					$$ = makeDefElem("schema", (Node *)makeString($2), @1);
-				}
-			| VERSION_P NonReservedWord_or_Sconst
-				{
-					$$ = makeDefElem("new_version", (Node *)makeString($2), @1);
-				}
-			| CASCADE
-				{
-					$$ = makeDefElem("cascade", (Node *)makeInteger(true), @1);
-				}
-		;
-
-/*****************************************************************************
- *
  *		QUERY :
  *				generic definition list (name '=' value, ...)
  *
@@ -1514,8 +1461,7 @@ object_type_any_name:
 
 
 drop_type_name:
-			EXTENSION								{ $$ = OBJECT_EXTENSION; }
-			| SCHEMA								{ $$ = OBJECT_SCHEMA; }
+			SCHEMA									{ $$ = OBJECT_SCHEMA; }
 		;
 
 any_name_list:
@@ -4132,7 +4078,6 @@ unreserved_keyword:
 			| DROP
 			| ENCODING
 			| EXPLAIN
-			| EXTENSION
 			| FIRST_P
 			| FORCE
 			| IF_P
@@ -4348,7 +4293,6 @@ bare_label_keyword:
 			| END_P
 			| EXISTS
 			| EXPLAIN
-			| EXTENSION
 			| FALSE_P
 			| FIRST_P
 			| FLOAT_P

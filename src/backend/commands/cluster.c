@@ -763,8 +763,7 @@ swap_relation_files(Oid r1, Oid r2, bool target_is_pg_class,
 			if (relform1->reltoastrelid)
 			{
 				count = deleteDependencyRecordsFor(RelationRelationId,
-												   relform1->reltoastrelid,
-												   false);
+												   relform1->reltoastrelid);
 				if (count != 1)
 					elog(ERROR, "expected one dependency record for TOAST table, found %ld",
 						 count);
@@ -772,8 +771,7 @@ swap_relation_files(Oid r1, Oid r2, bool target_is_pg_class,
 			if (relform2->reltoastrelid)
 			{
 				count = deleteDependencyRecordsFor(RelationRelationId,
-												   relform2->reltoastrelid,
-												   false);
+												   relform2->reltoastrelid);
 				if (count != 1)
 					elog(ERROR, "expected one dependency record for TOAST table, found %ld",
 						 count);

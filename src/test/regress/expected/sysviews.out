@@ -7,18 +7,6 @@
 -- so our ability to test with fixed expected output is pretty limited;
 -- but even a trivial check of count(*) will exercise the normal code path
 -- through the SRF.
-select count(*) >= 0 as ok from pg_available_extension_versions;
- ok 
-----
- t
-(1 row)
-
-select count(*) >= 0 as ok from pg_available_extensions;
- ok 
-----
- t
-(1 row)
-
 -- The entire output of pg_backend_memory_contexts is not stable,
 -- we test only the existance and basic condition of TopMemoryContext.
 select name, ident, parent, level, total_bytes >= free_bytes

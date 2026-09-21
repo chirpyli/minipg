@@ -33,8 +33,6 @@ typedef enum DependencyType
 	DEPENDENCY_NORMAL = 'n',
 	DEPENDENCY_AUTO = 'a',
 	DEPENDENCY_INTERNAL = 'i',
-	DEPENDENCY_EXTENSION = 'e',
-	DEPENDENCY_AUTO_EXTENSION = 'x',
 	DEPENDENCY_PIN = 'p'
 } DependencyType;
 
@@ -62,17 +60,15 @@ typedef enum ObjectClass
 	OCLASS_REWRITE,				/* pg_rewrite */
 	OCLASS_SCHEMA,				/* pg_namespace */
 	OCLASS_DATABASE,			/* pg_database */
-	OCLASS_EXTENSION,			/* pg_extension */
 } ObjectClass;
 
-#define LAST_OCLASS		OCLASS_EXTENSION
+#define LAST_OCLASS		OCLASS_DATABASE
 
 /* flag bits for performDeletion/performMultipleDeletions: */
 #define PERFORM_DELETION_INTERNAL			0x0001	/* internal action */
 #define PERFORM_DELETION_CONCURRENTLY		0x0002	/* concurrent drop */
 #define PERFORM_DELETION_QUIETLY			0x0004	/* suppress notices */
 #define PERFORM_DELETION_SKIP_ORIGINAL		0x0008	/* keep original obj */
-#define PERFORM_DELETION_SKIP_EXTENSIONS	0x0010	/* keep extensions */
 #define PERFORM_DELETION_CONCURRENT_LOCK	0x0020	/* normal drop with
 													 * concurrent lock mode */
 
@@ -128,13 +124,7 @@ extern void recordMultipleDependencies(const ObjectAddress *depender,
 									   int nreferenced,
 									   DependencyType behavior);
 
-extern void recordDependencyOnCurrentExtension(const ObjectAddress *object,
-											   bool isReplace);
-
-extern void checkMembershipInCurrentExtension(const ObjectAddress *object);
-
-extern long deleteDependencyRecordsFor(Oid classId, Oid objectId,
-									   bool skipExtensionDeps);
+extern long deleteDependencyRecordsFor(Oid classId, Oid objectId);
 
 extern long deleteDependencyRecordsForClass(Oid classId, Oid objectId,
 											Oid refclassId, char deptype);
@@ -152,11 +142,6 @@ extern long changeDependenciesOf(Oid classId, Oid oldObjectId,
 
 extern long changeDependenciesOn(Oid refClassId, Oid oldRefObjectId,
 								 Oid newRefObjectId);
-
-extern Oid	getExtensionOfObject(Oid classId, Oid objectId);
-extern List *getAutoExtensionsOfObject(Oid classId, Oid objectId);
-
-extern Oid	getExtensionType(Oid extensionOid, const char *typname);
 
 extern Oid	get_index_constraint(Oid indexId);
 

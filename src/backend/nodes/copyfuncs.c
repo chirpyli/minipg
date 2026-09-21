@@ -2310,18 +2310,6 @@ _copyVariableShowStmt(const VariableShowStmt *from)
 	return newnode;
 }
 
-static CreateExtensionStmt *
-_copyCreateExtensionStmt(const CreateExtensionStmt *from)
-{
-	CreateExtensionStmt *newnode = makeNode(CreateExtensionStmt);
-
-	COPY_STRING_FIELD(extname);
-	COPY_SCALAR_FIELD(if_not_exists);
-	COPY_NODE_FIELD(options);
-
-	return newnode;
-}
-
 static CreateSchemaStmt *
 _copyCreateSchemaStmt(const CreateSchemaStmt *from)
 {
@@ -2717,9 +2705,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_VariableShowStmt:
 			retval = _copyVariableShowStmt(from);
-			break;
-		case T_CreateExtensionStmt:
-			retval = _copyCreateExtensionStmt(from);
 			break;
 		case T_CheckPointStmt:
 			retval = (void *) makeNode(CheckPointStmt);

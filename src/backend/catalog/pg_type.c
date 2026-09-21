@@ -138,7 +138,6 @@ TypeShellMake(const char *typeName, Oid typeNamespace, Oid ownerId)
 								 0,
 								 false,
 								 false,
-								 true,	/* make extension dependency */
 								 false);
 
 	/* Post creation hook for new shell type */
@@ -413,7 +412,6 @@ TypeCreate(Oid newTypeOid,
 								 relationKind,
 								 isImplicitArray,
 								 isDependentType,
-								 true,	/* make extension dependency */
 								 rebuildDeps);
 
 	/* Post creation hook for new type */
@@ -447,20 +445,9 @@ TypeCreate(Oid newTypeOid,
  * isDependentType is true if this is an implicit array or relation rowtype;
  * that means it doesn't need its own dependencies on owner etc.
  *
- * We make an extension-membership dependency if we're in an extension
- * script and makeExtensionDep is true (and isDependentType isn't true).
- * makeExtensionDep should be true when creating a new type or replacing a
- * shell type, but not for ALTER TYPE on an existing type.  Passing false
- * causes the type's extension membership to be left alone.
- *
  * rebuild should be true if this is a pre-existing type.  We will remove
  * existing dependencies and rebuild them from scratch.  This is needed for
- * ALTER TYPE, and also when replacing a shell type.  We don't remove any
- * existing extension dependency, though; hence, if makeExtensionDep is also
- * true and we're in an extension script, an error will occur unless the
- * type already belongs to the current extension.  That's the behavior we
- * want when replacing a shell type, which is the only case where both flags
- * are true.
+ * ALTER TYPE, and also when replacing a shell type.
  */
 void
 GenerateTypeDependencies(HeapTuple typeTuple,
@@ -469,7 +456,6 @@ GenerateTypeDependencies(HeapTuple typeTuple,
 						 char relationKind, /* only for relation rowtypes */
 						 bool isImplicitArray,
 						 bool isDependentType,
-						 bool makeExtensionDep,
 						 bool rebuild)
 {
 	Form_pg_type typeForm = (Form_pg_type) GETSTRUCT(typeTuple);
@@ -478,16 +464,16 @@ GenerateTypeDependencies(HeapTuple typeTuple,
 				referenced;
 	ObjectAddresses *addrs_normal;
 
-	/* If rebuild, first flush old dependencies, except extension deps */
+	/* If rebuild, first flush old dependencies */
 	if (rebuild)
 	{
-		deleteDependencyRecordsFor(TypeRelationId, typeObjectId, true);
+		deleteDependencyRecordsFor(TypeRelationId, typeObjectId);
 	}
 
 	ObjectAddressSet(myself, TypeRelationId, typeObjectId);
 
 	/*
-	 * Make dependencies on namespace, owner, ACL, extension.
+	 * Make dependencies on namespace, owner, ACL.
 	 *
 	 * Skip these for a dependent type, since it will have such dependencies
 	 * indirectly through its depended-on type or relation.
@@ -501,9 +487,6 @@ GenerateTypeDependencies(HeapTuple typeTuple,
 		ObjectAddressSet(referenced, NamespaceRelationId,
 						 typeForm->typnamespace);
 		recordDependencyOn(&myself, &referenced, DEPENDENCY_NORMAL);
-
-		if (makeExtensionDep)
-			recordDependencyOnCurrentExtension(&myself, rebuild);
 	}
 
 	/* Normal dependencies on the I/O and support functions */

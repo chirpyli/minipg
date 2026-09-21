@@ -46,7 +46,6 @@ CATALOG_HEADERS := \
 	pg_rewrite.h \
 	pg_cast.h pg_namespace.h pg_depend.h \
 	pg_database.h pg_tablespace.h \
-	pg_extension.h \
 	pg_collation.h
 
 GENERATED_HEADERS := $(CATALOG_HEADERS:%.h=%_d.h) schemapg.h

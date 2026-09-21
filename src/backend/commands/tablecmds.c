@@ -3880,7 +3880,6 @@ ATExecAlterColumnType(AlteredTableInfo *tab, Relation rel,
 			case OCLASS_AMPROC:
 			case OCLASS_SCHEMA:
 			case OCLASS_DATABASE:
-			case OCLASS_EXTENSION:
 
 				/*
 				 * We don't expect any of these sorts of objects to depend on

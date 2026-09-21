@@ -260,7 +260,6 @@ typedef enum NodeTag
 	T_CheckPointStmt,
 	T_CreateSchemaStmt,
 	T_AlterObjectSchemaStmt,
-	T_CreateExtensionStmt,
 
 	/*
 	 * TAGS FOR PARSE TREE NODES (parsenodes.h)

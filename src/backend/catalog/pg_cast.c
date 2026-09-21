@@ -107,9 +107,6 @@ CastCreate(Oid sourcetypeid, Oid targettypeid, Oid funcid, char castcontext,
 	record_object_address_dependencies(&myself, addrs, behavior);
 	free_object_addresses(addrs);
 
-	/* dependency on extension */
-	recordDependencyOnCurrentExtension(&myself, false);
-
 	/* Post creation hook for new cast */
 	InvokeObjectPostCreateHook(CastRelationId, castid, 0);
 

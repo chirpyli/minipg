@@ -30,7 +30,6 @@
 #include "commands/dbcommands.h"
 #include "commands/defrem.h"
 #include "commands/explain.h"
-#include "commands/extension.h"
 #include "commands/portalcmds.h"
 #include "commands/schemacmds.h"
 #include "commands/tablecmds.h"
@@ -109,7 +108,6 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 	{
 		case T_AlterObjectSchemaStmt:
 		case T_AlterTableStmt:
-		case T_CreateExtensionStmt:
 		case T_CreateSchemaStmt:
 		case T_CreateStmt:
 		case T_CreatedbStmt:
@@ -715,10 +713,6 @@ ProcessUtilitySlow(ParseState *pstate,
 				}
 				break;
 
-			case T_CreateExtensionStmt:
-				address = CreateExtension(pstate, (CreateExtensionStmt *) parsetree);
-				break;
-
 			case T_ViewStmt:	/* CREATE VIEW */
 				address = DefineView((ViewStmt *) parsetree, queryString,
 									pstmt->stmt_location, pstmt->stmt_len);
@@ -1022,10 +1016,6 @@ CreateCommandTag(Node *parsetree)
 			tag = CMDTAG_CREATE_TABLE;
 			break;
 
-		case T_CreateExtensionStmt:
-			tag = CMDTAG_CREATE_EXTENSION;
-			break;
-
 		case T_DropStmt:
 			switch (((DropStmt *) parsetree)->removeType)
 			{
@@ -1041,9 +1031,6 @@ CreateCommandTag(Node *parsetree)
 				case OBJECT_SCHEMA:
 					tag = CMDTAG_DROP_SCHEMA;
 					break;
-			case OBJECT_EXTENSION:
-				tag = CMDTAG_DROP_EXTENSION;
-				break;
 				default:
 					tag = CMDTAG_UNKNOWN;
 			}

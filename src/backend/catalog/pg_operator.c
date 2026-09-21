@@ -266,7 +266,7 @@ OperatorShellMake(const char *operatorName,
 	CatalogTupleInsert(pg_operator_desc, tup);
 
 	/* Add dependencies for the entry */
-	makeOperatorDependencies(tup, true, false);
+	makeOperatorDependencies(tup, false);
 
 	heap_freetuple(tup);
 
@@ -537,7 +537,7 @@ OperatorCreate(const char *operatorName,
 	}
 
 	/* Add dependencies for the entry */
-	address = makeOperatorDependencies(tup, true, isUpdate);
+	address = makeOperatorDependencies(tup, isUpdate);
 
 	/* Post creation hook for new operator */
 	InvokeObjectPostCreateHook(OperatorRelationId, operatorObjectId, 0);
@@ -750,16 +750,11 @@ OperatorUpd(Oid baseId, Oid commId, Oid negId, bool isDelete)
  * complete operator, a new shell operator, a just-updated shell,
  * or an operator that's being modified by ALTER OPERATOR).
  *
- * makeExtensionDep should be true when making a new operator or
- * replacing a shell, false for ALTER OPERATOR.  Passing false
- * will prevent any change in the operator's extension membership.
- *
  * NB: the OidIsValid tests in this routine are necessary, in case
  * the given operator is a shell.
  */
 ObjectAddress
 makeOperatorDependencies(HeapTuple tuple,
-						 bool makeExtensionDep,
 						 bool isUpdate)
 {
 	Form_pg_operator oper = (Form_pg_operator) GETSTRUCT(tuple);
@@ -770,12 +765,11 @@ makeOperatorDependencies(HeapTuple tuple,
 	ObjectAddressSet(myself, OperatorRelationId, oper->oid);
 
 	/*
-	 * If we are updating the operator, delete any existing entries, except
-	 * for extension membership which should remain the same.
+	 * If we are updating the operator, delete any existing entries.
 	 */
 	if (isUpdate)
 	{
-		deleteDependencyRecordsFor(myself.classId, myself.objectId, true);
+		deleteDependencyRecordsFor(myself.classId, myself.objectId);
 	}
 
 	addrs = new_object_addresses();
@@ -840,10 +834,6 @@ makeOperatorDependencies(HeapTuple tuple,
 
 	record_object_address_dependencies(&myself, addrs, DEPENDENCY_NORMAL);
 	free_object_addresses(addrs);
-
-	/* Dependency on extension */
-	if (makeExtensionDep)
-		recordDependencyOnCurrentExtension(&myself, isUpdate);
 
 	return myself;
 }

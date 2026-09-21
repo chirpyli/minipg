@@ -173,12 +173,9 @@ DefineVirtualRelation(RangeVar *relation, List *tlist, bool replace,
 		 * change either, while the AT_AddColumnToView machinery took care of
 		 * adding such dependencies for new view columns.  The dependencies of
 		 * the view's query could have changed arbitrarily, but that was dealt
-		 * with inside StoreViewQuery.  What remains is only to check that
-		 * view replacement is allowed when we're creating an extension.
+		 * with inside StoreViewQuery.
 		 */
 		ObjectAddressSet(address, RelationRelationId, viewOid);
-
-		recordDependencyOnCurrentExtension(&address, true);
 
 		/*
 		 * Seems okay, so return the OID of the pre-existing view.

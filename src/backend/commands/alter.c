@@ -24,7 +24,6 @@
 #include "commands/alter.h"
 #include "commands/dbcommands.h"
 #include "commands/defrem.h"
-#include "commands/extension.h"
 #include "commands/tablecmds.h"
 #include "miscadmin.h"
 #include "parser/parse_func.h"

@@ -8,10 +8,6 @@
 -- but even a trivial check of count(*) will exercise the normal code path
 -- through the SRF.
 
-select count(*) >= 0 as ok from pg_available_extension_versions;
-
-select count(*) >= 0 as ok from pg_available_extensions;
-
 -- The entire output of pg_backend_memory_contexts is not stable,
 -- we test only the existance and basic condition of TopMemoryContext.
 select name, ident, parent, level, total_bytes >= free_bytes

@@ -993,16 +993,6 @@ _equalVariableShowStmt(const VariableShowStmt *a, const VariableShowStmt *b)
 }
 
 static bool
-_equalCreateExtensionStmt(const CreateExtensionStmt *a, const CreateExtensionStmt *b)
-{
-	COMPARE_STRING_FIELD(extname);
-	COMPARE_SCALAR_FIELD(if_not_exists);
-	COMPARE_NODE_FIELD(options);
-
-	return true;
-}
-
-static bool
 _equalCreateSchemaStmt(const CreateSchemaStmt *a, const CreateSchemaStmt *b)
 {
 	COMPARE_STRING_FIELD(schemaname);
@@ -1600,9 +1590,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_VariableShowStmt:
 			retval = _equalVariableShowStmt(a, b);
-			break;
-		case T_CreateExtensionStmt:
-			retval = _equalCreateExtensionStmt(a, b);
 			break;
 		case T_CheckPointStmt:
 			retval = true;

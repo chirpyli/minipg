@@ -62,11 +62,9 @@ enum SysCacheIdentifier
 	TABLESPACEOID,
 	TYPENAMENSP,
 	TYPEOID,
-	/* intentionally out of alphabetical order, to avoid an ABI break: */
-	EXTENSIONOID
-
-#define SysCacheSize (EXTENSIONOID + 1)
 };
+
+#define SysCacheSize (TYPEOID + 1)
 
 extern void InitCatalogCache(void);
 extern void InitCatalogCachePhase2(void);

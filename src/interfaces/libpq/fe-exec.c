@@ -1277,7 +1277,12 @@ pqCommandQueueAdvance(PGconn *conn, bool isReadyForQuery)
 {
 	PGcmdQueueEntry *completed = conn->cmd_queue_head;
 
-	Assert(completed != NULL);
+	/*
+	 * The queue can be empty here: during connection startup the server sends
+	 * ReadyForQuery without any command having been queued.
+	 */
+	if (completed == NULL)
+		return;
 
 	/* Only advance once the server has reported Ready for Query */
 	if (!isReadyForQuery)

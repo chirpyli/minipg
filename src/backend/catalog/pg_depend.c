@@ -22,9 +22,7 @@
 #include "catalog/indexing.h"
 #include "catalog/pg_constraint.h"
 #include "catalog/pg_depend.h"
-#include "catalog/pg_extension.h"
 #include "catalog/pg_type.h"
-#include "commands/extension.h"
 #include "miscadmin.h"
 #include "storage/lmgr.h"
 #include "storage/lock.h"
@@ -179,136 +177,15 @@ recordMultipleDependencies(const ObjectAddress *depender,
 }
 
 /*
- * If we are executing a CREATE EXTENSION operation, mark the given object
- * as being a member of the extension, or check that it already is one.
- * Otherwise, do nothing.
- *
- * This must be called during creation of any user-definable object type
- * that could be a member of an extension.
- *
- * isReplace must be true if the object already existed, and false if it is
- * newly created.  In the former case we insist that it already be a member
- * of the current extension.  In the latter case we can skip checking whether
- * it is already a member of any extension.
- *
- * Note: isReplace = true is typically used when updating an object in
- * CREATE OR REPLACE and similar commands.  We used to allow the target
- * object to not already be an extension member, instead silently absorbing
- * it into the current extension.  However, this was both error-prone
- * (extensions might accidentally overwrite free-standing objects) and
- * a security hazard (since the object would retain its previous ownership).
- */
-void
-recordDependencyOnCurrentExtension(const ObjectAddress *object,
-								   bool isReplace)
-{
-	/* Only whole objects can be extension members */
-	Assert(object->objectSubId == 0);
-
-	if (creating_extension)
-	{
-		ObjectAddress extension;
-
-		/* Only need to check for existing membership if isReplace */
-		if (isReplace)
-		{
-			Oid			oldext;
-
-			/*
-			 * Side note: these catalog lookups are safe only because the
-			 * object is a pre-existing one.  In the not-isReplace case, the
-			 * caller has most likely not yet done a CommandCounterIncrement
-			 * that would make the new object visible.
-			 */
-			oldext = getExtensionOfObject(object->classId, object->objectId);
-			if (OidIsValid(oldext))
-			{
-				/* If already a member of this extension, nothing to do */
-				if (oldext == CurrentExtensionObject)
-					return;
-				/* Already a member of some other extension, so reject */
-				ereport(ERROR,
-						(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-						 errmsg("%s is already a member of extension \"%s\"",
-								getObjectDescription(object, false),
-								get_extension_name(oldext))));
-			}
-			/* It's a free-standing object, so reject */
-			ereport(ERROR,
-					(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-					 errmsg("%s is not a member of extension \"%s\"",
-							getObjectDescription(object, false),
-							get_extension_name(CurrentExtensionObject)),
-					 errdetail("An extension is not allowed to replace an object that it does not own.")));
-		}
-
-		/* OK, record it as a member of CurrentExtensionObject */
-		extension.classId = ExtensionRelationId;
-		extension.objectId = CurrentExtensionObject;
-		extension.objectSubId = 0;
-
-		recordDependencyOn(object, &extension, DEPENDENCY_EXTENSION);
-	}
-}
-
-/*
- * If we are executing a CREATE EXTENSION operation, check that the given
- * object is a member of the extension, and throw an error if it isn't.
- * Otherwise, do nothing.
- *
- * This must be called whenever a CREATE IF NOT EXISTS operation (for an
- * object type that can be an extension member) has found that an object of
- * the desired name already exists.  It is insecure for an extension to use
- * IF NOT EXISTS except when the conflicting object is already an extension
- * member; otherwise a hostile user could substitute an object with arbitrary
- * properties.
- */
-void
-checkMembershipInCurrentExtension(const ObjectAddress *object)
-{
-	/*
-	 * This is actually the same condition tested in
-	 * recordDependencyOnCurrentExtension; but we want to issue a
-	 * differently-worded error, and anyway it would be pretty confusing to
-	 * call recordDependencyOnCurrentExtension in these circumstances.
-	 */
-
-	/* Only whole objects can be extension members */
-	Assert(object->objectSubId == 0);
-
-	if (creating_extension)
-	{
-		Oid			oldext;
-
-		oldext = getExtensionOfObject(object->classId, object->objectId);
-		/* If already a member of this extension, OK */
-		if (oldext == CurrentExtensionObject)
-			return;
-		/* Else complain */
-		ereport(ERROR,
-				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-				 errmsg("%s is not a member of extension \"%s\"",
-						getObjectDescription(object, false),
-						get_extension_name(CurrentExtensionObject)),
-				 errdetail("An extension may only use CREATE ... IF NOT EXISTS to skip object creation if the conflicting object is one that it already owns.")));
-	}
-}
-
-/*
  * deleteDependencyRecordsFor -- delete all records with given depender
  * classId/objectId.  Returns the number of records deleted.
  *
  * This is used when redefining an existing object.  Links leading to the
  * object do not change, and links leading from it will be recreated
  * (possibly with some differences from before).
- *
- * If skipExtensionDeps is true, we do not delete any dependencies that
- * show that the given object is a member of an extension.  This avoids
- * needing a lot of extra logic to fetch and recreate that dependency.
  */
 long
-deleteDependencyRecordsFor(Oid classId, Oid objectId,
-						   bool skipExtensionDeps)
+deleteDependencyRecordsFor(Oid classId, Oid objectId)
 {
 	long		count = 0;
 	Relation	depRel;
@@ -332,10 +209,6 @@ deleteDependencyRecordsFor(Oid classId, Oid objectId,
 
 	while (HeapTupleIsValid(tup = systable_getnext(scan)))
 	{
-		if (skipExtensionDeps &&
-			((Form_pg_depend) GETSTRUCT(tup))->deptype == DEPENDENCY_EXTENSION)
-			continue;
-
 		CatalogTupleDelete(depRel, &tup->t_self);
 		count++;
 	}
@@ -353,8 +226,7 @@ deleteDependencyRecordsFor(Oid classId, Oid objectId,
  * Returns the number of records deleted.
  *
  * This is a variant of deleteDependencyRecordsFor, useful when revoking
- * an object property that is expressed by a dependency record (such as
- * extension membership).
+ * an object property that is expressed by a dependency record.
  */
 long
 deleteDependencyRecordsForClass(Oid classId, Oid objectId,
@@ -887,173 +759,6 @@ dependencyLockAndCheckObject(Oid classId, Oid objectId)
  * Various special-purpose lookups and manipulations of pg_depend.
  */
 
-
-/*
- * Find the extension containing the specified object, if any
- *
- * Returns the OID of the extension, or InvalidOid if the object does not
- * belong to any extension.
- *
- * Extension membership is marked by an EXTENSION dependency from the object
- * to the extension.  Note that the result will be indeterminate if pg_depend
- * contains links from this object to more than one extension ... but that
- * should never happen.
- */
-Oid
-getExtensionOfObject(Oid classId, Oid objectId)
-{
-	Oid			result = InvalidOid;
-	Relation	depRel;
-	ScanKeyData key[2];
-	SysScanDesc scan;
-	HeapTuple	tup;
-
-	depRel = table_open(DependRelationId, AccessShareLock);
-
-	ScanKeyInit(&key[0],
-				Anum_pg_depend_classid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(classId));
-	ScanKeyInit(&key[1],
-				Anum_pg_depend_objid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(objectId));
-
-	scan = systable_beginscan(depRel, DependDependerIndexId, true,
-							  NULL, 2, key);
-
-	while (HeapTupleIsValid((tup = systable_getnext(scan))))
-	{
-		Form_pg_depend depform = (Form_pg_depend) GETSTRUCT(tup);
-
-		if (depform->refclassid == ExtensionRelationId &&
-			depform->deptype == DEPENDENCY_EXTENSION)
-		{
-			result = depform->refobjid;
-			break;				/* no need to keep scanning */
-		}
-	}
-
-	systable_endscan(scan);
-
-	table_close(depRel, AccessShareLock);
-
-	return result;
-}
-
-/*
- * Return (possibly NIL) list of extensions that the given object depends on
- * in DEPENDENCY_AUTO_EXTENSION mode.
- */
-List *
-getAutoExtensionsOfObject(Oid classId, Oid objectId)
-{
-	List	   *result = NIL;
-	Relation	depRel;
-	ScanKeyData key[2];
-	SysScanDesc scan;
-	HeapTuple	tup;
-
-	depRel = table_open(DependRelationId, AccessShareLock);
-
-	ScanKeyInit(&key[0],
-				Anum_pg_depend_classid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(classId));
-	ScanKeyInit(&key[1],
-				Anum_pg_depend_objid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(objectId));
-
-	scan = systable_beginscan(depRel, DependDependerIndexId, true,
-							  NULL, 2, key);
-
-	while (HeapTupleIsValid((tup = systable_getnext(scan))))
-	{
-		Form_pg_depend depform = (Form_pg_depend) GETSTRUCT(tup);
-
-		if (depform->refclassid == ExtensionRelationId &&
-			depform->deptype == DEPENDENCY_AUTO_EXTENSION)
-			result = lappend_oid(result, depform->refobjid);
-	}
-
-	systable_endscan(scan);
-
-	table_close(depRel, AccessShareLock);
-
-	return result;
-}
-
-/*
- * Look up a type belonging to an extension.
- *
- * Returns the type's OID, or InvalidOid if not found.
- *
- * Notice that the type is specified by name only, without a schema.
- * That's because this will typically be used by relocatable extensions
- * which can't make a-priori assumptions about which schema their objects
- * are in.  As long as the extension only defines one type of this name,
- * the answer is unique anyway.
- *
- * We might later add the ability to look up functions, operators, etc.
- */
-Oid
-getExtensionType(Oid extensionOid, const char *typname)
-{
-	Oid			result = InvalidOid;
-	Relation	depRel;
-	ScanKeyData key[3];
-	SysScanDesc scan;
-	HeapTuple	tup;
-
-	depRel = table_open(DependRelationId, AccessShareLock);
-
-	ScanKeyInit(&key[0],
-				Anum_pg_depend_refclassid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(ExtensionRelationId));
-	ScanKeyInit(&key[1],
-				Anum_pg_depend_refobjid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(extensionOid));
-	ScanKeyInit(&key[2],
-				Anum_pg_depend_refobjsubid,
-				BTEqualStrategyNumber, F_INT4EQ,
-				Int32GetDatum(0));
-
-	scan = systable_beginscan(depRel, DependReferenceIndexId, true,
-							  NULL, 3, key);
-
-	while (HeapTupleIsValid(tup = systable_getnext(scan)))
-	{
-		Form_pg_depend depform = (Form_pg_depend) GETSTRUCT(tup);
-
-		if (depform->classid == TypeRelationId &&
-			depform->deptype == DEPENDENCY_EXTENSION)
-		{
-			Oid			typoid = depform->objid;
-			HeapTuple	typtup;
-
-			typtup = SearchSysCache1(TYPEOID, ObjectIdGetDatum(typoid));
-			if (!HeapTupleIsValid(typtup))
-				continue;		/* should we throw an error? */
-			if (strcmp(NameStr(((Form_pg_type) GETSTRUCT(typtup))->typname),
-					   typname) == 0)
-			{
-				result = typoid;
-				ReleaseSysCache(typtup);
-				break;			/* no need to keep searching */
-			}
-			ReleaseSysCache(typtup);
-		}
-	}
-
-	systable_endscan(scan);
-
-	table_close(depRel, AccessShareLock);
-
-	return result;
-}
 
 /*
  * get_index_constraint

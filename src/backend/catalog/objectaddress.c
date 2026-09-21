@@ -29,7 +29,6 @@
 #include "catalog/pg_collation.h"
 #include "catalog/pg_constraint.h"
 #include "catalog/pg_database.h"
-#include "catalog/pg_extension.h"
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_opclass.h"
 #include "catalog/pg_operator.h"
@@ -39,7 +38,6 @@
 #include "catalog/pg_type.h"
 #include "commands/dbcommands.h"
 #include "commands/defrem.h"
-#include "commands/extension.h"
 #include "funcapi.h"
 #include "miscadmin.h"
 #include "nodes/makefuncs.h"
@@ -174,19 +172,6 @@ static const ObjectPropertyType ObjectProperty[] =
 		InvalidAttrNumber,
 		InvalidAttrNumber,
 		OBJECT_DATABASE,
-		false
-	},
-	{
-		"extension",
-		ExtensionRelationId,
-		ExtensionOidIndexId,
-		InvalidOid,
-		InvalidOid,
-		Anum_pg_extension_oid,
-		Anum_pg_extension_extname,
-		InvalidAttrNumber,		/* extension doesn't belong to extnamespace */
-		InvalidAttrNumber,
-		OBJECT_EXTENSION,
 		false
 	},
 	{
@@ -410,10 +395,6 @@ static const struct object_type_map
 	/* OCLASS_DATABASE */
 	{
 		"database", OBJECT_DATABASE
-	},
-	/* OCLASS_EXTENSION */
-	{
-		"extension", OBJECT_EXTENSION
 	}
 };
 
@@ -533,7 +514,6 @@ get_object_address(ObjectType objtype, Node *object,
 													   &relation, missing_ok);
 				break;
 			case OBJECT_DATABASE:
-			case OBJECT_EXTENSION:
 			case OBJECT_SCHEMA:
 				address = get_object_address_unqualified(objtype,
 														 (Value *) object, missing_ok);
@@ -710,11 +690,6 @@ get_object_address_unqualified(ObjectType objtype,
 		case OBJECT_DATABASE:
 			address.classId = DatabaseRelationId;
 			address.objectId = get_database_oid(name, missing_ok);
-			address.objectSubId = 0;
-			break;
-		case OBJECT_EXTENSION:
-			address.classId = ExtensionRelationId;
-			address.objectId = get_extension_oid(name, missing_ok);
 			address.objectSubId = 0;
 			break;
 		case OBJECT_SCHEMA:
@@ -1266,7 +1241,6 @@ pg_get_object_address(PG_FUNCTION_ARGS)
 		case OBJECT_ATTRIBUTE:
 		case OBJECT_COLLATION:
 		case OBJECT_DATABASE:
-		case OBJECT_EXTENSION:
 		case OBJECT_SCHEMA:
 			if (list_length(name) != 1)
 				ereport(ERROR,
@@ -2088,26 +2062,10 @@ getObjectDescription(const ObjectAddress *object, bool missing_ok)
 			break;
 		}
 
-		case OCLASS_EXTENSION:
-			{
-				char	   *extname;
-
-				extname = get_extension_name(object->objectId);
-				if (!extname)
-				{
-					if (!missing_ok)
-						elog(ERROR, "cache lookup failed for extension %u",
-							 object->objectId);
-					break;
-				}
-			appendStringInfo(&buffer, _("extension %s"), extname);
-			break;
-		}
-
-			/*
-			 * There's intentionally no default: case here; we want the
-			 * compiler to warn if a new OCLASS hasn't been handled above.
-			 */
+		/*
+		 * There's intentionally no default: case here; we want the
+		 * compiler to warn if a new OCLASS hasn't been handled above.
+		 */
 	}
 
 	/* an empty buffer is equivalent to no object found */
@@ -2545,16 +2503,10 @@ getObjectTypeDescription(const ObjectAddress *object, bool missing_ok)
 			appendStringInfoString(&buffer, "database");
 			break;
 
-		case OCLASS_EXTENSION:
-			appendStringInfoString(&buffer, "extension");
-			break;
-
-
-
-			/*
-			 * There's intentionally no default: case here; we want the
-			 * compiler to warn if a new OCLASS hasn't been handled above.
-			 */
+		/*
+		 * There's intentionally no default: case here; we want the
+		 * compiler to warn if a new OCLASS hasn't been handled above.
+		 */
 	}
 
 	/* the result can never be empty */
@@ -3168,29 +3120,11 @@ getObjectIdentityParts(const ObjectAddress *object,
 			break;
 		}
 
-		case OCLASS_EXTENSION:
-			{
-				char	   *extname;
-
-				extname = get_extension_name(object->objectId);
-				if (!extname)
-				{
-					if (!missing_ok)
-						elog(ERROR, "cache lookup failed for extension %u",
-							 object->objectId);
-					break;
-				}
-				appendStringInfoString(&buffer, quote_identifier(extname));
-					if (objname)
-						*objname = list_make1(extname);
-				break;
-				}
-
-				/*
-				 * There's intentionally no default: case here; we want the
-				 * compiler to warn if a new OCLASS hasn't been handled above.
-				 */
-				}
+	/*
+	 * There's intentionally no default: case here; we want the
+	 * compiler to warn if a new OCLASS hasn't been handled above.
+	 */
+	}
 
 	if (!missing_ok)
 	{

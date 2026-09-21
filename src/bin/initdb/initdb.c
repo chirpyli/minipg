@@ -996,8 +996,6 @@ setup_depend(FILE *cmdfd)
 		 * pg_database: it's a feature, not a bug, that template1 is not
 		 * pinned.
 		 *
-		 * pg_extension: a pinned extension isn't really an extension, hmm?
-		 *
 		 * pg_tablespace: tablespaces don't participate in the dependency
 		 * code, and DropTableSpace() explicitly protects the built-in
 		 * tablespaces.

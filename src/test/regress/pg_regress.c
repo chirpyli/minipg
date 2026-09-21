@@ -76,7 +76,6 @@ char	   *inputdir = ".";
 char	   *outputdir = ".";
 char	   *bindir = PGBINDIR;
 char	   *launcher = NULL;
-static _stringlist *loadextension = NULL;
 static int	max_connections = 0;
 static int	max_concurrent_tests = 0;
 static char *encoding = NULL;
@@ -1673,8 +1672,6 @@ drop_database_if_exists(const char *dbname)
 static void
 create_database(const char *dbname)
 {
-	_stringlist *sl;
-
 	/*
 	 * We use template0 so that any installation-local cruft in template1 will
 	 * not mess up the tests.
@@ -1689,16 +1686,6 @@ create_database(const char *dbname)
 	psql_command(dbname,
 				 "SET bytea_output TO 'hex';"
 				 "SET timezone_abbreviations TO 'Default';");
-
-	/*
-	 * Install any requested extensions.  We use CREATE IF NOT EXISTS so that
-	 * this will work whether or not the extension is preinstalled.
-	 */
-	for (sl = loadextension; sl != NULL; sl = sl->next)
-	{
-		header(_("installing %s"), sl->str);
-		psql_command(dbname, "CREATE EXTENSION IF NOT EXISTS \"%s\"", sl->str);
-	}
 }
 
 static void
@@ -1739,8 +1726,6 @@ help(void)
 	printf(_("  -h, --help                    show this help, then exit\n"));
 	printf(_("      --inputdir=DIR            take input files from DIR (default \".\")\n"));
 	printf(_("      --launcher=CMD            use CMD as launcher of psql\n"));
-	printf(_("      --load-extension=EXT      load the named extension before running the\n"));
-	printf(_("                                tests; can appear multiple times\n"));
 	printf(_("      --max-connections=N       maximum number of concurrent connections\n"));
 	printf(_("                                (default is 0, meaning unlimited)\n"));
 	printf(_("      --max-concurrent-tests=N  maximum number of concurrent tests in schedule\n"));
@@ -1796,7 +1781,6 @@ regression_main(int argc, char *argv[],
 		{"temp-config", required_argument, NULL, 19},
 		{"use-existing", no_argument, NULL, 20},
 		{"launcher", required_argument, NULL, 21},
-		{"load-extension", required_argument, NULL, 22},
 		{"config-auth", required_argument, NULL, 24},
 		{"max-concurrent-tests", required_argument, NULL, 25},
 		{NULL, 0, NULL, 0}
@@ -1906,9 +1890,6 @@ regression_main(int argc, char *argv[],
 				break;
 			case 21:
 				launcher = pg_strdup(optarg);
-				break;
-			case 22:
-				add_stringlist_item(&loadextension, optarg);
 				break;
 			case 24:
 				config_auth_datadir = pg_strdup(optarg);

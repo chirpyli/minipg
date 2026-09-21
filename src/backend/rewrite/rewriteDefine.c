@@ -127,7 +127,7 @@ InsertRule(Oid eventrel_oid, List *action, bool replace)
 
 	/* If replacing, get rid of old dependencies and make new ones */
 	if (is_update)
-		deleteDependencyRecordsFor(RewriteRelationId, rewriteObjectId, false);
+		deleteDependencyRecordsFor(RewriteRelationId, rewriteObjectId);
 
 	/*
 	 * Install a dependency on the rule's view to ensure it will go away on

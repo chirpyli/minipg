@@ -31,7 +31,6 @@
 #include "catalog/pg_constraint.h"
 #include "catalog/pg_database.h"
 #include "catalog/pg_depend.h"
-#include "catalog/pg_extension.h"
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_opclass.h"
 #include "catalog/pg_operator.h"
@@ -432,18 +431,6 @@ static const struct cachedesc cacheinfo[] = {
 			0
 		},
 		64
-	},
-	/* intentionally out of alphabetical order, to avoid an ABI break: */
-	{ExtensionRelationId,		/* EXTENSIONOID */
-		ExtensionOidIndexId,
-		1,
-		{
-			Anum_pg_extension_oid,
-			0,
-			0,
-			0
-		},
-		2
 	}
 };
 

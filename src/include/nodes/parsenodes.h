@@ -862,7 +862,6 @@ typedef enum ObjectType
 	OBJECT_COLLATION,
 	OBJECT_DATABASE,
 	OBJECT_DEFAULT,
-	OBJECT_EXTENSION,
 	OBJECT_FUNCTION,
 	OBJECT_INDEX,
 	OBJECT_OPCLASS,
@@ -1082,19 +1081,6 @@ typedef struct Constraint
 	char	   *access_method;	/* index access method; NULL for default */
 	Node	   *where_clause;	/* partial index predicate */
 } Constraint;
-
-/* ----------------------
- *		Create/Alter Extension Statements
- * ----------------------
- */
-
-typedef struct CreateExtensionStmt
-{
-	NodeTag		type;
-	char	   *extname;
-	bool		if_not_exists;	/* just do nothing if it already exists? */
-	List	   *options;		/* List of DefElem nodes */
-} CreateExtensionStmt;
 
 /* ----------------------
  *		Drop Table|Sequence|View|Index|Type|Domain|Conversion|Schema Statement

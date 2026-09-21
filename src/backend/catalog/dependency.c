@@ -30,7 +30,6 @@
 #include "catalog/pg_constraint.h"
 #include "catalog/pg_database.h"
 #include "catalog/pg_depend.h"
-#include "catalog/pg_extension.h"
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_opclass.h"
 #include "catalog/pg_operator.h"
@@ -41,7 +40,6 @@
 #include "catalog/pg_tablespace.h"
 #include "catalog/pg_type.h"
 #include "commands/defrem.h"
-#include "commands/extension.h"
 #include "commands/typecmds.h"
 #include "miscadmin.h"
 #include "nodes/nodeFuncs.h"
@@ -116,8 +114,7 @@ typedef struct
 #define DEPFLAG_NORMAL		0x0002	/* reached via normal dependency */
 #define DEPFLAG_AUTO		0x0004	/* reached via auto dependency */
 #define DEPFLAG_INTERNAL	0x0008	/* reached via internal dependency */
-#define DEPFLAG_EXTENSION	0x0020	/* reached via extension dependency */
-#define DEPFLAG_REVERSE		0x0040	/* reverse internal/extension link */
+#define DEPFLAG_REVERSE		0x0040	/* reverse internal link */
 #define DEPFLAG_SUBOBJECT	0x0100	/* subobject of another deletable object */
 
 
@@ -174,7 +171,6 @@ static const Oid object_classes[] = {
 	RewriteRelationId,			/* OCLASS_REWRITE */
 	NamespaceRelationId,		/* OCLASS_SCHEMA */
 	DatabaseRelationId,			/* OCLASS_DATABASE */
-	ExtensionRelationId,			/* OCLASS_EXTENSION */
 };
 
 
@@ -266,10 +262,6 @@ deleteObjectsInList(ObjectAddresses *targetObjects, Relation *depRel,
  *
  * PERFORM_DELETION_SKIP_ORIGINAL: do not delete the specified object(s),
  * but only what depends on it/them.
- *
- * PERFORM_DELETION_SKIP_EXTENSIONS: do not delete extensions, even when
- * deleting objects that are part of an extension.  This should generally
- * be used only when dropping temporary objects.
  *
  * PERFORM_DELETION_CONCURRENT_LOCK: perform the drop normally but with a lock
  * as if it were concurrent.  This is used by REINDEX CONCURRENTLY.
@@ -494,13 +486,12 @@ findDependentObjects(const ObjectAddress *object,
 
 	/*
 	 * The target object might be internally dependent on some other object
-	 * (its "owner"), and/or be a member of an extension (also considered its
-	 * owner).  If so, and if we aren't recursing from the owning object, we
-	 * have to transform this deletion request into a deletion request of the
-	 * owning object.  (We'll eventually recurse back to this object, but the
-	 * owning object has to be visited first so it will be deleted after.) The
-	 * way to find out about this is to scan the pg_depend entries that show
-	 * what this object depends on.
+	 * (its "owner").  If so, and if we aren't recursing from the owning
+	 * object, we have to transform this deletion request into a deletion
+	 * request of the owning object.  (We'll eventually recurse back to this
+	 * object, but the owning object has to be visited first so it will be
+	 * deleted after.) The way to find out about this is to scan the pg_depend
+	 * entries that show what this object depends on.
 	 */
 	ScanKeyInit(&key[0],
 				Anum_pg_depend_classid,
@@ -553,43 +544,14 @@ findDependentObjects(const ObjectAddress *object,
 		{
 			case DEPENDENCY_NORMAL:
 			case DEPENDENCY_AUTO:
-			case DEPENDENCY_AUTO_EXTENSION:
 				/* no problem */
 				break;
-
-			case DEPENDENCY_EXTENSION:
-
-				/*
-				 * If told to, ignore EXTENSION dependencies altogether.  This
-				 * flag is normally used to prevent dropping extensions during
-				 * temporary-object cleanup, even if a temp object was created
-				 * during an extension script.
-				 */
-				if (flags & PERFORM_DELETION_SKIP_EXTENSIONS)
-					break;
-
-				/*
-				 * If the other object is the extension currently being
-				 * created/altered, ignore this dependency and continue with
-				 * the deletion.  This allows dropping of an extension's
-				 * objects within the extension's scripts, as well as corner
-				 * cases such as dropping a transient object created within
-				 * such a script.
-				 */
-				if (creating_extension &&
-					otherObject.classId == ExtensionRelationId &&
-					otherObject.objectId == CurrentExtensionObject)
-					break;
-
-				/* Otherwise, treat this like an internal dependency */
-				/* FALL THRU */
 
 			case DEPENDENCY_INTERNAL:
 
 				/*
 				 * This object is part of the internal implementation of
-				 * another object, or is part of the extension that is the
-				 * other object.  We have three cases:
+				 * another object.  We have three cases:
 				 *
 				 * 1. At the outermost recursion level, we must disallow the
 				 * DROP.  However, if the owning object is listed in
@@ -618,14 +580,11 @@ findDependentObjects(const ObjectAddress *object,
 					 * We postpone actually issuing the error message until
 					 * after this loop, so that we can make the behavior
 					 * independent of the ordering of pg_depend entries, at
-					 * least if there's not more than one INTERNAL and one
-					 * EXTENSION dependency.  (If there's more, we'll complain
-					 * about a random one of them.)  Prefer to complain about
-					 * EXTENSION, since that's generally a more important
-					 * dependency.
+					 * least if there's not more than one INTERNAL dependency.
+					 * (If there's more, we'll complain about a random one of
+					 * them.)
 					 */
-					if (!OidIsValid(owningObject.classId) ||
-						foundDep->deptype == DEPENDENCY_EXTENSION)
+					if (!OidIsValid(owningObject.classId))
 						owningObject = otherObject;
 					break;
 				}
@@ -736,8 +695,8 @@ findDependentObjects(const ObjectAddress *object,
 	systable_endscan(scan);
 
 	/*
-	 * If we found an INTERNAL or EXTENSION dependency when we're at outer
-	 * level, complain about it now.
+	 * If we found an INTERNAL dependency when we're at outer level, complain
+	 * about it now.
 	 */
 	if (OidIsValid(owningObject.classId))
 	{
@@ -835,14 +794,10 @@ findDependentObjects(const ObjectAddress *object,
 				subflags = DEPFLAG_NORMAL;
 				break;
 			case DEPENDENCY_AUTO:
-			case DEPENDENCY_AUTO_EXTENSION:
 				subflags = DEPFLAG_AUTO;
 				break;
 			case DEPENDENCY_INTERNAL:
 				subflags = DEPFLAG_INTERNAL;
-				break;
-			case DEPENDENCY_EXTENSION:
-				subflags = DEPFLAG_EXTENSION;
 				break;
 			case DEPENDENCY_PIN:
 
@@ -999,12 +954,11 @@ reportDependentObjects(const ObjectAddresses *targetObjects,
 
 		/*
 		 * If, at any stage of the recursive search, we reached the object via
-		 * an AUTO, INTERNAL, or EXTENSION dependency, then it's
-		 * okay to delete it even in RESTRICT mode.
+		 * an AUTO or INTERNAL dependency, then it's okay to delete it even in
+		 * RESTRICT mode.
 		 */
 		if (extra->flags & (DEPFLAG_AUTO |
-							DEPFLAG_INTERNAL |
-							DEPFLAG_EXTENSION))
+							DEPFLAG_INTERNAL))
 		{
 			/*
 			 * auto-cascades are reported at DEBUG2, not msglevel.  We don't
@@ -1307,10 +1261,6 @@ doDeletion(const ObjectAddress *object, int flags)
 
 		case OCLASS_REWRITE:
 			RemoveRewriteRuleById(object->objectId);
-			break;
-
-		case OCLASS_EXTENSION:
-			RemoveExtensionById(object->objectId);
 			break;
 
 		case OCLASS_CAST:
@@ -2457,9 +2407,6 @@ getObjectClass(const ObjectAddress *object)
 
 		case DatabaseRelationId:
 			return OCLASS_DATABASE;
-
-		case ExtensionRelationId:
-			return OCLASS_EXTENSION;
 	}
 
 	/* shouldn't get here */

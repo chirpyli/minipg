@@ -55,7 +55,6 @@ CreateSchemaCommand(CreateSchemaStmt *stmt, const char *queryString,
 	int			save_sec_context;
 	int			save_nestlevel;
 	char	   *nsp = namespace_search_path;
-	ObjectAddress address;
 	StringInfoData pathbuf;
 
 	GetUserIdAndSecContext(&saved_uid, &save_sec_context);
@@ -96,13 +95,6 @@ CreateSchemaCommand(CreateSchemaStmt *stmt, const char *queryString,
 		namespaceId = get_namespace_oid(schemaName, true);
 		if (OidIsValid(namespaceId))
 		{
-			/*
-			 * If we are in an extension script, insist that the pre-existing
-			 * object be a member of the extension, to avoid security risks.
-			 */
-			ObjectAddressSet(address, NamespaceRelationId, namespaceId);
-			checkMembershipInCurrentExtension(&address);
-
 			/* OK to skip */
 			ereport(NOTICE,
 					(errcode(ERRCODE_DUPLICATE_SCHEMA),
@@ -151,14 +143,6 @@ CreateSchemaCommand(CreateSchemaStmt *stmt, const char *queryString,
 	(void) set_config_option("search_path", pathbuf.data,
 							 PGC_USERSET, PGC_S_SESSION,
 							 GUC_ACTION_SAVE, true, 0, false);
-
-	/*
-	 * Report the new schema to possibly interested event triggers.  Note we
-	 * must do this here and not in ProcessUtilitySlow because otherwise the
-	 * objects created below are reported before the schema, which would be
-	 * wrong.
-	 */
-	ObjectAddressSet(address, NamespaceRelationId, namespaceId);
 
 	/*
 	 * Examine the list of commands embedded in the CREATE SCHEMA command, and
