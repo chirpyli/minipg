@@ -20,7 +20,6 @@
 #include "postgres.h"
 
 #include "access/htup_details.h"
-#include "access/parallel.h"
 #include "access/xact.h"
 #include "access/xlog.h"
 #include "catalog/dependency.h"
@@ -2577,7 +2576,7 @@ recomputeNamespacePath(void)
  * End-of-transaction cleanup for namespaces.
  */
 void
-AtEOXact_Namespace(bool isCommit, bool parallel)
+AtEOXact_Namespace(bool isCommit)
 {
 	/*
 	 * Clean up if someone failed to do PopOverrideSearchPath

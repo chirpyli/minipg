@@ -16,7 +16,6 @@ OBJS = \
 	analyzejoins.o \
 	createplan.o \
 	initsplan.o \
-	planagg.o \
 	planmain.o \
 	planner.o \
 	setrefs.o \

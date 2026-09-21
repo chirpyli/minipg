@@ -286,7 +286,7 @@ extern bool stack_is_too_deep(void);
 
 /* in tcop/utility.c */
 extern void PreventCommandIfReadOnly(const char *cmdname);
-extern void PreventCommandIfParallelMode(const char *cmdname);
+
 extern void PreventCommandDuringRecovery(const char *cmdname);
 
 /* in utils/misc/guc.c */

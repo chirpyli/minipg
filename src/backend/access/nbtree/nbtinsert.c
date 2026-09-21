@@ -32,8 +32,7 @@
 static BTStack _bt_search_insert(Relation rel, BTInsertState insertstate);
 static TransactionId _bt_check_unique(Relation rel, BTInsertState insertstate,
 									  Relation heapRel,
-									  IndexUniqueCheck checkUnique, bool *is_unique,
-									  uint32 *speculativeToken);
+									  IndexUniqueCheck checkUnique, bool *is_unique);
 static OffsetNumber _bt_findinsertloc(Relation rel,
 									  BTInsertState insertstate,
 									  bool checkingunique,
@@ -78,22 +77,15 @@ static inline int _bt_blk_cmp(const void *arg1, const void *arg2);
  *		This routine is called by the public interface routine, btinsert.
  *		By here, itup is filled in, including the TID.
  *
- *		If checkUnique is UNIQUE_CHECK_NO or UNIQUE_CHECK_PARTIAL, this
- *		will allow duplicates.  Otherwise (UNIQUE_CHECK_YES or
- *		UNIQUE_CHECK_EXISTING) it will throw error for a duplicate.
- *		For UNIQUE_CHECK_EXISTING we merely run the duplicate check, and
- *		don't actually insert.
+ *		If checkUnique is UNIQUE_CHECK_NO, this will allow duplicates.
+ *		Otherwise (UNIQUE_CHECK_YES or UNIQUE_CHECK_EXISTING) it will
+ *		throw error for a duplicate.  For UNIQUE_CHECK_EXISTING we merely
+ *		run the duplicate check, and don't actually insert.
  *
  *		indexUnchanged executor hint indicates if itup is from an
  *		UPDATE that didn't logically change the indexed value, but
  *		must nevertheless have a new entry to point to a successor
  *		version.
- *
- *		The result value is only significant for UNIQUE_CHECK_PARTIAL:
- *		it must be true if the entry is known unique, else false.
- *		(In the current implementation we'll also return true after a
- *		successful UNIQUE_CHECK_YES or UNIQUE_CHECK_EXISTING call, but
- *		that's just a coding artifact.)
  */
 bool
 _bt_doinsert(Relation rel, IndexTuple itup,
@@ -202,10 +194,9 @@ search:
 	if (checkingunique)
 	{
 		TransactionId xwait;
-		uint32		speculativeToken;
 
 		xwait = _bt_check_unique(rel, &insertstate, heapRel, checkUnique,
-								 &is_unique, &speculativeToken);
+								 &is_unique);
 
 		if (unlikely(TransactionIdIsValid(xwait)))
 		{
@@ -213,15 +204,8 @@ search:
 			_bt_relbuf(rel, insertstate.buf);
 			insertstate.buf = InvalidBuffer;
 
-			/*
-			 * If it's a speculative insertion, wait for it to finish (ie. to
-			 * go ahead with the insertion, or kill the tuple).  Otherwise
-			 * wait for the transaction to finish as usual.
-			 */
-			if (speculativeToken)
-				SpeculativeInsertionWait(xwait, speculativeToken);
-			else
-				XactLockTableWait(xwait, rel, &itup->t_tid, XLTW_InsertIndex);
+			/* wait for the transaction to finish as usual */
+			XactLockTableWait(xwait, rel, &itup->t_tid, XLTW_InsertIndex);
 
 			/* start over... */
 			if (stack)
@@ -383,15 +367,7 @@ _bt_search_insert(Relation rel, BTInsertState insertstate)
  *
  * Returns InvalidTransactionId if there is no conflict, else an xact ID
  * we must wait for to see if it commits a conflicting tuple.   If an actual
- * conflict is detected, no return --- just ereport().  If an xact ID is
- * returned, and the conflicting tuple still has a speculative insertion in
- * progress, *speculativeToken is set to non-zero, and the caller can wait for
- * the verdict on the insertion using SpeculativeInsertionWait().
- *
- * However, if checkUnique == UNIQUE_CHECK_PARTIAL, we always return
- * InvalidTransactionId because we don't want to wait.  In this case we
- * set *is_unique to false if there is a potential conflict, and the
- * core code must redo the uniqueness check later.
+ * conflict is detected, no return --- just ereport().
  *
  * As a side-effect, sets state in insertstate that can later be used by
  * _bt_findinsertloc() to reuse most of the binary search work we do
@@ -403,8 +379,7 @@ _bt_search_insert(Relation rel, BTInsertState insertstate)
  */
 static TransactionId
 _bt_check_unique(Relation rel, BTInsertState insertstate, Relation heapRel,
-				 IndexUniqueCheck checkUnique, bool *is_unique,
-				 uint32 *speculativeToken)
+				 IndexUniqueCheck checkUnique, bool *is_unique)
 {
 	IndexTuple	itup = insertstate->itup;
 	IndexTuple	curitup = NULL;
@@ -561,22 +536,6 @@ _bt_check_unique(Relation rel, BTInsertState insertstate, Relation heapRel,
 					TransactionId xwait;
 
 					/*
-					 * It is a duplicate. If we are only doing a partial
-					 * check, then don't bother checking if the tuple is being
-					 * updated in another transaction. Just return the fact
-					 * that it is a potential conflict and leave the full
-					 * check till later. Don't invalidate binary search
-					 * bounds.
-					 */
-					if (checkUnique == UNIQUE_CHECK_PARTIAL)
-					{
-						if (nbuf != InvalidBuffer)
-							_bt_relbuf(rel, nbuf);
-						*is_unique = false;
-						return InvalidTransactionId;
-					}
-
-					/*
 					 * If this tuple is being updated by other transaction
 					 * then we have to wait for its commit/abort.
 					 */
@@ -588,7 +547,6 @@ _bt_check_unique(Relation rel, BTInsertState insertstate, Relation heapRel,
 						if (nbuf != InvalidBuffer)
 							_bt_relbuf(rel, nbuf);
 						/* Tell _bt_doinsert to wait... */
-						*speculativeToken = SnapshotDirty.speculativeToken;
 						/* Caller releases lock on buf immediately */
 						insertstate->bounds_valid = false;
 						return xwait;

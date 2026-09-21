@@ -38,7 +38,6 @@
 #include "access/heaptoast.h"
 #include "access/hio.h"
 #include "access/multixact.h"
-#include "access/parallel.h"
 #include "access/relscan.h"
 #include "access/subtrans.h"
 #include "access/syncscan.h"
@@ -2086,8 +2085,7 @@ ReleaseBulkInsertStatePin(BulkInsertState bistate)
  * that this routine directly takes a tuple rather than a slot.
  *
  * There's corresponding HEAP_INSERT_ options to all the TABLE_INSERT_
- * options, and there additionally is HEAP_INSERT_SPECULATIVE which is used to
- * implement table_tuple_insert_speculative().
+ * options.
  *
  * On return the header fields of *tup are updated to match the stored tuple;
  * in particular tup->t_self receives the actual TID where the tuple was
@@ -2144,8 +2142,7 @@ heap_insert(Relation relation, HeapTuple tup, CommandId cid,
 	/* NO EREPORT(ERROR) from here till changes are logged */
 	START_CRIT_SECTION();
 
-	RelationPutHeapTuple(relation, buffer, heaptup,
-						 (options & HEAP_INSERT_SPECULATIVE) != 0);
+	RelationPutHeapTuple(relation, buffer, heaptup);
 
 	if (PageIsAllVisible(BufferGetPage(buffer)))
 	{
@@ -2195,8 +2192,6 @@ heap_insert(Relation relation, HeapTuple tup, CommandId cid,
 		xlrec.flags = 0;
 		if (all_visible_cleared)
 			xlrec.flags |= XLH_INSERT_ALL_VISIBLE_CLEARED;
-		if (options & HEAP_INSERT_SPECULATIVE)
-			xlrec.flags |= XLH_INSERT_IS_SPECULATIVE;
 		Assert(ItemPointerGetBlockNumber(&heaptup->t_self) == BufferGetBlockNumber(buffer));
 
 		XLogBeginInsert();
@@ -2240,7 +2235,6 @@ heap_insert(Relation relation, HeapTuple tup, CommandId cid,
 	 */
 	CacheInvalidateHeapTuple(relation, heaptup, NULL);
 
-	/* Note: speculative insertions are counted too, even if aborted later */
 	pgstat_count_heap_insert(relation, 1);
 
 	/*
@@ -2264,17 +2258,6 @@ static HeapTuple
 heap_prepare_insert(Relation relation, HeapTuple tup, TransactionId xid,
 					CommandId cid, int options)
 {
-	/*
-	 * To allow parallel inserts, we need to ensure that they are safe to be
-	 * performed in workers. We have the infrastructure to allow parallel
-	 * inserts in general except for the cases where inserts generate a new
-	 * CommandId.
-	 */
-	if (IsParallelWorker())
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_TRANSACTION_STATE),
-				 errmsg("cannot insert tuples in a parallel worker")));
-
 	tup->t_data->t_infomask &= ~(HEAP_XACT_MASK);
 	tup->t_data->t_infomask2 &= ~(HEAP2_XACT_MASK);
 	tup->t_data->t_infomask |= HEAP_XMAX_INVALID;
@@ -2408,7 +2391,7 @@ heap_multi_insert(Relation relation, TupleTableSlot **slots, int ntuples,
 		 * RelationGetBufferForTuple has ensured that the first tuple fits.
 		 * Put that on the page, and then as many other tuples as fit.
 		 */
-		RelationPutHeapTuple(relation, buffer, heaptuples[ndone], false);
+		RelationPutHeapTuple(relation, buffer, heaptuples[ndone]);
 
 		/*
 		 * For logical decoding we need combo CIDs to properly decode the
@@ -2424,7 +2407,7 @@ heap_multi_insert(Relation relation, TupleTableSlot **slots, int ntuples,
 			if (PageGetHeapFreeSpace(page) < MAXALIGN(heaptup->t_len) + saveFreeSpace)
 				break;
 
-			RelationPutHeapTuple(relation, buffer, heaptup, false);
+			RelationPutHeapTuple(relation, buffer, heaptup);
 
 			/*
 			 * For logical decoding we need combo CIDs to properly decode the
@@ -2732,16 +2715,6 @@ heap_delete(Relation relation, ItemPointer tid,
 
 	Assert(ItemPointerIsValid(tid));
 
-	/*
-	 * Forbid this during a parallel operation, lest it allocate a combo CID.
-	 * Other workers might need that combo CID for visibility checks, and we
-	 * have no provision for broadcasting it to them.
-	 */
-	if (IsInParallelMode())
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_TRANSACTION_STATE),
-				 errmsg("cannot delete tuples during a parallel operation")));
-
 	block = ItemPointerGetBlockNumber(tid);
 	buffer = ReadBuffer(relation, block);
 	page = BufferGetPage(buffer);
@@ -2998,12 +2971,7 @@ l1:
 
 	MarkBufferDirty(buffer);
 
-	/*
-	 * XLOG stuff
-	 *
-	 * NB: heap_abort_speculative() uses the same xlog record and replay
-	 * routines.
-	 */
+	/* XLOG stuff */
 	if (RelationNeedsWAL(relation))
 	{
 		xl_heap_delete xlrec;
@@ -3056,7 +3024,7 @@ l1:
 		Assert(!HeapTupleHasExternal(&tp));
 	}
 	else if (HeapTupleHasExternal(&tp))
-		heap_toast_delete(relation, &tp, false);
+		heap_toast_delete(relation, &tp);
 
 	/*
 	 * Mark tuple for invalidation from system caches at next command
@@ -3180,16 +3148,6 @@ heap_update(Relation relation, ItemPointer otid, HeapTuple newtup,
 	/* Cheap, simplistic check that the tuple matches the rel's rowtype. */
 	Assert(HeapTupleHeaderGetNatts(newtup->t_data) <=
 		   RelationGetNumberOfAttributes(relation));
-
-	/*
-	 * Forbid this during a parallel operation, lest it allocate a combo CID.
-	 * Other workers might need that combo CID for visibility checks, and we
-	 * have no provision for broadcasting it to them.
-	 */
-	if (IsInParallelMode())
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_TRANSACTION_STATE),
-				 errmsg("cannot update tuples during a parallel operation")));
 
 #ifdef USE_ASSERT_CHECKING
 	check_lock_if_inplace_updateable_rel(relation, otid, newtup);
@@ -3948,7 +3906,7 @@ l2:
 		HeapTupleClearHeapOnly(newtup);
 	}
 
-	RelationPutHeapTuple(relation, newbuf, heaptup, false); /* insert new tuple */
+	RelationPutHeapTuple(relation, newbuf, heaptup); /* insert new tuple */
 
 
 	/* Clear obsolete visibility flags, possibly set by ourselves above... */
@@ -5922,247 +5880,6 @@ heap_lock_updated_tuple(Relation rel,
 }
 
 /*
- *	heap_finish_speculative - mark speculative insertion as successful
- *
- * To successfully finish a speculative insertion we have to clear speculative
- * token from tuple.  To do so the t_ctid field, which will contain a
- * speculative token value, is modified in place to point to the tuple itself,
- * which is characteristic of a newly inserted ordinary tuple.
- *
- * NB: It is not ok to commit without either finishing or aborting a
- * speculative insertion.  We could treat speculative tuples of committed
- * transactions implicitly as completed, but then we would have to be prepared
- * to deal with speculative tokens on committed tuples.  That wouldn't be
- * difficult - no-one looks at the ctid field of a tuple with invalid xmax -
- * but clearing the token at completion isn't very expensive either.
- * An explicit confirmation WAL record also makes logical decoding simpler.
- */
-void
-heap_finish_speculative(Relation relation, ItemPointer tid)
-{
-	Buffer		buffer;
-	Page		page;
-	OffsetNumber offnum;
-	ItemId		lp = NULL;
-	HeapTupleHeader htup;
-
-	buffer = ReadBuffer(relation, ItemPointerGetBlockNumber(tid));
-	LockBuffer(buffer, BUFFER_LOCK_EXCLUSIVE);
-	page = (Page) BufferGetPage(buffer);
-
-	offnum = ItemPointerGetOffsetNumber(tid);
-	if (PageGetMaxOffsetNumber(page) >= offnum)
-		lp = PageGetItemId(page, offnum);
-
-	if (PageGetMaxOffsetNumber(page) < offnum || !ItemIdIsNormal(lp))
-		elog(ERROR, "invalid lp");
-
-	htup = (HeapTupleHeader) PageGetItem(page, lp);
-
-	/* SpecTokenOffsetNumber should be distinguishable from any real offset */
-	StaticAssertStmt(MaxOffsetNumber < SpecTokenOffsetNumber,
-					 "invalid speculative token constant");
-
-	/* NO EREPORT(ERROR) from here till changes are logged */
-	START_CRIT_SECTION();
-
-	Assert(HeapTupleHeaderIsSpeculative(htup));
-
-	MarkBufferDirty(buffer);
-
-	/*
-	 * Replace the speculative insertion token with a real t_ctid, pointing to
-	 * itself like it does on regular tuples.
-	 */
-	htup->t_ctid = *tid;
-
-	/* XLOG stuff */
-	if (RelationNeedsWAL(relation))
-	{
-		xl_heap_confirm xlrec;
-		XLogRecPtr	recptr;
-
-		xlrec.offnum = ItemPointerGetOffsetNumber(tid);
-
-		XLogBeginInsert();
-
-		/* We want the same filtering on this as on a plain insert */
-		XLogSetRecordFlags(XLOG_INCLUDE_ORIGIN);
-
-		XLogRegisterData((char *) &xlrec, SizeOfHeapConfirm);
-		XLogRegisterBuffer(0, buffer, REGBUF_STANDARD);
-
-		recptr = XLogInsert(RM_HEAP_ID, XLOG_HEAP_CONFIRM);
-
-		PageSetLSN(page, recptr);
-	}
-
-	END_CRIT_SECTION();
-
-	UnlockReleaseBuffer(buffer);
-}
-
-/*
- *	heap_abort_speculative - kill a speculatively inserted tuple
- *
- * Marks a tuple that was speculatively inserted in the same command as dead,
- * by setting its xmin as invalid.  That makes it immediately appear as dead
- * to all transactions, including our own.  In particular, it makes
- * HeapTupleSatisfiesDirty() regard the tuple as dead, so that another backend
- * inserting a duplicate key value won't unnecessarily wait for our whole
- * transaction to finish (it'll just wait for our speculative insertion to
- * finish).
- *
- * Killing the tuple prevents "unprincipled deadlocks", which are deadlocks
- * that arise due to a mutual dependency that is not user visible.  By
- * definition, unprincipled deadlocks cannot be prevented by the user
- * reordering lock acquisition in client code, because the implementation level
- * lock acquisitions are not under the user's direct control.  If speculative
- * inserters did not take this precaution, then under high concurrency they
- * could deadlock with each other, which would not be acceptable.
- *
- * This is somewhat redundant with heap_delete, but we prefer to have a
- * dedicated routine with stripped down requirements.  Note that this is also
- * used to delete the TOAST tuples created during speculative insertion.
- *
- * This routine does not affect logical decoding as it only looks at
- * confirmation records.
- */
-void
-heap_abort_speculative(Relation relation, ItemPointer tid)
-{
-	TransactionId xid = GetCurrentTransactionId();
-	ItemId		lp;
-	HeapTupleData tp;
-	Page		page;
-	BlockNumber block;
-	Buffer		buffer;
-	TransactionId prune_xid;
-
-	Assert(ItemPointerIsValid(tid));
-
-	block = ItemPointerGetBlockNumber(tid);
-	buffer = ReadBuffer(relation, block);
-	page = BufferGetPage(buffer);
-
-	LockBuffer(buffer, BUFFER_LOCK_EXCLUSIVE);
-
-	/*
-	 * Page can't be all visible, we just inserted into it, and are still
-	 * running.
-	 */
-	Assert(!PageIsAllVisible(page));
-
-	lp = PageGetItemId(page, ItemPointerGetOffsetNumber(tid));
-	Assert(ItemIdIsNormal(lp));
-
-	tp.t_tableOid = RelationGetRelid(relation);
-	tp.t_data = (HeapTupleHeader) PageGetItem(page, lp);
-	tp.t_len = ItemIdGetLength(lp);
-	tp.t_self = *tid;
-
-	/*
-	 * Sanity check that the tuple really is a speculatively inserted tuple,
-	 * inserted by us.
-	 */
-	if (tp.t_data->t_choice.t_heap.t_xmin != xid)
-		elog(ERROR, "attempted to kill a tuple inserted by another transaction");
-	if (!(IsToastRelation(relation) || HeapTupleHeaderIsSpeculative(tp.t_data)))
-		elog(ERROR, "attempted to kill a non-speculative tuple");
-	Assert(!HeapTupleHeaderIsHeapOnly(tp.t_data));
-
-	/*
-	 * No need to check for serializable conflicts here.  There is never a
-	 * need for a combo CID, either.  No need to extract replica identity, or
-	 * do anything special with infomask bits.
-	 */
-
-	START_CRIT_SECTION();
-
-	/*
-	 * The tuple will become DEAD immediately.  Flag that this page is a
-	 * candidate for pruning by setting xmin to TransactionXmin. While not
-	 * immediately prunable, it is the oldest xid we can cheaply determine
-	 * that's safe against wraparound / being older than the table's
-	 * relfrozenxid.  To defend against the unlikely case of a new relation
-	 * having a newer relfrozenxid than our TransactionXmin, use relfrozenxid
-	 * if so (vacuum can't subsequently move relfrozenxid to beyond
-	 * TransactionXmin, so there's no race here).
-	 */
-	Assert(TransactionIdIsValid(TransactionXmin));
-	if (TransactionIdPrecedes(TransactionXmin, relation->rd_rel->relfrozenxid))
-		prune_xid = relation->rd_rel->relfrozenxid;
-	else
-		prune_xid = TransactionXmin;
-	PageSetPrunable(page, prune_xid);
-
-	/* store transaction information of xact deleting the tuple */
-	tp.t_data->t_infomask &= ~(HEAP_XMAX_BITS | HEAP_MOVED);
-	tp.t_data->t_infomask2 &= ~HEAP_KEYS_UPDATED;
-
-	/*
-	 * Set the tuple header xmin to InvalidTransactionId.  This makes the
-	 * tuple immediately invisible everyone.  (In particular, to any
-	 * transactions waiting on the speculative token, woken up later.)
-	 */
-	HeapTupleHeaderSetXmin(tp.t_data, InvalidTransactionId);
-
-	/* Clear the speculative insertion token too */
-	tp.t_data->t_ctid = tp.t_self;
-
-	MarkBufferDirty(buffer);
-
-	/*
-	 * XLOG stuff
-	 *
-	 * The WAL records generated here match heap_delete().  The same recovery
-	 * routines are used.
-	 */
-	if (RelationNeedsWAL(relation))
-	{
-		xl_heap_delete xlrec;
-		XLogRecPtr	recptr;
-
-		xlrec.flags = XLH_DELETE_IS_SUPER;
-		xlrec.infobits_set = compute_infobits(tp.t_data->t_infomask,
-											  tp.t_data->t_infomask2);
-		xlrec.offnum = ItemPointerGetOffsetNumber(&tp.t_self);
-		xlrec.xmax = xid;
-
-		XLogBeginInsert();
-		XLogRegisterData((char *) &xlrec, SizeOfHeapDelete);
-		XLogRegisterBuffer(0, buffer, REGBUF_STANDARD);
-
-		/* No replica identity & replication origin logged */
-
-		recptr = XLogInsert(RM_HEAP_ID, XLOG_HEAP_DELETE);
-
-		PageSetLSN(page, recptr);
-	}
-
-	END_CRIT_SECTION();
-
-	LockBuffer(buffer, BUFFER_LOCK_UNLOCK);
-
-	if (HeapTupleHasExternal(&tp))
-	{
-		Assert(!IsToastRelation(relation));
-		heap_toast_delete(relation, &tp, true);
-	}
-
-	/*
-	 * Never need to mark tuple for invalidation, since catalogs don't support
-	 * speculative insertion
-	 */
-
-	/* Now we can release the buffer */
-	ReleaseBuffer(buffer);
-
-	/* count deletion, as we counted the insertion too */
-	pgstat_count_heap_delete(relation);
-}
-
-/*
  * heap_inplace_lock - protect inplace update from concurrent heap_update()
  *
  * Evaluate whether the tuple's state is compatible with a no-key update.
@@ -6500,17 +6217,6 @@ heap_inplace_update(Relation relation, HeapTuple tuple)
 	HeapTupleHeader htup;
 	uint32		oldlen;
 	uint32		newlen;
-
-	/*
-	 * For now, we don't allow parallel updates.  Unlike a regular update,
-	 * this should never create a combo CID, so it might be possible to relax
-	 * this restriction, but not without more thought and testing.  It's not
-	 * clear that it would be useful, anyway.
-	 */
-	if (IsInParallelMode())
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_TRANSACTION_STATE),
-				 errmsg("cannot update tuples during a parallel operation")));
 
 	buffer = ReadBuffer(relation, ItemPointerGetBlockNumber(&(tuple->t_self)));
 	LockBuffer(buffer, BUFFER_LOCK_EXCLUSIVE);
@@ -9756,41 +9462,6 @@ heap_xlog_update(XLogReaderState *record, bool hot_update)
 		XLogRecordPageWithFreeSpace(rnode, newblk, freespace);
 }
 
-static void
-heap_xlog_confirm(XLogReaderState *record)
-{
-	XLogRecPtr	lsn = record->EndRecPtr;
-	xl_heap_confirm *xlrec = (xl_heap_confirm *) XLogRecGetData(record);
-	Buffer		buffer;
-	Page		page;
-	OffsetNumber offnum;
-	ItemId		lp = NULL;
-	HeapTupleHeader htup;
-
-	if (XLogReadBufferForRedo(record, 0, &buffer) == BLK_NEEDS_REDO)
-	{
-		page = BufferGetPage(buffer);
-
-		offnum = xlrec->offnum;
-		if (PageGetMaxOffsetNumber(page) >= offnum)
-			lp = PageGetItemId(page, offnum);
-
-		if (PageGetMaxOffsetNumber(page) < offnum || !ItemIdIsNormal(lp))
-			elog(PANIC, "invalid lp");
-
-		htup = (HeapTupleHeader) PageGetItem(page, lp);
-
-		/*
-		 * Confirm tuple as actually inserted
-		 */
-		ItemPointerSet(&htup->t_ctid, BufferGetBlockNumber(buffer), offnum);
-
-		PageSetLSN(page, lsn);
-		MarkBufferDirty(buffer);
-	}
-	if (BufferIsValid(buffer))
-		UnlockReleaseBuffer(buffer);
-}
 
 static void
 heap_xlog_lock(XLogReaderState *record)
@@ -9996,9 +9667,6 @@ heap_redo(XLogReaderState *record)
 		case XLOG_HEAP_HOT_UPDATE:
 			heap_xlog_update(record, true);
 			break;
-		case XLOG_HEAP_CONFIRM:
-			heap_xlog_confirm(record);
-			break;
 		case XLOG_HEAP_LOCK:
 			heap_xlog_lock(record);
 			break;
@@ -10091,22 +9759,6 @@ heap_mask(char *pagedata, BlockNumber blkno)
 			 * it. See heap_xlog_insert() for details.
 			 */
 			page_htup->t_choice.t_heap.t_field3.t_cid = MASK_MARKER;
-
-			/*
-			 * For a speculative tuple, heap_insert() does not set ctid in the
-			 * caller-passed heap tuple itself, leaving the ctid field to
-			 * contain a speculative token value - a per-backend monotonically
-			 * increasing identifier. Besides, it does not WAL-log ctid under
-			 * any circumstances.
-			 *
-			 * During redo, heap_xlog_insert() sets t_ctid to current block
-			 * number and self offset number. It doesn't care about any
-			 * speculative insertions on the primary. Hence, we set t_ctid to
-			 * current block number and self offset number to ignore any
-			 * inconsistency.
-			 */
-			if (HeapTupleHeaderIsSpeculative(page_htup))
-				ItemPointerSet(&page_htup->t_ctid, blkno, off);
 
 			/*
 			 * NB: Not ignoring ctid changes because that's important

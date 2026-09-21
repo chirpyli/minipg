@@ -1171,7 +1171,6 @@ _copySubPlan(const SubPlan *from)
 	COPY_SCALAR_FIELD(firstColCollation);
 	COPY_SCALAR_FIELD(useHashTable);
 	COPY_SCALAR_FIELD(unknownEqFalse);
-	COPY_SCALAR_FIELD(parallel_safe);
 	COPY_NODE_FIELD(setParam);
 	COPY_NODE_FIELD(parParam);
 	COPY_NODE_FIELD(args);

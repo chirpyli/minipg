@@ -151,9 +151,6 @@ typedef struct IndexInfo
 	List	   *ii_ExpressionsState;	/* list of ExprState */
 	List	   *ii_Predicate;	/* list of Expr */
 	ExprState  *ii_PredicateState;
-	Oid		   *ii_UniqueOps;	/* array with one entry per column */
-	Oid		   *ii_UniqueProcs; /* array with one entry per column */
-	uint16	   *ii_UniqueStrats;	/* array with one entry per column */
 	Datum	   *ii_OpclassOptions;	/* array with one entry per column */
 	bool		ii_Unique;
 	bool		ii_ReadyForInserts;

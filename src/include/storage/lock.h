@@ -146,7 +146,6 @@ typedef enum LockTagType
 	LOCKTAG_TUPLE,				/* one physical tuple */
 	LOCKTAG_TRANSACTION,		/* transaction (for waiting for xact done) */
 	LOCKTAG_VIRTUALTRANSACTION, /* virtual transaction (ditto) */
-	LOCKTAG_SPECULATIVE_TOKEN,	/* speculative insertion Xid and token */
 	LOCKTAG_OBJECT,				/* non-relation database object */
 	LOCKTAG_USERLOCK,			/* reserved for old contrib/userlock code */
 	LOCKTAG_ADVISORY			/* advisory user locks */
@@ -241,18 +240,6 @@ typedef struct LOCKTAG
 	 (locktag).locktag_field3 = 0, \
 	 (locktag).locktag_field4 = 0, \
 	 (locktag).locktag_type = LOCKTAG_VIRTUALTRANSACTION, \
-	 (locktag).locktag_lockmethodid = DEFAULT_LOCKMETHOD)
-
-/*
- * ID info for a speculative insert is TRANSACTION info +
- * its speculative insert counter.
- */
-#define SET_LOCKTAG_SPECULATIVE_INSERTION(locktag,xid,token) \
-	((locktag).locktag_field1 = (xid), \
-	 (locktag).locktag_field2 = (token),		\
-	 (locktag).locktag_field3 = 0, \
-	 (locktag).locktag_field4 = 0, \
-	 (locktag).locktag_type = LOCKTAG_SPECULATIVE_TOKEN, \
 	 (locktag).locktag_lockmethodid = DEFAULT_LOCKMETHOD)
 
 /*

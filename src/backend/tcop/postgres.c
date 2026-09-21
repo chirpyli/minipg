@@ -36,7 +36,6 @@
 #include "rusagestub.h"
 #endif
 
-#include "access/parallel.h"
 #include "access/printtup.h"
 #include "access/xact.h"
 #include "access/xlog.h"			/* for LocalProcessControlFile */
@@ -1546,9 +1545,6 @@ ProcessInterrupts(void)
 
 	if (ProcSignalBarrierPending)
 		ProcessProcSignalBarrier();
-
-	if (ParallelMessagePending)
-		HandleParallelMessages();
 
 	if (LogMemoryContextPending)
 		ProcessLogMemoryContextInterrupt();

@@ -134,7 +134,7 @@ extern Oid	get_collation_oid(List *collname, bool missing_ok);
 
 /* initialization & transaction cleanup code */
 extern void InitializeSearchPath(void);
-extern void AtEOXact_Namespace(bool isCommit, bool parallel);
+extern void AtEOXact_Namespace(bool isCommit);
 extern void AtEOSubXact_Namespace(bool isCommit, SubTransactionId mySubid,
 								  SubTransactionId parentSubid);
 

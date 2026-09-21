@@ -424,8 +424,7 @@ buildSubPlanHash(SubPlanState *node, ExprContext *econtext)
 												 0,
 												 node->planstate->state->es_query_cxt,
 												 node->hashtablecxt,
-												 node->hashtempcxt,
-												 false);
+												 node->hashtempcxt);
 
 	if (!subplan->unknownEqFalse)
 	{
@@ -452,8 +451,7 @@ buildSubPlanHash(SubPlanState *node, ExprContext *econtext)
 													 0,
 													 node->planstate->state->es_query_cxt,
 													 node->hashtablecxt,
-													 node->hashtempcxt,
-													 false);
+													 node->hashtempcxt);
 	}
 	else
 		node->hashnulls = NULL;

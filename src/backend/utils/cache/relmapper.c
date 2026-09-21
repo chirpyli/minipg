@@ -283,9 +283,6 @@ RelationMapUpdateMap(Oid relationId, Oid fileNode, bool shared,
 		if (GetCurrentTransactionNestLevel() > 1)
 			elog(ERROR, "cannot change relation mapping within subtransaction");
 
-		if (IsInParallelMode())
-			elog(ERROR, "cannot change relation mapping in parallel mode");
-
 		if (immediate)
 		{
 			/* Make it active, but only locally */
@@ -468,14 +465,11 @@ AtCCI_RelationMap(void)
  *
  * During abort, we just have to throw away any pending map changes.
  * Normal post-abort cleanup will take care of fixing relcache entries.
- * Parallel worker commit/abort is handled by resetting active mappings
- * that may have been received from the leader process.  (There should be
- * no pending updates in parallel workers.)
  */
 void
-AtEOXact_RelationMap(bool isCommit, bool isParallelWorker)
+AtEOXact_RelationMap(bool isCommit)
 {
-	if (isCommit && !isParallelWorker)
+	if (isCommit)
 	{
 		/*
 		 * We should not get here with any "pending" updates.  (We could
@@ -501,10 +495,7 @@ AtEOXact_RelationMap(bool isCommit, bool isParallelWorker)
 	}
 	else
 	{
-		/* Abort or parallel worker --- drop all local and pending updates */
-		Assert(!isParallelWorker || pending_shared_updates.num_mappings == 0);
-		Assert(!isParallelWorker || pending_local_updates.num_mappings == 0);
-
+		/* Abort --- drop all local and pending updates */
 		active_shared_updates.num_mappings = 0;
 		active_local_updates.num_mappings = 0;
 		pending_shared_updates.num_mappings = 0;

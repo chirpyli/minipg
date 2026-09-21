@@ -57,7 +57,7 @@ extern bool TransactionIdIsActive(TransactionId xid);
 extern TransactionId GetOldestNonRemovableTransactionId(Relation rel);
 extern TransactionId GetOldestTransactionIdConsideredRunning(void);
 extern TransactionId GetOldestActiveTransactionId(void);
-extern TransactionId GetOldestSafeDecodingTransactionId(bool catalogOnly);
+
 
 extern VirtualTransactionId *GetVirtualXIDsDelayingChkpt(int *nvxids);
 extern VirtualTransactionId *GetVirtualXIDsDelayingChkptEnd(int *nvxids);

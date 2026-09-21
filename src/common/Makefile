@@ -79,7 +79,6 @@ OBJS_COMMON = \
 OBJS_FRONTEND_SHLIB = \
 	$(OBJS_COMMON) \
 	fe_memutils.o \
-	restricted_token.o \
 	sprompt.o
 OBJS_FRONTEND = \
 	$(OBJS_FRONTEND_SHLIB) \

@@ -40,7 +40,7 @@
  * ----------
  */
 void
-heap_toast_delete(Relation rel, HeapTuple oldtup, bool is_speculative)
+heap_toast_delete(Relation rel, HeapTuple oldtup)
 {
 	TupleDesc	tupleDesc;
 	Datum		toast_values[MaxHeapAttributeNumber];
@@ -69,7 +69,7 @@ heap_toast_delete(Relation rel, HeapTuple oldtup, bool is_speculative)
 	heap_deform_tuple(oldtup, tupleDesc, toast_values, toast_isnull);
 
 	/* Do the real work. */
-	toast_delete_external(rel, toast_values, toast_isnull, is_speculative);
+	toast_delete_external(rel, toast_values, toast_isnull);
 }
 
 
@@ -108,14 +108,6 @@ heap_toast_insert_or_update(Relation rel, HeapTuple newtup, HeapTuple oldtup,
 	Datum		toast_oldvalues[MaxHeapAttributeNumber];
 	ToastAttrInfo toast_attr[MaxHeapAttributeNumber];
 	ToastTupleContext ttc;
-
-	/*
-	 * Ignore the INSERT_SPECULATIVE option. Speculative insertions/super
-	 * deletions just normally insert/delete the toast values. It seems
-	 * easiest to deal with that here, instead on, potentially, multiple
-	 * callers.
-	 */
-	options &= ~HEAP_INSERT_SPECULATIVE;
 
 	/*
 	 * We should only ever be called for tuples of plain relations or

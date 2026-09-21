@@ -17,7 +17,6 @@
 #include <signal.h>
 #include <unistd.h>
 
-#include "access/parallel.h"
 #include "port/pg_bitutils.h"
 #include "miscadmin.h"
 #include "pgstat.h"
@@ -643,9 +642,6 @@ procsignal_sigusr1_handler(SIGNAL_ARGS)
 
 	if (CheckProcSignal(PROCSIG_CATCHUP_INTERRUPT))
 		HandleCatchupInterrupt();
-
-	if (CheckProcSignal(PROCSIG_PARALLEL_MESSAGE))
-		HandleParallelMessageInterrupt();
 
 	if (CheckProcSignal(PROCSIG_BARRIER))
 		HandleProcSignalBarrierInterrupt();

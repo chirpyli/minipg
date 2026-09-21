@@ -33,20 +33,11 @@
 #include "fmgr.h"
 #include "lib/stringinfo.h"
 #include "miscadmin.h"
-#include "storage/shmem.h"
-#include "utils/hsearch.h"
 
 
 /* signatures for PostgreSQL-specific library init/fini functions */
 typedef void (*PG_init_t) (void);
 typedef void (*PG_fini_t) (void);
-
-/* hashtable entry for rendezvous variables */
-typedef struct
-{
-	char		varName[NAMEDATALEN];	/* hash key (must be first) */
-	void	   *varValue;
-} rendezvousHashEntry;
 
 /*
  * List of dynamically loaded files (kept in malloc'd memory).
@@ -83,50 +74,6 @@ static const Pg_magic_struct magic_data = PG_MODULE_MAGIC_DATA;
 
 
 /*
- * Load the specified dynamic-link library file, and look for a function
- * named funcname in it.
- *
- * If the function is not found, we raise an error if signalNotFound is true,
- * else return NULL.  Note that errors in loading the library
- * will provoke ereport() regardless of signalNotFound.
- *
- * If filehandle is not NULL, then *filehandle will be set to a handle
- * identifying the library file.  The filehandle can be used with
- * lookup_external_function to lookup additional functions in the same file
- * at less cost than repeating load_external_function.
- */
-void *
-load_external_function(const char *filename, const char *funcname,
-					   bool signalNotFound, void **filehandle)
-{
-	char	   *fullname;
-	void	   *lib_handle;
-	void	   *retval;
-
-	/* Expand the possibly-abbreviated filename to an exact path name */
-	fullname = expand_dynamic_library_name(filename);
-
-	/* Load the shared library, unless we already did */
-	lib_handle = internal_load_library(fullname);
-
-	/* Return handle if caller wants it */
-	if (filehandle)
-		*filehandle = lib_handle;
-
-	/* Look up the function within the library. */
-	retval = dlsym(lib_handle, funcname);
-
-	if (retval == NULL && signalNotFound)
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_FUNCTION),
-				 errmsg("could not find function \"%s\" in file \"%s\"",
-						funcname, fullname)));
-
-	pfree(fullname);
-	return retval;
-}
-
-/*
  * This function loads a shlib file without looking up any particular
  * function in it.  If the same shlib has previously been loaded,
  * unload and reload it.
@@ -153,16 +100,6 @@ load_file(const char *filename, bool restricted)
 	(void) internal_load_library(fullname);
 
 	pfree(fullname);
-}
-
-/*
- * Lookup a function whose library file is already loaded.
- * Return NULL if not found.
- */
-void *
-lookup_external_function(void *filehandle, const char *funcname)
-{
-	return dlsym(filehandle, funcname);
 }
 
 
@@ -640,105 +577,3 @@ find_in_dynamic_libpath(const char *basename)
 	return NULL;
 }
 
-
-/*
- * Find (or create) a rendezvous variable that one dynamically
- * loaded library can use to meet up with another.
- *
- * On the first call of this function for a particular varName,
- * a "rendezvous variable" is created with the given name.
- * The value of the variable is a void pointer (initially set to NULL).
- * Subsequent calls with the same varName just return the address of
- * the existing variable.  Once created, a rendezvous variable lasts
- * for the life of the process.
- *
- * Dynamically loaded libraries can use rendezvous variables
- * to find each other and share information: they just need to agree
- * on the variable name and the data it will point to.
- */
-void	  **
-find_rendezvous_variable(const char *varName)
-{
-	static HTAB *rendezvousHash = NULL;
-
-	rendezvousHashEntry *hentry;
-	bool		found;
-
-	/* Create a hashtable if we haven't already done so in this process */
-	if (rendezvousHash == NULL)
-	{
-		HASHCTL		ctl;
-
-		ctl.keysize = NAMEDATALEN;
-		ctl.entrysize = sizeof(rendezvousHashEntry);
-		rendezvousHash = hash_create("Rendezvous variable hash",
-									 16,
-									 &ctl,
-									 HASH_ELEM | HASH_STRINGS);
-	}
-
-	/* Find or create the hashtable entry for this varName */
-	hentry = (rendezvousHashEntry *) hash_search(rendezvousHash,
-												 varName,
-												 HASH_ENTER,
-												 &found);
-
-	/* Initialize to NULL if first time */
-	if (!found)
-		hentry->varValue = NULL;
-
-	return &hentry->varValue;
-}
-
-/*
- * Estimate the amount of space needed to serialize the list of libraries
- * we have loaded.
- */
-Size
-EstimateLibraryStateSpace(void)
-{
-	DynamicFileList *file_scanner;
-	Size		size = 1;
-
-	for (file_scanner = file_list;
-		 file_scanner != NULL;
-		 file_scanner = file_scanner->next)
-		size = add_size(size, strlen(file_scanner->filename) + 1);
-
-	return size;
-}
-
-/*
- * Serialize the list of libraries we have loaded to a chunk of memory.
- */
-void
-SerializeLibraryState(Size maxsize, char *start_address)
-{
-	DynamicFileList *file_scanner;
-
-	for (file_scanner = file_list;
-		 file_scanner != NULL;
-		 file_scanner = file_scanner->next)
-	{
-		Size		len;
-
-		len = strlcpy(start_address, file_scanner->filename, maxsize) + 1;
-		Assert(len < maxsize);
-		maxsize -= len;
-		start_address += len;
-	}
-	start_address[0] = '\0';
-}
-
-/*
- * Load every library the serializing backend had loaded.
- */
-void
-RestoreLibraryState(char *start_address)
-{
-	while (*start_address != '\0')
-	{
-		internal_load_library(start_address);
-		start_address += strlen(start_address) + 1;
-	}
-}

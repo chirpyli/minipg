@@ -34,7 +34,7 @@
 #define XLOG_HEAP_UPDATE		0x20
 #define XLOG_HEAP_TRUNCATE		0x30
 #define XLOG_HEAP_HOT_UPDATE	0x40
-#define XLOG_HEAP_CONFIRM		0x50
+
 #define XLOG_HEAP_LOCK			0x60
 #define XLOG_HEAP_INPLACE		0x70
 
@@ -64,7 +64,7 @@
 /* PD_ALL_VISIBLE was cleared */
 #define XLH_INSERT_ALL_VISIBLE_CLEARED			(1<<0)
 #define XLH_INSERT_LAST_IN_MULTI				(1<<1)
-#define XLH_INSERT_IS_SPECULATIVE				(1<<2)
+
 #define XLH_INSERT_CONTAINS_NEW_TUPLE			(1<<3)
 #define XLH_INSERT_ON_TOAST_RELATION			(1<<4)
 
@@ -292,13 +292,7 @@ typedef struct xl_heap_lock_updated
 
 #define SizeOfHeapLockUpdated	(offsetof(xl_heap_lock_updated, flags) + sizeof(uint8))
 
-/* This is what we need to know about confirmation of speculative insertion */
-typedef struct xl_heap_confirm
-{
-	OffsetNumber offnum;		/* confirmed tuple's offset on page */
-} xl_heap_confirm;
 
-#define SizeOfHeapConfirm	(offsetof(xl_heap_confirm, offnum) + sizeof(OffsetNumber))
 
 /* This is what we need to know about in-place update */
 typedef struct xl_heap_inplace

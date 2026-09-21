@@ -70,13 +70,6 @@ GetTableAmRoutine(Oid amhandler)
 
 	Assert(routine->tuple_insert != NULL);
 
-	/*
-	 * Could be made optional, but would require throwing error during
-	 * parse-analysis.
-	 */
-	Assert(routine->tuple_insert_speculative != NULL);
-	Assert(routine->tuple_complete_speculative != NULL);
-
 	Assert(routine->multi_insert != NULL);
 	Assert(routine->tuple_delete != NULL);
 	Assert(routine->tuple_update != NULL);

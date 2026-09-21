@@ -118,12 +118,6 @@
  *			than its own active transaction must acquire an exclusive
  *			lock.
  *
- *	SERIALIZABLEXACT's member 'perXactPredicateListLock'
- *		- Protects the linked list of predicate locks held by a transaction.
- *			Only needed for parallel mode, where multiple backends share the
- *			same SERIALIZABLEXACT object.  Not needed if
- *			SerializablePredicateListLock is held exclusively.
- *
  *	PredicateLockHashPartitionLock(hashcode)
  *		- The same lock protects a target, all locks on that target, and
  *			the linked list of locks on the target.
@@ -192,7 +186,6 @@
 
 #include "postgres.h"
 
-#include "access/parallel.h"
 #include "access/slru.h"
 #include "access/subtrans.h"
 #include "access/transam.h"
@@ -415,15 +408,6 @@ static HTAB *LocalPredicateLockHash = NULL;
  */
 static SERIALIZABLEXACT *MySerializableXact = InvalidSerializableXact;
 static bool MyXactDidWrite = false;
-
-/*
- * The SXACT_FLAG_RO_UNSAFE optimization might lead us to release
- * MySerializableXact early.  If that happens in a parallel query, the leader
- * needs to defer the destruction of the SERIALIZABLEXACT until end of
- * transaction, because the workers still have a reference to it.  In that
- * case, the leader stores it here.
- */
-static SERIALIZABLEXACT *SavedSerializableXact = InvalidSerializableXact;
 
 /* local functions */
 
@@ -1256,8 +1240,6 @@ InitPredicateLocks(void)
 		memset(PredXact->element, 0, requestSize);
 		for (i = 0; i < max_table_size; i++)
 		{
-			LWLockInitialize(&PredXact->element[i].sxact.perXactPredicateListLock,
-							 LWTRANCHE_PER_XACT_PREDICATE_LIST);
 			SHMQueueInsertBefore(&(PredXact->availableList),
 								 &(PredXact->element[i].link));
 		}
@@ -1723,17 +1705,6 @@ SetSerializableTransactionSnapshot(Snapshot snapshot,
 	Assert(IsolationIsSerializable());
 
 	/*
-	 * If this is called by parallel.c in a parallel worker, we don't want to
-	 * create a SERIALIZABLEXACT just yet because the leader's
-	 * SERIALIZABLEXACT will be installed with AttachSerializableXact().  We
-	 * also don't want to reject SERIALIZABLE READ ONLY DEFERRABLE in this
-	 * case, because the leader has already determined that the snapshot it
-	 * has passed us is safe.  So there is nothing for us to do.
-	 */
-	if (IsParallelWorker())
-		return;
-
-	/*
 	 * We do not allow SERIALIZABLE READ ONLY DEFERRABLE transactions to
 	 * import snapshots, since there's no way to wait for a safe snapshot when
 	 * we're using the snap we're told to.  (XXX instead of throwing an error,
@@ -1771,14 +1742,6 @@ GetSerializableTransactionSnapshotInt(Snapshot snapshot,
 	Assert(MySerializableXact == InvalidSerializableXact);
 
 	Assert(!RecoveryInProgress());
-
-	/*
-	 * Since all parts of a serializable transaction must use the same
-	 * snapshot, it is too late to establish one after a parallel operation
-	 * has begun.
-	 */
-	if (IsInParallelMode())
-		elog(ERROR, "cannot establish serializable snapshot during a parallel operation");
 
 	proc = MyProc;
 	Assert(proc != NULL);
@@ -2212,8 +2175,6 @@ DeleteChildTargetLocks(const PREDICATELOCKTARGETTAG *newtargettag)
 
 	LWLockAcquire(SerializablePredicateListLock, LW_SHARED);
 	sxact = MySerializableXact;
-	if (IsInParallelMode())
-		LWLockAcquire(&sxact->perXactPredicateListLock, LW_EXCLUSIVE);
 	predlock = (PREDICATELOCK *)
 		SHMQueueNext(&(sxact->predicateLocks),
 					 &(sxact->predicateLocks),
@@ -2267,8 +2228,6 @@ DeleteChildTargetLocks(const PREDICATELOCKTARGETTAG *newtargettag)
 
 		predlock = nextpredlock;
 	}
-	if (IsInParallelMode())
-		LWLockRelease(&sxact->perXactPredicateListLock);
 	LWLockRelease(SerializablePredicateListLock);
 }
 
@@ -2467,8 +2426,6 @@ CreatePredicateLock(const PREDICATELOCKTARGETTAG *targettag,
 	partitionLock = PredicateLockHashPartitionLock(targettaghash);
 
 	LWLockAcquire(SerializablePredicateListLock, LW_SHARED);
-	if (IsInParallelMode())
-		LWLockAcquire(&sxact->perXactPredicateListLock, LW_EXCLUSIVE);
 	LWLockAcquire(partitionLock, LW_EXCLUSIVE);
 
 	/* Make sure that the target is represented. */
@@ -2506,8 +2463,6 @@ CreatePredicateLock(const PREDICATELOCKTARGETTAG *targettag,
 	}
 
 	LWLockRelease(partitionLock);
-	if (IsInParallelMode())
-		LWLockRelease(&sxact->perXactPredicateListLock);
 	LWLockRelease(SerializablePredicateListLock);
 }
 
@@ -3334,16 +3289,11 @@ SetNewSxactGlobalXmin(void)
  *
  * If isReadOnlySafe is true, then predicate locks are being released before
  * the end of the transaction because MySerializableXact has been determined
- * to be RO_SAFE.  In non-parallel mode we can release it completely, but it
- * in parallel mode we partially release the SERIALIZABLEXACT and keep it
- * around until the end of the transaction, allowing each backend to clear its
- * MySerializableXact variable and benefit from the optimization in its own
- * time.
+ * to be RO_SAFE, so we can release it completely.
  */
 void
 ReleasePredicateLocks(bool isCommit, bool isReadOnlySafe)
 {
-	bool		partiallyReleasing = false;
 	bool		needToClear;
 	RWConflict	conflict,
 				nextConflict,
@@ -3367,37 +3317,7 @@ ReleasePredicateLocks(bool isCommit, bool isReadOnlySafe)
 	/* Are we at the end of a transaction, that is, a commit or abort? */
 	if (!isReadOnlySafe)
 	{
-		/*
-		 * Parallel workers mustn't release predicate locks at the end of
-		 * their transaction.  The leader will do that at the end of its
-		 * transaction.
-		 */
-		if (IsParallelWorker())
-		{
-			ReleasePredicateLocksLocal();
-			return;
 		}
-
-		/*
-		 * By the time the leader in a parallel query reaches end of
-		 * transaction, it has waited for all workers to exit.
-		 */
-		Assert(!ParallelContextActive());
-
-		/*
-		 * If the leader in a parallel query earlier stashed a partially
-		 * released SERIALIZABLEXACT for final clean-up at end of transaction
-		 * (because workers might still have been accessing it), then it's
-		 * time to restore it.
-		 */
-		if (SavedSerializableXact != InvalidSerializableXact)
-		{
-			Assert(MySerializableXact == InvalidSerializableXact);
-			MySerializableXact = SavedSerializableXact;
-			SavedSerializableXact = InvalidSerializableXact;
-			Assert(SxactIsPartiallyReleased(MySerializableXact));
-		}
-	}
 
 	if (MySerializableXact == InvalidSerializableXact)
 	{
@@ -3414,40 +3334,6 @@ ReleasePredicateLocks(bool isCommit, bool isReadOnlySafe)
 	if (isCommit && SxactIsPartiallyReleased(MySerializableXact))
 		isCommit = false;
 
-	/*
-	 * If we're called in the middle of a transaction because we discovered
-	 * that the SXACT_FLAG_RO_SAFE flag was set, then we'll partially release
-	 * it (that is, release the predicate locks and conflicts, but not the
-	 * SERIALIZABLEXACT itself) if we're the first backend to have noticed.
-	 */
-	if (isReadOnlySafe && IsInParallelMode())
-	{
-		/*
-		 * The leader needs to stash a pointer to it, so that it can
-		 * completely release it at end-of-transaction.
-		 */
-		if (!IsParallelWorker())
-			SavedSerializableXact = MySerializableXact;
-
-		/*
-		 * The first backend to reach this condition will partially release
-		 * the SERIALIZABLEXACT.  All others will just clear their
-		 * backend-local state so that they stop doing SSI checks for the rest
-		 * of the transaction.
-		 */
-		if (SxactIsPartiallyReleased(MySerializableXact))
-		{
-			LWLockRelease(SerializableXactHashLock);
-			ReleasePredicateLocksLocal();
-			return;
-		}
-		else
-		{
-			MySerializableXact->flags |= SXACT_FLAG_PARTIALLY_RELEASED;
-			partiallyReleasing = true;
-			/* ... and proceed to perform the partial release below. */
-		}
-	}
 	Assert(!isCommit || SxactIsPrepared(MySerializableXact));
 	Assert(!isCommit || !SxactIsDoomed(MySerializableXact));
 	Assert(!SxactIsCommitted(MySerializableXact));
@@ -3695,13 +3581,9 @@ ReleasePredicateLocks(bool isCommit, bool isReadOnlySafe)
 	 * serializable transactions completes.  We then find the "new oldest"
 	 * xmin and purge any transactions which finished before this transaction
 	 * was launched.
-	 *
-	 * For parallel queries in read-only transactions, it might run twice.
-	 * We only release the reference on the first call.
 	 */
 	needToClear = false;
-	if ((partiallyReleasing ||
-		 !SxactIsPartiallyReleased(MySerializableXact)) &&
+	if (!SxactIsPartiallyReleased(MySerializableXact) &&
 		TransactionIdEquals(MySerializableXact->xmin,
 							PredXact->SxactGlobalXmin))
 	{
@@ -3730,7 +3612,7 @@ ReleasePredicateLocks(bool isCommit, bool isReadOnlySafe)
 	 */
 	if (!isCommit)
 		ReleaseOneSerializableXact(MySerializableXact,
-								   isReadOnlySafe && IsInParallelMode(),
+								   false,
 								   false);
 
 	LWLockRelease(SerializableFinishedListLock);
@@ -3935,8 +3817,6 @@ ReleaseOneSerializableXact(SERIALIZABLEXACT *sxact, bool partial,
 	 * them to OldCommittedSxact if summarize is true)
 	 */
 	LWLockAcquire(SerializablePredicateListLock, LW_SHARED);
-	if (IsInParallelMode())
-		LWLockAcquire(&sxact->perXactPredicateListLock, LW_EXCLUSIVE);
 	predlock = (PREDICATELOCK *)
 		SHMQueueNext(&(sxact->predicateLocks),
 					 &(sxact->predicateLocks),
@@ -4016,8 +3896,6 @@ ReleaseOneSerializableXact(SERIALIZABLEXACT *sxact, bool partial,
 	 */
 	SHMQueueInit(&sxact->predicateLocks);
 
-	if (IsInParallelMode())
-		LWLockRelease(&sxact->perXactPredicateListLock);
 	LWLockRelease(SerializablePredicateListLock);
 
 	sxidtag.xid = sxact->topXid;
@@ -4395,8 +4273,6 @@ CheckTargetForConflictsIn(PREDICATELOCKTARGETTAG *targettag)
 		PREDICATELOCK *rmpredlock;
 
 		LWLockAcquire(SerializablePredicateListLock, LW_SHARED);
-		if (IsInParallelMode())
-			LWLockAcquire(&MySerializableXact->perXactPredicateListLock, LW_EXCLUSIVE);
 		LWLockAcquire(partitionLock, LW_EXCLUSIVE);
 		LWLockAcquire(SerializableXactHashLock, LW_EXCLUSIVE);
 
@@ -4431,8 +4307,6 @@ CheckTargetForConflictsIn(PREDICATELOCKTARGETTAG *targettag)
 
 		LWLockRelease(SerializableXactHashLock);
 		LWLockRelease(partitionLock);
-		if (IsInParallelMode())
-			LWLockRelease(&MySerializableXact->perXactPredicateListLock);
 		LWLockRelease(SerializablePredicateListLock);
 
 		if (rmpredlock != NULL)
@@ -4984,13 +4858,6 @@ AtPrepare_PredicateLocks(void)
 	 * guaranteed to be accurate.
 	 */
 	LWLockAcquire(SerializablePredicateListLock, LW_SHARED);
-
-	/*
-	 * No need to take sxact->perXactPredicateListLock in parallel mode
-	 * because there cannot be any parallel workers running while we are
-	 * preparing a transaction.
-	 */
-	Assert(!IsParallelWorker() && !ParallelContextActive());
 
 	predlock = (PREDICATELOCK *)
 		SHMQueueNext(&(sxact->predicateLocks),

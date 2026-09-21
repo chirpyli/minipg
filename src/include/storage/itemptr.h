@@ -53,16 +53,6 @@ typedef ItemPointerData *ItemPointer;
  * ----------------
  */
 
-/*
- * If a heap tuple holds a speculative insertion token rather than a real
- * TID, ip_posid is set to SpecTokenOffsetNumber, and the token is stored in
- * ip_blkid. SpecTokenOffsetNumber must be higher than MaxOffsetNumber, so
- * that it can be distinguished from a valid offset number in a regular item
- * pointer.
- */
-#define SpecTokenOffsetNumber		0xfffe
-
-
 /* ----------------
  *		support macros
  * ----------------

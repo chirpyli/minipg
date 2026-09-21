@@ -947,7 +947,7 @@ extern void pgstat_init_function_usage(struct FunctionCallInfoBaseData *fcinfo,
 extern void pgstat_end_function_usage(PgStat_FunctionCallUsage *fcu,
 									  bool finalize);
 
-extern void AtEOXact_PgStat(bool isCommit, bool parallel);
+extern void AtEOXact_PgStat(bool isCommit);
 extern void AtEOSubXact_PgStat(bool isCommit, int nestDepth);
 
 extern void AtPrepare_PgStat(void);

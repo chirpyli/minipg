@@ -724,11 +724,6 @@ makeIndexInfo(int numattrs, int numkeyattrs, Oid amoid, List *expressions,
 	/* opclass options */
 	n->ii_OpclassOptions = NULL;
 
-	/* speculative inserts */
-	n->ii_UniqueOps = NULL;
-	n->ii_UniqueProcs = NULL;
-	n->ii_UniqueStrats = NULL;
-
 	/* initialize index-build state to default */
 	n->ii_BrokenHotChain = false;
 

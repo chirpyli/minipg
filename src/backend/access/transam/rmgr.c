@@ -8,12 +8,12 @@
 #include "postgres.h"
 
 #include "access/clog.h"
-#include "access/generic_xlog.h"
 #include "access/hash_xlog.h"
 #include "access/heapam_xlog.h"
 #include "access/multixact.h"
 #include "access/nbtxlog.h"
 #include "access/xact.h"
+#include "access/xlog.h"
 #include "access/xlog_internal.h"
 #include "catalog/storage_xlog.h"
 #include "commands/dbcommands_xlog.h"

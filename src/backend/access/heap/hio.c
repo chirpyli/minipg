@@ -35,17 +35,10 @@
 void
 RelationPutHeapTuple(Relation relation,
 					 Buffer buffer,
-					 HeapTuple tuple,
-					 bool token)
+					 HeapTuple tuple)
 {
 	Page		pageHeader;
 	OffsetNumber offnum;
-
-	/*
-	 * A tuple that's being inserted speculatively should already have its
-	 * token set.
-	 */
-	Assert(!token || HeapTupleHeaderIsSpeculative(tuple->t_data));
 
 	/*
 	 * Do not allow tuples with invalid combinations of hint bits to be placed
@@ -68,12 +61,7 @@ RelationPutHeapTuple(Relation relation,
 	/* Update tuple->t_self to the actual position where it was stored */
 	ItemPointerSet(&(tuple->t_self), BufferGetBlockNumber(buffer), offnum);
 
-	/*
-	 * Insert the correct position into CTID of the stored tuple, too (unless
-	 * this is a speculative insertion, in which case the token is held in
-	 * CTID field instead)
-	 */
-	if (!token)
+	/* Insert the correct position into CTID of the stored tuple, too */
 	{
 		ItemId		itemId = PageGetItemId(pageHeader, offnum);
 		HeapTupleHeader item = (HeapTupleHeader) PageGetItem(pageHeader, itemId);

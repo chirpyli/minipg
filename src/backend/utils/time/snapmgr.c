@@ -257,10 +257,6 @@ GetTransactionSnapshot(void)
 		Assert(pairingheap_is_empty(&RegisteredSnapshots));
 		Assert(FirstXactSnapshot == NULL);
 
-		if (IsInParallelMode())
-			elog(ERROR,
-				 "cannot take query snapshot during a parallel operation");
-
 		/*
 		 * In transaction-snapshot mode, the first snapshot must live until
 		 * end of xact regardless of what the caller does with it, so we must
@@ -308,14 +304,6 @@ GetTransactionSnapshot(void)
 Snapshot
 GetLatestSnapshot(void)
 {
-	/*
-	 * We might be able to relax this, but nothing that could otherwise work
-	 * needs it.
-	 */
-	if (IsInParallelMode())
-		elog(ERROR,
-			 "cannot update SecondarySnapshot during a parallel operation");
-
 	/*
 	 * So far there are no cases requiring support for GetLatestSnapshot()
 	 * during logical decoding, but it wouldn't be hard to add if required.
@@ -716,25 +704,13 @@ PushCopiedSnapshot(Snapshot snapshot)
 void
 UpdateActiveSnapshotCommandId(void)
 {
-	CommandId	save_curcid,
-				curcid;
+	CommandId	curcid;
 
 	Assert(ActiveSnapshot != NULL);
 	Assert(ActiveSnapshot->as_snap->active_count == 1);
 	Assert(ActiveSnapshot->as_snap->regd_count == 0);
 
-	/*
-	 * Don't allow modification of the active snapshot during parallel
-	 * operation.  We share the snapshot to worker backends at the beginning
-	 * of parallel operation, so any change to the snapshot can lead to
-	 * inconsistencies.  We have other defenses against
-	 * CommandCounterIncrement, but there are a few places that call this
-	 * directly, so we put an additional guard here.
-	 */
-	save_curcid = ActiveSnapshot->as_snap->curcid;
 	curcid = GetCurrentCommandId(false);
-	if (IsInParallelMode() && save_curcid != curcid)
-		elog(ERROR, "cannot modify commandid in active snapshot during a parallel operation");
 	ActiveSnapshot->as_snap->curcid = curcid;
 }
 

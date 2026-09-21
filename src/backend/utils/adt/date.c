@@ -837,12 +837,7 @@ timestamptz_cmp_date(PG_FUNCTION_ARGS)
 	DateADT		dateVal = PG_GETARG_DATEADT(1);
 	PG_RETURN_INT32(-date_cmp_timestamptz_internal(dateVal, dt1));
 }
-/*
- * in_range support function for date.
- *
- * We implement this by promoting the dates to timestamp (without time zone)
- * and then using the timestamp-and-interval in_range function.
- */
+
 /* extract_date()
  * Extract specified field from date type.
  */
@@ -1505,9 +1500,6 @@ datetime_timestamp(PG_FUNCTION_ARGS)
  */
 /* time_mi_interval()
  * Subtract interval from time.
- */
-/*
- * in_range support function for time.
  */
 /* time_part() and extract_time()
  * Extract specified field from time type.

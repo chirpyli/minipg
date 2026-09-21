@@ -14,7 +14,6 @@
  */
 #include "postgres.h"
 
-#include "access/parallel.h"
 #include "common/hashfn.h"
 #include "executor/executor.h"
 #include "miscadmin.h"
@@ -166,8 +165,7 @@ BuildTupleHashTableExt(PlanState *parent,
 					   long nbuckets, Size additionalsize,
 					   MemoryContext metacxt,
 					   MemoryContext tablecxt,
-					   MemoryContext tempcxt,
-					   bool use_variable_hash_iv)
+					   MemoryContext tempcxt)
 {
 	TupleHashTable hashtable;
 	Size		entrysize = sizeof(TupleHashEntryData) + additionalsize;
@@ -197,18 +195,7 @@ BuildTupleHashTableExt(PlanState *parent,
 	hashtable->in_hash_funcs = NULL;
 	hashtable->cur_eq_func = NULL;
 
-	/*
-	 * If parallelism is in use, even if the leader backend is performing the
-	 * scan itself, we don't want to create the hashtable exactly the same way
-	 * in all workers. As hashtables are iterated over in keyspace-order,
-	 * doing so in all processes in the same way is likely to lead to
-	 * "unbalanced" hashtables when the table size initially is
-	 * underestimated.
-	 */
-	if (use_variable_hash_iv)
-		hashtable->hash_iv = murmurhash32(ParallelWorkerNumber);
-	else
-		hashtable->hash_iv = 0;
+	hashtable->hash_iv = 0;
 
 	hashtable->hashtab = tuplehash_create(metacxt, nbuckets, hashtable);
 
@@ -237,37 +224,6 @@ BuildTupleHashTableExt(PlanState *parent,
 	MemoryContextSwitchTo(oldcontext);
 
 	return hashtable;
-}
-
-/*
- * BuildTupleHashTable is a backwards-compatibilty wrapper for
- * BuildTupleHashTableExt(), that allocates the hashtable's metadata in
- * tablecxt. Note that hashtables created this way cannot be reset leak-free
- * with ResetTupleHashTable().
- */
-TupleHashTable
-BuildTupleHashTable(PlanState *parent,
-					TupleDesc inputDesc,
-					int numCols, AttrNumber *keyColIdx,
-					const Oid *eqfuncoids,
-					FmgrInfo *hashfunctions,
-					Oid *collations,
-					long nbuckets, Size additionalsize,
-					MemoryContext tablecxt,
-					MemoryContext tempcxt,
-					bool use_variable_hash_iv)
-{
-	return BuildTupleHashTableExt(parent,
-								  inputDesc,
-								  numCols, keyColIdx,
-								  eqfuncoids,
-								  hashfunctions,
-								  collations,
-								  nbuckets, additionalsize,
-								  tablecxt,
-								  tablecxt,
-								  tempcxt,
-								  use_variable_hash_iv);
 }
 
 /*

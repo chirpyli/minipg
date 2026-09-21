@@ -135,7 +135,6 @@ extern Oid	get_func_variadictype(Oid funcid);
 extern bool get_func_retset(Oid funcid);
 extern bool func_strict(Oid funcid);
 extern char func_volatile(Oid funcid);
-extern char func_parallel(Oid funcid);
 extern char get_func_prokind(Oid funcid);
 extern bool get_func_leakproof(Oid funcid);
 extern RegProcedure get_func_support(Oid funcid);

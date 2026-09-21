@@ -11,7 +11,6 @@ include $(top_builddir)/src/Makefile.global
 OBJS = \
 	clogdesc.o \
 	dbasedesc.o \
-	genericdesc.o \
 	hashdesc.o \
 	heapdesc.o \
 	mxactdesc.o \

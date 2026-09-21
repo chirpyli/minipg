@@ -64,7 +64,6 @@
 #include "common/file_perm.h"
 #include "common/file_utils.h"
 #include "common/logging.h"
-#include "common/restricted_token.h"
 #include "common/string.h"
 #include "fe_utils/string_utils.h"
 #include "getaddrinfo.h"
@@ -2184,7 +2183,6 @@ main(int argc, char *argv[])
 		}
 	}
 
-	get_restricted_token();
 
 	setup_pgdata();
 

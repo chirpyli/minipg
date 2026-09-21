@@ -376,7 +376,7 @@ toast_save_datum(Relation rel, Datum value,
  * ----------
  */
 void
-toast_delete_datum(Relation rel, Datum value, bool is_speculative)
+toast_delete_datum(Relation rel, Datum value)
 {
 	struct varlena *attr = (struct varlena *) DatumGetPointer(value);
 	struct varatt_external toast_pointer;
@@ -427,10 +427,7 @@ toast_delete_datum(Relation rel, Datum value, bool is_speculative)
 		/*
 		 * Have a chunk, delete it
 		 */
-		if (is_speculative)
-			heap_abort_speculative(toastrel, &toasttup->t_self);
-		else
-			simple_heap_delete(toastrel, &toasttup->t_self);
+		simple_heap_delete(toastrel, &toasttup->t_self);
 	}
 
 	/*

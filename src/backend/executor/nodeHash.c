@@ -27,7 +27,6 @@
 #include <limits.h>
 
 #include "access/htup_details.h"
-#include "access/parallel.h"
 #include "catalog/pg_statistic.h"
 #include "executor/execdebug.h"
 #include "executor/hashjoin.h"

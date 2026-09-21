@@ -93,13 +93,6 @@ typedef struct SERIALIZABLEXACT
 								 * FinishedSerializableTransactions */
 
 	/*
-	 * perXactPredicateListLock is only used in parallel queries: it protects
-	 * this SERIALIZABLEXACT's predicate lock list against other workers of
-	 * the same session.
-	 */
-	LWLock		perXactPredicateListLock;
-
-	/*
 	 * for r/o transactions: list of concurrent r/w transactions that we could
 	 * potentially have conflicts with, and vice versa for r/w transactions
 	 */

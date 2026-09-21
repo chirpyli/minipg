@@ -305,7 +305,7 @@ toast_tuple_cleanup(ToastTupleContext *ttc)
 			ToastAttrInfo *attr = &ttc->ttc_attr[i];
 
 			if ((attr->tai_colflags & TOASTCOL_NEEDS_DELETE_OLD) != 0)
-				toast_delete_datum(ttc->ttc_rel, ttc->ttc_oldvalues[i], false);
+				toast_delete_datum(ttc->ttc_rel, ttc->ttc_oldvalues[i]);
 		}
 	}
 }
@@ -315,8 +315,7 @@ toast_tuple_cleanup(ToastTupleContext *ttc)
  * relation.
  */
 void
-toast_delete_external(Relation rel, Datum *values, bool *isnull,
-					  bool is_speculative)
+toast_delete_external(Relation rel, Datum *values, bool *isnull)
 {
 	TupleDesc	tupleDesc = rel->rd_att;
 	int			numAttrs = tupleDesc->natts;
@@ -331,7 +330,7 @@ toast_delete_external(Relation rel, Datum *values, bool *isnull,
 			if (isnull[i])
 				continue;
 			else if (VARATT_IS_EXTERNAL_ONDISK(PointerGetDatum(value)))
-				toast_delete_datum(rel, value, is_speculative);
+				toast_delete_datum(rel, value);
 		}
 	}
 }

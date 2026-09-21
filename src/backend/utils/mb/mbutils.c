@@ -34,47 +34,9 @@
  */
 #include "postgres.h"
 
-#include "access/xact.h"
-#include "catalog/namespace.h"
 #include "mb/pg_wchar.h"
 #include "utils/builtins.h"
 #include "utils/memdebug.h"
-#include "utils/memutils.h"
-#include "utils/relcache.h"
-#include "utils/syscache.h"
-
-/*
- * We maintain a simple linked list caching the fmgr lookup info for the
- * currently selected conversion functions, as well as any that have been
- * selected previously in the current session.  (We remember previous
- * settings because we must be able to restore a previous setting during
- * transaction rollback, without doing any fresh catalog accesses.)
- *
- * Since we'll never release this data, we just keep it in TopMemoryContext.
- */
-typedef struct ConvProcInfo
-{
-	int			s_encoding;		/* server and client encoding IDs */
-	int			c_encoding;
-	FmgrInfo	to_server_info; /* lookup info for conversion procs */
-	FmgrInfo	to_client_info;
-} ConvProcInfo;
-
-static List *ConvProcList = NIL;	/* List of ConvProcInfo */
-
-/*
- * These variables point to the currently active conversion functions,
- * or are NULL when no conversion is needed.
- */
-static FmgrInfo *ToServerConvProc = NULL;
-static FmgrInfo *ToClientConvProc = NULL;
-
-/*
- * This variable stores the conversion function to convert from UTF-8
- * to the server encoding.  It's NULL if the server encoding *is* UTF-8,
- * or if we lack a conversion function for this.
- */
-static FmgrInfo *Utf8ToServerConvProc = NULL;
 
 /*
  * These variables track the currently-selected encodings.
@@ -94,8 +56,6 @@ static int	pending_client_encoding = PG_SQL_ASCII;
 
 
 /* Internal functions */
-static char *perform_default_encoding_conversion(const char *src,
-												 int len, bool is_client_to_server);
 static int	cliplen(const char *str, int len, int limit);
 
 pg_attribute_noreturn()
@@ -146,8 +106,8 @@ PrepareClientEncoding(int encoding)
 }
 
 /*
- * Set the active client encoding and set up the conversion-function pointers.
- * PrepareClientEncoding should have been called previously for this encoding.
+ * Set the active client encoding.  PrepareClientEncoding should have been
+ * called previously for this encoding.
  *
  * Returns 0 if okay, -1 if not (bad encoding or can't support conversion)
  */
@@ -155,8 +115,6 @@ int
 SetClientEncoding(int encoding)
 {
 	int			current_server_encoding;
-	bool		found;
-	ListCell   *lc;
 
 	if (!PG_VALID_FE_ENCODING(encoding))
 		return -1;
@@ -178,46 +136,11 @@ SetClientEncoding(int encoding)
 		encoding == PG_SQL_ASCII)
 	{
 		ClientEncoding = &pg_enc2name_tbl[encoding];
-		ToServerConvProc = NULL;
-		ToClientConvProc = NULL;
 		return 0;
 	}
 
-	/*
-	 * Search the cache for the entry previously prepared by
-	 * PrepareClientEncoding; if there isn't one, we lose.  While at it,
-	 * release any duplicate entries so that repeated Prepare/Set cycles don't
-	 * leak memory.
-	 */
-	found = false;
-	foreach(lc, ConvProcList)
-	{
-		ConvProcInfo *convinfo = (ConvProcInfo *) lfirst(lc);
-
-		if (convinfo->s_encoding == current_server_encoding &&
-			convinfo->c_encoding == encoding)
-		{
-			if (!found)
-			{
-				/* Found newest entry, so set up */
-				ClientEncoding = &pg_enc2name_tbl[encoding];
-				ToServerConvProc = &convinfo->to_server_info;
-				ToClientConvProc = &convinfo->to_client_info;
-				found = true;
-			}
-			else
-			{
-				/* Duplicate entry, release it */
-				ConvProcList = foreach_delete_current(ConvProcList, lc);
-				pfree(convinfo);
-			}
-		}
-	}
-
-	if (found)
-		return 0;				/* success */
-	else
-		return -1;				/* it's not cached, so fail */
+	/* No conversion function is available for other combinations */
+	return -1;
 }
 
 /*
@@ -583,11 +506,7 @@ pg_any_to_server(const char *s, int len, int encoding)
 		return unconstify(char *, s);
 	}
 
-	/* Fast path if we can use cached conversion function */
-	if (encoding == ClientEncoding->encoding)
-		return perform_default_encoding_conversion(s, len, true);
-
-	/* General case ... will not work outside transactions */
+	/* Conversion is unsupported; pg_do_encoding_conversion will raise it */
 	return (char *) pg_do_encoding_conversion((unsigned char *) unconstify(char *, s),
 											  len,
 											  encoding,
@@ -627,90 +546,11 @@ pg_server_to_any(const char *s, int len, int encoding)
 		return unconstify(char *, s);
 	}
 
-	/* Fast path if we can use cached conversion function */
-	if (encoding == ClientEncoding->encoding)
-		return perform_default_encoding_conversion(s, len, false);
-
-	/* General case ... will not work outside transactions */
+	/* Conversion is unsupported; pg_do_encoding_conversion will raise it */
 	return (char *) pg_do_encoding_conversion((unsigned char *) unconstify(char *, s),
 											  len,
 											  DatabaseEncoding->encoding,
 											  encoding);
-}
-
-/*
- *	Perform default encoding conversion using cached FmgrInfo. Since
- *	this function does not access database at all, it is safe to call
- *	outside transactions.  If the conversion has not been set up by
- *	SetClientEncoding(), no conversion is performed.
- */
-static char *
-perform_default_encoding_conversion(const char *src, int len,
-									bool is_client_to_server)
-{
-	char	   *result;
-	int			src_encoding,
-				dest_encoding;
-	FmgrInfo   *flinfo;
-
-	if (is_client_to_server)
-	{
-		src_encoding = ClientEncoding->encoding;
-		dest_encoding = DatabaseEncoding->encoding;
-		flinfo = ToServerConvProc;
-	}
-	else
-	{
-		src_encoding = DatabaseEncoding->encoding;
-		dest_encoding = ClientEncoding->encoding;
-		flinfo = ToClientConvProc;
-	}
-
-	if (flinfo == NULL)
-		return unconstify(char *, src);
-
-	/*
-	 * Allocate space for conversion result, being wary of integer overflow.
-	 * See comments in pg_do_encoding_conversion.
-	 */
-	if ((Size) len >= (MaxAllocHugeSize / (Size) MAX_CONVERSION_GROWTH))
-		ereport(ERROR,
-				(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
-				 errmsg("out of memory"),
-				 errdetail("String of %d bytes is too long for encoding conversion.",
-						   len)));
-
-	result = (char *)
-		MemoryContextAllocHuge(CurrentMemoryContext,
-							   (Size) len * MAX_CONVERSION_GROWTH + 1);
-
-	FunctionCall6(flinfo,
-				  Int32GetDatum(src_encoding),
-				  Int32GetDatum(dest_encoding),
-				  CStringGetDatum(src),
-				  CStringGetDatum(result),
-				  Int32GetDatum(len),
-				  BoolGetDatum(false));
-
-	/*
-	 * Release extra space if there might be a lot --- see comments in
-	 * pg_do_encoding_conversion.
-	 */
-	if (len > 1000000)
-	{
-		Size		resultlen = strlen(result);
-
-		if (resultlen >= MaxAllocSize)
-			ereport(ERROR,
-					(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
-					 errmsg("out of memory"),
-					 errdetail("String of %d bytes is too long for encoding conversion.",
-							   len)));
-
-		result = (char *) repalloc(result, resultlen + 1);
-	}
-
-	return result;
 }
 
 /*
@@ -720,16 +560,10 @@ perform_default_encoding_conversion(const char *src, int len,
  * have at least MAX_UNICODE_EQUIVALENT_STRING+1 bytes available.
  * The output will have a trailing '\0'.  Throws error if the conversion
  * cannot be performed.
- *
- * Note that this relies on having previously looked up any required
- * conversion function.  That's partly for speed but mostly because the parser
- * may call this outside any transaction, or in an aborted transaction.
  */
 void
 pg_unicode_to_server(pg_wchar c, unsigned char *s)
 {
-	unsigned char c_as_utf8[MAX_MULTIBYTE_CHAR_LEN + 1];
-	int			c_as_utf8_len;
 	int			server_encoding;
 
 	/*
@@ -758,27 +592,12 @@ pg_unicode_to_server(pg_wchar c, unsigned char *s)
 		return;
 	}
 
-	/* For all other cases, we must have a conversion function available */
-	if (Utf8ToServerConvProc == NULL)
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("conversion between %s and %s is not supported",
-						pg_enc2name_tbl[PG_UTF8].name,
-						GetDatabaseEncodingName())));
-
-	/* Construct UTF-8 source string */
-	unicode_to_utf8(c, c_as_utf8);
-	c_as_utf8_len = pg_utf_mblen(c_as_utf8);
-	c_as_utf8[c_as_utf8_len] = '\0';
-
-	/* Convert, or throw error if we can't */
-	FunctionCall6(Utf8ToServerConvProc,
-				  Int32GetDatum(PG_UTF8),
-				  Int32GetDatum(server_encoding),
-				  CStringGetDatum(c_as_utf8),
-				  CStringGetDatum(s),
-				  Int32GetDatum(c_as_utf8_len),
-				  BoolGetDatum(false));
+	/* For all other cases, conversion from UTF-8 is not supported */
+	ereport(ERROR,
+			(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+			 errmsg("conversion between %s and %s is not supported",
+					pg_enc2name_tbl[PG_UTF8].name,
+					GetDatabaseEncodingName())));
 }
 
 

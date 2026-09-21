@@ -251,46 +251,6 @@ heapam_tuple_insert(Relation relation, TupleTableSlot *slot, CommandId cid,
 		pfree(tuple);
 }
 
-static void
-heapam_tuple_insert_speculative(Relation relation, TupleTableSlot *slot,
-								CommandId cid, int options,
-								BulkInsertState bistate, uint32 specToken)
-{
-	bool		shouldFree = true;
-	HeapTuple	tuple = ExecFetchSlotHeapTuple(slot, true, &shouldFree);
-
-	/* Update the tuple with table oid */
-	slot->tts_tableOid = RelationGetRelid(relation);
-	tuple->t_tableOid = slot->tts_tableOid;
-
-	HeapTupleHeaderSetSpeculativeToken(tuple->t_data, specToken);
-	options |= HEAP_INSERT_SPECULATIVE;
-
-	/* Perform the insertion, and copy the resulting ItemPointer */
-	heap_insert(relation, tuple, cid, options, bistate);
-	ItemPointerCopy(&tuple->t_self, &slot->tts_tid);
-
-	if (shouldFree)
-		pfree(tuple);
-}
-
-static void
-heapam_tuple_complete_speculative(Relation relation, TupleTableSlot *slot,
-								  uint32 specToken, bool succeeded)
-{
-	bool		shouldFree = true;
-	HeapTuple	tuple = ExecFetchSlotHeapTuple(slot, true, &shouldFree);
-
-	/* adjust the tuple's state accordingly */
-	if (succeeded)
-		heap_finish_speculative(relation, &slot->tts_tid);
-	else
-		heap_abort_speculative(relation, &slot->tts_tid);
-
-	if (shouldFree)
-		pfree(tuple);
-}
-
 static TM_Result
 heapam_tuple_delete(Relation relation, ItemPointer tid, CommandId cid,
 					Snapshot snapshot, Snapshot crosscheck, bool wait,
@@ -364,9 +324,6 @@ tuple_lock_retry:
 	if (result == TM_Updated &&
 		(flags & TUPLE_LOCK_FLAG_FIND_LAST_VERSION))
 	{
-		/* Should not encounter speculative tuple on recheck */
-		Assert(!HeapTupleHeaderIsSpeculative(tuple->t_data));
-
 		ReleaseBuffer(buffer);
 
 		if (!ItemPointerEquals(&tmfd->ctid, &tuple->t_self))
@@ -2319,8 +2276,6 @@ static const TableAmRoutine heapam_methods = {
 	.index_fetch_tuple = heapam_index_fetch_tuple,
 
 	.tuple_insert = heapam_tuple_insert,
-	.tuple_insert_speculative = heapam_tuple_insert_speculative,
-	.tuple_complete_speculative = heapam_tuple_complete_speculative,
 	.multi_insert = heap_multi_insert,
 	.tuple_delete = heapam_tuple_delete,
 	.tuple_update = heapam_tuple_update,

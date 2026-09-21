@@ -14,7 +14,6 @@
 #ifndef NODEHASH_H
 #define NODEHASH_H
 
-#include "access/parallel.h"
 #include "nodes/execnodes.h"
 
 struct SharedHashJoinBatch;

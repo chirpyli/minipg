@@ -1519,8 +1519,7 @@ build_hash_table(AggState *aggstate, int setno, long nbuckets)
 												additionalsize,
 												metacxt,
 												hashcxt,
-												tmpcxt,
-												DO_AGGSPLIT_SKIPFINAL(aggstate->aggsplit));
+												tmpcxt);
 }
 
 /*

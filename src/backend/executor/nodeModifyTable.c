@@ -368,7 +368,7 @@ ExecInsert(ModifyTableState *mtstate,
 	 */
 	if (resultRelationDesc->rd_rel->relhasindex &&
 		resultRelInfo->ri_IndexRelationDescs == NULL)
-		ExecOpenIndices(resultRelInfo, false);
+		ExecOpenIndices(resultRelInfo);
 
 	{
 		/*
@@ -385,8 +385,7 @@ ExecInsert(ModifyTableState *mtstate,
 		/* insert index entries for tuple */
 		if (resultRelInfo->ri_NumIndices > 0)
 			recheckIndexes = ExecInsertIndexTuples(resultRelInfo,
-												   slot, estate, false,
-												   false, NULL);
+												   slot, estate, false);
 	}
 
 	if (canSetTag)
@@ -641,7 +640,7 @@ ExecUpdate(ModifyTableState *mtstate,
 	 */
 	if (resultRelationDesc->rd_rel->relhasindex &&
 		resultRelInfo->ri_IndexRelationDescs == NULL)
-		ExecOpenIndices(resultRelInfo, false);
+		ExecOpenIndices(resultRelInfo);
 
 	{
 		ItemPointerData lockedtid;
@@ -834,8 +833,7 @@ lreplace:
 		/* insert index entries for tuple if necessary */
 		if (resultRelInfo->ri_NumIndices > 0 && update_indexes)
 			recheckIndexes = ExecInsertIndexTuples(resultRelInfo,
-												   slot, estate, true, false,
-												   NULL);
+												   slot, estate, true);
 	}
 
 	if (canSetTag)

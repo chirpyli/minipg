@@ -1264,18 +1264,9 @@ WHERE p1.opfmethod = 0 OR p1.opfnamespace = 0;
 -- get noticed.
 SELECT oid, opfname FROM pg_opfamily f
 WHERE NOT EXISTS (SELECT 1 FROM pg_opclass WHERE opcfamily = f.oid);
- oid  |     opfname      
-------+------------------
- 1974 | network_ops
- 1975 | network_ops
- 1984 | macaddr_ops
- 1985 | macaddr_ops
- 3371 | macaddr8_ops
- 3372 | macaddr8_ops
- 2994 | record_ops
- 6194 | record_ops
- 3194 | record_image_ops
-(9 rows)
+ oid | opfname 
+-----+---------
+(0 rows)
 
 -- **************** pg_opclass ****************
 -- Look for illegal values in pg_opclass fields

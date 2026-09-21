@@ -35,7 +35,6 @@
 #include "access/heapam_xlog.h"
 #include "access/htup_details.h"
 #include "access/multixact.h"
-#include "access/parallel.h"
 #include "access/transam.h"
 #include "access/visibilitymap.h"
 #include "access/xact.h"
@@ -1921,7 +1920,6 @@ lazy_vacuum(LVRelState *vacrel)
 
 	/* Should not end up here with no indexes */
 	Assert(vacrel->nindexes > 0);
-	Assert(!IsParallelWorker());
 	Assert(vacrel->lpdead_item_pages > 0);
 
 	if (!vacrel->do_index_vacuuming)
@@ -2050,7 +2048,6 @@ lazy_vacuum_all_indexes(LVRelState *vacrel)
 {
 	bool		allindexes = true;
 
-	Assert(!IsParallelWorker());
 	Assert(vacrel->nindexes > 0);
 	Assert(vacrel->do_index_vacuuming);
 	Assert(vacrel->do_index_cleanup);
@@ -2465,7 +2462,6 @@ lazy_cleanup_all_indexes(LVRelState *vacrel)
 	bool		estimated_count =
 		vacrel->tupcount_pages < vacrel->rel_pages;
 
-	Assert(!IsParallelWorker());
 	Assert(vacrel->nindexes > 0);
 
 	/* Report that we are now cleaning up indexes */
@@ -3170,7 +3166,6 @@ update_index_statistics(LVRelState *vacrel)
 	int			nindexes = vacrel->nindexes;
 	IndexBulkDeleteResult **indstats = vacrel->indstats;
 
-	Assert(!IsInParallelMode());
 
 	for (int idx = 0; idx < nindexes; idx++)
 	{

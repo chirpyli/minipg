@@ -21,7 +21,6 @@
 
 #include "storage/proc.h"
 
-#include "access/parallel.h"
 #include "access/visibilitymap.h"
 #include "access/xact.h"
 #include "access/xlog.h"
@@ -123,8 +122,6 @@ RelationCreateStorage(RelFileNode rnode, char relpersistence)
 	SMgrRelation srel;
 	BackendId	backend;
 	bool		needs_wal;
-
-	Assert(!IsInParallelMode());	/* couldn't update pendingSyncHash */
 
 	backend = InvalidBackendId;
 	needs_wal = true;
@@ -538,84 +535,6 @@ RelFileNodeSkippingWAL(RelFileNode rnode)
 }
 
 /*
- * EstimatePendingSyncsSpace
- *		Estimate space needed to pass syncs to parallel workers.
- */
-Size
-EstimatePendingSyncsSpace(void)
-{
-	long		entries;
-
-	entries = pendingSyncHash ? hash_get_num_entries(pendingSyncHash) : 0;
-	return mul_size(1 + entries, sizeof(RelFileNode));
-}
-
-/*
- * SerializePendingSyncs
- *		Serialize syncs for parallel workers.
- */
-void
-SerializePendingSyncs(Size maxSize, char *startAddress)
-{
-	HTAB	   *tmphash;
-	HASHCTL		ctl;
-	HASH_SEQ_STATUS scan;
-	PendingRelSync *sync;
-	PendingRelDelete *delete;
-	RelFileNode *src;
-	RelFileNode *dest = (RelFileNode *) startAddress;
-
-	if (!pendingSyncHash)
-		goto terminate;
-
-	/* Create temporary hash to collect active relfilenodes */
-	ctl.keysize = sizeof(RelFileNode);
-	ctl.entrysize = sizeof(RelFileNode);
-	ctl.hcxt = CurrentMemoryContext;
-	tmphash = hash_create("tmp relfilenodes",
-						  hash_get_num_entries(pendingSyncHash), &ctl,
-						  HASH_ELEM | HASH_BLOBS | HASH_CONTEXT);
-
-	/* collect all rnodes from pending syncs */
-	hash_seq_init(&scan, pendingSyncHash);
-	while ((sync = (PendingRelSync *) hash_seq_search(&scan)))
-		(void) hash_search(tmphash, &sync->rnode, HASH_ENTER, NULL);
-
-	/* remove deleted rnodes */
-	for (delete = pendingDeletes; delete != NULL; delete = delete->next)
-		if (delete->atCommit)
-			(void) hash_search(tmphash, (void *) &delete->relnode,
-							   HASH_REMOVE, NULL);
-
-	hash_seq_init(&scan, tmphash);
-	while ((src = (RelFileNode *) hash_seq_search(&scan)))
-		*dest++ = *src;
-
-	hash_destroy(tmphash);
-
-terminate:
-	MemSet(dest, 0, sizeof(RelFileNode));
-}
-
-/*
- * RestorePendingSyncs
- *		Restore syncs within a parallel worker.
- *
- * RelationNeedsWAL() and RelFileNodeSkippingWAL() must offer the correct
- * answer to parallel workers.  Only smgrDoPendingSyncs() reads the
- * is_truncated field, at end of transaction.  Hence, don't restore it.
- */
-void
-RestorePendingSyncs(char *startAddress)
-{
-	RelFileNode *rnode;
-
-	Assert(pendingSyncHash == NULL);
-	for (rnode = (RelFileNode *) startAddress; rnode->relNode != 0; rnode++)
-		AddPendingSync(rnode);
-}
-
-/*
  *	smgrDoPendingDeletes() -- Take care of relation deletes at end of xact.
  *
  * This also runs when aborting a subxact; we want to clean up a failed
@@ -693,7 +612,7 @@ smgrDoPendingDeletes(bool isCommit)
  *	smgrDoPendingSyncs() -- Take care of relation syncs at end of xact.
  */
 void
-smgrDoPendingSyncs(bool isCommit, bool isParallelWorker)
+smgrDoPendingSyncs(bool isCommit)
 {
 	PendingRelDelete *pending;
 	int			nrels = 0,
@@ -715,13 +634,6 @@ smgrDoPendingSyncs(bool isCommit, bool isParallelWorker)
 	}
 
 	AssertPendingSyncs_RelationCache();
-
-	/* Parallel worker -- just throw away all pending syncs */
-	if (isParallelWorker)
-	{
-		pendingSyncHash = NULL;
-		return;
-	}
 
 	/* Skip syncing nodes that smgrDoPendingDeletes() will delete. */
 	for (pending = pendingDeletes; pending != NULL; pending = pending->next)

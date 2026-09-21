@@ -29,7 +29,6 @@
 #include <utime.h>
 
 #include "access/htup_details.h"
-#include "access/parallel.h"
 #include "common/file_perm.h"
 #include "libpq/libpq.h"
 #include "libpq/pqsignal.h"
@@ -666,12 +665,6 @@ SetUserIdAndContext(Oid userid, bool sec_def_context)
 void
 InitializeSessionUserId(const char *rolename, Oid roleid)
 {
-	/*
-	 * 在并行 worker 中 ParallelWorkerMain 已设置好输出变量，无需重复执行。
-	 */
-	if (InitializingParallelWorker)
-		return;
-
 	AssertState(!OidIsValid(AuthenticatedUserId));
 
 	AuthenticatedUserId = BOOTSTRAP_SUPERUSERID;

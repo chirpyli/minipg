@@ -232,24 +232,6 @@ PreventCommandIfReadOnly(const char *cmdname)
 }
 
 /*
- * PreventCommandIfParallelMode: throw error if current (sub)transaction is
- * in parallel mode.
- *
- * This is useful partly to ensure consistency of the error message wording;
- * some callers have checked IsInParallelMode() for themselves.
- */
-void
-PreventCommandIfParallelMode(const char *cmdname)
-{
-	if (IsInParallelMode())
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_TRANSACTION_STATE),
-		/* translator: %s is name of a SQL command, eg CREATE */
-				 errmsg("cannot execute %s during a parallel operation",
-						cmdname)));
-}
-
-/*
  * PreventCommandDuringRecovery: throw error if RecoveryInProgress
  *
  * The majority of operations that are unsafe in a Hot Standby
@@ -348,14 +330,12 @@ standard_ProcessUtility(PlannedStmt *pstmt,
 	/* Prohibit read/write commands in read-only states. */
 	readonly_flags = ClassifyUtilityCommandAsReadOnly(parsetree);
 	if (readonly_flags != COMMAND_IS_STRICTLY_READ_ONLY &&
-		(XactReadOnly || IsInParallelMode()))
+		XactReadOnly)
 	{
 		CommandTag	commandtag = CreateCommandTag(parsetree);
 
 		if ((readonly_flags & COMMAND_OK_IN_READ_ONLY_TXN) == 0)
 			PreventCommandIfReadOnly(GetCommandTagName(commandtag));
-		if ((readonly_flags & COMMAND_OK_IN_PARALLEL_MODE) == 0)
-			PreventCommandIfParallelMode(GetCommandTagName(commandtag));
 		if ((readonly_flags & COMMAND_OK_IN_RECOVERY) == 0)
 			PreventCommandDuringRecovery(GetCommandTagName(commandtag));
 	}

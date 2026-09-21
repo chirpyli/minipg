@@ -2195,59 +2195,6 @@ CompareIndexInfo(IndexInfo *info1, IndexInfo *info2,
 }
 
 /* ----------------
- *		BuildSpeculativeIndexInfo
- *			Add extra state to IndexInfo record
- *
- * For unique indexes, we usually don't want to add info to the IndexInfo for
- * checking uniqueness, since the B-Tree AM handles that directly.  However,
- * in the case of speculative insertion, additional support is required.
- *
- * Do this processing here rather than in BuildIndexInfo() to not incur the
- * overhead in the common non-speculative cases.
- * ----------------
- */
-void
-BuildSpeculativeIndexInfo(Relation index, IndexInfo *ii)
-{
-	int			indnkeyatts;
-	int			i;
-
-	indnkeyatts = IndexRelationGetNumberOfKeyAttributes(index);
-
-	/*
-	 * fetch info for checking unique indexes
-	 */
-	Assert(ii->ii_Unique);
-
-	if (index->rd_rel->relam != BTREE_AM_OID)
-		elog(ERROR, "unexpected non-btree speculative unique index");
-
-	ii->ii_UniqueOps = (Oid *) palloc(sizeof(Oid) * indnkeyatts);
-	ii->ii_UniqueProcs = (Oid *) palloc(sizeof(Oid) * indnkeyatts);
-	ii->ii_UniqueStrats = (uint16 *) palloc(sizeof(uint16) * indnkeyatts);
-
-	/*
-	 * We have to look up the operator's strategy number.  This provides a
-	 * cross-check that the operator does match the index.
-	 */
-	/* We need the func OIDs and strategy numbers too */
-	for (i = 0; i < indnkeyatts; i++)
-	{
-		ii->ii_UniqueStrats[i] = BTEqualStrategyNumber;
-		ii->ii_UniqueOps[i] =
-			get_opfamily_member(index->rd_opfamily[i],
-								index->rd_opcintype[i],
-								index->rd_opcintype[i],
-								ii->ii_UniqueStrats[i]);
-		if (!OidIsValid(ii->ii_UniqueOps[i]))
-			elog(ERROR, "missing operator %d(%u,%u) in opfamily %u",
-				 ii->ii_UniqueStrats[i], index->rd_opcintype[i],
-				 index->rd_opcintype[i], index->rd_opfamily[i]);
-		ii->ii_UniqueProcs[i] = get_opcode(ii->ii_UniqueOps[i]);
-	}
-}
-
-/* ----------------
  *		FormIndexDatum
  *			Construct values[] and isnull[] arrays for a new index tuple.
  *
@@ -3361,8 +3308,6 @@ SetReindexPending(List *indexes)
 	/* Reindexing is not re-entrant. */
 	if (pendingReindexedIndexes)
 		elog(ERROR, "cannot reindex while reindexing");
-	if (IsInParallelMode())
-		elog(ERROR, "cannot modify reindex state during a parallel operation");
 	pendingReindexedIndexes = list_copy(indexes);
 	reindexingNestLevel = GetCurrentTransactionNestLevel();
 }
@@ -3374,8 +3319,6 @@ SetReindexPending(List *indexes)
 static void
 RemoveReindexPending(Oid indexOid)
 {
-	if (IsInParallelMode())
-		elog(ERROR, "cannot modify reindex state during a parallel operation");
 	pendingReindexedIndexes = list_delete_oid(pendingReindexedIndexes,
 											  indexOid);
 }

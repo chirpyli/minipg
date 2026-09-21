@@ -20,7 +20,6 @@
 
 #include "access/genam.h"
 #include "access/htup_details.h"
-#include "access/parallel.h"
 #include "access/sysattr.h"
 #include "access/table.h"
 #include "access/xact.h"
@@ -191,9 +190,6 @@ standard_planner(Query *parse, const char *query_string, int cursorOptions,
 	glob->lastPlanNodeId = 0;
 	glob->transientPlan = false;
 	glob->dependsOnRole = false;
-
-	/* Scan the query tree for parallel-unsafe functions */
-	glob->maxParallelHazard = max_parallel_hazard(parse);
 
 	/* Default assumption is we need all the tuples */
 	tuple_fraction = 0.0;

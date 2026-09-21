@@ -33,7 +33,6 @@
 #include "access/htup_details.h"
 #include "access/multixact.h"
 #include "access/nbtree.h"
-#include "access/parallel.h"
 #include "access/sysattr.h"
 #include "access/table.h"
 #include "access/tableam.h"
@@ -965,8 +964,6 @@ retry:
 static void
 RelationInitPhysicalAddr(Relation relation)
 {
-	Oid			oldnode = relation->rd_node.relNode;
-
 	/* these relations kinds never have storage */
 	if (!RELKIND_HAS_STORAGE(relation->rd_rel->relkind))
 		return;
@@ -993,19 +990,6 @@ RelationInitPhysicalAddr(Relation relation)
 		if (!OidIsValid(relation->rd_node.relNode))
 			elog(ERROR, "could not find relation mapping for relation \"%s\", OID %u",
 				 RelationGetRelationName(relation), relation->rd_id);
-	}
-
-	/*
-	 * For RelationNeedsWAL() to answer correctly on parallel workers, restore
-	 * rd_firstRelfilenodeSubid.  No subtransactions start or end while in
-	 * parallel mode, so the specific SubTransactionId does not matter.
-	 */
-	if (IsParallelWorker() && oldnode != relation->rd_node.relNode)
-	{
-		if (RelFileNodeSkippingWAL(relation->rd_node))
-			relation->rd_firstRelfilenodeSubid = TopSubTransactionId;
-		else
-			relation->rd_firstRelfilenodeSubid = InvalidSubTransactionId;
 	}
 }
 

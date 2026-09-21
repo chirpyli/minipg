@@ -46,7 +46,6 @@
 #include "access/hash.h"
 #include "access/htup_details.h"
 #include "access/nbtree.h"
-#include "access/parallel.h"
 #include "access/relation.h"
 #include "catalog/pg_collation.h"
 #include "access/table.h"

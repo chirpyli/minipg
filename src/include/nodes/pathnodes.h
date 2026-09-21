@@ -119,8 +119,6 @@ typedef struct PlannerGlobal
 
 	bool		dependsOnRole;	/* is plan specific to current role? */
 
-	char		maxParallelHazard;	/* worst PROPARALLEL hazard level */
-
 } PlannerGlobal;
 
 /* macro for fetching the Plan associated with a SubPlan node */

@@ -1724,16 +1724,6 @@ timestamp_larger(PG_FUNCTION_ARGS)
 
 
 /*
- * in_range support functions for timestamps and intervals.
- *
- * Per SQL spec, we support these with interval as the offset type.
- * The spec's restriction that the offset not be negative is a bit hard to
- * decipher for intervals, but we choose to interpret it the same as our
- * interval comparison operators would.
- */
-
-
-/*
  * interval_accum, interval_accum_inv, and interval_avg implement the
  * AVG(interval) aggregate.
  *

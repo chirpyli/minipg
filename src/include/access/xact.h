@@ -120,12 +120,9 @@ extern int	MyXactFlags;
 typedef enum
 {
 	XACT_EVENT_COMMIT,
-	XACT_EVENT_PARALLEL_COMMIT,
 	XACT_EVENT_ABORT,
-	XACT_EVENT_PARALLEL_ABORT,
 	XACT_EVENT_PREPARE,
 	XACT_EVENT_PRE_COMMIT,
-	XACT_EVENT_PARALLEL_PRE_COMMIT,
 	XACT_EVENT_PRE_PREPARE
 } XactEvent;
 
@@ -396,7 +393,6 @@ extern FullTransactionId GetCurrentFullTransactionIdIfAny(void);
 extern void MarkCurrentTransactionIdLoggedIfAny(void);
 extern bool SubTransactionIsActive(SubTransactionId subxid);
 extern CommandId GetCurrentCommandId(bool used);
-extern void SetParallelStartTimestamps(TimestampTz xact_ts, TimestampTz stmt_ts);
 extern TimestampTz GetCurrentTransactionStartTimestamp(void);
 extern TimestampTz GetCurrentStatementStartTimestamp(void);
 extern TimestampTz GetCurrentTransactionStopTimestamp(void);
@@ -421,10 +417,6 @@ extern void BeginInternalSubTransaction(const char *name);
 extern void ReleaseCurrentSubTransaction(void);
 extern void RollbackAndReleaseCurrentSubTransaction(void);
 extern bool IsSubTransaction(void);
-extern Size EstimateTransactionStateSpace(void);
-extern void SerializeTransactionState(Size maxsize, char *start_address);
-extern void StartParallelWorkerTransaction(char *tstatespace);
-extern void EndParallelWorkerTransaction(void);
 extern bool IsTransactionBlock(void);
 extern bool IsTransactionOrTransactionBlock(void);
 extern char TransactionBlockStatusCode(void);
@@ -467,9 +459,5 @@ extern const char *xact_identify(uint8 info);
 extern void ParseCommitRecord(uint8 info, xl_xact_commit *xlrec, xl_xact_parsed_commit *parsed);
 extern void ParseAbortRecord(uint8 info, xl_xact_abort *xlrec, xl_xact_parsed_abort *parsed);
 extern void ParsePrepareRecord(uint8 info, xl_xact_prepare *xlrec, xl_xact_parsed_prepare *parsed);
-
-extern void EnterParallelMode(void);
-extern void ExitParallelMode(void);
-extern bool IsInParallelMode(void);
 
 #endif							/* XACT_H */

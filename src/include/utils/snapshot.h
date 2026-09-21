@@ -93,13 +93,10 @@ typedef enum SnapshotType
 	 * another transaction that's still in progress; or to
 	 * InvalidTransactionId if the tuple's xmin is committed good, committed
 	 * dead, or my own xact.  Similarly for snapshot->xmax and the tuple's
-	 * xmax.  If the tuple was inserted speculatively, meaning that the
-	 * inserter might still back down on the insertion without aborting the
-	 * whole transaction, the associated token is also returned in
-	 * snapshot->speculativeToken.  See also InitDirtySnapshot().
+	 * xmax.  See also InitDirtySnapshot().
 	 * -------------------------------------------------------------------------
 	 */
-	SNAPSHOT_DIRTY,
+	 SNAPSHOT_DIRTY,
 
 	/*
 	 * A tuple is visible iff the tuple might be visible to some transaction;
@@ -176,12 +173,6 @@ typedef struct SnapshotData
 	bool		copied;			/* false if it's a static snapshot */
 
 	CommandId	curcid;			/* in my xact, CID < curcid are visible */
-
-	/*
-	 * An extra return value for HeapTupleSatisfiesDirty, not used in MVCC
-	 * snapshots.
-	 */
-	uint32		speculativeToken;
 
 	/*
 	 * For SNAPSHOT_NON_VACUUMABLE (and hopefully more in the future) this is

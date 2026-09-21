@@ -48,7 +48,7 @@ CatalogOpenIndexes(Relation heapRel)
 	resultRelInfo->ri_RangeTableIndex = 0;	/* dummy */
 	resultRelInfo->ri_RelationDesc = heapRel;
 
-	ExecOpenIndices(resultRelInfo, false);
+	ExecOpenIndices(resultRelInfo);
 
 	return resultRelInfo;
 }

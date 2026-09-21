@@ -486,20 +486,6 @@ typedef struct TableAmRoutine
 								 CommandId cid, int options,
 								 struct BulkInsertStateData *bistate);
 
-	/* see table_tuple_insert_speculative() for reference about parameters */
-	void		(*tuple_insert_speculative) (Relation rel,
-											 TupleTableSlot *slot,
-											 CommandId cid,
-											 int options,
-											 struct BulkInsertStateData *bistate,
-											 uint32 specToken);
-
-	/* see table_tuple_complete_speculative() for reference about parameters */
-	void		(*tuple_complete_speculative) (Relation rel,
-											   TupleTableSlot *slot,
-											   uint32 specToken,
-											   bool succeeded);
-
 	/* see table_multi_insert() for reference about parameters */
 	void		(*multi_insert) (Relation rel, TupleTableSlot **slots, int nslots,
 								 CommandId cid, int options, struct BulkInsertStateData *bistate);
@@ -1299,39 +1285,6 @@ table_tuple_insert(Relation rel, TupleTableSlot *slot, CommandId cid,
 {
 	rel->rd_tableam->tuple_insert(rel, slot, cid, options,
 								  bistate);
-}
-
-/*
- * Perform a "speculative insertion". These can be backed out afterwards
- * without aborting the whole transaction.  Other sessions can wait for the
- * speculative insertion to be confirmed, turning it into a regular tuple, or
- * aborted, as if it never existed.  Speculatively inserted tuples behave as
- * "value locks" of short duration, used to implement INSERT .. ON CONFLICT.
- *
- * A transaction having performed a speculative insertion has to either abort,
- * or finish the speculative insertion with
- * table_tuple_complete_speculative(succeeded = ...).
- */
-static inline void
-table_tuple_insert_speculative(Relation rel, TupleTableSlot *slot,
-							   CommandId cid, int options,
-							   struct BulkInsertStateData *bistate,
-							   uint32 specToken)
-{
-	rel->rd_tableam->tuple_insert_speculative(rel, slot, cid, options,
-											  bistate, specToken);
-}
-
-/*
- * Complete "speculative insertion" started in the same transaction. If
- * succeeded is true, the tuple is fully inserted, if false, it's removed.
- */
-static inline void
-table_tuple_complete_speculative(Relation rel, TupleTableSlot *slot,
-								 uint32 specToken, bool succeeded)
-{
-	rel->rd_tableam->tuple_complete_speculative(rel, slot, specToken,
-												succeeded);
 }
 
 /*

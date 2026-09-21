@@ -91,12 +91,6 @@ heap_desc(StringInfo buf, XLogReaderState *record)
 		for (i = 0; i < xlrec->nrelids; i++)
 			appendStringInfo(buf, " %u", xlrec->relids[i]);
 	}
-	else if (info == XLOG_HEAP_CONFIRM)
-	{
-		xl_heap_confirm *xlrec = (xl_heap_confirm *) rec;
-
-		appendStringInfo(buf, "off %u", xlrec->offnum);
-	}
 	else if (info == XLOG_HEAP_LOCK)
 	{
 		xl_heap_lock *xlrec = (xl_heap_lock *) rec;
@@ -208,9 +202,6 @@ heap_identify(uint8 info)
 			break;
 		case XLOG_HEAP_TRUNCATE:
 			id = "TRUNCATE";
-			break;
-		case XLOG_HEAP_CONFIRM:
-			id = "HEAP_CONFIRM";
 			break;
 		case XLOG_HEAP_LOCK:
 			id = "LOCK";

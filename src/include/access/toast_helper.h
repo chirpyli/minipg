@@ -110,7 +110,6 @@ extern void toast_tuple_externalize(ToastTupleContext *ttc, int attribute,
 									int options);
 extern void toast_tuple_cleanup(ToastTupleContext *ttc);
 
-extern void toast_delete_external(Relation rel, Datum *values, bool *isnull,
-								  bool is_speculative);
+extern void toast_delete_external(Relation rel, Datum *values, bool *isnull);
 
 #endif

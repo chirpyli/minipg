@@ -14,9 +14,7 @@ include $(top_builddir)/src/Makefile.global
 
 OBJS = \
 	clog.o \
-	generic_xlog.o \
 	multixact.o \
-	parallel.o \
 	rmgr.o \
 	slru.o \
 	subtrans.o \

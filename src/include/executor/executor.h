@@ -83,15 +83,6 @@ extern void execTuplesHashPrepare(int numCols,
 								  const Oid *eqOperators,
 								  Oid **eqFuncOids,
 								  FmgrInfo **hashFunctions);
-extern TupleHashTable BuildTupleHashTable(PlanState *parent,
-										  TupleDesc inputDesc,
-										  int numCols, AttrNumber *keyColIdx,
-										  const Oid *eqfuncoids,
-										  FmgrInfo *hashfunctions,
-										  Oid *collations,
-										  long nbuckets, Size additionalsize,
-										  MemoryContext tablecxt,
-										  MemoryContext tempcxt, bool use_variable_hash_iv);
 extern TupleHashTable BuildTupleHashTableExt(PlanState *parent,
 											 TupleDesc inputDesc,
 											 int numCols, AttrNumber *keyColIdx,
@@ -101,7 +92,7 @@ extern TupleHashTable BuildTupleHashTableExt(PlanState *parent,
 											 long nbuckets, Size additionalsize,
 											 MemoryContext metacxt,
 											 MemoryContext tablecxt,
-											 MemoryContext tempcxt, bool use_variable_hash_iv);
+											 MemoryContext tempcxt);
 extern TupleHashEntry LookupTupleHashEntry(TupleHashTable hashtable,
 										   TupleTableSlot *slot,
 										   bool *isnew, uint32 *hash);
@@ -550,16 +541,11 @@ extern Bitmapset *ExecGetAllUpdatedCols(ResultRelInfo *relinfo, EState *estate);
 /*
  * prototypes from functions in execIndexing.c
  */
-extern void ExecOpenIndices(ResultRelInfo *resultRelInfo, bool speculative);
+extern void ExecOpenIndices(ResultRelInfo *resultRelInfo);
 extern void ExecCloseIndices(ResultRelInfo *resultRelInfo);
 extern List *ExecInsertIndexTuples(ResultRelInfo *resultRelInfo,
 								   TupleTableSlot *slot, EState *estate,
-								   bool update,
-								   bool noDupErr,
-								   bool *specConflict);
-extern bool ExecCheckIndexConstraints(ResultRelInfo *resultRelInfo,
-									  TupleTableSlot *slot,
-									  EState *estate, ItemPointer conflictTid);
+								   bool update);
 
 /*
  * prototypes from functions in nodeModifyTable.c

@@ -106,8 +106,6 @@ extern bool CompareIndexInfo(IndexInfo *info1, IndexInfo *info2,
 							 Oid *opfamilies1, Oid *opfamilies2,
 							 AttrMap *attmap);
 
-extern void BuildSpeculativeIndexInfo(Relation index, IndexInfo *ii);
-
 extern void FormIndexDatum(IndexInfo *indexInfo,
 						   TupleTableSlot *slot,
 						   EState *estate,

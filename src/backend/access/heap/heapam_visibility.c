@@ -411,11 +411,6 @@ HeapTupleSatisfiesToast(HeapTuple htup, Snapshot snapshot,
 			}
 		}
 
-		/*
-		 * An invalid Xmin can be left behind by a speculative insertion that
-		 * is canceled by super-deleting the tuple.  This also applies to
-		 * TOAST tuples created during speculative insertion.
-		 */
 		else if (!TransactionIdIsValid(HeapTupleHeaderGetXmin(tuple)))
 			return false;
 	}
@@ -732,10 +727,7 @@ HeapTupleSatisfiesUpdate(HeapTuple htup, CommandId curcid,
  * tuple.  snapshot->xmin is set to the tuple's xmin if that is another
  * transaction that's still in progress; or to InvalidTransactionId if the
  * tuple's xmin is committed good, committed dead, or my own xact.
- * Similarly for snapshot->xmax and the tuple's xmax.  If the tuple was
- * inserted speculatively, meaning that the inserter might still back down
- * on the insertion without aborting the whole transaction, the associated
- * token is also returned in snapshot->speculativeToken.
+ * Similarly for snapshot->xmax and the tuple's xmax.
  */
 static bool
 HeapTupleSatisfiesDirty(HeapTuple htup, Snapshot snapshot,
@@ -747,7 +739,6 @@ HeapTupleSatisfiesDirty(HeapTuple htup, Snapshot snapshot,
 	Assert(htup->t_tableOid != InvalidOid);
 
 	snapshot->xmin = snapshot->xmax = InvalidTransactionId;
-	snapshot->speculativeToken = 0;
 
 	if (!HeapTupleHeaderXminCommitted(tuple))
 	{
@@ -829,20 +820,6 @@ HeapTupleSatisfiesDirty(HeapTuple htup, Snapshot snapshot,
 		}
 		else if (TransactionIdIsInProgress(HeapTupleHeaderGetRawXmin(tuple)))
 		{
-			/*
-			 * Return the speculative token to caller.  Caller can worry about
-			 * xmax, since it requires a conclusively locked row version, and
-			 * a concurrent update to this tuple is a conflict of its
-			 * purposes.
-			 */
-			if (HeapTupleHeaderIsSpeculative(tuple))
-			{
-				snapshot->speculativeToken =
-					HeapTupleHeaderGetSpeculativeToken(tuple);
-
-				Assert(snapshot->speculativeToken != 0);
-			}
-
 			snapshot->xmin = HeapTupleHeaderGetRawXmin(tuple);
 			/* XXX shouldn't we fall through to look at xmax? */
 			return true;		/* in insertion by other */

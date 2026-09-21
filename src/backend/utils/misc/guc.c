@@ -83,15 +83,6 @@
 #include "utils/inval.h"
 #include "utils/varlena.h"
 
-/*
- * GUC variables previously declared in the now-removed replication headers
- * (walreceiver.h / syncrep.h). They are still needed by the standby recovery
- * and synchronous-commit machinery, so define them here.
- */
-bool		hot_standby_feedback = false;
-int			wal_receiver_status_interval = 10;
-int			wal_receiver_timeout = 60000;
-
 #define CONFIG_FILENAME "postgresql.conf"
 
 /*
@@ -1398,16 +1389,6 @@ static struct config_bool ConfigureNamesBool[] =
 	},
 
 	{
-		{"hot_standby_feedback", PGC_SIGHUP, REPLICATION_STANDBY,
-			gettext_noop("Allows feedback from a hot standby to the primary that will avoid query conflicts."),
-			NULL
-		},
-		&hot_standby_feedback,
-		false,
-		NULL, NULL, NULL
-	},
-
-	{
 		{"in_hot_standby", PGC_INTERNAL, PRESET_OPTIONS,
 			gettext_noop("Shows whether hot standby is currently active."),
 			NULL,
@@ -1558,28 +1539,6 @@ static struct config_int ConfigureNamesInt[] =
 		},
 		&recovery_min_apply_delay,
 		0, 0, INT_MAX,
-		NULL, NULL, NULL
-	},
-
-	{
-		{"wal_receiver_status_interval", PGC_SIGHUP, REPLICATION_STANDBY,
-			gettext_noop("Sets the maximum interval between WAL receiver status reports to the sending server."),
-			NULL,
-			GUC_UNIT_S
-		},
-		&wal_receiver_status_interval,
-		10, 0, INT_MAX / 1000,
-		NULL, NULL, NULL
-	},
-
-	{
-		{"wal_receiver_timeout", PGC_SIGHUP, REPLICATION_STANDBY,
-			gettext_noop("Sets the maximum wait time to receive data from the sending server."),
-			NULL,
-			GUC_UNIT_MS
-		},
-		&wal_receiver_timeout,
-		60 * 1000, 0, INT_MAX,
 		NULL, NULL, NULL
 	},
 
@@ -5566,24 +5525,6 @@ set_config_option(const char *name, const char *value,
 		return 0;
 
 	/*
-	 * GUC_ACTION_SAVE changes are acceptable during a parallel operation,
-	 * because the current worker will also pop the change.
-	 *
-	 * Also allow normal setting if the GUC is marked GUC_ALLOW_IN_PARALLEL.
-	 *
-	 * Other changes might need to affect other workers, so forbid them.
-	 */
-	if (IsInParallelMode() && changeVal && action != GUC_ACTION_SAVE &&
-		(record->flags & GUC_ALLOW_IN_PARALLEL) == 0)
-	{
-		ereport(elevel,
-				(errcode(ERRCODE_INVALID_TRANSACTION_STATE),
-				 errmsg("parameter \"%s\" cannot be set during a parallel operation",
-						name)));
-		return 0;
-	}
-
-	/*
 	 * Check if the option can be set at this time. See guc.h for the precise
 	 * rules.
 	 */
@@ -6552,15 +6493,6 @@ void
 ExecSetVariableStmt(VariableSetStmt *stmt, bool isTopLevel)
 {
 	GucAction	action = stmt->is_local ? GUC_ACTION_LOCAL : GUC_ACTION_SET;
-
-	/*
-	 * Workers synchronize these parameters at the start of the parallel
-	 * operation; then, we block SET during the operation.
-	 */
-	if (IsInParallelMode())
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_TRANSACTION_STATE),
-				 errmsg("cannot set parameters during a parallel operation")));
 
 	switch (stmt->kind)
 	{
