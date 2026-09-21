@@ -223,12 +223,9 @@ typedef struct AggStatePerAggData
  */
 typedef struct AggStatePerGroupData
 {
-#define FIELDNO_AGGSTATEPERGROUPDATA_TRANSVALUE 0
 	Datum		transValue;		/* current transition value */
-#define FIELDNO_AGGSTATEPERGROUPDATA_TRANSVALUEISNULL 1
 	bool		transValueIsNull;
 
-#define FIELDNO_AGGSTATEPERGROUPDATA_NOTRANSVALUE 2
 	bool		noTransValue;	/* true if transValue not set yet */
 
 	/*

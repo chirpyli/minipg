@@ -1753,16 +1753,12 @@ typedef struct AggState
 	AggStatePerTrans pertrans;	/* per-Trans state information */
 	ExprContext *hashcontext;	/* econtexts for long-lived data (hashtable) */
 	ExprContext *tmpcontext;	/* econtext for input expressions */
-#define FIELDNO_AGGSTATE_CURAGGCONTEXT 14
 	ExprContext *curaggcontext; /* currently active aggcontext */
 	AggStatePerAgg curperagg;	/* currently active aggregate, if any */
-#define FIELDNO_AGGSTATE_CURPERTRANS 16
 	AggStatePerTrans curpertrans;	/* currently active trans state, if any */
 	bool		input_done;		/* indicates end of input */
 	bool		agg_done;		/* indicates completion of Agg scan */
 	int			projected_set;	/* The last projected grouping set */
-#define FIELDNO_AGGSTATE_CURRENT_SET 20
-	int			current_set;	/* The current grouping set being evaluated */
 	Bitmapset  *grouped_cols;	/* grouped cols in current projection */
 	List	   *all_grouped_cols;	/* list of all grouped cols in DESC order */
 	Bitmapset  *colnos_needed;	/* all columns needed from the outer plan */
@@ -1777,7 +1773,6 @@ typedef struct AggState
 	HeapTuple	grp_firstTuple; /* copy of first tuple of current group */
 	/* these fields are used in AGG_HASHED mode: */
 	bool		table_filled;	/* hash table filled yet? */
-	int			num_hashes;
 	MemoryContext hash_metacxt; /* memory for hash table itself */
 	struct HashTapeInfo *hash_tapeinfo; /* metadata for spill tapes */
 	struct HashAggSpill *hash_spill;	/* spill info, exists only during
@@ -1804,7 +1799,6 @@ typedef struct AggState
 										 * per-group pointers */
 
 	/* support for evaluation of agg input expressions: */
-#define FIELDNO_AGGSTATE_ALL_PERGROUPS 53
 	AggStatePerGroup *all_pergroups;	/* array of first ->pergroups, than
 										 * ->hash_pergroup */
 	ProjectionInfo *combinedproj;	/* projection machinery */

@@ -77,7 +77,7 @@ static bool isAssignmentIndirectionExpr(Expr *expr);
 static void ExecBuildAggTransCall(ExprState *state, AggState *aggstate,
 								  ExprEvalStep *scratch,
 								  FunctionCallInfo fcinfo, AggStatePerTrans pertrans,
-								  int transno, int setno, int setoff, bool ishash,
+								  int transno, int setoff, bool ishash,
 								  bool nullcheck);
 
 
@@ -2791,21 +2791,13 @@ ExecBuildAggTrans(AggState *aggstate, AggStatePerPhase phase,
 		 */
 		if (doSort)
 		{
-			int			processGroupingSets = Max(phase->numsets, 1);
-			int			setoff = 0;
-
-			for (int setno = 0; setno < processGroupingSets; setno++)
-			{
-				ExecBuildAggTransCall(state, aggstate, &scratch, trans_fcinfo,
-									  pertrans, transno, setno, setoff, false,
-									  nullcheck);
-				setoff++;
-			}
+			ExecBuildAggTransCall(state, aggstate, &scratch, trans_fcinfo,
+								  pertrans, transno, 0, false,
+								  nullcheck);
 		}
 
 		if (doHash)
 		{
-			int			numHashes = aggstate->num_hashes;
 			int			setoff;
 
 			/* in MIXED mode, there'll be preceding transition values */
@@ -2814,13 +2806,9 @@ ExecBuildAggTrans(AggState *aggstate, AggStatePerPhase phase,
 			else
 				setoff = 0;
 
-			for (int setno = 0; setno < numHashes; setno++)
-			{
-				ExecBuildAggTransCall(state, aggstate, &scratch, trans_fcinfo,
-									  pertrans, transno, setno, setoff, true,
-									  nullcheck);
-				setoff++;
-			}
+			ExecBuildAggTransCall(state, aggstate, &scratch, trans_fcinfo,
+								  pertrans, transno, setoff, true,
+								  nullcheck);
 		}
 
 		/* adjust early bail out jump target(s) */
@@ -2863,7 +2851,7 @@ static void
 ExecBuildAggTransCall(ExprState *state, AggState *aggstate,
 					  ExprEvalStep *scratch,
 					  FunctionCallInfo fcinfo, AggStatePerTrans pertrans,
-					  int transno, int setno, int setoff, bool ishash,
+					  int transno, int setoff, bool ishash,
 					  bool nullcheck)
 {
 	ExprContext *aggcontext;
@@ -2947,7 +2935,6 @@ ExecBuildAggTransCall(ExprState *state, AggState *aggstate,
 		scratch->opcode = EEOP_AGG_ORDERED_TRANS_TUPLE;
 
 	scratch->d.agg_trans.pertrans = pertrans;
-	scratch->d.agg_trans.setno = setno;
 	scratch->d.agg_trans.setoff = setoff;
 	scratch->d.agg_trans.transno = transno;
 	scratch->d.agg_trans.aggcontext = aggcontext;

@@ -175,13 +175,11 @@ static pg_always_inline void ExecEvalArrayCompareInternal(FunctionCallInfo fcinf
 static pg_always_inline void ExecAggPlainTransByVal(AggState *aggstate,
 													AggStatePerTrans pertrans,
 													AggStatePerGroup pergroup,
-													ExprContext *aggcontext,
-													int setno);
+													ExprContext *aggcontext);
 static pg_always_inline void ExecAggPlainTransByRef(AggState *aggstate,
 													AggStatePerTrans pertrans,
 													AggStatePerGroup pergroup,
-													ExprContext *aggcontext,
-													int setno);
+													ExprContext *aggcontext);
 
 /*
  * ScalarArrayOpExprHashEntry
@@ -1453,8 +1451,7 @@ ExecInterpExpr(ExprState *state, ExprContext *econtext, bool *isnull)
 			{
 				/* invoke transition function, unless prevented by strictness */
 				ExecAggPlainTransByVal(aggstate, pertrans, pergroup,
-									   op->d.agg_trans.aggcontext,
-									   op->d.agg_trans.setno);
+									   op->d.agg_trans.aggcontext);
 			}
 
 			EEO_NEXT();
@@ -1472,8 +1469,7 @@ ExecInterpExpr(ExprState *state, ExprContext *econtext, bool *isnull)
 
 			if (likely(!pergroup->transValueIsNull))
 				ExecAggPlainTransByVal(aggstate, pertrans, pergroup,
-									   op->d.agg_trans.aggcontext,
-									   op->d.agg_trans.setno);
+									   op->d.agg_trans.aggcontext);
 
 			EEO_NEXT();
 		}
@@ -1489,8 +1485,7 @@ ExecInterpExpr(ExprState *state, ExprContext *econtext, bool *isnull)
 			Assert(pertrans->transtypeByVal);
 
 			ExecAggPlainTransByVal(aggstate, pertrans, pergroup,
-								   op->d.agg_trans.aggcontext,
-								   op->d.agg_trans.setno);
+								   op->d.agg_trans.aggcontext);
 
 			EEO_NEXT();
 		}
@@ -1510,8 +1505,7 @@ ExecInterpExpr(ExprState *state, ExprContext *econtext, bool *isnull)
 								 op->d.agg_trans.aggcontext);
 			else if (likely(!pergroup->transValueIsNull))
 				ExecAggPlainTransByRef(aggstate, pertrans, pergroup,
-									   op->d.agg_trans.aggcontext,
-									   op->d.agg_trans.setno);
+									   op->d.agg_trans.aggcontext);
 
 			EEO_NEXT();
 		}
@@ -1528,8 +1522,7 @@ ExecInterpExpr(ExprState *state, ExprContext *econtext, bool *isnull)
 
 			if (likely(!pergroup->transValueIsNull))
 				ExecAggPlainTransByRef(aggstate, pertrans, pergroup,
-									   op->d.agg_trans.aggcontext,
-									   op->d.agg_trans.setno);
+									   op->d.agg_trans.aggcontext);
 			EEO_NEXT();
 		}
 
@@ -1544,8 +1537,7 @@ ExecInterpExpr(ExprState *state, ExprContext *econtext, bool *isnull)
 			Assert(!pertrans->transtypeByVal);
 
 			ExecAggPlainTransByRef(aggstate, pertrans, pergroup,
-								   op->d.agg_trans.aggcontext,
-								   op->d.agg_trans.setno);
+								   op->d.agg_trans.aggcontext);
 
 			EEO_NEXT();
 		}
@@ -3673,7 +3665,7 @@ ExecEvalAggOrderedTransTuple(ExprState *state, ExprEvalStep *op,
 static pg_always_inline void
 ExecAggPlainTransByVal(AggState *aggstate, AggStatePerTrans pertrans,
 					   AggStatePerGroup pergroup,
-					   ExprContext *aggcontext, int setno)
+					   ExprContext *aggcontext)
 {
 	FunctionCallInfo fcinfo = pertrans->transfn_fcinfo;
 	MemoryContext oldContext;
@@ -3681,7 +3673,6 @@ ExecAggPlainTransByVal(AggState *aggstate, AggStatePerTrans pertrans,
 
 	/* cf. select_current_set() */
 	aggstate->curaggcontext = aggcontext;
-	aggstate->current_set = setno;
 
 	/* set up aggstate->curpertrans for AggGetAggref() */
 	aggstate->curpertrans = pertrans;
@@ -3705,7 +3696,7 @@ ExecAggPlainTransByVal(AggState *aggstate, AggStatePerTrans pertrans,
 static pg_always_inline void
 ExecAggPlainTransByRef(AggState *aggstate, AggStatePerTrans pertrans,
 					   AggStatePerGroup pergroup,
-					   ExprContext *aggcontext, int setno)
+					   ExprContext *aggcontext)
 {
 	FunctionCallInfo fcinfo = pertrans->transfn_fcinfo;
 	MemoryContext oldContext;
@@ -3713,7 +3704,6 @@ ExecAggPlainTransByRef(AggState *aggstate, AggStatePerTrans pertrans,
 
 	/* cf. select_current_set() */
 	aggstate->curaggcontext = aggcontext;
-	aggstate->current_set = setno;
 
 	/* set up aggstate->curpertrans for AggGetAggref() */
 	aggstate->curpertrans = pertrans;

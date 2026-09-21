@@ -555,7 +555,6 @@ typedef struct ExprEvalStep
 		{
 			AggStatePerTrans pertrans;
 			ExprContext *aggcontext;
-			int			setno;
 			int			transno;
 			int			setoff;
 		}			agg_trans;
