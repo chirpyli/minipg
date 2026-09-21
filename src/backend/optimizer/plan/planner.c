@@ -2281,7 +2281,7 @@ plan_cluster_use_sort(Oid tableOid, Oid indexOid)
 	setup_simple_rel_arrays(root);
 
 	/* Build RelOptInfo；此处需要真实索引信息，不按继承父表处理 */
-	rel = build_simple_rel(root, 1, NULL, false);
+	rel = build_simple_rel(root, 1, false);
 
 	/* Locate IndexOptInfo for the target index */
 	indexInfo = NULL;

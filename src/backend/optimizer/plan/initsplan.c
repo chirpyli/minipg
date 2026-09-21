@@ -108,7 +108,7 @@ add_base_rels_to_query(PlannerInfo *root, Node *jtnode)
 	{
 		int			varno = ((RangeTblRef *) jtnode)->rtindex;
 
-		(void) build_simple_rel(root, varno, NULL, false);
+		(void) build_simple_rel(root, varno, false);
 	}
 	else if (IsA(jtnode, FromExpr))
 	{

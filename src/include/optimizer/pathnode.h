@@ -187,7 +187,7 @@ extern ModifyTablePath *create_modifytable_path(PlannerInfo *root,
 extern void setup_simple_rel_arrays(PlannerInfo *root);
 extern void expand_planner_arrays(PlannerInfo *root, int add_size);
 extern RelOptInfo *build_simple_rel(PlannerInfo *root, int relid,
-									RelOptInfo *parent, bool inhparent);
+									bool inhparent);
 extern RelOptInfo *find_base_rel(PlannerInfo *root, int relid);
 extern RelOptInfo *find_join_rel(PlannerInfo *root, Relids relids);
 extern RelOptInfo *build_join_rel(PlannerInfo *root,

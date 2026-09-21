@@ -172,8 +172,7 @@ expand_planner_arrays(PlannerInfo *root, int add_size)
  *	  Construct a new RelOptInfo for a base relation or 'other' relation.
  */
 RelOptInfo *
-build_simple_rel(PlannerInfo *root, int relid, RelOptInfo *parent,
-				 bool inhparent)
+build_simple_rel(PlannerInfo *root, int relid, bool inhparent)
 {
 	RelOptInfo *rel;
 	RangeTblEntry *rte;
@@ -188,7 +187,7 @@ build_simple_rel(PlannerInfo *root, int relid, RelOptInfo *parent,
 	Assert(rte != NULL);
 
 	rel = makeNode(RelOptInfo);
-	rel->reloptkind = parent ? RELOPT_OTHER_MEMBER_REL : RELOPT_BASEREL;
+	rel->reloptkind = RELOPT_BASEREL;
 	rel->relids = bms_make_singleton(relid);
 	rel->rows = 0;
 	/* cheap startup cost is interesting iff not all tuples to be retrieved */
@@ -222,45 +221,10 @@ build_simple_rel(PlannerInfo *root, int relid, RelOptInfo *parent,
 	rel->joininfo = NIL;
 	rel->has_eclass_joins = false;
 
-	/*
-	 * Pass assorted information down the inheritance hierarchy.
-	 */
-	if (parent)
-	{
-		/*
-		 * Each direct or indirect child wants to know the relids of its
-		 * topmost parent.
-		 */
-		if (parent->top_parent_relids)
-			rel->top_parent_relids = parent->top_parent_relids;
-		else
-			rel->top_parent_relids = bms_copy(parent->relids);
-
-		/*
-		 * Also propagate lateral-reference information from appendrel parent
-		 * rels to their child rels.  We intentionally give each child rel the
-		 * same minimum parameterization, even though it's quite possible that
-		 * some don't reference all the lateral rels.  This is because any
-		 * append path for the parent will have to have the same
-		 * parameterization for every child anyway, and there's no value in
-		 * forcing extra reparameterize_path() calls.  Similarly, a lateral
-		 * reference to the parent prevents use of otherwise-movable join rels
-		 * for each child.
-		 *
-		 * It's possible for child rels to have their own children, in which
-		 * case the topmost parent's lateral info propagates all the way down.
-		 */
-		rel->direct_lateral_relids = parent->direct_lateral_relids;
-		rel->lateral_relids = parent->lateral_relids;
-		rel->lateral_referencers = parent->lateral_referencers;
-	}
-	else
-	{
-		rel->top_parent_relids = NULL;
-		rel->direct_lateral_relids = NULL;
-		rel->lateral_relids = NULL;
-		rel->lateral_referencers = NULL;
-	}
+	rel->top_parent_relids = NULL;
+	rel->direct_lateral_relids = NULL;
+	rel->lateral_relids = NULL;
+	rel->lateral_referencers = NULL;
 
 	/* Check type of rtable entry */
 	switch (rte->rtekind)
@@ -296,26 +260,6 @@ build_simple_rel(PlannerInfo *root, int relid, RelOptInfo *parent,
 			elog(ERROR, "unrecognized RTE kind: %d",
 				 (int) rte->rtekind);
 			break;
-	}
-
-	/*
-	 * Copy the parent's quals to the child, with appropriate substitution of
-	 * variables.  If any constant false or NULL clauses turn up, we can mark
-	 * the child as dummy right away.
-	 */
-	if (parent)
-	{
-		AppendRelInfo *appinfo = root->append_rel_array[relid];
-
-		Assert(appinfo != NULL);
-		if (!apply_child_basequals(root, parent, rel, rte, appinfo))
-		{
-			/*
-			 * Some restriction clause reduced to constant FALSE or NULL after
-			 * substitution, so this child need not be scanned.
-			 */
-			mark_dummy_rel(rel);
-		}
 	}
 
 	/* Save the finished struct in the query's simple_rel_array */

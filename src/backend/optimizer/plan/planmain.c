@@ -101,7 +101,7 @@ query_planner(PlannerInfo *root,
 			if (rte->rtekind == RTE_RESULT)
 			{
 				/* Make the RelOptInfo for it directly */
-				final_rel = build_simple_rel(root, varno, NULL, false);
+				final_rel = build_simple_rel(root, varno, false);
 
 				/*
 				 * The only path for it is a trivial Result path.  We cheat a
