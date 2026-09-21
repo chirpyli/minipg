@@ -1765,7 +1765,6 @@ typedef struct AggState
 	int			max_colno_needed;	/* highest colno needed from outer plan */
 	bool		all_cols_needed;	/* are all cols from outer plan needed? */
 	/* These fields are for grouping set phase data */
-	int			maxsets;		/* The max number of sets in any phase */
 	AggStatePerPhase phases;	/* array of all phases */
 	/* these fields are used in AGG_PLAIN and AGG_SORTED modes: */
 	AggStatePerGroup *pergroups;	/* grouping set indexed array of per-group

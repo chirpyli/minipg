@@ -2967,7 +2967,6 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 	int			phaseidx;
 	ListCell   *l;
 	Bitmapset  *all_grouped_cols = NULL;
-	int			numGroupingSets = 1;
 	int			numPhases;
 	int			numHashes;
 	int			i = 0;
@@ -2989,7 +2988,6 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 	aggstate->numaggs = 0;
 	aggstate->numtrans = 0;
 	aggstate->aggstrategy = node->aggstrategy;
-	aggstate->maxsets = 0;
 	aggstate->projected_set = -1;
 	aggstate->peragg = NULL;
 	aggstate->pertrans = NULL;
@@ -3013,7 +3011,6 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 	 */
 
 
-	aggstate->maxsets = numGroupingSets;
 	aggstate->numphases = numPhases;
 
 	/*
@@ -3739,8 +3736,6 @@ ExecEndAgg(AggState *node)
 {
 	PlanState  *outerPlan;
 	int			transno;
-	int			numGroupingSets = Max(node->maxsets, 1);
-	int			setno;
 
 	/* Make sure we have closed any open tuplesorts */
 
@@ -3761,8 +3756,7 @@ ExecEndAgg(AggState *node)
 	}
 
 	/* And ensure any agg shutdown callbacks have been called */
-	for (setno = 0; setno < numGroupingSets; setno++)
-		ReScanExprContext(node->ss.ps.ps_ExprContext);
+	ReScanExprContext(node->ss.ps.ps_ExprContext);
 	if (node->hashcontext)
 		ReScanExprContext(node->hashcontext);
 
@@ -3787,8 +3781,6 @@ ExecReScanAgg(AggState *node)
 	PlanState  *outerPlan = outerPlanState(node);
 	Agg		   *aggnode = (Agg *) node->ss.ps.plan;
 	int			transno;
-	int			numGroupingSets = Max(node->maxsets, 1);
-	int			setno;
 
 	node->agg_done = false;
 
@@ -3840,10 +3832,7 @@ ExecReScanAgg(AggState *node)
 	 * that need to be run now.) For the AGG_HASHED case, see below.
 	 */
 
-	for (setno = 0; setno < numGroupingSets; setno++)
-	{
-		ReScanExprContext(node->ss.ps.ps_ExprContext);
-	}
+	ReScanExprContext(node->ss.ps.ps_ExprContext);
 
 	/* Release first tuple of group, if we have made a copy */
 	if (node->grp_firstTuple != NULL)
@@ -3884,11 +3873,8 @@ ExecReScanAgg(AggState *node)
 		/*
 		 * Reset the per-group state (in particular, mark transvalues null)
 		 */
-		for (setno = 0; setno < numGroupingSets; setno++)
-		{
-			MemSet(node->pergroups[setno], 0,
-				   sizeof(AggStatePerGroupData) * node->numaggs);
-		}
+		MemSet(node->pergroups[0], 0,
+			   sizeof(AggStatePerGroupData) * node->numaggs);
 
 		/* reset to phase 1 */
 		initialize_phase(node, 1);
