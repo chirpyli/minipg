@@ -3629,19 +3629,6 @@ cost_qual_eval_walker(Node *node, cost_qual_eval_context *context)
 		 */
 		return false;
 	}
-	else if (IsA(node, AlternativeSubPlan))
-	{
-		/*
-		 * Arbitrarily use the first alternative plan for costing.  (We should
-		 * certainly only include one alternative, and we don't yet have
-		 * enough information to know which one the executor is most likely to
-		 * use.)
-		 */
-		AlternativeSubPlan *asplan = (AlternativeSubPlan *) node;
-
-		return cost_qual_eval_walker((Node *) linitial(asplan->subplans),
-									 context);
-	}
 	else if (IsA(node, PlaceHolderVar))
 	{
 		/*

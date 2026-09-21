@@ -1691,19 +1691,6 @@ _readSubPlan(void)
 }
 
 /*
- * _readAlternativeSubPlan
- */
-static AlternativeSubPlan *
-_readAlternativeSubPlan(void)
-{
-	READ_LOCALS(AlternativeSubPlan);
-
-	READ_NODE_FIELD(subplans);
-
-	READ_DONE();
-}
-
-/*
  * parseNodeString
  *
  * Given a character string representing a node tree, parseNodeString creates
@@ -1872,8 +1859,6 @@ parseNodeString(void)
 		return_value = _readPlanInvalItem();
 	else if (MATCH("SUBPLAN", 7))
 		return_value = _readSubPlan();
-	else if (MATCH("ALTERNATIVESUBPLAN", 18))
-		return_value = _readAlternativeSubPlan();
 	else
 	{
 		elog(ERROR, "badly formatted node string \"%.32s\"...", token);

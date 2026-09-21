@@ -1130,7 +1130,6 @@ process_sublinks_mutator(Node *node, process_sublinks_context *context)
 	 * ourselves invoked directly on a Query, either.
 	 */
 	Assert(!IsA(node, SubPlan));
-	Assert(!IsA(node, AlternativeSubPlan));
 	Assert(!IsA(node, Query));
 
 	/*

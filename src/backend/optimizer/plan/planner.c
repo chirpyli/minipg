@@ -331,7 +331,6 @@ subquery_planner(PlannerGlobal *glob, Query *parse,
 
 	root->qual_security_level = 0;
 	root->hasPseudoConstantQuals = false;
-	root->hasAlternativeSubPlans = false;
 	root->hasRecursion = hasRecursion;
 	if (hasRecursion)
 		root->wt_param_id = assign_special_exec_param(root);
@@ -2940,36 +2939,5 @@ make_group_input_target(PlannerInfo *root, PathTarget *final_target)
 
 	/* XXX this causes some redundant cost calculation ... */
 	return set_pathtarget_cost_width(root, input_target);
-}
-
-/*
- * mark_partial_aggref
- *	  Adjust an Aggref to make it represent a partial-aggregation step.
- *
- * The Aggref node is modified in-place; caller must do any copying required.
- */
-void
-mark_partial_aggref(Aggref *agg, AggSplit aggsplit)
-{
-	/* aggtranstype should be computed by this point */
-	Assert(OidIsValid(agg->aggtranstype));
-	/* ... but aggsplit should still be as the parser left it */
-	Assert(agg->aggsplit == AGGSPLIT_SIMPLE);
-
-	/* Mark the Aggref with the intended partial-aggregation mode */
-	agg->aggsplit = aggsplit;
-
-	/*
-	 * Adjust result type if needed.  Normally, a partial aggregate returns
-	 * the aggregate's transition type; but if that's INTERNAL and we're
-	 * serializing, it returns BYTEA instead.
-	 */
-	if (DO_AGGSPLIT_SKIPFINAL(aggsplit))
-	{
-		if (agg->aggtranstype == INTERNALOID && DO_AGGSPLIT_SERIALIZE(aggsplit))
-			agg->aggtype = BYTEAOID;
-		else
-			agg->aggtype = agg->aggtranstype;
-	}
 }
 

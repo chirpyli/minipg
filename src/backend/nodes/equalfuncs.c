@@ -373,14 +373,6 @@ _equalSubPlan(const SubPlan *a, const SubPlan *b)
 }
 
 static bool
-_equalAlternativeSubPlan(const AlternativeSubPlan *a, const AlternativeSubPlan *b)
-{
-	COMPARE_NODE_FIELD(subplans);
-
-	return true;
-}
-
-static bool
 _equalFieldSelect(const FieldSelect *a, const FieldSelect *b)
 {
 	COMPARE_NODE_FIELD(arg);
@@ -1442,9 +1434,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_SubPlan:
 			retval = _equalSubPlan(a, b);
-			break;
-		case T_AlternativeSubPlan:
-			retval = _equalAlternativeSubPlan(a, b);
 			break;
 		case T_FieldSelect:
 			retval = _equalFieldSelect(a, b);

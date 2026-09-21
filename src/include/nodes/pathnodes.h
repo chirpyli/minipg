@@ -317,7 +317,6 @@ struct PlannerInfo
 	bool		hasHavingQual;	/* true if havingQual was non-null */
 	bool		hasPseudoConstantQuals; /* true if any RestrictInfo has
 										 * pseudoconstant = true */
-	bool		hasAlternativeSubPlans; /* true if we've made any of those */
 	bool		hasRecursion;	/* true if planning a recursive WITH item */
 
 	/*
@@ -336,10 +335,6 @@ struct PlannerInfo
 	/* These fields are workspace for createplan.c */
 	Relids		curOuterRels;	/* outer rels above current node */
 	List	   *curOuterParams; /* not-yet-assigned NestLoopParams */
-
-	/* These fields are workspace for setrefs.c */
-	bool	   *isAltSubplan;	/* array corresponding to glob->subplans */
-	bool	   *isUsedSubplan;	/* array corresponding to glob->subplans */
 
 	/* optional private data for join_search_hook */
 	void	   *join_search_private;

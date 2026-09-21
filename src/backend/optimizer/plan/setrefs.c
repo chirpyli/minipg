@@ -49,7 +49,6 @@ typedef struct
 {
 	PlannerInfo *root;
 	int			rtoffset;
-	double		num_exec;
 } fix_scan_expr_context;
 
 typedef struct
@@ -59,7 +58,6 @@ typedef struct
 	indexed_tlist *inner_itlist;
 	Index		acceptable_rel;
 	int			rtoffset;
-	double		num_exec;
 } fix_join_expr_context;
 
 typedef struct
@@ -68,27 +66,7 @@ typedef struct
 	indexed_tlist *subplan_itlist;
 	Index		newvarno;
 	int			rtoffset;
-	double		num_exec;
 } fix_upper_expr_context;
-
-/*
- * Selecting the best alternative in an AlternativeSubPlan expression requires
- * estimating how many times that expression will be evaluated.  For an
- * expression in a plan node's targetlist, the plan's estimated number of
- * output rows is clearly what to use, but for an expression in a qual it's
- * far less clear.  Since AlternativeSubPlans aren't heavily used, we don't
- * want to expend a lot of cycles making such estimates.  What we use is twice
- * the number of output rows.  That's not entirely unfounded: we know that
- * clause_selectivity() would fall back to a default selectivity estimate
- * of 0.5 for any SubPlan, so if the qual containing the SubPlan is the last
- * to be applied (which it likely would be, thanks to order_qual_clauses()),
- * this matches what we could have estimated in a far more laborious fashion.
- * Obviously there are many other scenarios, but it's probably not worth the
- * trouble to try to improve on this estimate, especially not when we don't
- * have a better estimate for the selectivity of the SubPlan qual itself.
- */
-#define NUM_EXEC_TLIST(parentplan)  ((parentplan)->plan_rows)
-#define NUM_EXEC_QUAL(parentplan)   ((parentplan)->plan_rows * 2.0)
 
 /*
  * Check if a Const node is a regclass value.  We accept plain OID too,
@@ -101,8 +79,8 @@ typedef struct
 	(((con)->consttype == REGCLASSOID || (con)->consttype == OIDOID) && \
 	 !(con)->constisnull)
 
-#define fix_scan_list(root, lst, rtoffset, num_exec) \
-	((List *) fix_scan_expr(root, (Node *) (lst), rtoffset, num_exec))
+#define fix_scan_list(root, lst, rtoffset) \
+	((List *) fix_scan_expr(root, (Node *) (lst), rtoffset))
 
 static void add_rtes_to_flat_rtable(PlannerInfo *root, bool recursing);
 static void flatten_unplanned_rtes(PlannerGlobal *glob, RangeTblEntry *rte);
@@ -122,13 +100,11 @@ static Plan *set_append_references(PlannerInfo *root,
 								   int rtoffset);
 static void set_hash_references(PlannerInfo *root, Plan *plan, int rtoffset);
 static Relids offset_relid_set(Relids relids, int rtoffset);
-static Node *fix_scan_expr(PlannerInfo *root, Node *node,
-						   int rtoffset, double num_exec);
+static Node *fix_scan_expr(PlannerInfo *root, Node *node, int rtoffset);
 static Node *fix_scan_expr_mutator(Node *node, fix_scan_expr_context *context);
 static bool fix_scan_expr_walker(Node *node, fix_scan_expr_context *context);
 static void set_join_references(PlannerInfo *root, Join *join, int rtoffset);
 static void set_upper_references(PlannerInfo *root, Plan *plan, int rtoffset);
-static Node *convert_combining_aggrefs(Node *node, void *context);
 static void set_dummy_tlist_references(Plan *plan, int rtoffset);
 static indexed_tlist *build_tlist_index(List *tlist);
 static Var *search_indexed_tlist_for_var(Var *var,
@@ -147,14 +123,14 @@ static List *fix_join_expr(PlannerInfo *root,
 						   indexed_tlist *outer_itlist,
 						   indexed_tlist *inner_itlist,
 						   Index acceptable_rel,
-						   int rtoffset, double num_exec);
+						   int rtoffset);
 static Node *fix_join_expr_mutator(Node *node,
 								   fix_join_expr_context *context);
 static Node *fix_upper_expr(PlannerInfo *root,
 							Node *node,
 							indexed_tlist *subplan_itlist,
 							Index newvarno,
-							int rtoffset, double num_exec);
+							int rtoffset);
 static Node *fix_upper_expr_mutator(Node *node,
 									fix_upper_expr_context *context);
 
@@ -182,9 +158,6 @@ static Node *fix_upper_expr_mutator(Node *node,
  *
  * 4. Aggrefs in Agg plan nodes need to be adjusted in some cases involving
  * partial aggregation or minmax aggregate optimization.
- *
- * 5. AlternativeSubPlan expressions are replaced by just one of their
- * alternatives, using an estimate of how many times they'll be executed.
  *
  * 6. We compute regproc OIDs for operators (ie, we look up the function
  * that implements each op).
@@ -283,42 +256,8 @@ set_plan_references(PlannerInfo *root, Plan *plan)
 		glob->appendRelations = lappend(glob->appendRelations, appinfo);
 	}
 
-	/* If needed, create workspace for processing AlternativeSubPlans */
-	if (root->hasAlternativeSubPlans)
-	{
-		root->isAltSubplan = (bool *)
-			palloc0(list_length(glob->subplans) * sizeof(bool));
-		root->isUsedSubplan = (bool *)
-			palloc0(list_length(glob->subplans) * sizeof(bool));
-	}
-
 	/* Now fix the Plan tree */
 	result = set_plan_refs(root, plan, rtoffset);
-
-	/*
-	 * If we have AlternativeSubPlans, it is likely that we now have some
-	 * unreferenced subplans in glob->subplans.  To avoid expending cycles on
-	 * those subplans later, get rid of them by setting those list entries to
-	 * NULL.  (Note: we can't do this immediately upon processing an
-	 * AlternativeSubPlan, because there may be multiple copies of the
-	 * AlternativeSubPlan, and they can get resolved differently.)
-	 */
-	if (root->hasAlternativeSubPlans)
-	{
-		foreach(lc, glob->subplans)
-		{
-			int			ndx = foreach_current_index(lc);
-
-			/*
-			 * If it was used by some AlternativeSubPlan in this query level,
-			 * but wasn't selected as best by any AlternativeSubPlan, then we
-			 * don't need it.  Do not touch subplans that aren't parts of
-			 * AlternativeSubPlans.
-			 */
-			if (root->isAltSubplan[ndx] && !root->isUsedSubplan[ndx])
-				lfirst(lc) = NULL;
-		}
-	}
 
 	return result;
 }
@@ -542,10 +481,10 @@ set_plan_refs(PlannerInfo *root, Plan *plan, int rtoffset)
 				splan->scanrelid += rtoffset;
 				splan->plan.targetlist =
 					fix_scan_list(root, splan->plan.targetlist,
-								  rtoffset, NUM_EXEC_TLIST(plan));
+								  rtoffset);
 				splan->plan.qual =
 					fix_scan_list(root, splan->plan.qual,
-								  rtoffset, NUM_EXEC_QUAL(plan));
+								  rtoffset);
 			}
 			break;
 		case T_IndexScan:
@@ -555,22 +494,22 @@ set_plan_refs(PlannerInfo *root, Plan *plan, int rtoffset)
 				splan->scan.scanrelid += rtoffset;
 				splan->scan.plan.targetlist =
 					fix_scan_list(root, splan->scan.plan.targetlist,
-								  rtoffset, NUM_EXEC_TLIST(plan));
+								  rtoffset);
 				splan->scan.plan.qual =
 					fix_scan_list(root, splan->scan.plan.qual,
-								  rtoffset, NUM_EXEC_QUAL(plan));
+								  rtoffset);
 				splan->indexqual =
 					fix_scan_list(root, splan->indexqual,
-								  rtoffset, 1);
+								  rtoffset);
 				splan->indexqualorig =
 					fix_scan_list(root, splan->indexqualorig,
-								  rtoffset, NUM_EXEC_QUAL(plan));
+								  rtoffset);
 				splan->indexorderby =
 					fix_scan_list(root, splan->indexorderby,
-								  rtoffset, 1);
+								  rtoffset);
 				splan->indexorderbyorig =
 					fix_scan_list(root, splan->indexorderbyorig,
-								  rtoffset, NUM_EXEC_QUAL(plan));
+								  rtoffset);
 			}
 			break;
 		case T_IndexOnlyScan:
@@ -589,10 +528,10 @@ set_plan_refs(PlannerInfo *root, Plan *plan, int rtoffset)
 				Assert(splan->scan.plan.targetlist == NIL);
 				Assert(splan->scan.plan.qual == NIL);
 				splan->indexqual =
-					fix_scan_list(root, splan->indexqual, rtoffset, 1);
+					fix_scan_list(root, splan->indexqual, rtoffset);
 				splan->indexqualorig =
 					fix_scan_list(root, splan->indexqualorig,
-								  rtoffset, NUM_EXEC_QUAL(plan));
+								  rtoffset);
 			}
 			break;
 		case T_BitmapHeapScan:
@@ -602,13 +541,13 @@ set_plan_refs(PlannerInfo *root, Plan *plan, int rtoffset)
 				splan->scan.scanrelid += rtoffset;
 				splan->scan.plan.targetlist =
 					fix_scan_list(root, splan->scan.plan.targetlist,
-								  rtoffset, NUM_EXEC_TLIST(plan));
+								  rtoffset);
 				splan->scan.plan.qual =
 					fix_scan_list(root, splan->scan.plan.qual,
-								  rtoffset, NUM_EXEC_QUAL(plan));
+								  rtoffset);
 				splan->bitmapqualorig =
 					fix_scan_list(root, splan->bitmapqualorig,
-								  rtoffset, NUM_EXEC_QUAL(plan));
+								  rtoffset);
 			}
 			break;
 		case T_TidScan:
@@ -618,13 +557,13 @@ set_plan_refs(PlannerInfo *root, Plan *plan, int rtoffset)
 				splan->scan.scanrelid += rtoffset;
 				splan->scan.plan.targetlist =
 					fix_scan_list(root, splan->scan.plan.targetlist,
-								  rtoffset, NUM_EXEC_TLIST(plan));
+								  rtoffset);
 				splan->scan.plan.qual =
 					fix_scan_list(root, splan->scan.plan.qual,
-								  rtoffset, NUM_EXEC_QUAL(plan));
+								  rtoffset);
 				splan->tidquals =
 					fix_scan_list(root, splan->tidquals,
-								  rtoffset, 1);
+								  rtoffset);
 			}
 			break;
 		case T_TidRangeScan:
@@ -634,13 +573,13 @@ set_plan_refs(PlannerInfo *root, Plan *plan, int rtoffset)
 				splan->scan.scanrelid += rtoffset;
 				splan->scan.plan.targetlist =
 					fix_scan_list(root, splan->scan.plan.targetlist,
-								  rtoffset, NUM_EXEC_TLIST(plan));
+								  rtoffset);
 				splan->scan.plan.qual =
 					fix_scan_list(root, splan->scan.plan.qual,
-								  rtoffset, NUM_EXEC_QUAL(plan));
+								  rtoffset);
 				splan->tidrangequals =
 					fix_scan_list(root, splan->tidrangequals,
-								  rtoffset, 1);
+								  rtoffset);
 			}
 			break;
 		case T_SubqueryScan:
@@ -655,13 +594,13 @@ set_plan_refs(PlannerInfo *root, Plan *plan, int rtoffset)
 				splan->scan.scanrelid += rtoffset;
 				splan->scan.plan.targetlist =
 					fix_scan_list(root, splan->scan.plan.targetlist,
-								  rtoffset, NUM_EXEC_TLIST(plan));
+								  rtoffset);
 				splan->scan.plan.qual =
 					fix_scan_list(root, splan->scan.plan.qual,
-								  rtoffset, NUM_EXEC_QUAL(plan));
+								  rtoffset);
 				splan->values_lists =
 					fix_scan_list(root, splan->values_lists,
-								  rtoffset, 1);
+								  rtoffset);
 			}
 			break;
 		case T_NestLoop:
@@ -685,8 +624,7 @@ set_plan_refs(PlannerInfo *root, Plan *plan, int rtoffset)
 				set_dummy_tlist_references(plan, rtoffset);
 
 				mplan->param_exprs = fix_scan_list(root, mplan->param_exprs,
-												   rtoffset,
-												   NUM_EXEC_TLIST(plan));
+												   rtoffset);
 				break;
 			}
 
@@ -711,28 +649,6 @@ set_plan_refs(PlannerInfo *root, Plan *plan, int rtoffset)
 			Assert(plan->qual == NIL);
 			break;
 		case T_Agg:
-			{
-				Agg		   *agg = (Agg *) plan;
-
-				/*
-				 * If this node is combining partial-aggregation results, we
-				 * must convert its Aggrefs to contain references to the
-				 * partial-aggregate subexpressions that will be available
-				 * from the child plan node.
-				 */
-				if (DO_AGGSPLIT_COMBINE(agg->aggsplit))
-				{
-					plan->targetlist = (List *)
-						convert_combining_aggrefs((Node *) plan->targetlist,
-												  NULL);
-					plan->qual = (List *)
-						convert_combining_aggrefs((Node *) plan->qual,
-												  NULL);
-				}
-
-				set_upper_references(root, plan, rtoffset);
-			}
-			break;
 		case T_Group:
 			set_upper_references(root, plan, rtoffset);
 			break;
@@ -773,14 +689,14 @@ set_plan_refs(PlannerInfo *root, Plan *plan, int rtoffset)
 
 					splan->plan.targetlist =
 						fix_scan_list(root, splan->plan.targetlist,
-									  rtoffset, NUM_EXEC_TLIST(plan));
+									  rtoffset);
 					splan->plan.qual =
 						fix_scan_list(root, splan->plan.qual,
-									  rtoffset, NUM_EXEC_QUAL(plan));
+									  rtoffset);
 				}
 				/* resconstantqual can't contain any subplan variable refs */
 				splan->resconstantqual =
-					fix_scan_expr(root, splan->resconstantqual, rtoffset, 1);
+					fix_scan_expr(root, splan->resconstantqual, rtoffset);
 			}
 			break;
 		case T_ProjectSet:
@@ -921,31 +837,28 @@ set_indexonlyscan_references(PlannerInfo *root,
 					   (Node *) plan->scan.plan.targetlist,
 					   index_itlist,
 					   INDEX_VAR,
-					   rtoffset,
-					   NUM_EXEC_TLIST((Plan *) plan));
+					   rtoffset);
 	plan->scan.plan.qual = (List *)
 		fix_upper_expr(root,
 					   (Node *) plan->scan.plan.qual,
 					   index_itlist,
 					   INDEX_VAR,
-					   rtoffset,
-					   NUM_EXEC_QUAL((Plan *) plan));
+					   rtoffset);
 	plan->recheckqual = (List *)
 		fix_upper_expr(root,
 					   (Node *) plan->recheckqual,
 					   index_itlist,
 					   INDEX_VAR,
-					   rtoffset,
-					   NUM_EXEC_QUAL((Plan *) plan));
+					   rtoffset);
 	/* indexqual is already transformed to reference index columns */
 	plan->indexqual = fix_scan_list(root, plan->indexqual,
-									rtoffset, 1);
+									rtoffset);
 	/* indexorderby is already transformed to reference index columns */
 	plan->indexorderby = fix_scan_list(root, plan->indexorderby,
-									   rtoffset, 1);
+									   rtoffset);
 	/* indextlist must NOT be transformed to reference index columns */
 	plan->indextlist = fix_scan_list(root, plan->indextlist,
-									 rtoffset, NUM_EXEC_TLIST((Plan *) plan));
+									 rtoffset);
 
 	pfree(index_itlist);
 
@@ -992,10 +905,10 @@ set_subqueryscan_references(PlannerInfo *root,
 		plan->scan.scanrelid += rtoffset;
 		plan->scan.plan.targetlist =
 			fix_scan_list(root, plan->scan.plan.targetlist,
-						  rtoffset, NUM_EXEC_TLIST((Plan *) plan));
+						  rtoffset);
 		plan->scan.plan.qual =
 			fix_scan_list(root, plan->scan.plan.qual,
-						  rtoffset, NUM_EXEC_QUAL((Plan *) plan));
+						  rtoffset);
 
 		result = (Plan *) plan;
 	}
@@ -1168,8 +1081,7 @@ set_hash_references(PlannerInfo *root, Plan *plan, int rtoffset)
 					   (Node *) hplan->hashkeys,
 					   outer_itlist,
 					   OUTER_VAR,
-					   rtoffset,
-					   NUM_EXEC_QUAL(plan));
+					   rtoffset);
 
 	/* Hash doesn't project */
 	set_dummy_tlist_references(plan, rtoffset);
@@ -1288,84 +1200,31 @@ fix_param_node(PlannerInfo *root, Param *p)
 }
 
 /*
- * fix_alternative_subplan
- *		Do set_plan_references processing on an AlternativeSubPlan
- *
- * Choose one of the alternative implementations and return just that one,
- * discarding the rest of the AlternativeSubPlan structure.
- * Note: caller must still recurse into the result!
- *
- * We don't make any attempt to fix up cost estimates in the parent plan
- * node or higher-level nodes.
- */
-static Node *
-fix_alternative_subplan(PlannerInfo *root, AlternativeSubPlan *asplan,
-						double num_exec)
-{
-	SubPlan    *bestplan = NULL;
-	Cost		bestcost = 0;
-	ListCell   *lc;
-
-	/*
-	 * Compute the estimated cost of each subplan assuming num_exec
-	 * executions, and keep the cheapest one.  In event of exact equality of
-	 * estimates, we prefer the later plan; this is a bit arbitrary, but in
-	 * current usage it biases us to break ties against fast-start subplans.
-	 */
-	Assert(asplan->subplans != NIL);
-
-	foreach(lc, asplan->subplans)
-	{
-		SubPlan    *curplan = (SubPlan *) lfirst(lc);
-		Cost		curcost;
-
-		curcost = curplan->startup_cost + num_exec * curplan->per_call_cost;
-		if (bestplan == NULL || curcost <= bestcost)
-		{
-			bestplan = curplan;
-			bestcost = curcost;
-		}
-
-		/* Also mark all subplans that are in AlternativeSubPlans */
-		root->isAltSubplan[curplan->plan_id - 1] = true;
-	}
-
-	/* Mark the subplan we selected */
-	root->isUsedSubplan[bestplan->plan_id - 1] = true;
-
-	return (Node *) bestplan;
-}
-
-/*
  * fix_scan_expr
  *		Do set_plan_references processing on a scan-level expression
  *
  * This consists of incrementing all Vars' varnos by rtoffset,
  * expanding PlaceHolderVars,
  * replacing Aggref nodes that should be replaced by initplan output Params,
- * choosing the best implementation for AlternativeSubPlans,
  * looking up operator opcode info for OpExpr and related nodes,
  * and adding OIDs from regclass Const nodes into root->glob->relationOids.
  *
  * 'node': the expression to be modified
  * 'rtoffset': how much to increment varnos by
- * 'num_exec': estimated number of executions of expression
  *
  * The expression tree is either copied-and-modified, or modified in-place
  * if that seems safe.
  */
 static Node *
-fix_scan_expr(PlannerInfo *root, Node *node, int rtoffset, double num_exec)
+fix_scan_expr(PlannerInfo *root, Node *node, int rtoffset)
 {
 	fix_scan_expr_context context;
 
 	context.root = root;
 	context.rtoffset = rtoffset;
-	context.num_exec = num_exec;
 
 	if (rtoffset != 0 ||
-		root->glob->lastPHId != 0 ||
-		root->hasAlternativeSubPlans)
+		root->glob->lastPHId != 0)
 	{
 		return fix_scan_expr_mutator(node, &context);
 	}
@@ -1375,8 +1234,7 @@ fix_scan_expr(PlannerInfo *root, Node *node, int rtoffset, double num_exec)
 		 * If rtoffset == 0, we don't need to change any Vars, and if there
 		 * are no placeholders anywhere
 		 * we won't need to remove them, and if there are no minmax Aggrefs we
-		 * won't need to replace them, and if there are no AlternativeSubPlans
-		 * we won't need to remove them.  Then it's OK to just scribble on the
+		 * won't need to replace them.  Then it's OK to just scribble on the
 		 * input node tree instead of copying (since the only change, filling
 		 * in any unset opfuncid fields, is harmless).  This saves just enough
 		 * cycles to be noticeable on trivial queries.
@@ -1419,11 +1277,6 @@ fix_scan_expr_mutator(Node *node, fix_scan_expr_context *context)
 
 		return fix_scan_expr_mutator((Node *) phv->phexpr, context);
 	}
-	if (IsA(node, AlternativeSubPlan))
-		return fix_scan_expr_mutator(fix_alternative_subplan(context->root,
-															 (AlternativeSubPlan *) node,
-															 context->num_exec),
-									 context);
 	fix_expr_common(context->root, node);
 	return expression_tree_mutator(node, fix_scan_expr_mutator,
 								   (void *) context);
@@ -1436,7 +1289,6 @@ fix_scan_expr_walker(Node *node, fix_scan_expr_context *context)
 		return false;
 	Assert(!(IsA(node, Var) && ((Var *) node)->varno == ROWID_VAR));
 	Assert(!IsA(node, PlaceHolderVar));
-	Assert(!IsA(node, AlternativeSubPlan));
 	fix_expr_common(context->root, node);
 	return expression_tree_walker(node, fix_scan_expr_walker,
 								  (void *) context);
@@ -1473,8 +1325,7 @@ set_join_references(PlannerInfo *root, Join *join, int rtoffset)
 								   outer_itlist,
 								   inner_itlist,
 								   (Index) 0,
-								   rtoffset,
-								   NUM_EXEC_QUAL((Plan *) join));
+								   rtoffset);
 
 	/* Now do join-type-specific stuff */
 	if (IsA(join, NestLoop))
@@ -1490,8 +1341,7 @@ set_join_references(PlannerInfo *root, Join *join, int rtoffset)
 												   (Node *) nlp->paramval,
 												   outer_itlist,
 												   OUTER_VAR,
-												   rtoffset,
-												   NUM_EXEC_TLIST(outer_plan));
+												   rtoffset);
 			/* Check we replaced any PlaceHolderVar with simple Var */
 			if (!(IsA(nlp->paramval, Var) &&
 				  nlp->paramval->varno == OUTER_VAR))
@@ -1507,8 +1357,7 @@ set_join_references(PlannerInfo *root, Join *join, int rtoffset)
 										 outer_itlist,
 										 inner_itlist,
 										 (Index) 0,
-										 rtoffset,
-										 NUM_EXEC_QUAL((Plan *) join));
+										 rtoffset);
 	}
 	else if (IsA(join, HashJoin))
 	{
@@ -1519,8 +1368,7 @@ set_join_references(PlannerInfo *root, Join *join, int rtoffset)
 										outer_itlist,
 										inner_itlist,
 										(Index) 0,
-										rtoffset,
-										NUM_EXEC_QUAL((Plan *) join));
+										rtoffset);
 
 		/*
 		 * HashJoin's hashkeys are used to look for matching tuples from its
@@ -1530,8 +1378,7 @@ set_join_references(PlannerInfo *root, Join *join, int rtoffset)
 											   (Node *) hj->hashkeys,
 											   outer_itlist,
 											   OUTER_VAR,
-											   rtoffset,
-											   NUM_EXEC_QUAL((Plan *) join));
+											   rtoffset);
 	}
 
 	/*
@@ -1569,15 +1416,13 @@ set_join_references(PlannerInfo *root, Join *join, int rtoffset)
 										  outer_itlist,
 										  inner_itlist,
 										  (Index) 0,
-										  rtoffset,
-										  NUM_EXEC_TLIST((Plan *) join));
+										  rtoffset);
 	join->plan.qual = fix_join_expr(root,
 									join->plan.qual,
 									outer_itlist,
 									inner_itlist,
 									(Index) 0,
-									rtoffset,
-									NUM_EXEC_QUAL((Plan *) join));
+									rtoffset);
 
 	pfree(outer_itlist);
 	pfree(inner_itlist);
@@ -1630,16 +1475,14 @@ set_upper_references(PlannerInfo *root, Plan *plan, int rtoffset)
 										 (Node *) tle->expr,
 										 subplan_itlist,
 										 OUTER_VAR,
-										 rtoffset,
-										 NUM_EXEC_TLIST(plan));
+										 rtoffset);
 		}
 		else
 			newexpr = fix_upper_expr(root,
 									 (Node *) tle->expr,
 									 subplan_itlist,
 									 OUTER_VAR,
-									 rtoffset,
-									 NUM_EXEC_TLIST(plan));
+									 rtoffset);
 		tle = flatCopyTargetEntry(tle);
 		tle->expr = (Expr *) newexpr;
 		output_targetlist = lappend(output_targetlist, tle);
@@ -1651,80 +1494,9 @@ set_upper_references(PlannerInfo *root, Plan *plan, int rtoffset)
 					   (Node *) plan->qual,
 					   subplan_itlist,
 					   OUTER_VAR,
-					   rtoffset,
-					   NUM_EXEC_QUAL(plan));
+					   rtoffset);
 
 	pfree(subplan_itlist);
-}
-
-/*
- * Recursively scan an expression tree and convert Aggrefs to the proper
- * intermediate form for combining aggregates.  This means (1) replacing each
- * one's argument list with a single argument that is the original Aggref
- * modified to show partial aggregation and (2) changing the upper Aggref to
- * show combining aggregation.
- *
- * After this step, set_upper_references will replace the partial Aggrefs
- * with Vars referencing the lower Agg plan node's outputs, so that the final
- * form seen by the executor is a combining Aggref with a Var as input.
- *
- * It's rather messy to postpone this step until setrefs.c; ideally it'd be
- * done in createplan.c.  The difficulty is that once we modify the Aggref
- * expressions, they will no longer be equal() to their original form and
- * so cross-plan-node-level matches will fail.  So this has to happen after
- * the plan node above the Agg has resolved its subplan references.
- */
-static Node *
-convert_combining_aggrefs(Node *node, void *context)
-{
-	if (node == NULL)
-		return NULL;
-	if (IsA(node, Aggref))
-	{
-		Aggref	   *orig_agg = (Aggref *) node;
-		Aggref	   *child_agg;
-		Aggref	   *parent_agg;
-
-		/* Assert we've not chosen to partial-ize any unsupported cases */
-		Assert(orig_agg->aggorder == NIL);
-		Assert(orig_agg->aggdistinct == NIL);
-
-		/*
-		 * Since aggregate calls can't be nested, we needn't recurse into the
-		 * arguments.  But for safety, flat-copy the Aggref node itself rather
-		 * than modifying it in-place.
-		 */
-		child_agg = makeNode(Aggref);
-		memcpy(child_agg, orig_agg, sizeof(Aggref));
-
-		/*
-		 * For the parent Aggref, we want to copy all the fields of the
-		 * original aggregate *except* the args list, which we'll replace
-		 * below.  Rather than explicitly knowing about all the other fields
-		 * here, we can momentarily modify child_agg to provide a suitable
-		 * source for copyObject.
-		 */
-		child_agg->args = NIL;
-		parent_agg = copyObject(child_agg);
-		child_agg->args = orig_agg->args;
-
-		/*
-		 * Now, set up child_agg to represent the first phase of partial
-		 * aggregation.  For now, assume serialization is required.
-		 */
-		mark_partial_aggref(child_agg, AGGSPLIT_INITIAL_SERIAL);
-
-		/*
-		 * And set up parent_agg to represent the second phase.
-		 */
-		parent_agg->args = list_make1(makeTargetEntry((Expr *) child_agg,
-													  1, NULL, false));
-		mark_partial_aggref(parent_agg, AGGSPLIT_FINAL_DESERIAL);
-
-		return (Node *) parent_agg;
-	}
-	return expression_tree_mutator(node, convert_combining_aggrefs,
-								   (void *) context);
 }
 
 /*
@@ -1992,7 +1764,6 @@ search_indexed_tlist_for_sortgroupref(Expr *node,
  * 'acceptable_rel' is either zero or the rangetable index of a relation
  *		whose Vars may appear in the clause without provoking an error
  * 'rtoffset': how much to increment varnos by
- * 'num_exec': estimated number of executions of expression
  *
  * Returns the new expression tree.  The original clause structure is
  * not modified.
@@ -2003,8 +1774,7 @@ fix_join_expr(PlannerInfo *root,
 			  indexed_tlist *outer_itlist,
 			  indexed_tlist *inner_itlist,
 			  Index acceptable_rel,
-			  int rtoffset,
-			  double num_exec)
+			  int rtoffset)
 {
 	fix_join_expr_context context;
 
@@ -2013,7 +1783,6 @@ fix_join_expr(PlannerInfo *root,
 	context.inner_itlist = inner_itlist;
 	context.acceptable_rel = acceptable_rel;
 	context.rtoffset = rtoffset;
-	context.num_exec = num_exec;
 	return (List *) fix_join_expr_mutator((Node *) clauses, &context);
 }
 
@@ -2108,11 +1877,6 @@ fix_join_expr_mutator(Node *node, fix_join_expr_context *context)
 	/* Special cases (apply only AFTER failing to match to lower tlist) */
 	if (IsA(node, Param))
 		return fix_param_node(context->root, (Param *) node);
-	if (IsA(node, AlternativeSubPlan))
-		return fix_join_expr_mutator(fix_alternative_subplan(context->root,
-															 (AlternativeSubPlan *) node,
-															 context->num_exec),
-									 context);
 	fix_expr_common(context->root, node);
 	return expression_tree_mutator(node,
 								   fix_join_expr_mutator,
@@ -2144,7 +1908,6 @@ fix_join_expr_mutator(Node *node, fix_join_expr_context *context)
  * 'subplan_itlist': indexed target list for subplan (or index)
  * 'newvarno': varno to use for Vars referencing tlist elements
  * 'rtoffset': how much to increment varnos by
- * 'num_exec': estimated number of executions of expression
  *
  * The resulting tree is a copy of the original in which all Var nodes have
  * varno = newvarno, varattno = resno of corresponding targetlist element.
@@ -2155,8 +1918,7 @@ fix_upper_expr(PlannerInfo *root,
 			   Node *node,
 			   indexed_tlist *subplan_itlist,
 			   Index newvarno,
-			   int rtoffset,
-			   double num_exec)
+			   int rtoffset)
 {
 	fix_upper_expr_context context;
 
@@ -2164,7 +1926,6 @@ fix_upper_expr(PlannerInfo *root,
 	context.subplan_itlist = subplan_itlist;
 	context.newvarno = newvarno;
 	context.rtoffset = rtoffset;
-	context.num_exec = num_exec;
 	return fix_upper_expr_mutator(node, &context);
 }
 
@@ -2215,11 +1976,6 @@ fix_upper_expr_mutator(Node *node, fix_upper_expr_context *context)
 	/* Special cases (apply only AFTER failing to match to lower tlist) */
 	if (IsA(node, Param))
 		return fix_param_node(context->root, (Param *) node);
-	if (IsA(node, AlternativeSubPlan))
-		return fix_upper_expr_mutator(fix_alternative_subplan(context->root,
-															  (AlternativeSubPlan *) node,
-															  context->num_exec),
-									  context);
 	fix_expr_common(context->root, node);
 	return expression_tree_mutator(node,
 								   fix_upper_expr_mutator,

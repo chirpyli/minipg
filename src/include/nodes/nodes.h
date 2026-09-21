@@ -129,7 +129,6 @@ typedef enum NodeTag
 	T_BoolExpr,
 	T_SubLink,
 	T_SubPlan,
-	T_AlternativeSubPlan,
 	T_FieldSelect,
 	T_FieldStore,
 	T_RelabelType,

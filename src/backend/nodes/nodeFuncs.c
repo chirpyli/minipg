@@ -119,14 +119,6 @@ exprType(const Node *expr)
 				}
 			}
 			break;
-		case T_AlternativeSubPlan:
-			{
-				const AlternativeSubPlan *asplan = (const AlternativeSubPlan *) expr;
-
-				/* subplans should all return the same thing */
-				type = exprType((Node *) linitial(asplan->subplans));
-			}
-			break;
 		case T_FieldSelect:
 			type = ((const FieldSelect *) expr)->resulttype;
 			break;
@@ -258,14 +250,6 @@ exprTypmod(const Node *expr)
 					return subplan->firstColTypmod;
 				}
 				/* otherwise, result is RECORD or BOOLEAN, typmod is -1 */
-			}
-			break;
-		case T_AlternativeSubPlan:
-			{
-				const AlternativeSubPlan *asplan = (const AlternativeSubPlan *) expr;
-
-				/* subplans should all return the same thing */
-				return exprTypmod((Node *) linitial(asplan->subplans));
 			}
 			break;
 		case T_FieldSelect:
@@ -726,14 +710,6 @@ exprCollation(const Node *expr)
 					/* otherwise, SubPlan's result is RECORD or BOOLEAN */
 					coll = InvalidOid;	/* ... so it has no collation */
 				}
-			}
-			break;
-		case T_AlternativeSubPlan:
-			{
-				const AlternativeSubPlan *asplan = (const AlternativeSubPlan *) expr;
-
-				/* subplans should all return the same thing */
-				coll = exprCollation((Node *) linitial(asplan->subplans));
 			}
 			break;
 		case T_FieldSelect:
@@ -1684,8 +1660,6 @@ expression_tree_walker(Node *node,
 					return true;
 			}
 			break;
-		case T_AlternativeSubPlan:
-			return walker(((AlternativeSubPlan *) node)->subplans, context);
 		case T_FieldSelect:
 			return walker(((FieldSelect *) node)->arg, context);
 		case T_FieldStore:
@@ -2192,16 +2166,6 @@ expression_tree_mutator(Node *node,
 				/* transform args list (params to be passed to subplan) */
 				MUTATE(newnode->args, subplan->args, List *);
 				/* but not the sub-Plan itself, which is referenced as-is */
-				return (Node *) newnode;
-			}
-			break;
-		case T_AlternativeSubPlan:
-			{
-				AlternativeSubPlan *asplan = (AlternativeSubPlan *) node;
-				AlternativeSubPlan *newnode;
-
-				FLATCOPY(newnode, asplan, AlternativeSubPlan);
-				MUTATE(newnode->subplans, asplan->subplans, List *);
 				return (Node *) newnode;
 			}
 			break;

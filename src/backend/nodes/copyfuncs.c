@@ -1181,19 +1181,6 @@ _copySubPlan(const SubPlan *from)
 }
 
 /*
- * _copyAlternativeSubPlan
- */
-static AlternativeSubPlan *
-_copyAlternativeSubPlan(const AlternativeSubPlan *from)
-{
-	AlternativeSubPlan *newnode = makeNode(AlternativeSubPlan);
-
-	COPY_NODE_FIELD(subplans);
-
-	return newnode;
-}
-
-/*
  * _copyFieldSelect
  */
 static FieldSelect *
@@ -2553,9 +2540,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_SubPlan:
 			retval = _copySubPlan(from);
-			break;
-		case T_AlternativeSubPlan:
-			retval = _copyAlternativeSubPlan(from);
 			break;
 		case T_FieldSelect:
 			retval = _copyFieldSelect(from);

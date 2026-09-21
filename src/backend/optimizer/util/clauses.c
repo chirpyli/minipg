@@ -253,7 +253,6 @@ contain_subplans_walker(Node *node, void *context)
 	if (node == NULL)
 		return false;
 	if (IsA(node, SubPlan) ||
-		IsA(node, AlternativeSubPlan) ||
 		IsA(node, SubLink))
 		return true;			/* abort the tree traversal and return true */
 	return expression_tree_walker(node, contain_subplans_walker, context);
@@ -596,8 +595,6 @@ contain_nonstrict_functions_walker(Node *node, void *context)
 		return true;
 	}
 	else if (IsA(node, SubPlan))
-		return true;
-	else if (IsA(node, AlternativeSubPlan))
 		return true;
 	else if (IsA(node, FieldStore))
 		return true;
@@ -2113,7 +2110,6 @@ eval_const_expressions_mutator(Node *node,
 				break;
 			}
 		case T_SubPlan:
-		case T_AlternativeSubPlan:
 
 			/*
 			 * Return a SubPlan unchanged --- too late to do anything with it.

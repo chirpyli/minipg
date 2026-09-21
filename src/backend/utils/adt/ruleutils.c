@@ -5252,33 +5252,6 @@ get_rule_expr(Node *node, deparse_context *context,
 			}
 			break;
 
-		case T_AlternativeSubPlan:
-			{
-				AlternativeSubPlan *asplan = (AlternativeSubPlan *) node;
-				ListCell   *lc;
-
-				/*
-				 * This case cannot be reached in normal usage, since no
-				 * AlternativeSubPlan can appear either in parsetrees or
-				 * finished plan trees.  We keep it just in case somebody
-				 * wants to use this code to print planner data structures.
-				 */
-				appendStringInfoString(buf, "(alternatives: ");
-				foreach(lc, asplan->subplans)
-				{
-					SubPlan    *splan = lfirst_node(SubPlan, lc);
-
-					if (splan->useHashTable)
-						appendStringInfo(buf, "hashed %s", splan->plan_name);
-					else
-						appendStringInfoString(buf, splan->plan_name);
-					if (lnext(asplan->subplans, lc))
-						appendStringInfoString(buf, " or ");
-				}
-				appendStringInfoChar(buf, ')');
-			}
-			break;
-
 		case T_FieldSelect:
 			{
 				FieldSelect *fselect = (FieldSelect *) node;

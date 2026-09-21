@@ -49,7 +49,6 @@ extern PlannerInfo *subquery_planner(PlannerGlobal *glob, Query *parse,
 extern RowMarkType select_rowmark_type(RangeTblEntry *rte,
 									   LockClauseStrength strength);
 
-extern void mark_partial_aggref(Aggref *agg, AggSplit aggsplit);
 
 extern Path *get_cheapest_fractional_path(RelOptInfo *rel,
 										  double tuple_fraction);

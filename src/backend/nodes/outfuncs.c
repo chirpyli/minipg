@@ -1002,14 +1002,6 @@ _outSubPlan(StringInfo str, const SubPlan *node)
 }
 
 static void
-_outAlternativeSubPlan(StringInfo str, const AlternativeSubPlan *node)
-{
-	WRITE_NODE_TYPE("ALTERNATIVESUBPLAN");
-
-	WRITE_NODE_FIELD(subplans);
-}
-
-static void
 _outFieldSelect(StringInfo str, const FieldSelect *node)
 {
 	WRITE_NODE_TYPE("FIELDSELECT");
@@ -1641,7 +1633,6 @@ _outPlannerInfo(StringInfo str, const PlannerInfo *node)
 	WRITE_BOOL_FIELD(hasLateralRTEs);
 	WRITE_BOOL_FIELD(hasHavingQual);
 	WRITE_BOOL_FIELD(hasPseudoConstantQuals);
-	WRITE_BOOL_FIELD(hasAlternativeSubPlans);
 	WRITE_BOOL_FIELD(hasRecursion);
 	WRITE_INT_FIELD(wt_param_id);
 	WRITE_BITMAPSET_FIELD(curOuterRels);
@@ -2596,9 +2587,6 @@ outNode(StringInfo str, const void *obj)
 				break;
 			case T_SubPlan:
 				_outSubPlan(str, obj);
-				break;
-			case T_AlternativeSubPlan:
-				_outAlternativeSubPlan(str, obj);
 				break;
 			case T_FieldSelect:
 				_outFieldSelect(str, obj);

@@ -389,10 +389,6 @@ static void finalize_aggregate(AggState *aggstate,
 							   AggStatePerAgg peragg,
 							   AggStatePerGroup pergroupstate,
 							   Datum *resultVal, bool *resultIsNull);
-static void finalize_partialaggregate(AggState *aggstate,
-									  AggStatePerAgg peragg,
-									  AggStatePerGroup pergroupstate,
-									  Datum *resultVal, bool *resultIsNull);
 static inline void prepare_hash_slot(AggStatePerHash perhash,
 									 TupleTableSlot *inputslot,
 									 TupleTableSlot *hashslot);
@@ -1140,68 +1136,6 @@ finalize_aggregate(AggState *aggstate,
 }
 
 /*
- * Compute the output value of one partial aggregate.
- *
- * The serialization function will be run, and the result delivered, in the
- * output-tuple context; caller's CurrentMemoryContext does not matter.
- */
-static void
-finalize_partialaggregate(AggState *aggstate,
-						  AggStatePerAgg peragg,
-						  AggStatePerGroup pergroupstate,
-						  Datum *resultVal, bool *resultIsNull)
-{
-	AggStatePerTrans pertrans = &aggstate->pertrans[peragg->transno];
-	MemoryContext oldContext;
-
-	oldContext = MemoryContextSwitchTo(aggstate->ss.ps.ps_ExprContext->ecxt_per_tuple_memory);
-
-	/*
-	 * serialfn_oid will be set if we must serialize the transvalue before
-	 * returning it
-	 */
-	if (OidIsValid(pertrans->serialfn_oid))
-	{
-		/* Don't call a strict serialization function with NULL input. */
-		if (pertrans->serialfn.fn_strict && pergroupstate->transValueIsNull)
-		{
-			*resultVal = (Datum) 0;
-			*resultIsNull = true;
-		}
-		else
-		{
-			FunctionCallInfo fcinfo = pertrans->serialfn_fcinfo;
-
-			fcinfo->args[0].value =
-				MakeExpandedObjectReadOnly(pergroupstate->transValue,
-										   pergroupstate->transValueIsNull,
-										   pertrans->transtypeLen);
-			fcinfo->args[0].isnull = pergroupstate->transValueIsNull;
-			fcinfo->isnull = false;
-
-			*resultVal = FunctionCallInvoke(fcinfo);
-			*resultIsNull = fcinfo->isnull;
-		}
-	}
-	else
-	{
-		/* Don't need MakeExpandedObjectReadOnly; datumCopy will copy it */
-		*resultVal = pergroupstate->transValue;
-		*resultIsNull = pergroupstate->transValueIsNull;
-	}
-
-	/* If result is pass-by-ref, make sure it is in the right context. */
-	if (!peragg->resulttypeByVal && !*resultIsNull &&
-		!MemoryContextContains(CurrentMemoryContext,
-							   DatumGetPointer(*resultVal)))
-		*resultVal = datumCopy(*resultVal,
-							   peragg->resulttypeByVal,
-							   peragg->resulttypeLen);
-
-	MemoryContextSwitchTo(oldContext);
-}
-
-/*
  * Extract the attributes that make up the grouping key into the
  * hashslot. This is necessary to compute the hash or perform a lookup.
  */
@@ -1343,12 +1277,8 @@ finalize_aggregates(AggState *aggstate,
 
 		pergroupstate = &pergroup[transno];
 
-		if (DO_AGGSPLIT_SKIPFINAL(aggstate->aggsplit))
-			finalize_partialaggregate(aggstate, peragg, pergroupstate,
-									  &aggvalues[aggno], &aggnulls[aggno]);
-		else
-			finalize_aggregate(aggstate, peragg, pergroupstate,
-							   &aggvalues[aggno], &aggnulls[aggno]);
+		finalize_aggregate(aggstate, peragg, pergroupstate,
+						   &aggvalues[aggno], &aggnulls[aggno]);
 	}
 }
 
@@ -3608,8 +3538,6 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 
 		/* Planner should have assigned aggregate to correct level */
 		Assert(aggref->agglevelsup == 0);
-		/* ... and the split mode should match */
-		Assert(aggref->aggsplit == aggstate->aggsplit);
 
 		peragg = &peraggs[aggref->aggno];
 
@@ -3635,46 +3563,10 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 		Assert(OidIsValid(aggtranstype));
 
 		/* Final function only required if we're finalizing the aggregates */
-		if (DO_AGGSPLIT_SKIPFINAL(aggstate->aggsplit))
-			peragg->finalfn_oid = finalfn_oid = InvalidOid;
-		else
-			peragg->finalfn_oid = finalfn_oid = aggform->aggfinalfn;
+		peragg->finalfn_oid = finalfn_oid = aggform->aggfinalfn;
 
 		serialfn_oid = InvalidOid;
 		deserialfn_oid = InvalidOid;
-
-		/*
-		 * Check if serialization/deserialization is required.  We only do it
-		 * for aggregates that have transtype INTERNAL.
-		 */
-		if (aggtranstype == INTERNALOID)
-		{
-			/*
-			 * The planner should only have generated a serialize agg node if
-			 * every aggregate with an INTERNAL state has a serialization
-			 * function.  Verify that.
-			 */
-			if (DO_AGGSPLIT_SERIALIZE(aggstate->aggsplit))
-			{
-				/* serialization only valid when not running finalfn */
-				Assert(DO_AGGSPLIT_SKIPFINAL(aggstate->aggsplit));
-
-				if (!OidIsValid(aggform->aggserialfn))
-					elog(ERROR, "serialfunc not provided for serialization aggregation");
-				serialfn_oid = aggform->aggserialfn;
-			}
-
-			/* Likewise for deserialization functions */
-			if (DO_AGGSPLIT_DESERIALIZE(aggstate->aggsplit))
-			{
-				/* deserialization only valid when combining states */
-				Assert(DO_AGGSPLIT_COMBINE(aggstate->aggsplit));
-
-				if (!OidIsValid(aggform->aggdeserialfn))
-					elog(ERROR, "deserialfunc not provided for deserialization aggregation");
-				deserialfn_oid = aggform->aggdeserialfn;
-			}
-		}
 
 		/* Check that aggregate owner has permission to call component fns */
 		{
@@ -3746,21 +3638,7 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 			bool		initValueIsNull;
 			Oid			transfn_oid;
 
-			/*
-			 * If this aggregation is performing state combines, then instead
-			 * of using the transition function, we'll use the combine
-			 * function
-			 */
-			if (DO_AGGSPLIT_COMBINE(aggstate->aggsplit))
-			{
-				transfn_oid = aggform->aggcombinefn;
-
-				/* If not set then the planner messed up */
-				if (!OidIsValid(transfn_oid))
-					elog(ERROR, "combinefn not set for aggregate function");
-			}
-			else
-				transfn_oid = aggform->aggtransfn;
+			transfn_oid = aggform->aggtransfn;
 
 			InvokeFunctionExecuteHook(transfn_oid);
 
@@ -3896,54 +3774,6 @@ build_pertrans_for_aggref(AggStatePerTrans pertrans,
 
 	pertrans->aggtranstype = aggtranstype;
 
-	/*
-	 * When combining states, we have no use at all for the aggregate
-	 * function's transfn. Instead we use the combinefn.  In this case, the
-	 * transfn and transfn_oid fields of pertrans refer to the combine
-	 * function rather than the transition function.
-	 */
-	if (DO_AGGSPLIT_COMBINE(aggstate->aggsplit))
-	{
-		Expr	   *combinefnexpr;
-		size_t		numTransArgs;
-
-		/*
-		 * When combining there's only one input, the to-be-combined added
-		 * transition value from below (this node's transition value is
-		 * counted separately).
-		 */
-		pertrans->numTransInputs = 1;
-
-		/* account for the current transition state */
-		numTransArgs = pertrans->numTransInputs + 1;
-
-		build_aggregate_combinefn_expr(aggtranstype,
-									   aggref->inputcollid,
-									   aggtransfn,
-									   &combinefnexpr);
-		fmgr_info(aggtransfn, &pertrans->transfn);
-		fmgr_info_set_expr((Node *) combinefnexpr, &pertrans->transfn);
-
-		pertrans->transfn_fcinfo =
-			(FunctionCallInfo) palloc(SizeForFunctionCallInfo(2));
-		InitFunctionCallInfoData(*pertrans->transfn_fcinfo,
-								 &pertrans->transfn,
-								 numTransArgs,
-								 pertrans->aggCollation,
-								 (void *) aggstate, NULL);
-
-		/*
-		 * Ensure that a combine function to combine INTERNAL states is not
-		 * strict. This should have been checked during CREATE AGGREGATE, but
-		 * the strict property could have been changed since then.
-		 */
-		if (pertrans->transfn.fn_strict && aggtranstype == INTERNALOID)
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_FUNCTION_DEFINITION),
-					 errmsg("combine function with transition type %s must not be declared STRICT",
-							format_type_be(aggtranstype))));
-	}
-	else
 	{
 		Expr	   *transfnexpr;
 		size_t		numTransArgs;
