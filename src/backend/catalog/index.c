@@ -50,7 +50,6 @@
 #include "catalog/pg_type.h"
 #include "catalog/storage.h"
 #include "catalog/storage_xlog.h"
-#include "commands/progress.h"
 #include "commands/tablecmds.h"
 #include "commands/tablespace.h"
 #include "executor/executor.h"
@@ -59,7 +58,6 @@
 #include "nodes/nodeFuncs.h"
 #include "optimizer/optimizer.h"
 #include "parser/parser.h"
-#include "utils/backend_progress.h"
 #include "rewrite/rewriteManip.h"
 #include "storage/bufmgr.h"
 #include "storage/lmgr.h"
@@ -1835,11 +1833,11 @@ index_drop(Oid indexId, bool concurrent, bool concurrent_lock_mode)
 		 * to acquire an exclusive lock on our table.  The lock code will
 		 * detect deadlock and error out properly.
 		 *
-		 * Note: we report progress through WaitForLockers() unconditionally
+		 * Note: we wait for lock holders through WaitForLockers() unconditionally
 		 * here, even though it will only be used when we're called by REINDEX
 		 * CONCURRENTLY and not when called by DROP INDEX CONCURRENTLY.
 		 */
-		WaitForLockers(heaplocktag, AccessExclusiveLock, true);
+		WaitForLockers(heaplocktag, AccessExclusiveLock);
 
 		/* Finish invalidation of index and mark it as dead */
 		index_concurrently_set_dead(heapId, indexId);
@@ -1855,7 +1853,7 @@ index_drop(Oid indexId, bool concurrent, bool concurrent_lock_mode)
 		 * Wait till every transaction that saw the old index state has
 		 * finished.  See above about progress reporting.
 		 */
-		WaitForLockers(heaplocktag, AccessExclusiveLock, true);
+		WaitForLockers(heaplocktag, AccessExclusiveLock);
 
 		/*
 		 * Re-open relations to allow us to complete our actions.
@@ -2463,21 +2461,7 @@ index_build(Relation heapRelation,
 
 	/* Set up initial progress report status */
 	{
-		const int	progress_index[] = {
-			PROGRESS_CREATEIDX_PHASE,
-			PROGRESS_CREATEIDX_SUBPHASE,
-			PROGRESS_CREATEIDX_TUPLES_DONE,
-			PROGRESS_CREATEIDX_TUPLES_TOTAL,
-			PROGRESS_SCAN_BLOCKS_DONE,
-			PROGRESS_SCAN_BLOCKS_TOTAL
-		};
-		const int64 progress_vals[] = {
-			PROGRESS_CREATEIDX_PHASE_BUILD,
-			PROGRESS_CREATEIDX_SUBPHASE_INITIALIZE,
-			0, 0, 0, 0
-		};
 
-		pgstat_progress_update_multi_param(6, progress_index, progress_vals);
 	}
 
 	/*
@@ -2648,19 +2632,7 @@ validate_index(Oid heapId, Oid indexId, Snapshot snapshot)
 	int			save_nestlevel;
 
 	{
-		const int	progress_index[] = {
-			PROGRESS_CREATEIDX_PHASE,
-			PROGRESS_CREATEIDX_TUPLES_DONE,
-			PROGRESS_CREATEIDX_TUPLES_TOTAL,
-			PROGRESS_SCAN_BLOCKS_DONE,
-			PROGRESS_SCAN_BLOCKS_TOTAL
-		};
-		const int64 progress_vals[] = {
-			PROGRESS_CREATEIDX_PHASE_VALIDATE_IDXSCAN,
-			0, 0, 0, 0
-		};
 
-		pgstat_progress_update_multi_param(5, progress_index, progress_vals);
 	}
 
 	/* Open and lock the parent heap relation */
@@ -2693,9 +2665,7 @@ validate_index(Oid heapId, Oid indexId, Snapshot snapshot)
 	 */
 	ivinfo.index = indexRelation;
 	ivinfo.analyze_only = false;
-	ivinfo.report_progress = true;
 	ivinfo.estimated_count = true;
-	ivinfo.message_level = DEBUG2;
 	ivinfo.num_heap_tuples = heapRelation->rd_rel->reltuples;
 	ivinfo.strategy = NULL;
 
@@ -2717,25 +2687,13 @@ validate_index(Oid heapId, Oid indexId, Snapshot snapshot)
 
 	/* Execute the sort */
 	{
-		const int	progress_index[] = {
-			PROGRESS_CREATEIDX_PHASE,
-			PROGRESS_SCAN_BLOCKS_DONE,
-			PROGRESS_SCAN_BLOCKS_TOTAL
-		};
-		const int64 progress_vals[] = {
-			PROGRESS_CREATEIDX_PHASE_VALIDATE_SORT,
-			0, 0
-		};
 
-		pgstat_progress_update_multi_param(3, progress_index, progress_vals);
 	}
 	tuplesort_performsort(state.tuplesort);
 
 	/*
 	 * Now scan the heap and "merge" it with the index
 	 */
-	pgstat_progress_update_param(PROGRESS_CREATEIDX_PHASE,
-								 PROGRESS_CREATEIDX_PHASE_VALIDATE_TABLESCAN);
 	table_index_validate_scan(heapRelation,
 							  indexRelation,
 							  indexInfo,
@@ -3177,8 +3135,6 @@ reindex_relation(Oid relid, int flags)
 		Assert(!ReindexIsProcessingIndex(indexOid));
 
 		/* Set index rebuild count */
-		pgstat_progress_update_param(PROGRESS_CLUSTER_INDEX_REBUILD_COUNT,
-									 i);
 		i++;
 	}
 

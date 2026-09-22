@@ -655,7 +655,6 @@ typedef struct TableAmRoutine
 										   struct IndexInfo *index_info,
 										   bool allow_sync,
 										   bool anyvisible,
-										   bool progress,
 										   BlockNumber start_blockno,
 										   BlockNumber numblocks,
 										   IndexBuildCallback callback,
@@ -1608,8 +1607,8 @@ table_scan_analyze_next_tuple(TableScanDesc scan, TransactionId OldestXmin,
  * so here because the AM might reject some of the tuples for its own reasons,
  * such as being unable to store NULLs.
  *
- * If 'progress', the PROGRESS_SCAN_BLOCKS_TOTAL counter is updated when
- * starting the scan, and PROGRESS_SCAN_BLOCKS_DONE is updated as we go along.
+ * This scans the relation and invokes the callback for each tuple that
+ * should be indexed.
  *
  * A side effect is to set indexInfo->ii_BrokenHotChain to true if we detect
  * any potentially broken HOT chains.  Currently, we set this if there are any
@@ -1623,7 +1622,6 @@ table_index_build_scan(Relation table_rel,
 					   Relation index_rel,
 					   struct IndexInfo *index_info,
 					   bool allow_sync,
-					   bool progress,
 					   IndexBuildCallback callback,
 					   void *callback_state,
 					   TableScanDesc scan)
@@ -1633,7 +1631,6 @@ table_index_build_scan(Relation table_rel,
 														 index_info,
 														 allow_sync,
 														 false,
-														 progress,
 														 0,
 														 InvalidBlockNumber,
 														 callback,
@@ -1657,7 +1654,6 @@ table_index_build_range_scan(Relation table_rel,
 							 struct IndexInfo *index_info,
 							 bool allow_sync,
 							 bool anyvisible,
-							 bool progress,
 							 BlockNumber start_blockno,
 							 BlockNumber numblocks,
 							 IndexBuildCallback callback,
@@ -1668,8 +1664,7 @@ table_index_build_range_scan(Relation table_rel,
 														 index_rel,
 														 index_info,
 														 allow_sync,
-														 anyvisible,
-														 progress,
+																												 anyvisible,
 														 start_blockno,
 														 numblocks,
 														 callback,

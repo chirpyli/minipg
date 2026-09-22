@@ -21,7 +21,6 @@
 #include "miscadmin.h"
 #include "storage/proc.h"
 #include "storage/procarray.h"
-#include "utils/backend_progress.h"
 #include "utils/backend_status.h"
 #include "utils/builtins.h"
 #include "utils/timestamp.h"
@@ -71,112 +70,7 @@ pg_stat_get_backend_idset(PG_FUNCTION_ARGS)
 	}
 }
 
-/*
- * Returns command progress information for the named command.
- */
-Datum
-pg_stat_get_progress_info(PG_FUNCTION_ARGS)
-{
-#define PG_STAT_GET_PROGRESS_COLS	PGSTAT_NUM_PROGRESS_PARAM + 3
-	int			num_backends = pgstat_fetch_stat_numbackends();
-	int			curr_backend;
-	char	   *cmd = text_to_cstring(PG_GETARG_TEXT_PP(0));
-	ProgressCommandType cmdtype;
-	TupleDesc	tupdesc;
-	Tuplestorestate *tupstore;
-	ReturnSetInfo *rsinfo = (ReturnSetInfo *) fcinfo->resultinfo;
-	MemoryContext per_query_ctx;
-	MemoryContext oldcontext;
-
-	/* check to see if caller supports us returning a tuplestore */
-	if (rsinfo == NULL || !IsA(rsinfo, ReturnSetInfo))
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("set-valued function called in context that cannot accept a set")));
-	if (!(rsinfo->allowedModes & SFRM_Materialize))
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("materialize mode required, but it is not allowed in this context")));
-
-	/* Build a tuple descriptor for our result type */
-	if (get_call_result_type(fcinfo, NULL, &tupdesc) != TYPEFUNC_COMPOSITE)
-		elog(ERROR, "return type must be a row type");
-
-	/* Translate command name into command type code. */
-	if (pg_strcasecmp(cmd, "VACUUM") == 0)
-		cmdtype = PROGRESS_COMMAND_VACUUM;
-	else if (pg_strcasecmp(cmd, "ANALYZE") == 0)
-		cmdtype = PROGRESS_COMMAND_ANALYZE;
-	else if (pg_strcasecmp(cmd, "CLUSTER") == 0)
-		cmdtype = PROGRESS_COMMAND_CLUSTER;
-	else if (pg_strcasecmp(cmd, "CREATE INDEX") == 0)
-		cmdtype = PROGRESS_COMMAND_CREATE_INDEX;
-	else
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				 errmsg("invalid command name: \"%s\"", cmd)));
-
-	per_query_ctx = rsinfo->econtext->ecxt_per_query_memory;
-	oldcontext = MemoryContextSwitchTo(per_query_ctx);
-
-	tupstore = tuplestore_begin_heap(true, false, work_mem);
-	rsinfo->returnMode = SFRM_Materialize;
-	rsinfo->setResult = tupstore;
-	rsinfo->setDesc = tupdesc;
-	MemoryContextSwitchTo(oldcontext);
-
-	/* 1-based index */
-	for (curr_backend = 1; curr_backend <= num_backends; curr_backend++)
-	{
-		LocalPgBackendStatus *local_beentry;
-		PgBackendStatus *beentry;
-		Datum		values[PG_STAT_GET_PROGRESS_COLS];
-		bool		nulls[PG_STAT_GET_PROGRESS_COLS];
-		int			i;
-
-		MemSet(values, 0, sizeof(values));
-		MemSet(nulls, 0, sizeof(nulls));
-
-		local_beentry = pgstat_fetch_stat_local_beentry(curr_backend);
-
-		if (!local_beentry)
-			continue;
-
-		beentry = &local_beentry->backendStatus;
-
-		/*
-		 * Report values for only those backends which are running the given
-		 * command.
-		 */
-		if (!beentry || beentry->st_progress_command != cmdtype)
-			continue;
-
-		/* Value available to all callers */
-		values[0] = Int32GetDatum(beentry->st_procpid);
-		values[1] = ObjectIdGetDatum(beentry->st_databaseid);
-
-		/* show rest of the values including relid only to role members */
-		if (HAS_PGSTAT_PERMISSIONS(beentry->st_userid))
-		{
-			values[2] = ObjectIdGetDatum(beentry->st_progress_command_target);
-			for (i = 0; i < PGSTAT_NUM_PROGRESS_PARAM; i++)
-				values[i + 3] = Int64GetDatum(beentry->st_progress_param[i]);
-		}
-		else
-		{
-			nulls[2] = true;
-			for (i = 0; i < PGSTAT_NUM_PROGRESS_PARAM; i++)
-				nulls[i + 3] = true;
-		}
-
-		tuplestore_putvalues(tupstore, tupdesc, values, nulls);
-	}
-
-	/* clean up and return the tuplestore */
-	tuplestore_donestoring(tupstore);
-
-	return (Datum) 0;
-}
+/* Returns activity of PG backends. */
 
 /*
  * Returns activity of PG backends.

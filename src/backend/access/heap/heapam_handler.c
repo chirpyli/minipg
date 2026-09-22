@@ -31,10 +31,8 @@
 #include "catalog/index.h"
 #include "catalog/storage.h"
 #include "catalog/storage_xlog.h"
-#include "commands/progress.h"
 #include "executor/executor.h"
 #include "miscadmin.h"
-#include "utils/backend_progress.h"
 #include "storage/bufmgr.h"
 #include "storage/bufpage.h"
 #include "storage/lmgr.h"
@@ -667,39 +665,13 @@ heapam_relation_copy_for_cluster(Relation OldHeap, Relation NewHeap,
 	 * Prepare to scan the OldHeap.  To ensure we see recently-dead tuples
 	 * that still need to be copied, we scan with SnapshotAny and use
 	 * HeapTupleSatisfiesVacuum for the visibility test.
+	 *
+	 * VACUUM FULL always rewrites the heap by a sequential scan (the CLUSTER
+	 * index-scan / sort paths are not used here).
 	 */
-	if (OldIndex != NULL && !use_sort)
-	{
-		const int	ci_index[] = {
-			PROGRESS_CLUSTER_PHASE,
-			PROGRESS_CLUSTER_INDEX_RELID
-		};
-		int64		ci_val[2];
-
-		/* Set phase and OIDOldIndex to columns */
-		ci_val[0] = PROGRESS_CLUSTER_PHASE_INDEX_SCAN_HEAP;
-		ci_val[1] = RelationGetRelid(OldIndex);
-		pgstat_progress_update_multi_param(2, ci_index, ci_val);
-
-		tableScan = NULL;
-		heapScan = NULL;
-		indexScan = index_beginscan(OldHeap, OldIndex, SnapshotAny, 0, 0);
-		index_rescan(indexScan, NULL, 0, NULL, 0);
-	}
-	else
-	{
-		/* In scan-and-sort mode and also VACUUM FULL, set phase */
-		pgstat_progress_update_param(PROGRESS_CLUSTER_PHASE,
-									 PROGRESS_CLUSTER_PHASE_SEQ_SCAN_HEAP);
-
-		tableScan = table_beginscan(OldHeap, SnapshotAny, 0, (ScanKey) NULL);
-		heapScan = (HeapScanDesc) tableScan;
-		indexScan = NULL;
-
-		/* Set total heap blocks */
-		pgstat_progress_update_param(PROGRESS_CLUSTER_TOTAL_HEAP_BLKS,
-									 heapScan->rs_nblocks);
-	}
+	tableScan = table_beginscan(OldHeap, SnapshotAny, 0, (ScanKey) NULL);
+	heapScan = (HeapScanDesc) tableScan;
+	indexScan = NULL;
 
 	slot = table_slot_create(OldHeap, NULL);
 	hslot = (BufferHeapTupleTableSlot *) slot;
@@ -739,8 +711,6 @@ heapam_relation_copy_for_cluster(Relation OldHeap, Relation NewHeap,
 				 * is manually updated to the correct value when the table
 				 * scan finishes.
 				 */
-				pgstat_progress_update_param(PROGRESS_CLUSTER_HEAP_BLKS_SCANNED,
-											 heapScan->rs_nblocks);
 				break;
 			}
 
@@ -755,11 +725,6 @@ heapam_relation_copy_for_cluster(Relation OldHeap, Relation NewHeap,
 			 */
 			if (prev_cblock != heapScan->rs_cblock)
 			{
-				pgstat_progress_update_param(PROGRESS_CLUSTER_HEAP_BLKS_SCANNED,
-											 (heapScan->rs_cblock +
-											  heapScan->rs_nblocks -
-											  heapScan->rs_startblock
-											  ) % heapScan->rs_nblocks + 1);
 				prev_cblock = heapScan->rs_cblock;
 			}
 		}
@@ -842,14 +807,10 @@ heapam_relation_copy_for_cluster(Relation OldHeap, Relation NewHeap,
 			 * In scan-and-sort mode, report increase in number of tuples
 			 * scanned
 			 */
-			pgstat_progress_update_param(PROGRESS_CLUSTER_HEAP_TUPLES_SCANNED,
-										 *num_tuples);
 		}
 		else
 		{
 			const int	ct_index[] = {
-				PROGRESS_CLUSTER_HEAP_TUPLES_SCANNED,
-				PROGRESS_CLUSTER_HEAP_TUPLES_WRITTEN
 			};
 			int64		ct_val[2];
 
@@ -862,7 +823,6 @@ heapam_relation_copy_for_cluster(Relation OldHeap, Relation NewHeap,
 			 */
 			ct_val[0] = *num_tuples;
 			ct_val[1] = *num_tuples;
-			pgstat_progress_update_multi_param(2, ct_index, ct_val);
 		}
 	}
 
@@ -882,14 +842,10 @@ heapam_relation_copy_for_cluster(Relation OldHeap, Relation NewHeap,
 		double		n_tuples = 0;
 
 		/* Report that we are now sorting tuples */
-		pgstat_progress_update_param(PROGRESS_CLUSTER_PHASE,
-									 PROGRESS_CLUSTER_PHASE_SORT_TUPLES);
 
 		tuplesort_performsort(tuplesort);
 
 		/* Report that we are now writing new heap */
-		pgstat_progress_update_param(PROGRESS_CLUSTER_PHASE,
-									 PROGRESS_CLUSTER_PHASE_WRITE_NEW_HEAP);
 
 		for (;;)
 		{
@@ -907,8 +863,6 @@ heapam_relation_copy_for_cluster(Relation OldHeap, Relation NewHeap,
 									 values, isnull,
 									 rwstate);
 			/* Report n_tuples */
-			pgstat_progress_update_param(PROGRESS_CLUSTER_HEAP_TUPLES_WRITTEN,
-										 n_tuples);
 		}
 
 		tuplesort_end(tuplesort);
@@ -1094,7 +1048,6 @@ heapam_index_build_range_scan(Relation heapRelation,
 							  IndexInfo *indexInfo,
 							  bool allow_sync,
 							  bool anyvisible,
-							  bool progress,
 							  BlockNumber start_blockno,
 							  BlockNumber numblocks,
 							  IndexBuildCallback callback,
@@ -1115,7 +1068,6 @@ heapam_index_build_range_scan(Relation heapRelation,
 	Snapshot	snapshot;
 	bool		need_unregister_snapshot = false;
 	TransactionId OldestXmin;
-	BlockNumber previous_blkno = InvalidBlockNumber;
 	BlockNumber root_blkno = InvalidBlockNumber;
 	OffsetNumber root_offsets[MaxHeapTuplesPerPage];
 
@@ -1213,25 +1165,6 @@ heapam_index_build_range_scan(Relation heapRelation,
 		   !TransactionIdIsValid(OldestXmin));
 	Assert(snapshot == SnapshotAny || !anyvisible);
 
-	/* Publish number of blocks to scan */
-	if (progress)
-	{
-		BlockNumber nblocks;
-
-		if (hscan->rs_base.rs_parallel != NULL)
-		{
-			ParallelBlockTableScanDesc pbscan;
-
-			pbscan = (ParallelBlockTableScanDesc) hscan->rs_base.rs_parallel;
-			nblocks = pbscan->phs_nblocks;
-		}
-		else
-			nblocks = hscan->rs_nblocks;
-
-		pgstat_progress_update_param(PROGRESS_SCAN_BLOCKS_TOTAL,
-									 nblocks);
-	}
-
 	/* set our scan endpoints */
 	if (!allow_sync)
 		heap_setscanlimits(scan, start_blockno, numblocks);
@@ -1252,19 +1185,6 @@ heapam_index_build_range_scan(Relation heapRelation,
 		bool		tupleIsAlive;
 
 		CHECK_FOR_INTERRUPTS();
-
-		/* Report scan progress, if asked to. */
-		if (progress)
-		{
-			BlockNumber blocks_done = heapam_scan_get_blocks_done(hscan);
-
-			if (blocks_done != previous_blkno)
-			{
-				pgstat_progress_update_param(PROGRESS_SCAN_BLOCKS_DONE,
-											 blocks_done);
-				previous_blkno = blocks_done;
-			}
-		}
 
 		/*
 		 * When dealing with a HOT-chain of updated tuples, we want to index
@@ -1626,25 +1546,6 @@ heapam_index_build_range_scan(Relation heapRelation,
 		}
 	}
 
-	/* Report scan progress one last time. */
-	if (progress)
-	{
-		BlockNumber blks_done;
-
-		if (hscan->rs_base.rs_parallel != NULL)
-		{
-			ParallelBlockTableScanDesc pbscan;
-
-			pbscan = (ParallelBlockTableScanDesc) hscan->rs_base.rs_parallel;
-			blks_done = pbscan->phs_nblocks;
-		}
-		else
-			blks_done = hscan->rs_nblocks;
-
-		pgstat_progress_update_param(PROGRESS_SCAN_BLOCKS_DONE,
-									 blks_done);
-	}
-
 	table_endscan(scan);
 
 	/* we can now forget our snapshot, if set and registered by us */
@@ -1722,8 +1623,6 @@ heapam_index_validate_scan(Relation heapRelation,
 								 false);	/* syncscan not OK */
 	hscan = (HeapScanDesc) scan;
 
-	pgstat_progress_update_param(PROGRESS_SCAN_BLOCKS_TOTAL,
-								 hscan->rs_nblocks);
 
 	/*
 	 * Scan all tuples matching the snapshot.
@@ -1741,8 +1640,6 @@ heapam_index_validate_scan(Relation heapRelation,
 		if ((previous_blkno == InvalidBlockNumber) ||
 			(hscan->rs_cblock != previous_blkno))
 		{
-			pgstat_progress_update_param(PROGRESS_SCAN_BLOCKS_DONE,
-										 hscan->rs_cblock);
 			previous_blkno = hscan->rs_cblock;
 		}
 

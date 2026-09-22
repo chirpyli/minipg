@@ -19,9 +19,7 @@
 #include "access/transam.h"
 #include "access/xact.h"
 #include "catalog/catalog.h"
-#include "commands/progress.h"
 #include "miscadmin.h"
-#include "utils/backend_progress.h"
 #include "storage/lmgr.h"
 #include "storage/proc.h"
 #include "storage/procarray.h"
@@ -790,12 +788,10 @@ XactLockTableWaitErrorCb(void *arg)
  * wait for them.
  */
 void
-WaitForLockersMultiple(List *locktags, LOCKMODE lockmode, bool progress)
+WaitForLockersMultiple(List *locktags, LOCKMODE lockmode)
 {
 	List	   *holders = NIL;
 	ListCell   *lc;
-	int			total = 0;
-	int			done = 0;
 
 	/* Done if no locks to wait for */
 	if (list_length(locktags) == 0)
@@ -805,17 +801,9 @@ WaitForLockersMultiple(List *locktags, LOCKMODE lockmode, bool progress)
 	foreach(lc, locktags)
 	{
 		LOCKTAG    *locktag = lfirst(lc);
-		int			count;
 
-		holders = lappend(holders,
-						  GetLockConflicts(locktag, lockmode,
-										   progress ? &count : NULL));
-		if (progress)
-			total += count;
+		holders = lappend(holders, GetLockConflicts(locktag, lockmode, NULL));
 	}
-
-	if (progress)
-		pgstat_progress_update_param(PROGRESS_WAITFOR_TOTAL, total);
 
 	/*
 	 * Note: GetLockConflicts() never reports our own xid, hence we need not
@@ -829,34 +817,9 @@ WaitForLockersMultiple(List *locktags, LOCKMODE lockmode, bool progress)
 
 		while (VirtualTransactionIdIsValid(*lockholders))
 		{
-			/* If requested, publish who we're going to wait for. */
-			if (progress)
-			{
-				PGPROC	   *holder = BackendIdGetProc(lockholders->backendId);
-
-				if (holder)
-					pgstat_progress_update_param(PROGRESS_WAITFOR_CURRENT_PID,
-												 holder->pid);
-			}
 			VirtualXactLock(*lockholders, true);
 			lockholders++;
-
-			if (progress)
-				pgstat_progress_update_param(PROGRESS_WAITFOR_DONE, ++done);
 		}
-	}
-	if (progress)
-	{
-		const int	index[] = {
-			PROGRESS_WAITFOR_TOTAL,
-			PROGRESS_WAITFOR_DONE,
-			PROGRESS_WAITFOR_CURRENT_PID
-		};
-		const int64 values[] = {
-			0, 0, 0
-		};
-
-		pgstat_progress_update_multi_param(3, index, values);
 	}
 
 	list_free_deep(holders);
@@ -868,12 +831,12 @@ WaitForLockersMultiple(List *locktags, LOCKMODE lockmode, bool progress)
  * Same as WaitForLockersMultiple, for a single lock tag.
  */
 void
-WaitForLockers(LOCKTAG heaplocktag, LOCKMODE lockmode, bool progress)
+WaitForLockers(LOCKTAG heaplocktag, LOCKMODE lockmode)
 {
 	List	   *l;
 
 	l = list_make1(&heaplocktag);
-	WaitForLockersMultiple(l, lockmode, progress);
+	WaitForLockersMultiple(l, lockmode);
 	list_free(l);
 }
 

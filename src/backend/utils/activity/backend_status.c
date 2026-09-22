@@ -285,15 +285,7 @@ pgstat_bestart(void)
 		MemSet(&lbeentry.st_clientaddr, 0, sizeof(lbeentry.st_clientaddr));
 
 	lbeentry.st_state = STATE_UNDEFINED;
-	lbeentry.st_progress_command = PROGRESS_COMMAND_INVALID;
-	lbeentry.st_progress_command_target = InvalidOid;
 	lbeentry.st_query_id = UINT64CONST(0);
-
-	/*
-	 * we don't zero st_progress_param here to save cycles; nobody should
-	 * examine it until st_progress_command has been set to something other
-	 * than PROGRESS_COMMAND_INVALID
-	 */
 
 	/*
 	 * We're ready to enter the critical section that fills the shared-memory

@@ -44,7 +44,6 @@
 #include "storage/procarray.h"
 #include "storage/sinvaladt.h"
 #include "storage/smgr.h"
-#include "utils/backend_progress.h"
 #include "utils/backend_status.h"
 #include "utils/builtins.h"
 #include "utils/catcache.h"
@@ -2248,7 +2247,6 @@ AbortTransaction(void)
 
 	/* Clear wait information and command progress indicator */
 	pgstat_report_wait_end();
-	pgstat_progress_end_command();
 
 	/* Clean up buffer I/O and buffer context locks, too */
 	AbortBufferIO();
@@ -4368,7 +4366,6 @@ AbortSubTransaction(void)
 	LWLockReleaseAll();
 
 	pgstat_report_wait_end();
-	pgstat_progress_end_command();
 	AbortBufferIO();
 	UnlockBuffers();
 

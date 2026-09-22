@@ -1084,15 +1084,6 @@ typedef BTScanOpaqueData *BTScanOpaque;
 #define SK_BT_NULLS_FIRST	(INDOPTION_NULLS_FIRST << SK_BT_INDOPTION_SHIFT)
 
 /*
- * Constant definition for progress reporting.
- */
-/* PROGRESS_CREATEIDX_SUBPHASE_INITIALIZE is 1 (see progress.h) */
-#define PROGRESS_BTREE_PHASE_INDEXBUILD_TABLESCAN		2
-#define PROGRESS_BTREE_PHASE_PERFORMSORT_1				3
-#define PROGRESS_BTREE_PHASE_PERFORMSORT_2				4
-#define PROGRESS_BTREE_PHASE_LEAF_LOAD					5
-
-/*
  * external entry points for btree, in nbtree.c
  */
 extern void btbuildempty(Relation index);

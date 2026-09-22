@@ -36,12 +36,10 @@
 #include "catalog/toasting.h"
 #include "commands/cluster.h"
 #include "commands/defrem.h"
-#include "commands/progress.h"
 #include "commands/tablecmds.h"
 #include "commands/vacuum.h"
 #include "miscadmin.h"
 #include "optimizer/optimizer.h"
-#include "utils/backend_progress.h"
 #include "storage/bufmgr.h"
 #include "storage/lmgr.h"
 #include "storage/predicate.h"
@@ -93,9 +91,6 @@ cluster_rel(Oid tableOid, ClusterParams *params)
 	/* Check for user-requested abort. */
 	CHECK_FOR_INTERRUPTS();
 
-	pgstat_progress_start_command(PROGRESS_COMMAND_CLUSTER, tableOid);
-	pgstat_progress_update_param(PROGRESS_CLUSTER_COMMAND,
-								 PROGRESS_CLUSTER_COMMAND_VACUUM_FULL);
 
 	/*
 	 * We grab exclusive access to the target rel for the duration of the
@@ -106,7 +101,6 @@ cluster_rel(Oid tableOid, ClusterParams *params)
 	/* If the table has gone away, we can skip processing it */
 	if (!OldHeap)
 	{
-		pgstat_progress_end_command();
 		return;
 	}
 
@@ -145,7 +139,6 @@ cluster_rel(Oid tableOid, ClusterParams *params)
 	/* Restore userid and security context */
 	SetUserIdAndSecContext(save_userid, save_sec_context);
 
-	pgstat_progress_end_command();
 }
 
 /*
@@ -875,8 +868,6 @@ finish_heap_swap(Oid OIDOldHeap, Oid OIDNewHeap,
 	int			i;
 
 	/* Report that we are now swapping relation files */
-	pgstat_progress_update_param(PROGRESS_CLUSTER_PHASE,
-								 PROGRESS_CLUSTER_PHASE_SWAP_REL_FILES);
 
 	/* Zero out possible results from swapped_relation_files */
 	memset(mapped_tables, 0, sizeof(mapped_tables));
@@ -924,14 +915,10 @@ finish_heap_swap(Oid OIDOldHeap, Oid OIDNewHeap,
 		reindex_flags |= REINDEX_REL_FORCE_INDEXES_PERMANENT;
 
 	/* Report that we are now reindexing relations */
-	pgstat_progress_update_param(PROGRESS_CLUSTER_PHASE,
-								 PROGRESS_CLUSTER_PHASE_REBUILD_INDEX);
 
 	reindex_relation(OIDOldHeap, reindex_flags);
 
 	/* Report that we are now doing clean up */
-	pgstat_progress_update_param(PROGRESS_CLUSTER_PHASE,
-								 PROGRESS_CLUSTER_PHASE_FINAL_CLEANUP);
 
 	/*
 	 * If the relation being rebuilt is pg_class, swap_relation_files()

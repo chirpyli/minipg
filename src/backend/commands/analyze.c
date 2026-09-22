@@ -42,7 +42,6 @@
 typedef int (*AcquireSampleRowsFunc) (Relation onerel, int elevel,
 									  HeapTuple *rows, int targrows,
 									  double *totalrows, double *totaldeadrows);
-#include "commands/progress.h"
 #include "commands/tablecmds.h"
 #include "commands/vacuum.h"
 #include "executor/executor.h"
@@ -50,7 +49,6 @@ typedef int (*AcquireSampleRowsFunc) (Relation onerel, int elevel,
 #include "nodes/nodeFuncs.h"
 #include "parser/parse_oper.h"
 #include "parser/parse_relation.h"
-#include "utils/backend_progress.h"
 
 #include "storage/bufmgr.h"
 #include "storage/lmgr.h"
@@ -199,8 +197,6 @@ analyze_rel(Oid relid, RangeVar *relation,
 	/*
 	 * OK, let's do it.  First, initialize progress reporting.
 	 */
-	pgstat_progress_start_command(PROGRESS_COMMAND_ANALYZE,
-								  RelationGetRelid(onerel));
 
 	/*
 	 * Do the normal non-recursive ANALYZE.
@@ -216,7 +212,6 @@ analyze_rel(Oid relid, RangeVar *relation,
 	 */
 	relation_close(onerel, NoLock);
 
-	pgstat_progress_end_command();
 }
 
 /*
@@ -429,9 +424,6 @@ do_analyze_rel(Relation onerel, VacuumParams *params,
 	 * Acquire the sample rows
 	 */
 	rows = (HeapTuple *) palloc(targrows * sizeof(HeapTuple));
-	pgstat_progress_update_param(PROGRESS_ANALYZE_PHASE,
-								 inh ? PROGRESS_ANALYZE_PHASE_ACQUIRE_SAMPLE_ROWS_INH :
-								 PROGRESS_ANALYZE_PHASE_ACQUIRE_SAMPLE_ROWS);
 	numrows = (*acquirefunc) (onerel, elevel,
 							  rows, targrows,
 							  &totalrows, &totaldeadrows);
@@ -447,8 +439,6 @@ do_analyze_rel(Relation onerel, VacuumParams *params,
 		MemoryContext col_context,
 					old_context;
 
-		pgstat_progress_update_param(PROGRESS_ANALYZE_PHASE,
-									 PROGRESS_ANALYZE_PHASE_COMPUTE_STATS);
 
 		col_context = AllocSetContextCreate(anl_context,
 											"Analyze Column",
@@ -496,8 +486,6 @@ do_analyze_rel(Relation onerel, VacuumParams *params,
 
 	}
 
-	pgstat_progress_update_param(PROGRESS_ANALYZE_PHASE,
-								 PROGRESS_ANALYZE_PHASE_FINALIZE_ANALYZE);
 
 	/*
 	 * Update pages/tuples stats in pg_class ... but not if we're doing
@@ -565,7 +553,6 @@ do_analyze_rel(Relation onerel, VacuumParams *params,
 			ivinfo.index = Irel[ind];
 			ivinfo.analyze_only = true;
 			ivinfo.estimated_count = true;
-			ivinfo.message_level = elevel;
 			ivinfo.num_heap_tuples = onerel->rd_rel->reltuples;
 			ivinfo.strategy = vac_strategy;
 
@@ -1034,8 +1021,6 @@ acquire_sample_rows(Relation onerel, int elevel,
 #endif
 
 	/* Report sampling block numbers */
-	pgstat_progress_update_param(PROGRESS_ANALYZE_BLOCKS_TOTAL,
-								 nblocks);
 
 	/* Prepare for sampling rows */
 	reservoir_init_selection_state(&rstate, targrows);
@@ -1153,8 +1138,6 @@ acquire_sample_rows(Relation onerel, int elevel,
 			samplerows += 1;
 		}
 
-		pgstat_progress_update_param(PROGRESS_ANALYZE_BLOCKS_DONE,
-									 ++blksdone);
 	}
 
 	ExecDropSingleTupleTableSlot(slot);

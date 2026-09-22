@@ -52,10 +52,8 @@
 #include "access/xlog.h"
 #include "access/xloginsert.h"
 #include "catalog/index.h"
-#include "commands/progress.h"
 #include "executor/instrument.h"
 #include "miscadmin.h"
-#include "utils/backend_progress.h"
 #include "storage/smgr.h"
 #include "tcop/tcopprot.h"		/* pgrminclude ignore */
 #include "utils/rel.h"
@@ -229,8 +227,6 @@ _bt_spools_heapscan(Relation heap, Relation index, BTBuildState *buildstate,
 	buildstate->spool = btspool;
 
 	/* Report table scan phase started */
-	pgstat_progress_update_param(PROGRESS_CREATEIDX_SUBPHASE,
-								 PROGRESS_BTREE_PHASE_INDEXBUILD_TABLESCAN);
 
 	/*
 	 * Begin serial/leader tuplesort.
@@ -284,7 +280,7 @@ _bt_spools_heapscan(Relation heap, Relation index, BTBuildState *buildstate,
 	}
 
 	/* Fill spool using a serial heap scan */
-	reltuples = table_index_build_scan(heap, index, indexInfo, true, true,
+	reltuples = table_index_build_scan(heap, index, indexInfo, true,
 									   _bt_build_callback, (void *) buildstate,
 									   NULL);
 
@@ -293,17 +289,7 @@ _bt_spools_heapscan(Relation heap, Relation index, BTBuildState *buildstate,
 	 * values set by table_index_build_scan
 	 */
 	{
-		const int	progress_index[] = {
-			PROGRESS_CREATEIDX_TUPLES_TOTAL,
-			PROGRESS_SCAN_BLOCKS_TOTAL,
-			PROGRESS_SCAN_BLOCKS_DONE
-		};
-		const int64 progress_vals[] = {
-			buildstate->indtuples,
-			0, 0
-		};
 
-		pgstat_progress_update_multi_param(3, progress_index, progress_vals);
 	}
 
 	/* okay, all heap tuples are spooled */
@@ -348,13 +334,9 @@ _bt_leafbuild(BTSpool *btspool, BTSpool *btspool2)
 
 
 	/* Execute the sort */
-	pgstat_progress_update_param(PROGRESS_CREATEIDX_SUBPHASE,
-								 PROGRESS_BTREE_PHASE_PERFORMSORT_1);
 	tuplesort_performsort(btspool->sortstate);
 	if (btspool2)
 	{
-		pgstat_progress_update_param(PROGRESS_CREATEIDX_SUBPHASE,
-									 PROGRESS_BTREE_PHASE_PERFORMSORT_2);
 		tuplesort_performsort(btspool2->sortstate);
 	}
 
@@ -370,8 +352,6 @@ _bt_leafbuild(BTSpool *btspool, BTSpool *btspool2)
 	wstate.btws_pages_written = 0;
 	wstate.btws_zeropage = NULL;	/* until needed */
 
-	pgstat_progress_update_param(PROGRESS_CREATEIDX_SUBPHASE,
-								 PROGRESS_BTREE_PHASE_LEAF_LOAD);
 	_bt_load(&wstate, btspool, btspool2);
 }
 
@@ -1094,8 +1074,6 @@ _bt_load(BTWriteState *wstate, BTSpool *btspool, BTSpool *btspool2)
 			}
 
 			/* Report progress */
-			pgstat_progress_update_param(PROGRESS_CREATEIDX_TUPLES_DONE,
-										 ++tuples_done);
 		}
 		pfree(sortKeys);
 	}
@@ -1174,8 +1152,6 @@ _bt_load(BTWriteState *wstate, BTSpool *btspool, BTSpool *btspool2)
 			}
 
 			/* Report progress */
-			pgstat_progress_update_param(PROGRESS_CREATEIDX_TUPLES_DONE,
-										 ++tuples_done);
 		}
 
 		if (state)
@@ -1204,8 +1180,6 @@ _bt_load(BTWriteState *wstate, BTSpool *btspool, BTSpool *btspool2)
 			_bt_buildadd(wstate, state, itup, 0);
 
 			/* Report progress */
-			pgstat_progress_update_param(PROGRESS_CREATEIDX_TUPLES_DONE,
-										 ++tuples_done);
 		}
 	}
 

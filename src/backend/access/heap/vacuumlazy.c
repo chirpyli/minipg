@@ -42,12 +42,10 @@
 #include "catalog/index.h"
 #include "catalog/storage.h"
 #include "commands/dbcommands.h"
-#include "commands/progress.h"
 #include "commands/vacuum.h"
 #include "executor/instrument.h"
 #include "miscadmin.h"
 #include "optimizer/paths.h"
-#include "utils/backend_progress.h"
 #include "portability/instr_time.h"
 
 #include "storage/bufmgr.h"
@@ -352,8 +350,6 @@ heap_vacuum_rel(Relation rel, VacuumParams *params,
 	else
 		elevel = DEBUG2;
 
-	pgstat_progress_start_command(PROGRESS_COMMAND_VACUUM,
-								  RelationGetRelid(rel));
 
 	vacuum_set_xid_limits(rel,
 						  params->freeze_min_age,
@@ -501,8 +497,6 @@ heap_vacuum_rel(Relation rel, VacuumParams *params,
 	error_context_stack = errcallback.previous;
 
 	/* Report that we are now doing final cleanup */
-	pgstat_progress_update_param(PROGRESS_VACUUM_PHASE,
-								 PROGRESS_VACUUM_PHASE_FINAL_CLEANUP);
 
 	/*
 	 * Update statistics in pg_class.
@@ -537,7 +531,6 @@ heap_vacuum_rel(Relation rel, VacuumParams *params,
 						new_min_multi,
 						false);
 
-	pgstat_progress_end_command();
 
 	/* and log the action if appropriate */
 	if (params->log_min_duration >= 0)
@@ -738,12 +731,6 @@ lazy_scan_heap(LVRelState *vacrel, VacuumParams *params, bool aggressive)
 	Buffer		vmbuffer = InvalidBuffer;
 	bool		skipping_blocks;
 	StringInfoData buf;
-	const int	initprog_index[] = {
-		PROGRESS_VACUUM_PHASE,
-		PROGRESS_VACUUM_TOTAL_HEAP_BLKS,
-		PROGRESS_VACUUM_MAX_DEAD_TUPLES
-	};
-	int64		initprog_val[3];
 	GlobalVisState *vistest;
 
 	pg_rusage_init(&ru0);
@@ -799,11 +786,6 @@ lazy_scan_heap(LVRelState *vacrel, VacuumParams *params, bool aggressive)
 	lazy_space_alloc(vacrel, nblocks);
 	dead_tuples = vacrel->dead_tuples;
 
-	/* Report that we're scanning the heap, advertising total # of blocks */
-	initprog_val[0] = PROGRESS_VACUUM_PHASE_SCAN_HEAP;
-	initprog_val[1] = nblocks;
-	initprog_val[2] = dead_tuples->max_tuples;
-	pgstat_progress_update_multi_param(3, initprog_index, initprog_val);
 
 	/*
 	 * Except when aggressive is set, we want to skip pages that are
@@ -892,7 +874,6 @@ lazy_scan_heap(LVRelState *vacrel, VacuumParams *params, bool aggressive)
 #define FORCE_CHECK_PAGE() \
 		(blkno == nblocks - 1 && should_attempt_truncation(vacrel))
 
-		pgstat_progress_update_param(PROGRESS_VACUUM_HEAP_BLKS_SCANNED, blkno);
 
 		update_vacuum_error_info(vacrel, NULL, VACUUM_ERRCB_PHASE_SCAN_HEAP,
 								 blkno, InvalidOffsetNumber);
@@ -1021,8 +1002,6 @@ lazy_scan_heap(LVRelState *vacrel, VacuumParams *params, bool aggressive)
 			next_fsm_block_to_vacuum = blkno;
 
 			/* Report that we are once again scanning the heap */
-			pgstat_progress_update_param(PROGRESS_VACUUM_PHASE,
-										 PROGRESS_VACUUM_PHASE_SCAN_HEAP);
 		}
 
 		/*
@@ -1394,7 +1373,6 @@ lazy_scan_heap(LVRelState *vacrel, VacuumParams *params, bool aggressive)
 	}
 
 	/* report that everything is now scanned */
-	pgstat_progress_update_param(PROGRESS_VACUUM_HEAP_BLKS_SCANNED, blkno);
 
 	/* Clear the block number information */
 	vacrel->blkno = InvalidBlockNumber;
@@ -1432,7 +1410,6 @@ lazy_scan_heap(LVRelState *vacrel, VacuumParams *params, bool aggressive)
 		FreeSpaceMapVacuumRange(vacrel->rel, next_fsm_block_to_vacuum, blkno);
 
 	/* report all blocks vacuumed */
-	pgstat_progress_update_param(PROGRESS_VACUUM_HEAP_BLKS_VACUUMED, blkno);
 
 	/* Do post-vacuum cleanup */
 	if (vacrel->nindexes > 0 && vacrel->do_index_cleanup)
@@ -1878,8 +1855,6 @@ retry:
 		}
 
 		Assert(dead_tuples->num_tuples <= dead_tuples->max_tuples);
-		pgstat_progress_update_param(PROGRESS_VACUUM_NUM_DEAD_TUPLES,
-									 dead_tuples->num_tuples);
 	}
 
 	/* Finally, add page-local counts to whole-VACUUM counts */
@@ -2052,8 +2027,6 @@ lazy_vacuum_all_indexes(LVRelState *vacrel)
 	}
 
 	/* Report that we are now vacuuming indexes */
-	pgstat_progress_update_param(PROGRESS_VACUUM_PHASE,
-								 PROGRESS_VACUUM_PHASE_VACUUM_INDEX);
 
 	for (int idx = 0; idx < vacrel->nindexes; idx++)
 	{
@@ -2090,8 +2063,6 @@ lazy_vacuum_all_indexes(LVRelState *vacrel)
 	 * deletes that we weren't able to finish due to the failsafe triggering.
 	 */
 	vacrel->num_index_scans++;
-	pgstat_progress_update_param(PROGRESS_VACUUM_NUM_INDEX_VACUUMS,
-								 vacrel->num_index_scans);
 
 	return allindexes;
 }
@@ -2128,8 +2099,6 @@ lazy_vacuum_heap_rel(LVRelState *vacrel)
 	Assert(vacrel->num_index_scans > 0);
 
 	/* Report that we are now vacuuming the heap */
-	pgstat_progress_update_param(PROGRESS_VACUUM_PHASE,
-								 PROGRESS_VACUUM_PHASE_VACUUM_HEAP);
 
 	/* Update error traceback information */
 	update_vacuum_error_info(vacrel, &saved_err_info,
@@ -2225,7 +2194,6 @@ lazy_vacuum_heap_page(LVRelState *vacrel, BlockNumber blkno, Buffer buffer,
 
 	Assert(vacrel->nindexes == 0 || vacrel->do_index_vacuuming);
 
-	pgstat_progress_update_param(PROGRESS_VACUUM_HEAP_BLKS_VACUUMED, blkno);
 
 	/* Update error traceback information */
 	update_vacuum_error_info(vacrel, &saved_err_info,
@@ -2455,8 +2423,6 @@ lazy_cleanup_all_indexes(LVRelState *vacrel)
 	Assert(vacrel->nindexes > 0);
 
 	/* Report that we are now cleaning up indexes */
-	pgstat_progress_update_param(PROGRESS_VACUUM_PHASE,
-								 PROGRESS_VACUUM_PHASE_INDEX_CLEANUP);
 
 	for (int idx = 0; idx < vacrel->nindexes; idx++)
 	{
@@ -2492,9 +2458,7 @@ lazy_vacuum_one_index(Relation indrel, IndexBulkDeleteResult *istat,
 
 	ivinfo.index = indrel;
 	ivinfo.analyze_only = false;
-	ivinfo.report_progress = false;
 	ivinfo.estimated_count = true;
-	ivinfo.message_level = elevel;
 	ivinfo.num_heap_tuples = reltuples;
 	ivinfo.strategy = vacrel->bstrategy;
 
@@ -2548,9 +2512,7 @@ lazy_cleanup_one_index(Relation indrel, IndexBulkDeleteResult *istat,
 
 	ivinfo.index = indrel;
 	ivinfo.analyze_only = false;
-	ivinfo.report_progress = false;
 	ivinfo.estimated_count = estimated_count;
-	ivinfo.message_level = elevel;
 
 	ivinfo.num_heap_tuples = reltuples;
 	ivinfo.strategy = vacrel->bstrategy;
@@ -2645,8 +2607,6 @@ lazy_truncate_heap(LVRelState *vacrel)
 	int			lock_retry;
 
 	/* Report that we are now truncating */
-	pgstat_progress_update_param(PROGRESS_VACUUM_PHASE,
-								 PROGRESS_VACUUM_PHASE_TRUNCATE);
 
 	/*
 	 * Loop until no more truncating can be done.

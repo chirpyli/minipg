@@ -23,11 +23,9 @@
 #include "access/relscan.h"
 #include "access/tableam.h"
 #include "catalog/index.h"
-#include "commands/progress.h"
 #include "commands/vacuum.h"
 #include "miscadmin.h"
 #include "optimizer/plancat.h"
-#include "utils/backend_progress.h"
 #include "utils/builtins.h"
 #include "utils/index_selfuncs.h"
 #include "utils/rel.h"
@@ -157,11 +155,9 @@ hashbuild(Relation heap, Relation index, IndexInfo *indexInfo)
 	buildstate.heapRel = heap;
 
 	/* do the heap scan */
-	reltuples = table_index_build_scan(heap, index, indexInfo, true, true,
+	reltuples = table_index_build_scan(heap, index, indexInfo, true,
 									   hashbuildCallback,
 									   (void *) &buildstate, NULL);
-	pgstat_progress_update_param(PROGRESS_CREATEIDX_TUPLES_TOTAL,
-								 buildstate.indtuples);
 
 	if (buildstate.spool)
 	{

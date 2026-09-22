@@ -34,7 +34,6 @@
 #include "catalog/pg_type.h"
 #include "commands/dbcommands.h"
 #include "commands/defrem.h"
-#include "commands/progress.h"
 #include "commands/tablecmds.h"
 #include "commands/tablespace.h"
 #include "mb/pg_wchar.h"
@@ -45,7 +44,6 @@
 #include "parser/parse_coerce.h"
 #include "parser/parse_func.h"
 #include "parser/parse_oper.h"
-#include "utils/backend_progress.h"
 #include "postgres_ext.h"
 #include "rewrite/rewriteManip.h"
 #include "storage/lmgr.h"
@@ -341,7 +339,7 @@ CompareOpclassOptions(Datum *opts1, Datum *opts2, int natts)
  * doesn't show up in the output, we know we can forget about it.
  */
 void
-WaitForOlderSnapshots(TransactionId limitXmin, bool progress)
+WaitForOlderSnapshots(TransactionId limitXmin)
 {
 	int			n_old_snapshots;
 	int			i;
@@ -351,9 +349,6 @@ WaitForOlderSnapshots(TransactionId limitXmin, bool progress)
 										  PROC_IN_VACUUM
 										  | PROC_IN_SAFE_IC,
 										  &n_old_snapshots);
-	if (progress)
-		pgstat_progress_update_param(PROGRESS_WAITFOR_TOTAL, n_old_snapshots);
-
 	for (i = 0; i < n_old_snapshots; i++)
 	{
 		if (!VirtualTransactionIdIsValid(old_snapshots[i]))
@@ -390,20 +385,9 @@ WaitForOlderSnapshots(TransactionId limitXmin, bool progress)
 
 		if (VirtualTransactionIdIsValid(old_snapshots[i]))
 		{
-			/* If requested, publish who we're going to wait for. */
-			if (progress)
-			{
-				PGPROC	   *holder = BackendIdGetProc(old_snapshots[i].backendId);
-
-				if (holder)
-					pgstat_progress_update_param(PROGRESS_WAITFOR_CURRENT_PID,
-												 holder->pid);
-			}
 			VirtualXactLock(old_snapshots[i], true);
 		}
 
-		if (progress)
-			pgstat_progress_update_param(PROGRESS_WAITFOR_DONE, i + 1);
 	}
 }
 
@@ -498,18 +482,10 @@ DefineIndex(Oid relationId,
 	/*
 	 * Start progress report.
 	 */
-	pgstat_progress_start_command(PROGRESS_COMMAND_CREATE_INDEX,
-								  relationId);
-	pgstat_progress_update_param(PROGRESS_CREATEIDX_COMMAND,
-								 concurrent ?
-								 PROGRESS_CREATEIDX_COMMAND_CREATE_CONCURRENTLY :
-								 PROGRESS_CREATEIDX_COMMAND_CREATE);
 
 	/*
 	 * No index OID to report yet
 	 */
-	pgstat_progress_update_param(PROGRESS_CREATEIDX_INDEX_OID,
-								 InvalidOid);
 
 	/*
 	 * count key attributes in index
@@ -660,8 +636,6 @@ DefineIndex(Oid relationId,
 	accessMethodId = accessMethodForm->oid;
 	amRoutine = GetIndexAmRoutine(accessMethodForm->amhandler);
 
-	pgstat_progress_update_param(PROGRESS_CREATEIDX_ACCESS_METHOD_OID,
-								 accessMethodId);
 
 	if (stmt->unique && !amRoutine->amcanunique)
 		ereport(ERROR,
@@ -832,7 +806,6 @@ DefineIndex(Oid relationId,
 
 		table_close(rel, NoLock);
 
-		pgstat_progress_end_command();
 
 		return address;
 	}
@@ -853,7 +826,6 @@ DefineIndex(Oid relationId,
 		/* Close the heap and we're done, in the non-concurrent case */
 		table_close(rel, NoLock);
 
-		pgstat_progress_end_command();
 
 		return address;
 	}
@@ -899,16 +871,7 @@ DefineIndex(Oid relationId,
 	 * include the report for the beginning of phase 2.
 	 */
 	{
-		const int	progress_cols[] = {
-			PROGRESS_CREATEIDX_INDEX_OID,
-			PROGRESS_CREATEIDX_PHASE
-		};
-		const int64 progress_vals[] = {
-			indexRelationId,
-			PROGRESS_CREATEIDX_PHASE_WAIT_1
-		};
 
-		pgstat_progress_update_multi_param(2, progress_cols, progress_vals);
 	}
 
 	/*
@@ -927,7 +890,7 @@ DefineIndex(Oid relationId,
 	 * exclusive lock on our table.  The lock code will detect deadlock and
 	 * error out properly.
 	 */
-	WaitForLockers(heaplocktag, ShareLock, true);
+	WaitForLockers(heaplocktag, ShareLock);
 
 	/*
 	 * At this moment we are sure that there are no transactions with the
@@ -972,9 +935,7 @@ DefineIndex(Oid relationId,
 	 * We once again wait until no transaction can have the table open with
 	 * the index marked as read-only for updates.
 	 */
-	pgstat_progress_update_param(PROGRESS_CREATEIDX_PHASE,
-								 PROGRESS_CREATEIDX_PHASE_WAIT_2);
-	WaitForLockers(heaplocktag, ShareLock, true);
+	WaitForLockers(heaplocktag, ShareLock);
 
 	/*
 	 * Now take the "reference snapshot" that will be used by validate_index()
@@ -1035,9 +996,7 @@ DefineIndex(Oid relationId,
 	 * before the reference snap was taken, we have to wait out any
 	 * transactions that might have older snapshots.
 	 */
-	pgstat_progress_update_param(PROGRESS_CREATEIDX_PHASE,
-								 PROGRESS_CREATEIDX_PHASE_WAIT_3);
-	WaitForOlderSnapshots(limitXmin, true);
+	WaitForOlderSnapshots(limitXmin);
 
 	/*
 	 * Index can now be marked valid -- update its pg_index entry
@@ -1059,7 +1018,6 @@ DefineIndex(Oid relationId,
 	 */
 	UnlockRelationIdForSession(&heaprelid, ShareUpdateExclusiveLock);
 
-	pgstat_progress_end_command();
 
 	return address;
 }

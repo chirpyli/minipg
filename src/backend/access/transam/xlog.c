@@ -41,7 +41,6 @@
 #include "catalog/catversion.h"
 #include "catalog/pg_control.h"
 #include "catalog/pg_database.h"
-#include "commands/progress.h"
 #include "commands/tablespace.h"
 #include "common/controldata_utils.h"
 #include "common/file_utils.h"

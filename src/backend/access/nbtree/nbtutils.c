@@ -25,7 +25,7 @@
 #include "access/relscan.h"
 #include "storage/lwlock.h"
 #include "catalog/catalog.h"
-#include "commands/progress.h"
+
 #include "lib/qunique.h"
 #include "miscadmin.h"
 #include "utils/array.h"

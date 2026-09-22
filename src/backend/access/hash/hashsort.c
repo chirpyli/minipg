@@ -26,9 +26,7 @@
 #include "postgres.h"
 
 #include "access/hash.h"
-#include "commands/progress.h"
 #include "miscadmin.h"
-#include "utils/backend_progress.h"
 #include "port/pg_bitutils.h"
 #include "utils/tuplesort.h"
 
@@ -148,7 +146,5 @@ _h_indexbuild(HSpool *hspool, Relation heapRel)
 		/* allow insertion phase to be interrupted, and track progress */
 		CHECK_FOR_INTERRUPTS();
 
-		pgstat_progress_update_param(PROGRESS_CREATEIDX_TUPLES_DONE,
-									 ++tups_done);
 	}
 }

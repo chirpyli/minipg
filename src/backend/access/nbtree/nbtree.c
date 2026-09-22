@@ -22,11 +22,9 @@
 #include "access/nbtxlog.h"
 #include "access/relscan.h"
 #include "access/xlog.h"
-#include "commands/progress.h"
 #include "commands/vacuum.h"
 #include "miscadmin.h"
 #include "nodes/execnodes.h"
-#include "utils/backend_progress.h"
 
 #include "storage/condition_variable.h"
 #include "storage/indexfsm.h"
@@ -734,10 +732,6 @@ btvacuumscan(IndexVacuumInfo *info, IndexBulkDeleteResult *stats,
 		if (needLock)
 			UnlockRelationForExtension(rel, ExclusiveLock);
 
-		if (info->report_progress)
-			pgstat_progress_update_param(PROGRESS_SCAN_BLOCKS_TOTAL,
-										 num_pages);
-
 		/* Quit if we've scanned the whole relation */
 		if (scanblkno >= num_pages)
 			break;
@@ -745,9 +739,6 @@ btvacuumscan(IndexVacuumInfo *info, IndexBulkDeleteResult *stats,
 		for (; scanblkno < num_pages; scanblkno++)
 		{
 			btvacuumpage(&vstate, scanblkno);
-			if (info->report_progress)
-				pgstat_progress_update_param(PROGRESS_SCAN_BLOCKS_DONE,
-											 scanblkno);
 		}
 	}
 

@@ -82,8 +82,8 @@ extern void XactLockTableWait(TransactionId xid, Relation rel,
 extern bool ConditionalXactLockTableWait(TransactionId xid);
 
 /* Lock VXIDs, specified by conflicting locktags */
-extern void WaitForLockers(LOCKTAG heaplocktag, LOCKMODE lockmode, bool progress);
-extern void WaitForLockersMultiple(List *locktags, LOCKMODE lockmode, bool progress);
+extern void WaitForLockers(LOCKTAG heaplocktag, LOCKMODE lockmode);
+extern void WaitForLockersMultiple(List *locktags, LOCKMODE lockmode);
 
 /* Lock a general object (other than a relation) of the current database */
 extern void LockDatabaseObject(Oid classid, Oid objid, uint16 objsubid,
