@@ -62,12 +62,6 @@ typedef struct HeapScanDescData
 
 	HeapTupleData rs_ctup;		/* current tuple in scan, if any */
 
-	/*
-	 * For parallel scans to store page allocation data.  NULL when not
-	 * performing a parallel scan.
-	 */
-	ParallelBlockTableScanWorkerData *rs_parallelworkerdata;
-
 	/* these fields only used in page-at-a-time mode and for bitmap scans */
 	int			rs_cindex;		/* current tuple's index in vistuples */
 	int			rs_ntuples;		/* number of visible tuples on page */
@@ -113,7 +107,6 @@ typedef enum
 
 extern TableScanDesc heap_beginscan(Relation relation, Snapshot snapshot,
 									int nkeys, ScanKey key,
-									ParallelTableScanDesc parallel_scan,
 									uint32 flags);
 extern void heap_setscanlimits(TableScanDesc scan, BlockNumber startBlk,
 							   BlockNumber numBlks);

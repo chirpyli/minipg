@@ -165,11 +165,8 @@ typedef enum
 {
 	PGASYNC_IDLE,				/* nothing's happening, dude */
 	PGASYNC_BUSY,				/* query in progress */
-	PGASYNC_READY,				/* query done, waiting for client to fetch
+	PGASYNC_READY				/* query done, waiting for client to fetch
 								 * result */
-	PGASYNC_READY_MORE,			/* query done, waiting for client to fetch
-								 * result, more results expected from this
-								 * query */
 } PGAsyncStatusType;
 
 /* Target server type (decoded value of target_session_attrs) */
@@ -227,20 +224,10 @@ typedef enum pg_conn_host_type
 } pg_conn_host_type;
 
 /*
- * PGQueryClass tracks which query protocol is in use for each command queue
- * entry.  minipg only supports the simple Query protocol.
- */
-typedef enum
-{
-	PGQUERY_SIMPLE				/* simple Query protocol (PQexec) */
-} PGQueryClass;
-
-/*
  * An entry in the pending command queue.
  */
 typedef struct PGcmdQueueEntry
 {
-	PGQueryClass queryclass;	/* Query type */
 	char	   *query;			/* SQL command, or NULL if none/unknown/OOM */
 	struct PGcmdQueueEntry *next;	/* list link */
 } PGcmdQueueEntry;
@@ -319,7 +306,6 @@ struct pg_conn
 	bool		options_valid;	/* true if OK to attempt connection */
 	bool		nonblocking;	/* whether this connection is using nonblock
 								 * sending semantics */
-	bool		singleRowMode;	/* return current query result row-by-row? */
 
 	/* Support for multiple hosts in connection string */
 	int			nconnhost;		/* # of hosts named in conn string */
@@ -406,8 +392,6 @@ struct pg_conn
 
 	/* Status for asynchronous result construction */
 	PGresult   *result;			/* result being constructed */
-	PGresult   *next_result;	/* next result (used in single-row mode) */
-
 
 	/*
 	 * Buffer for current error message.  This is cleared at the start of any

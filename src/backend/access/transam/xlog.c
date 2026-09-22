@@ -62,7 +62,6 @@
 #include "storage/predicate.h"
 #include "storage/proc.h"
 #include "storage/procarray.h"
-#include "storage/reinit.h"
 #include "storage/sinvaladt.h"
 #include "storage/smgr.h"
 #include "storage/spin.h"
@@ -6996,14 +6995,6 @@ StartupXLOG(void)
 		CheckRequiredParameterValues();
 
 		/*
-		 * We're in recovery, so unlogged relations may be trashed and must be
-		 * reset.  This should be done BEFORE allowing Hot Standby
-		 * connections, so that read-only backends don't try to read whatever
-		 * garbage is left over from before.
-		 */
-		ResetUnloggedRelations(UNLOGGED_RELATION_CLEANUP);
-
-		/*
 		 * Likewise, delete any saved transaction snapshot files that got left
 		 * behind by crashed backends.
 		 */
@@ -7431,23 +7422,6 @@ StartupXLOG(void)
 			ereport(FATAL,
 					(errmsg("recovery ended before configured recovery target was reached")));
 	}
-
-	/*
-	 * Kill WAL receiver, if it's still running, before we continue to write
-	 * the startup checkpoint and aborted-contrecord records. It will trump
-	 * over these records and subsequent ones if it's still alive when we
-	 * start writing WAL.
-	 */
-
-	/*
-	 * Reset unlogged relations to the contents of their INIT fork. This is
-	 * done AFTER recovery is complete so as to include any unlogged relations
-	 * created during recovery, but BEFORE recovery is marked as having
-	 * completed successfully. Otherwise we'd not retry if any of the post
-	 * end-of-recovery steps fail.
-	 */
-	if (InRecovery)
-		ResetUnloggedRelations(UNLOGGED_RELATION_INIT);
 
 	/*
 	 * We don't need the latch anymore. It's not strictly necessary to disown
@@ -10299,12 +10273,8 @@ get_sync_bit(int method)
 	 * posix_fadvise(POSIX_FADV_DONTNEED) call in XLogFileClose() for the same
 	 * reason.
 	 *
-	 * Never use O_DIRECT in walreceiver process for similar reasons; the WAL
-	 * written by walreceiver is normally read by the startup process soon
-	 * after it's written. Also, walreceiver performs unaligned writes, which
-	 * don't work with O_DIRECT, so it is required for correctness too.
 	 */
-	if (!XLogIsNeeded() && !AmWalReceiverProcess())
+	if (!XLogIsNeeded())
 		o_direct_flag = PG_O_DIRECT;
 
 	switch (method)

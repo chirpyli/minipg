@@ -1460,97 +1460,18 @@ cost_sort(Path *path, PlannerInfo *root,
 /*
  * cost_append
  *	  Determines and returns the cost of an Append node.
+ *
+ * Only dummy (subpath-less) AppendPaths are ever created in this build of
+ * the code, so the cost is simply zero.
  */
 void
 cost_append(AppendPath *apath)
 {
-	ListCell   *l;
+	Assert(apath->subpaths == NIL);
 
 	apath->path.startup_cost = 0;
 	apath->path.total_cost = 0;
 	apath->path.rows = 0;
-
-	if (apath->subpaths == NIL)
-		return;
-
-	{
-		List	   *pathkeys = apath->path.pathkeys;
-
-		if (pathkeys == NIL)
-		{
-			Path	   *subpath = (Path *) linitial(apath->subpaths);
-
-			/*
-			 * For an unordered, non-parallel-aware Append we take the startup
-			 * cost as the startup cost of the first subpath.
-			 */
-			apath->path.startup_cost = subpath->startup_cost;
-
-			/* Compute rows and costs as sums of subplan rows and costs. */
-			foreach(l, apath->subpaths)
-			{
-				Path	   *subpath = (Path *) lfirst(l);
-
-				apath->path.rows += subpath->rows;
-				apath->path.total_cost += subpath->total_cost;
-			}
-		}
-		else
-		{
-			/*
-			 * For an ordered, non-parallel-aware Append we take the startup
-			 * cost as the sum of the subpath startup costs.  This ensures
-			 * that we don't underestimate the startup cost when a query's
-			 * LIMIT is such that several of the children have to be run to
-			 * satisfy it.  This might be overkill --- another plausible hack
-			 * would be to take the Append's startup cost as the maximum of
-			 * the child startup costs.  But we don't want to risk believing
-			 * that an ORDER BY LIMIT query can be satisfied at small cost
-			 * when the first child has small startup cost but later ones
-			 * don't.  (If we had the ability to deal with nonlinear cost
-			 * interpolation for partial retrievals, we would not need to be
-			 * so conservative about this.)
-			 *
-			 * This case is also different from the above in that we have to
-			 * account for possibly injecting sorts into subpaths that aren't
-			 * natively ordered.
-			 */
-			foreach(l, apath->subpaths)
-			{
-				Path	   *subpath = (Path *) lfirst(l);
-				Path		sort_path;	/* dummy for result of cost_sort */
-
-				if (!pathkeys_contained_in(pathkeys, subpath->pathkeys))
-				{
-					/*
-					 * We'll need to insert a Sort node, so include costs for
-					 * that.  We can use the parent's LIMIT if any, since we
-					 * certainly won't pull more than that many tuples from
-					 * any child.
-					 */
-					cost_sort(&sort_path,
-							  NULL, /* doesn't currently need root */
-							  pathkeys,
-							  subpath->total_cost,
-							  subpath->rows,
-							  subpath->pathtarget->width,
-							  0.0,
-							  work_mem);
-					subpath = &sort_path;
-				}
-
-				apath->path.rows += subpath->rows;
-				apath->path.startup_cost += subpath->startup_cost;
-				apath->path.total_cost += subpath->total_cost;
-			}
-		}
-	}
-	/*
-	 * Although Append does not do any selection or projection, it's not free;
-	 * add a small per-tuple overhead.
-	 */
-	apath->path.total_cost +=
-		cpu_tuple_cost * APPEND_CPU_COST_MULTIPLIER * apath->path.rows;
 }
 
 /*

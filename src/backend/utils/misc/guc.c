@@ -560,8 +560,6 @@ const char *const config_group_names[] =
 	gettext_noop("Client Connection Defaults / Statement Behavior"),
 	/* CLIENT_CONN_LOCALE */
 	gettext_noop("Client Connection Defaults / Locale and Formatting"),
-	/* CLIENT_CONN_PRELOAD */
-	gettext_noop("Client Connection Defaults / Shared Library Preloading"),
 	/* CLIENT_CONN_OTHER */
 	gettext_noop("Client Connection Defaults / Other Defaults"),
 	/* LOCK_MANAGEMENT */
@@ -2710,21 +2708,6 @@ static struct config_string ConfigureNamesString[] =
 		check_default_table_access_method, NULL, NULL
 	},
 
-	{
-		{"dynamic_library_path", PGC_SUSET, CLIENT_CONN_OTHER,
-			gettext_noop("Sets the path for dynamically loadable modules."),
-			gettext_noop("If a dynamically loadable module needs to be opened and "
-						 "the specified name does not have a directory component (i.e., the "
-						 "name does not contain a slash), the system will search this path for "
-						 "the specified file."),
-			GUC_SUPERUSER_ONLY
-		},
-		&Dynamic_library_path,
-		"$libdir",
-		NULL, NULL, NULL
-	},
-
-
 	/* See main.c about why defaults for LC_foo are not all alike */
 
 	{
@@ -2746,39 +2729,6 @@ static struct config_string ConfigureNamesString[] =
 		},
 		&locale_ctype,
 		"C",
-		NULL, NULL, NULL
-	},
-
-	{
-		{"session_preload_libraries", PGC_SUSET, CLIENT_CONN_PRELOAD,
-			gettext_noop("Lists shared libraries to preload into each backend."),
-			NULL,
-			GUC_LIST_INPUT | GUC_LIST_QUOTE | GUC_SUPERUSER_ONLY
-		},
-		&session_preload_libraries_string,
-		"",
-		NULL, NULL, NULL
-	},
-
-	{
-		{"shared_preload_libraries", PGC_POSTMASTER, CLIENT_CONN_PRELOAD,
-			gettext_noop("Lists shared libraries to preload into server."),
-			NULL,
-			GUC_LIST_INPUT | GUC_LIST_QUOTE | GUC_SUPERUSER_ONLY
-		},
-		&shared_preload_libraries_string,
-		"",
-		NULL, NULL, NULL
-	},
-
-	{
-		{"local_preload_libraries", PGC_USERSET, CLIENT_CONN_PRELOAD,
-			gettext_noop("Lists unprivileged shared libraries to preload into each backend."),
-			NULL,
-			GUC_LIST_INPUT | GUC_LIST_QUOTE
-		},
-		&local_preload_libraries_string,
-		"",
 		NULL, NULL, NULL
 	},
 

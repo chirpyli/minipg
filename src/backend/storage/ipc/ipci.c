@@ -44,30 +44,6 @@ int			shared_memory_type = DEFAULT_SHARED_MEMORY_TYPE;
 
 shmem_startup_hook_type shmem_startup_hook = NULL;
 
-static Size total_addin_request = 0;
-static bool addin_request_allowed = true;
-
-
-/*
- * RequestAddinShmemSpace
- *		Request that extra shmem space be allocated for use by
- *		a loadable module.
- *
- * This is only useful if called from the _PG_init hook of a library that
- * is loaded into the postmaster via shared_preload_libraries.  Once
- * shared memory has been allocated, calls will be ignored.  (We could
- * raise an error, but it seems better to make it a no-op, so that
- * libraries containing such calls can be reloaded if needed.)
- */
-void
-RequestAddinShmemSpace(Size size)
-{
-	if (IsUnderPostmaster || !addin_request_allowed)
-		return;					/* too late */
-	total_addin_request = add_size(total_addin_request, size);
-}
-
-
 /*
  * CreateSharedMemoryAndSemaphores
  *		Creates and initializes shared memory and semaphores.
@@ -124,10 +100,6 @@ CreateSharedMemoryAndSemaphores(void)
 		size = add_size(size, SnapMgrShmemSize());
 		size = add_size(size, BTreeShmemSize());
 		size = add_size(size, SyncScanShmemSize());
-
-		/* freeze the addin request size and include it */
-		addin_request_allowed = false;
-		size = add_size(size, total_addin_request);
 
 		/* might as well round it off to a multiple of a typical page size */
 		size = add_size(size, 8192 - (size % 8192));

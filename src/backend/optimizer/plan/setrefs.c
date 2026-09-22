@@ -95,11 +95,7 @@ static Plan *set_subqueryscan_references(PlannerInfo *root,
 										 int rtoffset);
 static bool trivial_subqueryscan(SubqueryScan *plan);
 static Plan *clean_up_removed_plan_level(Plan *parent, Plan *child);
-static Plan *set_append_references(PlannerInfo *root,
-								   Append *aplan,
-								   int rtoffset);
 static void set_hash_references(PlannerInfo *root, Plan *plan, int rtoffset);
-static Relids offset_relid_set(Relids relids, int rtoffset);
 static Node *fix_scan_expr(PlannerInfo *root, Node *node, int rtoffset);
 static Node *fix_scan_expr_mutator(Node *node, fix_scan_expr_context *context);
 static bool fix_scan_expr_walker(Node *node, fix_scan_expr_context *context);
@@ -740,11 +736,6 @@ set_plan_refs(PlannerInfo *root, Plan *plan, int rtoffset)
 				}
 			}
 			break;
-		case T_Append:
-			/* Needs special treatment, see comments below */
-			return set_append_references(root,
-										 (Append *) plan,
-										 rtoffset);
 		case T_BitmapAnd:
 			{
 				BitmapAnd  *splan = (BitmapAnd *) plan;
@@ -1005,61 +996,6 @@ clean_up_removed_plan_level(Plan *parent, Plan *child)
 }
 
 /*
- * set_append_references
- *		Do set_plan_references processing on an Append
- *
- * We try to strip out the Append entirely; if we can't, we have
- * to do the normal processing on it.
- */
-static Plan *
-set_append_references(PlannerInfo *root,
-					  Append *aplan,
-					  int rtoffset)
-{
-	ListCell   *l;
-
-	/*
-	 * Append, like Sort et al, doesn't actually evaluate its targetlist or
-	 * check quals.  If it's got exactly one child plan, then it's not doing
-	 * anything useful at all, and we can strip it out.
-	 */
-	Assert(aplan->plan.qual == NIL);
-
-	/* First, we gotta recurse on the children */
-	foreach(l, aplan->appendplans)
-	{
-		lfirst(l) = set_plan_refs(root, (Plan *) lfirst(l), rtoffset);
-	}
-
-	/*
-	 * See if it's safe to get rid of the Append entirely.  For this to be
-	 * safe, there must be only one child plan and that child plan's parallel
-	 * awareness must match that of the Append's.  The reason for the latter
-	 * is that the if the Append is parallel aware and the child is not then
-	 * the calling plan may execute the non-parallel aware child multiple
-	 * times.
-	 */
-	if (list_length(aplan->appendplans) == 1)
-		return clean_up_removed_plan_level((Plan *) aplan,
-										   (Plan *) linitial(aplan->appendplans));
-
-	/*
-	 * Otherwise, clean up the Append as needed.  It's okay to do this after
-	 * recursing to the children, because set_dummy_tlist_references doesn't
-	 * look at those.
-	 */
-	set_dummy_tlist_references((Plan *) aplan, rtoffset);
-
-	aplan->apprelids = offset_relid_set(aplan->apprelids, rtoffset);
-
-	/* We don't need to recurse to lefttree or righttree ... */
-	Assert(aplan->plan.lefttree == NULL);
-	Assert(aplan->plan.righttree == NULL);
-
-	return (Plan *) aplan;
-}
-
-/*
  * set_hash_references
  *	   Do set_plan_references processing on a Hash node
  */
@@ -1090,24 +1026,7 @@ set_hash_references(PlannerInfo *root, Plan *plan, int rtoffset)
 	Assert(plan->qual == NIL);
 }
 
-/*
- * offset_relid_set
- *		Apply rtoffset to the members of a Relids set.
- */
-static Relids
-offset_relid_set(Relids relids, int rtoffset)
-{
-	Relids		result = NULL;
-	int			rtindex;
 
-	/* If there's no offset to apply, we needn't recompute the value */
-	if (rtoffset == 0)
-		return relids;
-	rtindex = -1;
-	while ((rtindex = bms_next_member(relids, rtindex)) >= 0)
-		result = bms_add_member(result, rtindex + rtoffset);
-	return result;
-}
 
 /*
  * copyVar

@@ -45,7 +45,7 @@ typedef enum NodeTag
 	T_Result,
 	T_ProjectSet,
 	T_ModifyTable,
-	T_Append,
+	T_Append,					/* dummy AppendPath only; no Append plan node exists */
 	T_BitmapAnd,
 	T_BitmapOr,
 	T_Scan,
@@ -84,7 +84,6 @@ typedef enum NodeTag
 	T_ResultState,
 	T_ProjectSetState,
 	T_ModifyTableState,
-	T_AppendState,
 	T_BitmapAndState,
 	T_BitmapOrState,
 	T_ScanState,
@@ -214,8 +213,6 @@ typedef enum NodeTag
 	 */
 	T_MemoryContext,
 	T_AllocSetContext,
-	T_SlabContext,
-	T_GenerationContext,
 
 	/*
 	 * TAGS FOR VALUE NODES (value.h)

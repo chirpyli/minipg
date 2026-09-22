@@ -1041,31 +1041,6 @@ typedef struct ModifyTableState
 } ModifyTableState;
 
 /* ----------------
- *	 AppendState information
- *
- *		nplans				how many plans are in the array
- *		whichplan			which synchronous plan is being executed (0 .. n-1)
- *							or a special negative value. See nodeAppend.c.
- *		valid_subplans		valid synchronous appendplans indexes to scan.
- * ----------------
- */
-
-struct AppendState;
-typedef struct AppendState AppendState;
-
-struct AppendState
-{
-	PlanState	ps;				/* its first field is NodeTag */
-	PlanState **appendplans;	/* array of PlanStates for my inputs */
-	int			as_nplans;
-	int			as_whichplan;
-	bool		as_begun;		/* false means need to initialize */
-	bool		as_syncdone;	/* true if all synchronous plans done */
-	Bitmapset  *as_valid_subplans;
-	bool		(*choose_next_subplan) (AppendState *);
-};
-
-/* ----------------
  *	 BitmapAndState information
  * ----------------
  */

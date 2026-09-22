@@ -31,7 +31,6 @@
 #include "catalog/heap.h"
 #include "catalog/index.h"
 #include "catalog/namespace.h"
-#include "catalog/objectaccess.h"
 #include "catalog/pg_am.h"
 #include "catalog/toasting.h"
 #include "commands/cluster.h"
@@ -690,15 +689,6 @@ swap_relation_files(Oid r1, Oid r2, bool target_is_pg_class,
 		CacheInvalidateRelcacheByTuple(reltup1);
 		CacheInvalidateRelcacheByTuple(reltup2);
 	}
-
-	/*
-	 * Post alter hook for modified relations. The change to r2 is always
-	 * internal, but r1 depends on the invocation context.
-	 */
-	InvokeObjectPostAlterHookArg(RelationRelationId, r1, 0,
-								 InvalidOid, is_internal);
-	InvokeObjectPostAlterHookArg(RelationRelationId, r2, 0,
-								 InvalidOid, true);
 
 	/*
 	 * If we have toast tables associated with the relations being swapped,

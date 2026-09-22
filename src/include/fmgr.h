@@ -441,9 +441,6 @@ extern int no_such_variable
  *
  * Note: we compare magic blocks with memcmp(), so there had better not be
  * any alignment pad bytes in them.
- *
- * Note: when changing the contents of magic blocks, be sure to adjust the
- * incompatible_module_error() function in dfmgr.c.
  *-------------------------------------------------------------------------
  */
 
@@ -706,13 +703,6 @@ extern bool get_fn_expr_variadic(FmgrInfo *flinfo);
 extern bytea *get_fn_opclass_options(FmgrInfo *flinfo);
 extern bool has_fn_opclass_options(FmgrInfo *flinfo);
 extern void set_fn_opclass_options(FmgrInfo *flinfo, bytea *options);
-
-/*
- * Routines in dfmgr.c
- */
-extern char *Dynamic_library_path;
-
-extern void load_file(const char *filename, bool restricted);
 
 /*
  * Support for aggregate functions

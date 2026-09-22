@@ -68,8 +68,7 @@
  * The region may be NOACCESS, so make it UNDEFINED first to avoid errors as
  * we fill it.  Filling the region makes it DEFINED, so make it UNDEFINED
  * again afterward.  Whether to finally make it UNDEFINED or NOACCESS is
- * fairly arbitrary.  UNDEFINED is more convenient for SlabRealloc(), and
- * other callers have no preference.
+ * fairly arbitrary; no caller depends on any particular final state.
  */
 void
 randomize_mem(char *ptr, size_t size)

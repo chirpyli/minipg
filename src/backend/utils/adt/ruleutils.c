@@ -2667,16 +2667,7 @@ set_deparse_plan(deparse_namespace *dpns, Plan *plan)
 {
 	dpns->plan = plan;
 
-	/*
-	 * We special-case Append to pretend that the first child
-	 * plan is the OUTER referent; we have to interpret OUTER Vars in their
-	 * tlists according to one of the children, and the first one is the most
-	 * natural choice.
-	 */
-	if (IsA(plan, Append))
-		dpns->outer_plan = linitial(((Append *) plan)->appendplans);
-	else
-		dpns->outer_plan = outerPlan(plan);
+	dpns->outer_plan = outerPlan(plan);
 
 	if (dpns->outer_plan)
 		dpns->outer_tlist = dpns->outer_plan->targetlist;
@@ -3782,50 +3773,6 @@ get_variable(Var *var, int levelsup, bool istoplevel, deparse_context *context)
 	 */
 	if (varno >= 1 && varno <= list_length(dpns->rtable))
 	{
-		/*
-		 * We might have been asked to map child Vars to some parent relation.
-		 */
-		if (context->appendparents && dpns->appendrels)
-		{
-			Index		pvarno = varno;
-			AttrNumber	pvarattno = varattno;
-			AppendRelInfo *appinfo = dpns->appendrels[pvarno];
-			bool		found = false;
-
-			/* Only map up to inheritance parents, not UNION ALL appendrels */
-			while (appinfo &&
-				   rt_fetch(appinfo->parent_relid,
-							dpns->rtable)->rtekind == RTE_RELATION)
-			{
-				found = false;
-				if (pvarattno > 0)	/* system columns stay as-is */
-				{
-					if (pvarattno > appinfo->num_child_cols)
-						break;	/* safety check */
-					pvarattno = appinfo->parent_colnos[pvarattno - 1];
-					if (pvarattno == 0)
-						break;	/* Var is local to child */
-				}
-
-				pvarno = appinfo->parent_relid;
-				found = true;
-
-				/* If the parent is itself a child, continue up. */
-				Assert(pvarno > 0 && pvarno <= list_length(dpns->rtable));
-				appinfo = dpns->appendrels[pvarno];
-			}
-
-			/*
-			 * If we found an ancestral rel, and that rel is included in
-			 * appendparents, print that column not the original one.
-			 */
-			if (found && bms_is_member(pvarno, context->appendparents))
-			{
-				varno = pvarno;
-				varattno = pvarattno;
-			}
-		}
-
 		rte = rt_fetch(varno, dpns->rtable);
 		refname = (char *) list_nth(dpns->rtable_names, varno - 1);
 		colinfo = deparse_columns_fetch(varno, dpns);
@@ -4018,28 +3965,15 @@ resolve_special_varno(Node *node, deparse_context *context,
 	{
 		TargetEntry *tle;
 		deparse_namespace save_dpns;
-		Bitmapset  *save_appendparents;
 
 		tle = get_tle_by_resno(dpns->outer_tlist, var->varattno);
 		if (!tle)
 			elog(ERROR, "bogus varattno for OUTER_VAR var: %d", var->varattno);
 
-		/*
-		 * If we're descending to the first child of an Append,
-		 * update appendparents.  This will affect deparsing of all Vars
-		 * appearing within the eventually-resolved subexpression.
-		 */
-		save_appendparents = context->appendparents;
-
-		if (IsA(dpns->plan, Append))
-			context->appendparents = bms_union(context->appendparents,
-											   ((Append *) dpns->plan)->apprelids);
-
 		push_child_plan(dpns, dpns->outer_plan, &save_dpns);
 		resolve_special_varno((Node *) tle->expr, context,
 							  callback, callback_arg);
 		pop_child_plan(dpns, &save_dpns);
-		context->appendparents = save_appendparents;
 		return;
 	}
 	else if (var->varno == INNER_VAR && dpns->inner_tlist)

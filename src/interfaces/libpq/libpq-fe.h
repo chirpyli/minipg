@@ -35,14 +35,6 @@ extern "C"
 /* Indicates presence of PQsetTraceFlags; also new PQtrace output format */
 #define LIBPQ_HAS_TRACE_FLAGS 1
 
-/*
- * Option flags for PQcopyResult
- */
-#define PG_COPYRES_ATTRS		  0x01
-#define PG_COPYRES_TUPLES		  0x02	/* Implies PG_COPYRES_ATTRS */
-#define PG_COPYRES_EVENTS		  0x04
-#define PG_COPYRES_NOTICEHOOKS	  0x08
-
 /* Application-visible enum types */
 
 /*
@@ -99,7 +91,6 @@ typedef enum
 								 * backend */
 	PGRES_NONFATAL_ERROR,		/* notice or warning message */
 	PGRES_FATAL_ERROR,			/* query failed */
-	PGRES_SINGLE_TUPLE			/* single tuple from larger resultset */
 } ExecStatusType;
 
 typedef enum
@@ -354,7 +345,6 @@ extern PGresult *PQexec(PGconn *conn, const char *query);
 
 /* Interface for multiple-result or asynchronous queries */
 extern int	PQsendQuery(PGconn *conn, const char *query);
-extern int	PQsetSingleRowMode(PGconn *conn);
 extern PGresult *PQgetResult(PGconn *conn);
 
 /* Routines for managing an asynchronous query */
@@ -407,7 +397,6 @@ extern void PQfreemem(void *ptr);
 
 /* Create and manipulate PGresults */
 extern PGresult *PQmakeEmptyPGresult(PGconn *conn, ExecStatusType status);
-extern PGresult *PQcopyResult(const PGresult *src, int flags);
 extern int	PQsetResultAttrs(PGresult *res, int numAttributes, PGresAttDesc *attDescs);
 extern void *PQresultAlloc(PGresult *res, size_t nBytes);
 extern size_t PQresultMemorySize(const PGresult *res);

@@ -74,7 +74,6 @@
 
 #include "executor/executor.h"
 #include "executor/nodeAgg.h"
-#include "executor/nodeAppend.h"
 #include "executor/nodeBitmapAnd.h"
 #include "executor/nodeBitmapHeapscan.h"
 #include "executor/nodeBitmapIndexscan.h"
@@ -160,11 +159,6 @@ ExecInitNode(Plan *node, EState *estate, int eflags)
 		case T_ModifyTable:
 			result = (PlanState *) ExecInitModifyTable((ModifyTable *) node,
 													   estate, eflags);
-			break;
-
-		case T_Append:
-			result = (PlanState *) ExecInitAppend((Append *) node,
-												  estate, eflags);
 			break;
 
 		case T_BitmapAnd:
@@ -495,10 +489,6 @@ ExecEndNode(PlanState *node)
 
 		case T_ModifyTableState:
 			ExecEndModifyTable((ModifyTableState *) node);
-			break;
-
-		case T_AppendState:
-			ExecEndAppend((AppendState *) node);
 			break;
 
 		case T_BitmapAndState:

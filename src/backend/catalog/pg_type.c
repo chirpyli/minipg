@@ -20,7 +20,6 @@
 #include "catalog/catalog.h"
 #include "catalog/dependency.h"
 #include "catalog/indexing.h"
-#include "catalog/objectaccess.h"
 #include "catalog/pg_collation.h"
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_proc.h"
@@ -139,9 +138,6 @@ TypeShellMake(const char *typeName, Oid typeNamespace, Oid ownerId)
 								 false,
 								 false,
 								 false);
-
-	/* Post creation hook for new shell type */
-	InvokeObjectPostCreateHook(TypeRelationId, typoid, 0);
 
 	ObjectAddressSet(address, TypeRelationId, typoid);
 
@@ -414,9 +410,6 @@ TypeCreate(Oid newTypeOid,
 								 isDependentType,
 								 rebuildDeps);
 
-	/* Post creation hook for new type */
-	InvokeObjectPostCreateHook(TypeRelationId, typeObjectId, 0);
-
 	ObjectAddressSet(address, TypeRelationId, typeObjectId);
 
 	/*
@@ -641,8 +634,6 @@ RenameTypeInternal(Oid typeOid, const char *newTypeName, Oid typeNamespace)
 	namestrcpy(&(typ->typname), newTypeName);
 
 	CatalogTupleUpdate(pg_type_desc, &tuple->t_self, tuple);
-
-	InvokeObjectPostAlterHook(TypeRelationId, typeOid, 0);
 
 	heap_freetuple(tuple);
 	table_close(pg_type_desc, RowExclusiveLock);

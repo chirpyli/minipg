@@ -19,7 +19,6 @@
 #include "catalog/catalog.h"
 #include "catalog/dependency.h"
 #include "catalog/indexing.h"
-#include "catalog/objectaccess.h"
 #include "catalog/pg_rewrite.h"
 #include "miscadmin.h"
 #include "nodes/nodeFuncs.h"
@@ -149,9 +148,6 @@ InsertRule(Oid eventrel_oid, List *action, bool replace)
 	 */
 	recordDependencyOnExpr(&myself, (Node *) action, NIL,
 						   DEPENDENCY_NORMAL);
-
-	/* Post creation hook for new rule */
-	InvokeObjectPostCreateHook(RewriteRelationId, rewriteObjectId, 0);
 
 	table_close(pg_rewrite_desc, RowExclusiveLock);
 

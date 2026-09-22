@@ -19,7 +19,6 @@
 #include "postgres.h"
 
 #include "access/htup_details.h"
-#include "catalog/objectaccess.h"
 #include "executor/execdebug.h"
 #include "funcapi.h"
 #include "miscadmin.h"
@@ -303,8 +302,6 @@ init_sexpr(Oid foid, Oid input_collation, Expr *node,
 		   MemoryContext sexprCxt, bool allowSRF, bool needDescForSRF)
 {
 	size_t		numargs = list_length(sexpr->args);
-
-	InvokeFunctionExecuteHook(foid);
 
 	/*
 	 * Safety check on nargs.  Under normal circumstances this should never

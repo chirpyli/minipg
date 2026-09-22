@@ -19,7 +19,6 @@
 #include "catalog/catalog.h"
 #include "catalog/dependency.h"
 #include "catalog/indexing.h"
-#include "catalog/objectaccess.h"
 #include "catalog/pg_namespace.h"
 #include "utils/builtins.h"
 #include "utils/rel.h"
@@ -79,9 +78,6 @@ NamespaceCreate(const char *nspName, Oid ownerId)
 	Assert(OidIsValid(nspoid));
 
 	table_close(nspdesc, RowExclusiveLock);
-
-	/* Post creation hook for new schema */
-	InvokeObjectPostCreateHook(NamespaceRelationId, nspoid, 0);
 
 	return nspoid;
 }

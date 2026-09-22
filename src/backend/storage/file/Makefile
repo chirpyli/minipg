@@ -16,6 +16,5 @@ OBJS = \
 	buffile.o \
 	copydir.o \
 	fd.o \
-	reinit.o \
 
 include $(top_srcdir)/src/backend/common.mk

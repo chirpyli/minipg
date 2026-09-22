@@ -22,7 +22,6 @@
 #include "catalog/catalog.h"
 #include "catalog/dependency.h"
 #include "catalog/indexing.h"
-#include "catalog/objectaccess.h"
 #include "catalog/pg_constraint.h"
 #include "catalog/pg_operator.h"
 #include "catalog/pg_type.h"
@@ -162,10 +161,6 @@ CreateConstraintEntry(const char *constraintName,
 	 * assume they are members of the opclass supporting the index, so there's
 	 * an indirect dependency via that.
 	 */
-
-	/* Post creation hook for new constraint */
-	InvokeObjectPostCreateHookArg(ConstraintRelationId, conOid, 0,
-								  is_internal);
 
 	return conOid;
 }
@@ -425,8 +420,6 @@ RenameConstraintById(Oid conId, const char *newname)
 
 	CatalogTupleUpdate(conDesc, &tuple->t_self, tuple);
 
-	InvokeObjectPostAlterHook(ConstraintRelationId, conId, 0);
-
 	heap_freetuple(tuple);
 	table_close(conDesc, RowExclusiveLock);
 }
@@ -481,8 +474,6 @@ AlterConstraintNamespaces(Oid ownerId, Oid oldNspId,
 			 * changeDependencyFor().
 			 */
 		}
-
-		InvokeObjectPostAlterHook(ConstraintRelationId, thisobj.objectId, 0);
 
 		add_exact_object_address(&thisobj, objsMoved);
 	}

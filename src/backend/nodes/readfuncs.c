@@ -1145,23 +1145,6 @@ _readModifyTable(void)
 }
 
 /*
- * _readAppend
- */
-static Append *
-_readAppend(void)
-{
-	READ_LOCALS(Append);
-
-	ReadCommonPlan(&local_node->plan);
-
-	READ_BITMAPSET_FIELD(apprelids);
-	READ_NODE_FIELD(appendplans);
-	READ_INT_FIELD(first_partial_plan);
-
-	READ_DONE();
-}
-
-/*
  * _readBitmapAnd
  */
 static BitmapAnd *
@@ -1799,8 +1782,8 @@ parseNodeString(void)
 		return_value = _readProjectSet();
 	else if (MATCH("MODIFYTABLE", 11))
 		return_value = _readModifyTable();
-	else if (MATCH("APPEND", 6))
-		return_value = _readAppend();
+	else if (MATCH("APPENDRELINFO", 13))
+		return_value = _readAppendRelInfo();
 	else if (MATCH("BITMAPAND", 9))
 		return_value = _readBitmapAnd();
 	else if (MATCH("BITMAPOR", 8))

@@ -368,9 +368,9 @@ transformInsertStmt(ParseState *pstate, InsertStmt *stmt)
 	pstate->p_is_insert = true;
 
 	/*
-	 * We have three cases to deal with: DEFAULT VALUES (selectStmt == NULL),
-	 * VALUES list, or general SELECT input.  We special-case VALUES, both for
-	 * efficiency and so we can handle DEFAULT specifications.
+	 * We have two cases to deal with: a VALUES list, or general SELECT input.
+	 * We special-case VALUES, both for efficiency and so we can handle DEFAULT
+	 * specifications.
 	 *
 	 * The grammar allows attaching ORDER BY or WITH to a VALUES clause.  If
 	 * we have any of those, treat it as a general SELECT; so it will work,
@@ -417,16 +417,7 @@ transformInsertStmt(ParseState *pstate, InsertStmt *stmt)
 	/*
 	 * Determine which variant of INSERT we have.
 	 */
-	if (selectStmt == NULL)
-	{
-		/*
-		 * We have INSERT ... DEFAULT VALUES.  We can handle this case by
-		 * emitting an empty targetlist --- all columns will be defaulted when
-		 * the planner expands the targetlist.
-		 */
-		exprList = NIL;
-	}
-	else if (isGeneralSelect)
+	if (isGeneralSelect)
 	{
 		/*
 		 * We make the sub-pstate a child of the outer pstate so that it can

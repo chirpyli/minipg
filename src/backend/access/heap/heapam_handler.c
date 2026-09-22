@@ -46,8 +46,6 @@ static void reform_and_rewrite_tuple(HeapTuple tuple,
 									 Relation OldHeap, Relation NewHeap,
 									 Datum *values, bool *isnull, RewriteState rwstate);
 
-static BlockNumber heapam_scan_get_blocks_done(HeapScanDesc hscan);
-
 static const TableAmRoutine heapam_methods;
 
 
@@ -800,30 +798,10 @@ heapam_relation_copy_for_cluster(Relation OldHeap, Relation NewHeap,
 
 		*num_tuples += 1;
 		if (tuplesort != NULL)
-		{
 			tuplesort_putheaptuple(tuplesort, tuple);
-
-			/*
-			 * In scan-and-sort mode, report increase in number of tuples
-			 * scanned
-			 */
-		}
 		else
-		{
-			const int	ct_index[] = {
-			};
-			int64		ct_val[2];
-
 			reform_and_rewrite_tuple(tuple, OldHeap, NewHeap,
 									 values, isnull, rwstate);
-
-			/*
-			 * In indexscan mode and also VACUUM FULL, report increase in
-			 * number of tuples scanned and written
-			 */
-			ct_val[0] = *num_tuples;
-			ct_val[1] = *num_tuples;
-		}
 	}
 
 	if (indexScan != NULL)
@@ -1804,45 +1782,6 @@ heapam_index_validate_scan(Relation heapRelation,
 	indexInfo->ii_PredicateState = NULL;
 }
 
-/*
- * Return the number of blocks that have been read by this scan since
- * starting.  This is meant for progress reporting rather than be fully
- * accurate: in a parallel scan, workers can be concurrently reading blocks
- * further ahead than what we report.
- */
-static BlockNumber
-heapam_scan_get_blocks_done(HeapScanDesc hscan)
-{
-	ParallelBlockTableScanDesc bpscan = NULL;
-	BlockNumber startblock;
-	BlockNumber blocks_done;
-
-	if (hscan->rs_base.rs_parallel != NULL)
-	{
-		bpscan = (ParallelBlockTableScanDesc) hscan->rs_base.rs_parallel;
-		startblock = bpscan->phs_startblock;
-	}
-	else
-		startblock = hscan->rs_startblock;
-
-	/*
-	 * Might have wrapped around the end of the relation, if startblock was
-	 * not zero.
-	 */
-	if (hscan->rs_cblock > startblock)
-		blocks_done = hscan->rs_cblock - startblock;
-	else
-	{
-		BlockNumber nblocks;
-
-		nblocks = bpscan != NULL ? bpscan->phs_nblocks : hscan->rs_nblocks;
-		blocks_done = nblocks - startblock +
-			hscan->rs_cblock;
-	}
-
-	return blocks_done;
-}
-
 
 /* ------------------------------------------------------------------------
  * Miscellaneous callbacks for the heap AM
@@ -2159,9 +2098,6 @@ static const TableAmRoutine heapam_methods = {
 	.scan_set_tidrange = heap_set_tidrange,
 	.scan_getnextslot_tidrange = heap_getnextslot_tidrange,
 
-	.parallelscan_estimate = table_block_parallelscan_estimate,
-	.parallelscan_initialize = table_block_parallelscan_initialize,
-	.parallelscan_reinitialize = table_block_parallelscan_reinitialize,
 
 	.index_fetch_begin = heapam_index_fetch_begin,
 	.index_fetch_reset = heapam_index_fetch_reset,

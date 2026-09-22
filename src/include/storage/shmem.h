@@ -43,9 +43,6 @@ extern HTAB *ShmemInitHash(const char *name, long init_size, long max_size,
 						   HASHCTL *infoP, int hash_flags);
 extern void *ShmemInitStruct(const char *name, Size size, bool *foundPtr);
 
-/* ipci.c */
-extern void RequestAddinShmemSpace(Size size);
-
 /* size constants for the shmem index table */
  /* max size of data structure string name */
 #define SHMEM_INDEX_KEYSIZE		 (48)

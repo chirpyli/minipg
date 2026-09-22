@@ -212,7 +212,6 @@
 #include "postgres.h"
 
 #include "access/htup_details.h"
-#include "catalog/objectaccess.h"
 #include "catalog/pg_aggregate.h"
 #include "catalog/pg_proc.h"
 #include "catalog/pg_type.h"
@@ -3338,22 +3337,12 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 				 aggref->aggfnoid);
 		aggform = (Form_pg_aggregate) GETSTRUCT(aggTuple);
 
-		InvokeFunctionExecuteHook(aggref->aggfnoid);
-
 		/* planner recorded transition state type in the Aggref itself */
 		aggtranstype = aggref->aggtranstype;
 		Assert(OidIsValid(aggtranstype));
 
 		/* Final function only required if we're finalizing the aggregates */
 		peragg->finalfn_oid = finalfn_oid = aggform->aggfinalfn;
-
-		/* Check that aggregate owner has permission to call component fns */
-		{
-			if (OidIsValid(finalfn_oid))
-			{
-				InvokeFunctionExecuteHook(finalfn_oid);
-			}
-		}
 
 		/*
 		 * Get actual datatypes of the (nominal) aggregate inputs.  These
@@ -3410,8 +3399,6 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 			Oid			transfn_oid;
 
 			transfn_oid = aggform->aggtransfn;
-
-			InvokeFunctionExecuteHook(transfn_oid);
 
 			/*
 			 * initval is potentially null, so don't try to access it as a

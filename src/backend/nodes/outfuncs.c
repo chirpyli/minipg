@@ -406,18 +406,6 @@ _outModifyTable(StringInfo str, const ModifyTable *node)
 }
 
 static void
-_outAppend(StringInfo str, const Append *node)
-{
-	WRITE_NODE_TYPE("APPEND");
-
-	_outPlanInfo(str, (const Plan *) node);
-
-	WRITE_BITMAPSET_FIELD(apprelids);
-	WRITE_NODE_FIELD(appendplans);
-	WRITE_INT_FIELD(first_partial_plan);
-}
-
-static void
 _outBitmapAnd(StringInfo str, const BitmapAnd *node)
 {
 	WRITE_NODE_TYPE("BITMAPAND");
@@ -1374,7 +1362,6 @@ _outAppendPath(StringInfo str, const AppendPath *node)
 	_outPathInfo(str, (const Path *) node);
 
 	WRITE_NODE_FIELD(subpaths);
-	WRITE_INT_FIELD(first_partial_path);
 }
 
 static void
@@ -2455,9 +2442,6 @@ outNode(StringInfo str, const void *obj)
 				break;
 			case T_ModifyTable:
 				_outModifyTable(str, obj);
-				break;
-			case T_Append:
-				_outAppend(str, obj);
 				break;
 			case T_BitmapAnd:
 				_outBitmapAnd(str, obj);

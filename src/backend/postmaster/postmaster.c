@@ -704,13 +704,7 @@ PostmasterMain(int argc, char *argv[])
 	LocalProcessControlFile(false);
 
 	/*
-	 * process any libraries that should be preloaded at postmaster start
-	 */
-	process_shared_preload_libraries();
-
-	/*
-	 * Now that loadable modules have had their chance to register background
-	 * workers, calculate MaxBackends.
+	 * Calculate MaxBackends.
 	 */
 	InitializeMaxBackends();
 

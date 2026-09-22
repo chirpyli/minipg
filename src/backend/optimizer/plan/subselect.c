@@ -1538,22 +1538,6 @@ finalize_plan(PlannerInfo *root, Plan *plan,
 			}
 			break;
 
-		case T_Append:
-			{
-				ListCell   *l;
-
-				foreach(l, ((Append *) plan)->appendplans)
-				{
-					context.paramids =
-						bms_add_members(context.paramids,
-										finalize_plan(root,
-													  (Plan *) lfirst(l),
-													  valid_params,
-													  scan_params));
-				}
-			}
-			break;
-
 		case T_BitmapAnd:
 			{
 				ListCell   *l;

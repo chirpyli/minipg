@@ -2465,9 +2465,7 @@ apply_scanjoin_target_to_paths(PlannerInfo *root,
 	/*
 	 * Update the rel's target to be the final (with SRFs) scan/join target.
 	 * This now matches the actual output of all the paths, and we might get
-	 * confused in createplan.c if they don't agree.  We must do this now so
-	 * that any append paths made in the next part will use the correct
-	 * pathtarget (cf. create_append_path).
+	 * confused in createplan.c if they don't agree.
 	 */
 	rel->reltarget = llast_node(PathTarget, scanjoin_targets);
 

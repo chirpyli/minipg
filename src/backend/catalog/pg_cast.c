@@ -19,7 +19,6 @@
 #include "catalog/catalog.h"
 #include "catalog/dependency.h"
 #include "catalog/indexing.h"
-#include "catalog/objectaccess.h"
 #include "catalog/pg_cast.h"
 #include "catalog/pg_proc.h"
 #include "catalog/pg_type.h"
@@ -106,9 +105,6 @@ CastCreate(Oid sourcetypeid, Oid targettypeid, Oid funcid, char castcontext,
 
 	record_object_address_dependencies(&myself, addrs, behavior);
 	free_object_addresses(addrs);
-
-	/* Post creation hook for new cast */
-	InvokeObjectPostCreateHook(CastRelationId, castid, 0);
 
 	heap_freetuple(tuple);
 

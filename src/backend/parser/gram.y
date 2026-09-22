@@ -373,7 +373,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 	ELSE ENCODING END_P
 	EXISTS EXPLAIN
 
-	FALSE_P FIRST_P FLOAT_P FOR
+	FALSE_P FIRST_P FLOAT_P
 	FORCE FROM FULL
 
 	GROUP_P
@@ -418,11 +418,11 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 	TRUE_P
 	TRUNCATE TYPE_P
 
-	UNCOMMITTED UNIQUE UNKNOWN
+	UNCOMMITTED UNIQUE
 	UPDATE USING
 
 	VACUUM VALUES VARCHAR VARYING
-	VERBOSE VERSION_P VIEW
+	VERBOSE VIEW
 
 	WHEN WHERE WITH WITHOUT WORK WRITE
 
@@ -4116,11 +4116,9 @@ unreserved_keyword:
 			| TRUNCATE
 			| TYPE_P
 			| UNCOMMITTED
-			| UNKNOWN
 			| UPDATE
 			| VACUUM
 			| VARYING
-			| VERSION_P
 			| VIEW
 			| WITHOUT
 			| WORK
@@ -4212,7 +4210,6 @@ reserved_keyword:
 			| ELSE
 			| END_P
 			| FALSE_P
-			| FOR
 			| FROM
 			| GROUP_P
 			| HAVING
@@ -4363,14 +4360,12 @@ bare_label_keyword:
 			| TYPE_P
 			| UNCOMMITTED
 			| UNIQUE
-			| UNKNOWN
 			| UPDATE
 			| USING
 			| VACUUM
 			| VALUES
 			| VARCHAR
 			| VERBOSE
-			| VERSION_P
 			| VIEW
 			| WHEN
 			| WORK

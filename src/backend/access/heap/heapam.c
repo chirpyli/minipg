@@ -238,7 +238,6 @@ static const int MultiXactStatusLock[MaxMultiXactStatus + 1] =
 static void
 initscan(HeapScanDesc scan, ScanKey key, bool keep_startblock)
 {
-	ParallelBlockTableScanDesc bpscan = NULL;
 	bool		allow_strat;
 	bool		allow_sync;
 
@@ -253,13 +252,7 @@ initscan(HeapScanDesc scan, ScanKey key, bool keep_startblock)
 	 * results for a non-MVCC snapshot, the caller must hold some higher-level
 	 * lock that ensures the interesting tuple(s) won't change.)
 	 */
-	if (scan->rs_base.rs_parallel != NULL)
-	{
-		bpscan = (ParallelBlockTableScanDesc) scan->rs_base.rs_parallel;
-		scan->rs_nblocks = bpscan->phs_nblocks;
-	}
-	else
-		scan->rs_nblocks = RelationGetNumberOfBlocks(scan->rs_base.rs_rd);
+	scan->rs_nblocks = RelationGetNumberOfBlocks(scan->rs_base.rs_rd);
 
 	/*
 	 * If the table is large relative to NBuffers, use a bulk-read access
@@ -269,9 +262,6 @@ initscan(HeapScanDesc scan, ScanKey key, bool keep_startblock)
 	 * (However, some callers need to be able to disable one or both of these
 	 * behaviors, independently of the size of the table; also there is a GUC
 	 * variable that can disable synchronized scanning.)
-	 *
-	 * Note that table_block_parallelscan_initialize has a very similar test;
-	 * if you change this, consider changing that one, too.
 	 */
 	if (scan->rs_nblocks > NBuffers / 4)
 	{
@@ -294,15 +284,7 @@ initscan(HeapScanDesc scan, ScanKey key, bool keep_startblock)
 		scan->rs_strategy = NULL;
 	}
 
-	if (scan->rs_base.rs_parallel != NULL)
-	{
-		/* For parallel scan, believe whatever ParallelTableScanDesc says. */
-		if (scan->rs_base.rs_parallel->phs_syncscan)
-			scan->rs_base.rs_flags |= SO_ALLOW_SYNC;
-		else
-			scan->rs_base.rs_flags &= ~SO_ALLOW_SYNC;
-	}
-	else if (keep_startblock)
+	if (keep_startblock)
 	{
 		/*
 		 * When rescanning, we want to keep the previous startblock setting,
@@ -538,29 +520,7 @@ heapgettup(HeapScanDesc scan,
 				tuple->t_data = NULL;
 				return;
 			}
-			if (scan->rs_base.rs_parallel != NULL)
-			{
-				ParallelBlockTableScanDesc pbscan =
-				(ParallelBlockTableScanDesc) scan->rs_base.rs_parallel;
-				ParallelBlockTableScanWorker pbscanwork =
-				scan->rs_parallelworkerdata;
-
-				table_block_parallelscan_startblock_init(scan->rs_base.rs_rd,
-														 pbscanwork, pbscan);
-
-				page = table_block_parallelscan_nextpage(scan->rs_base.rs_rd,
-														 pbscanwork, pbscan);
-
-				/* Other processes might have already finished the scan. */
-				if (page == InvalidBlockNumber)
-				{
-					Assert(!BufferIsValid(scan->rs_cbuf));
-					tuple->t_data = NULL;
-					return;
-				}
-			}
-			else
-				page = scan->rs_startblock; /* first page */
+			page = scan->rs_startblock; /* first page */
 			heapgetpage((TableScanDesc) scan, page);
 			lineoff = FirstOffsetNumber;	/* first offnum */
 			scan->rs_inited = true;
@@ -584,9 +544,6 @@ heapgettup(HeapScanDesc scan,
 	}
 	else if (backward)
 	{
-		/* backward parallel scan not supported */
-		Assert(scan->rs_base.rs_parallel == NULL);
-
 		if (!scan->rs_inited)
 		{
 			/*
@@ -760,17 +717,6 @@ heapgettup(HeapScanDesc scan,
 				page = scan->rs_nblocks;
 			page--;
 		}
-		else if (scan->rs_base.rs_parallel != NULL)
-		{
-			ParallelBlockTableScanDesc pbscan =
-			(ParallelBlockTableScanDesc) scan->rs_base.rs_parallel;
-			ParallelBlockTableScanWorker pbscanwork =
-			scan->rs_parallelworkerdata;
-
-			page = table_block_parallelscan_nextpage(scan->rs_base.rs_rd,
-													 pbscanwork, pbscan);
-			finished = (page == InvalidBlockNumber);
-		}
 		else
 		{
 			page++;
@@ -876,29 +822,7 @@ heapgettup_pagemode(HeapScanDesc scan,
 				tuple->t_data = NULL;
 				return;
 			}
-			if (scan->rs_base.rs_parallel != NULL)
-			{
-				ParallelBlockTableScanDesc pbscan =
-				(ParallelBlockTableScanDesc) scan->rs_base.rs_parallel;
-				ParallelBlockTableScanWorker pbscanwork =
-				scan->rs_parallelworkerdata;
-
-				table_block_parallelscan_startblock_init(scan->rs_base.rs_rd,
-														 pbscanwork, pbscan);
-
-				page = table_block_parallelscan_nextpage(scan->rs_base.rs_rd,
-														 pbscanwork, pbscan);
-
-				/* Other processes might have already finished the scan. */
-				if (page == InvalidBlockNumber)
-				{
-					Assert(!BufferIsValid(scan->rs_cbuf));
-					tuple->t_data = NULL;
-					return;
-				}
-			}
-			else
-				page = scan->rs_startblock; /* first page */
+			page = scan->rs_startblock; /* first page */
 			heapgetpage((TableScanDesc) scan, page);
 			lineindex = 0;
 			scan->rs_inited = true;
@@ -919,9 +843,6 @@ heapgettup_pagemode(HeapScanDesc scan,
 	}
 	else if (backward)
 	{
-		/* backward parallel scan not supported */
-		Assert(scan->rs_base.rs_parallel == NULL);
-
 		if (!scan->rs_inited)
 		{
 			/*
@@ -1069,17 +990,6 @@ heapgettup_pagemode(HeapScanDesc scan,
 				page = scan->rs_nblocks;
 			page--;
 		}
-		else if (scan->rs_base.rs_parallel != NULL)
-		{
-			ParallelBlockTableScanDesc pbscan =
-			(ParallelBlockTableScanDesc) scan->rs_base.rs_parallel;
-			ParallelBlockTableScanWorker pbscanwork =
-			scan->rs_parallelworkerdata;
-
-			page = table_block_parallelscan_nextpage(scan->rs_base.rs_rd,
-													 pbscanwork, pbscan);
-			finished = (page == InvalidBlockNumber);
-		}
 		else
 		{
 			page++;
@@ -1187,7 +1097,6 @@ fastgetattr(HeapTuple tup, int attnum, TupleDesc tupleDesc,
 TableScanDesc
 heap_beginscan(Relation relation, Snapshot snapshot,
 			   int nkeys, ScanKey key,
-			   ParallelTableScanDesc parallel_scan,
 			   uint32 flags)
 {
 	HeapScanDesc scan;
@@ -1210,7 +1119,6 @@ heap_beginscan(Relation relation, Snapshot snapshot,
 	scan->rs_base.rs_snapshot = snapshot;
 	scan->rs_base.rs_nkeys = nkeys;
 	scan->rs_base.rs_flags = flags;
-	scan->rs_base.rs_parallel = parallel_scan;
 	scan->rs_strategy = NULL;	/* set in initscan */
 
 	/*
@@ -1245,15 +1153,6 @@ heap_beginscan(Relation relation, Snapshot snapshot,
 
 	/* we only need to set this up once */
 	scan->rs_ctup.t_tableOid = RelationGetRelid(relation);
-
-	/*
-	 * Allocate memory to keep track of page allocation for parallel workers
-	 * when doing a parallel scan.
-	 */
-	if (parallel_scan != NULL)
-		scan->rs_parallelworkerdata = palloc(sizeof(ParallelBlockTableScanWorkerData));
-	else
-		scan->rs_parallelworkerdata = NULL;
 
 	/*
 	 * we do this here instead of in initscan() because heap_rescan also calls
@@ -1329,9 +1228,6 @@ heap_endscan(TableScanDesc sscan)
 
 	if (scan->rs_strategy != NULL)
 		FreeAccessStrategy(scan->rs_strategy);
-
-	if (scan->rs_parallelworkerdata != NULL)
-		pfree(scan->rs_parallelworkerdata);
 
 	if (scan->rs_base.rs_flags & SO_TEMP_SNAPSHOT)
 		UnregisterSnapshot(scan->rs_base.rs_snapshot);

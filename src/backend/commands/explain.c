@@ -102,7 +102,6 @@ static void show_modifytable_info(ModifyTableState *mtstate, List *ancestors,
 								  ExplainState *es);
 static void ExplainMemberNodes(PlanState **planstates, int nplans,
 							   List *ancestors, ExplainState *es);
-static void ExplainMissingMembers(int nplans, int nchildren, ExplainState *es);
 static void ExplainSubPlans(List *plans, List *ancestors,
 							const char *relationship, ExplainState *es);
 static void ExplainProperty(const char *qlabel, const char *unit,
@@ -514,9 +513,8 @@ ExplainPrintSettings(ExplainState *es)
  *	  convert a QueryDesc's plan tree to text and append it to es->str
  *
  * The caller should have set up the options fields of *es, as well as
- * initializing the output buffer es->str.  Also, output formatting state
- * such as the indent level is assumed valid.  Plan-tree-specific fields
- * in *es are initialized here.
+ * initializing the output buffer es->str.  Also, the indent level is
+ * assumed valid.  Plan-tree-specific fields in *es are initialized here.
  *
  * NB: will not work on utility statements
  */
@@ -588,10 +586,6 @@ ExplainPreScanNode(PlanState *planstate, Bitmapset **rels_used)
 			*rels_used = bms_add_member(*rels_used,
 										((ModifyTable *) plan)->nominalRelation);
 			break;
-		case T_Append:
-			*rels_used = bms_add_members(*rels_used,
-										 ((Append *) plan)->apprelids);
-			break;
 		default:
 			break;
 	}
@@ -653,9 +647,6 @@ ExplainNode(PlanState *planstate, List *ancestors,
 					pname = "???";
 					break;
 			}
-			break;
-		case T_Append:
-			pname = "Append";
 			break;
 		case T_BitmapAnd:
 			pname = "BitmapAnd";
@@ -1101,30 +1092,10 @@ ExplainNode(PlanState *planstate, List *ancestors,
 		show_wal_usage(es, &planstate->instrument->walusage);
 
 
-	/*
-	 * If some child plans were eliminated during executor initialization,
-	 * the number of child plans we'll display below will be less than the
-	 * number of subplans that was specified in the plan.  To make this a bit
-	 * less mysterious, emit an indication that this happened.  Note that this
-	 * field is emitted now because we want it to be a property of the parent
-	 * node; it *cannot* be emitted within the Plans sub-node we'll open next.
-	 */
-	switch (nodeTag(plan))
-	{
-		case T_Append:
-			ExplainMissingMembers(((AppendState *) planstate)->as_nplans,
-								  list_length(((Append *) plan)->appendplans),
-								  es);
-			break;
-		default:
-			break;
-	}
-
 	/* Get ready to display the child plans */
 	haschildren = planstate->initPlan ||
 		outerPlanState(planstate) ||
 		innerPlanState(planstate) ||
-		IsA(plan, Append) ||
 		IsA(plan, BitmapAnd) ||
 		IsA(plan, BitmapOr) ||
 		IsA(plan, SubqueryScan) ||
@@ -1152,11 +1123,6 @@ ExplainNode(PlanState *planstate, List *ancestors,
 	/* special child plans */
 	switch (nodeTag(plan))
 	{
-		case T_Append:
-			ExplainMemberNodes(((AppendState *) planstate)->appendplans,
-							   ((AppendState *) planstate)->as_nplans,
-							   ancestors, es);
-			break;
 		case T_BitmapAnd:
 			ExplainMemberNodes(((BitmapAndState *) planstate)->bitmapplans,
 							   ((BitmapAndState *) planstate)->nplans,
@@ -1203,9 +1169,6 @@ show_plan_tlist(PlanState *planstate, List *ancestors, ExplainState *es)
 
 	/* No work if empty tlist (this occurs eg in bitmap indexscans) */
 	if (plan->targetlist == NIL)
-		return;
-	/* The tlist of an Append isn't real helpful, so suppress it */
-	if (IsA(plan, Append))
 		return;
 
 	/* Set up deparsing context */
@@ -1859,8 +1822,7 @@ show_instrumentation_count(const char *qlabel, int which,
  * indexes can be explained.
  *
  * Note: names returned by this function should be "raw"; the caller will
- * apply quoting if needed.  Formerly the convention was to do quoting here,
- * but we don't want that in non-text output formats.
+ * apply quoting if needed.
  */
 static const char *
 explain_get_index_name(Oid indexId)
@@ -2176,21 +2138,6 @@ ExplainMemberNodes(PlanState **planstates, int nplans,
 }
 
 /*
- * Report about any pruned subnodes of an Append node.
- *
- * nplans indicates the number of live subplans.
- * nchildren indicates the original number of subnodes in the Plan;
- * some of these may have been pruned by the run-time pruning code.
- */
-static void
-ExplainMissingMembers(int nplans, int nchildren, ExplainState *es)
-{
-	if (nplans < nchildren)
-		ExplainPropertyInteger("Subplans Removed", NULL,
-							   nchildren - nplans, es);
-}
-
-/*
  * Explain a list of SubPlans (or initPlans, which also use SubPlan nodes).
  *
  * The ancestors list should already contain the immediate parent of these
@@ -2271,7 +2218,7 @@ ExplainPropertyList(const char *qlabel, List *data, ExplainState *es)
 /*
  * Explain a simple property.
  *
- * If unit is non-NULL the text format will display it after the value.
+ * If unit is non-NULL it will be displayed after the value.
  *
  * This usually should not be invoked directly, but via one of the datatype
  * specific routines ExplainPropertyText, ExplainPropertyInteger, etc.
@@ -2347,7 +2294,7 @@ ExplainPropertyBool(const char *qlabel, bool value, ExplainState *es)
 }
 
 /*
- * Indent a text-format line.
+ * Indent a line of output.
  *
  * We indent by two spaces per indentation level.  However, when emitting
  * data for a parallel worker there might already be data on the current line

@@ -102,7 +102,6 @@ enlargePQExpBuffer            108
 PQconnectionUsedPassword      115
 pg_valid_server_encoding_id   116
 PQconnectionNeedsPassword     117
-PQcopyResult                  118
 PQsetResultAttrs              119
 PQsetvalue                    120
 PQresultAlloc                 121
@@ -120,7 +119,6 @@ PQconnectStartParams          132
 PQping                        133
 PQpingParams                  134
 PQlibVersion                  135
-PQsetSingleRowMode            136
 PQconninfo                    137
 PQsetErrorContextVisibility   138
 PQresultVerboseErrorMessage   139

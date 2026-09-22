@@ -29,7 +29,6 @@
 #include "catalog/heap.h"
 #include "catalog/index.h"
 #include "catalog/namespace.h"
-#include "catalog/objectaccess.h"
 #include "catalog/pg_am.h"
 #include "catalog/pg_collation.h"
 #include "catalog/pg_constraint.h"
@@ -1000,8 +999,6 @@ truncate_check_rel(Oid relid, Form_pg_class reltuple)
 				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
 				 errmsg("permission denied: \"%s\" is a system catalog",
 						relname)));
-
-	InvokeObjectTruncateHook(relid);
 }
 
 /*
@@ -1134,9 +1131,6 @@ RenameRelationInternal(Oid myrelid, const char *newrelname, bool is_internal, bo
 
 	CatalogTupleUpdate(relrelation, &otid, reltup);
 	UnlockTuple(relrelation, &otid, InplaceUpdateTupleLock);
-
-	InvokeObjectPostAlterHookArg(RelationRelationId, myrelid, 0,
-								 InvalidOid, is_internal);
 
 	heap_freetuple(reltup);
 	table_close(relrelation, RowExclusiveLock);
@@ -2831,9 +2825,6 @@ ATExecAddColumn(List **wqueue, AlteredTableInfo *tab, Relation rel,
 
 	heap_freetuple(reltup);
 
-	/* Post creation hook for new attribute */
-	InvokeObjectPostCreateHook(RelationRelationId, myrelid, newattnum);
-
 	table_close(pgclass, RowExclusiveLock);
 
 	/* Make the attribute's catalog entry visible */
@@ -3037,9 +3028,6 @@ ATExecSetStatistics(Relation rel, const char *colName, int16 colNum, Node *newVa
 
 	CatalogTupleUpdate(attrelation, &tuple->t_self, tuple);
 
-	InvokeObjectPostAlterHook(RelationRelationId,
-							  RelationGetRelid(rel),
-							  attrtuple->attnum);
 	ObjectAddressSubSet(address, RelationRelationId,
 						RelationGetRelid(rel), attnum);
 	heap_freetuple(tuple);
@@ -3097,10 +3085,6 @@ SetIndexStorageProperties(Relation rel, Relation attrelation,
 				attrtuple->attstorage = newstorage;
 
 			CatalogTupleUpdate(attrelation, &tuple->t_self, tuple);
-
-			InvokeObjectPostAlterHook(RelationRelationId,
-									  RelationGetRelid(rel),
-									  attrtuple->attnum);
 
 			heap_freetuple(tuple);
 		}
@@ -3176,10 +3160,6 @@ ATExecSetStorage(Relation rel, const char *colName, Node *newValue, LOCKMODE loc
 						format_type_be(attrtuple->atttypid))));
 
 	CatalogTupleUpdate(attrelation, &tuple->t_self, tuple);
-
-	InvokeObjectPostAlterHook(RelationRelationId,
-							  RelationGetRelid(rel),
-							  attrtuple->attnum);
 
 	heap_freetuple(tuple);
 
@@ -3976,9 +3956,6 @@ ATExecAlterColumnType(AlteredTableInfo *tab, Relation rel,
 	 */
 	RemoveStatistics(RelationGetRelid(rel), attnum);
 
-	InvokeObjectPostAlterHook(RelationRelationId,
-							  RelationGetRelid(rel), attnum);
-
 	ObjectAddressSubSet(address, RelationRelationId,
 						RelationGetRelid(rel), attnum);
 
@@ -4466,8 +4443,6 @@ AlterRelationNamespaceInternal(Relation classRel, Oid relOid,
 	if (!already_done)
 	{
 		add_exact_object_address(&thisobj, objsMoved);
-
-		InvokeObjectPostAlterHook(RelationRelationId, relOid, 0);
 	}
 
 	heap_freetuple(classTup);

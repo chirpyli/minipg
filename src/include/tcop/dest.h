@@ -88,7 +88,6 @@ typedef enum
 	DestNone,					/* results are discarded */
 	DestDebug,					/* results go to debugging output */
 	DestRemote,					/* results sent to frontend process */
-	DestRemoteExecute,			/* sent to frontend, in Execute command */
 	DestRemoteSimple,			/* sent to frontend, w/no catalog access */
 	DestTuplestore,				/* results sent to Tuplestore */
 	DestSQLFunction				/* results sent to SQL-language func mgr */

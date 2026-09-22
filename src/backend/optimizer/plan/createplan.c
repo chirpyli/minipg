@@ -911,177 +911,31 @@ create_join_plan(PlannerInfo *root, JoinPath *best_path)
 
 /*
  * create_append_plan
- *	  Create an Append plan for 'best_path' and (recursively) plans
- *	  for its subpaths.
+ *	  Create a plan for a dummy (known empty) AppendPath.
+ *
+ * An AppendPath with no members is only generated for relations that are
+ * known to be empty (see set_dummy_rel_pathlist and mark_dummy_rel), so
+ * we always generate a Result plan with a constant-FALSE gating qual.
  *
  *	  Returns a Plan node.
  */
 static Plan *
 create_append_plan(PlannerInfo *root, AppendPath *best_path, int flags)
 {
-	Append	   *plan;
+	Plan	   *plan;
 	List	   *tlist = build_path_tlist(root, &best_path->path);
-	int			orig_tlist_length = list_length(tlist);
-	bool		tlist_was_changed = false;
-	List	   *pathkeys = best_path->path.pathkeys;
-	List	   *subplans = NIL;
-	ListCell   *subpaths;
-	RelOptInfo *rel = best_path->path.parent;
-	int			nodenumsortkeys = 0;
-	AttrNumber *nodeSortColIdx = NULL;
-	Oid		   *nodeSortOperators = NULL;
-	Oid		   *nodeCollations = NULL;
-	bool	   *nodeNullsFirst = NULL;
 
-	/*
-	 * The subpaths list could be empty, if every child was proven empty by
-	 * constraint exclusion.  In that case generate a dummy plan that returns
-	 * no rows.
-	 *
-	 * Note that an AppendPath with no members is also generated in certain
-	 * cases where there was no appending construct at all, but we know the
-	 * relation is empty (see set_dummy_rel_pathlist and mark_dummy_rel).
-	 */
-	if (best_path->subpaths == NIL)
-	{
-		/* Generate a Result plan with constant-FALSE gating qual */
-		Plan	   *plan;
+	Assert(best_path->subpaths == NIL);
 
-		plan = (Plan *) make_result(tlist,
-									(Node *) list_make1(makeBoolConst(false,
-																	  false)),
-									NULL);
+	/* Generate a Result plan with constant-FALSE gating qual */
+	plan = (Plan *) make_result(tlist,
+								(Node *) list_make1(makeBoolConst(false,
+																  false)),
+								NULL);
 
-		copy_generic_path_info(plan, (Path *) best_path);
+	copy_generic_path_info(plan, (Path *) best_path);
 
-		return plan;
-	}
-
-	/*
-	 * Otherwise build an Append plan.  Note that if there's just one child,
-	 * the Append is pretty useless; but we wait till setrefs.c to get rid of
-	 * it.  Doing so here doesn't work because the varno of the child scan
-	 * plan won't match the parent-rel Vars it'll be asked to emit.
-	 *
-	 * We don't have the actual creation of the Append node split out into a
-	 * separate make_xxx function.  This is because we want to run
-	 * prepare_sort_from_pathkeys on it before we do so on the individual
-	 * child plans, to make cross-checking the sort info easier.
-	 */
-	plan = makeNode(Append);
-	plan->plan.targetlist = tlist;
-	plan->plan.qual = NIL;
-	plan->plan.lefttree = NULL;
-	plan->plan.righttree = NULL;
-	plan->apprelids = rel->relids;
-
-	if (pathkeys != NIL)
-	{
-		/*
-		 * Compute sort column info, and adjust the Append's tlist as needed.
-		 * Because we pass adjust_tlist_in_place = true, we may ignore the
-		 * function result; it must be the same plan node.  However, we then
-		 * need to detect whether any tlist entries were added.
-		 */
-		(void) prepare_sort_from_pathkeys((Plan *) plan, pathkeys,
-										  best_path->path.parent->relids,
-										  NULL,
-										  true,
-										  &nodenumsortkeys,
-										  &nodeSortColIdx,
-										  &nodeSortOperators,
-										  &nodeCollations,
-										  &nodeNullsFirst);
-		tlist_was_changed = (orig_tlist_length != list_length(plan->plan.targetlist));
-	}
-
-	/* Build the plan for each child */
-	foreach(subpaths, best_path->subpaths)
-	{
-		Path	   *subpath = (Path *) lfirst(subpaths);
-		Plan	   *subplan;
-
-		/* Must insist that all children return the same tlist */
-		subplan = create_plan_recurse(root, subpath, CP_EXACT_TLIST);
-
-		/*
-		 * For ordered Appends, we must insert a Sort node if subplan isn't
-		 * sufficiently ordered.
-		 */
-		if (pathkeys != NIL)
-		{
-			int			numsortkeys;
-			AttrNumber *sortColIdx;
-			Oid		   *sortOperators;
-			Oid		   *collations;
-			bool	   *nullsFirst;
-
-			/*
-			 * Compute sort column info, and adjust subplan's tlist as needed.
-			 * We must apply prepare_sort_from_pathkeys even to subplans that
-			 * don't need an explicit sort, to make sure they are returning
-			 * the same sort key columns the Append expects.
-			 */
-			subplan = prepare_sort_from_pathkeys(subplan, pathkeys,
-												 subpath->parent->relids,
-												 nodeSortColIdx,
-												 false,
-												 &numsortkeys,
-												 &sortColIdx,
-												 &sortOperators,
-												 &collations,
-												 &nullsFirst);
-
-			/*
-			 * Check that we got the same sort key information.  We just
-			 * Assert that the sortops match, since those depend only on the
-			 * pathkeys; but it seems like a good idea to check the sort
-			 * column numbers explicitly, to ensure the tlists match up.
-			 */
-			Assert(numsortkeys == nodenumsortkeys);
-			if (memcmp(sortColIdx, nodeSortColIdx,
-					   numsortkeys * sizeof(AttrNumber)) != 0)
-				elog(ERROR, "Append child's targetlist doesn't match Append");
-			Assert(memcmp(sortOperators, nodeSortOperators,
-						  numsortkeys * sizeof(Oid)) == 0);
-			Assert(memcmp(collations, nodeCollations,
-						  numsortkeys * sizeof(Oid)) == 0);
-			Assert(memcmp(nullsFirst, nodeNullsFirst,
-						  numsortkeys * sizeof(bool)) == 0);
-
-			/* Now, insert a Sort node if subplan isn't sufficiently ordered */
-			if (!pathkeys_contained_in(pathkeys, subpath->pathkeys))
-			{
-				Sort	   *sort = make_sort(subplan, numsortkeys,
-											 sortColIdx, sortOperators,
-											 collations, nullsFirst);
-
-				label_sort_with_costsize(root, sort);
-				subplan = (Plan *) sort;
-			}
-		}
-
-		subplans = lappend(subplans, subplan);
-	}
-
-	plan->appendplans = subplans;
-	plan->first_partial_plan = best_path->first_partial_path;
-
-	copy_generic_path_info(&plan->plan, (Path *) best_path);
-
-	/*
-	 * If prepare_sort_from_pathkeys added sort columns, but we were told to
-	 * produce either the exact tlist or a narrow tlist, we should get rid of
-	 * the sort columns again.  We must inject a projection node to do so.
-	 */
-	if (tlist_was_changed && (flags & (CP_EXACT_TLIST | CP_SMALL_TLIST)))
-	{
-		tlist = list_truncate(list_copy(plan->plan.targetlist),
-							  orig_tlist_length);
-		return inject_projection_plan((Plan *) plan, tlist);
-	}
-	else
-		return (Plan *) plan;
+	return plan;
 }
 
 /*
@@ -4886,7 +4740,6 @@ is_projection_capable_plan(Plan *plan)
 		case T_Sort:
 		case T_Unique:
 		case T_ModifyTable:
-		case T_Append:
 			return false;
 		case T_ProjectSet:
 

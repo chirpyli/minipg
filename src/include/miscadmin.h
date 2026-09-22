@@ -314,13 +314,10 @@ extern void SwitchBackToLocalLatch(void);
 typedef enum BackendType
 {
 	B_INVALID = 0,
-	B_AUTOVAC_LAUNCHER,
-	B_AUTOVAC_WORKER,
 	B_BACKEND,
 	B_BG_WRITER,
 	B_CHECKPOINTER,
 	B_STARTUP,
-	B_WAL_RECEIVER,
 	B_WAL_SENDER,
 	B_WAL_WRITER,
 	B_LOGGER,
@@ -424,7 +421,6 @@ typedef enum
 	BgWriterProcess,
 	CheckpointerProcess,
 	WalWriterProcess,
-	WalReceiverProcess,
 
 	NUM_AUXPROCTYPES			/* Must be last! */
 } AuxProcType;
@@ -436,7 +432,6 @@ extern AuxProcType MyAuxProcType;
 #define AmBackgroundWriterProcess() (MyAuxProcType == BgWriterProcess)
 #define AmCheckpointerProcess()		(MyAuxProcType == CheckpointerProcess)
 #define AmWalWriterProcess()		(MyAuxProcType == WalWriterProcess)
-#define AmWalReceiverProcess()		(MyAuxProcType == WalReceiverProcess)
 
 
 /*****************************************************************************
@@ -453,10 +448,6 @@ extern void BaseInit(void);
 
 /* in utils/init/miscinit.c */
 extern bool IgnoreSystemIndexes;
-extern PGDLLIMPORT bool process_shared_preload_libraries_in_progress;
-extern char *session_preload_libraries_string;
-extern char *shared_preload_libraries_string;
-extern char *local_preload_libraries_string;
 
 extern void CreateDataDirLockFile(bool amPostmaster);
 extern void CreateSocketLockFile(const char *socketfile, bool amPostmaster,
@@ -465,8 +456,6 @@ extern void TouchSocketLockFiles(void);
 extern void AddToDataDirLockFile(int target_line, const char *str);
 extern bool RecheckDataDirLockFile(void);
 extern void ValidatePgVersion(const char *path);
-extern void process_shared_preload_libraries(void);
-extern void process_session_preload_libraries(void);
 
 /* in access/transam/xlog.c */
 extern bool BackupInProgress(void);

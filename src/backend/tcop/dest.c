@@ -111,7 +111,6 @@ CreateDestReceiver(CommandDest dest)
 	switch (dest)
 	{
 		case DestRemote:
-		case DestRemoteExecute:
 			return printtup_create_DR(dest);
 
 		case DestRemoteSimple:
@@ -148,7 +147,6 @@ EndCommand(const QueryCompletion *qc, CommandDest dest, bool force_undecorated_o
 	switch (dest)
 	{
 		case DestRemote:
-		case DestRemoteExecute:
 		case DestRemoteSimple:
 
 			/*
@@ -208,7 +206,6 @@ NullCommand(CommandDest dest)
 	switch (dest)
 	{
 		case DestRemote:
-		case DestRemoteExecute:
 		case DestRemoteSimple:
 
 			/* Tell the FE that we saw an empty query string */
@@ -241,7 +238,6 @@ ReadyForQuery(CommandDest dest)
 	switch (dest)
 	{
 		case DestRemote:
-		case DestRemoteExecute:
 		case DestRemoteSimple:
 			{
 				StringInfoData buf;

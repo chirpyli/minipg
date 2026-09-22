@@ -212,24 +212,6 @@ typedef struct ModifyTable
 } ModifyTable;
 
 /* ----------------
- *	 Append node -
- *		Generate the concatenation of the results of sub-plans.
- * ----------------
- */
-typedef struct Append
-{
-	Plan		plan;
-	Bitmapset  *apprelids;		/* RTIs of appendrel(s) formed by this node */
-	List	   *appendplans;
-
-	/*
-	 * All 'appendplans' preceding this index are non-partial plans. All
-	 * 'appendplans' from this index onwards are partial plans.
-	 */
-	int			first_partial_plan;
-} Append;
-
-/* ----------------
  *	 BitmapAnd node -
  *		Generate the intersection of the results of sub-plans.
  *

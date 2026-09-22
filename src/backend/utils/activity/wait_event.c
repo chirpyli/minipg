@@ -203,9 +203,6 @@ pgstat_get_wait_activity(WaitEventActivity w)
 
 	switch (w)
 	{
-		case WAIT_EVENT_AUTOVACUUM_MAIN:
-			event_name = "AutoVacuumMain";
-			break;
 		case WAIT_EVENT_BGWRITER_HIBERNATE:
 			event_name = "BgWriterHibernate";
 			break;
@@ -214,12 +211,6 @@ pgstat_get_wait_activity(WaitEventActivity w)
 			break;
 		case WAIT_EVENT_CHECKPOINTER_MAIN:
 			event_name = "CheckpointerMain";
-			break;
-		case WAIT_EVENT_PGSTAT_MAIN:
-			event_name = "PgStatMain";
-			break;
-		case WAIT_EVENT_RECOVERY_WAL_STREAM:
-			event_name = "RecoveryWalStream";
 			break;
 		case WAIT_EVENT_SYSLOGGER_MAIN:
 			event_name = "SysLoggerMain";
@@ -277,9 +268,6 @@ pgstat_get_wait_ipc(WaitEventIPC w)
 		case WAIT_EVENT_BACKEND_TERMINATION:
 			event_name = "BackendTermination";
 			break;
-		case WAIT_EVENT_BACKUP_WAIT_WAL_ARCHIVE:
-			event_name = "BackupWaitWalArchive";
-			break;
 		case WAIT_EVENT_BTREE_PAGE:
 			event_name = "BtreePage";
 			break;
@@ -291,9 +279,6 @@ pgstat_get_wait_ipc(WaitEventIPC w)
 			break;
 		case WAIT_EVENT_CHECKPOINT_START:
 			event_name = "CheckpointStart";
-			break;
-		case WAIT_EVENT_EXECUTE_GATHER:
-			event_name = "ExecuteGather";
 			break;
 		case WAIT_EVENT_HASH_BATCH_ALLOCATE:
 			event_name = "HashBatchAllocate";
@@ -392,14 +377,8 @@ pgstat_get_wait_timeout(WaitEventTimeout w)
 
 	switch (w)
 	{
-		case WAIT_EVENT_BASE_BACKUP_THROTTLE:
-			event_name = "BaseBackupThrottle";
-			break;
 		case WAIT_EVENT_CHECKPOINT_WRITE_DELAY:
 			event_name = "CheckpointWriteDelay";
-			break;
-		case WAIT_EVENT_PG_SLEEP:
-			event_name = "PgSleep";
 			break;
 		case WAIT_EVENT_RECOVERY_APPLY_DELAY:
 			event_name = "RecoveryApplyDelay";
@@ -432,9 +411,6 @@ pgstat_get_wait_io(WaitEventIO w)
 
 	switch (w)
 	{
-		case WAIT_EVENT_BASEBACKUP_READ:
-			event_name = "BaseBackupRead";
-			break;
 		case WAIT_EVENT_BUFFILE_READ:
 			event_name = "BufFileRead";
 			break;
@@ -525,9 +501,6 @@ pgstat_get_wait_io(WaitEventIO w)
 		case WAIT_EVENT_REORDER_BUFFER_WRITE:
 			event_name = "ReorderBufferWrite";
 			break;
-		case WAIT_EVENT_REORDER_LOGICAL_MAPPING_READ:
-			event_name = "ReorderLogicalMappingRead";
-			break;
 		case WAIT_EVENT_SLRU_FLUSH_SYNC:
 			event_name = "SLRUFlushSync";
 			break;
@@ -563,9 +536,6 @@ pgstat_get_wait_io(WaitEventIO w)
 			break;
 		case WAIT_EVENT_TWOPHASE_FILE_WRITE:
 			event_name = "TwophaseFileWrite";
-			break;
-		case WAIT_EVENT_WALSENDER_TIMELINE_HISTORY_READ:
-			event_name = "WALSenderTimelineHistoryRead";
 			break;
 		case WAIT_EVENT_WAL_BOOTSTRAP_SYNC:
 			event_name = "WALBootstrapSync";

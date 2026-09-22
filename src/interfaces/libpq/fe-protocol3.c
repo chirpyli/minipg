@@ -275,8 +275,6 @@ pqParseInput3(PGconn *conn)
 						return;
 					}
 					break;
-				case 'n':		/* No Data (simple protocol never sends it) */
-					break;
 				case 'D':		/* Data Row */
 					if (conn->result != NULL &&
 						conn->result->resultStatus == PGRES_TUPLES_OK)

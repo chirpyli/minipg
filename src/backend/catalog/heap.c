@@ -44,7 +44,6 @@
 #include "catalog/dependency.h"
 #include "catalog/heap.h"
 #include "catalog/index.h"
-#include "catalog/objectaccess.h"
 #include "catalog/pg_am.h"
 #include "catalog/pg_collation.h"
 #include "catalog/pg_constraint.h"
@@ -1240,9 +1239,6 @@ heap_create_with_catalog(const char *relname,
 		record_object_address_dependencies(&myself, addrs, DEPENDENCY_NORMAL);
 		free_object_addresses(addrs);
 	}
-
-	/* Post creation hook for new relation */
-	InvokeObjectPostCreateHookArg(RelationRelationId, relid, 0, is_internal);
 
 	/*
 	 * ok, the relation has been cataloged, so close our relations and return

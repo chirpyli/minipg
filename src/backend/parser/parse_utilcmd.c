@@ -242,7 +242,6 @@ transformCreateStmt(CreateStmt *stmt, const char *queryString)
 static void
 transformColumnDefinition(CreateStmtContext *cxt, ColumnDef *column)
 {
-	bool		saw_default;
 	ListCell   *clist;
 
 	cxt->columns = lappend(cxt->columns, column);
@@ -251,26 +250,12 @@ transformColumnDefinition(CreateStmtContext *cxt, ColumnDef *column)
 	if (column->typeName)
 		transformColumnType(cxt, column);
 
-	saw_default = false;
-
 	foreach(clist, column->constraints)
 	{
 		Constraint *constraint = lfirst_node(Constraint, clist);
 
 		switch (constraint->contype)
 		{
-			case CONSTR_DEFAULT:
-				if (saw_default)
-					ereport(ERROR,
-							(errcode(ERRCODE_SYNTAX_ERROR),
-							 errmsg("multiple default values specified for column \"%s\" of table \"%s\"",
-									column->colname, cxt->relation->relname),
-							 parser_errposition(cxt->pstate,
-												constraint->location)));
-				column->raw_default = constraint->raw_expr;
-				saw_default = true;
-				break;
-
 			case CONSTR_PRIMARY:
 				/* FALL THRU */
 
@@ -303,11 +288,6 @@ transformTableConstraint(CreateStmtContext *cxt, Constraint *constraint)
 
 		case CONSTR_UNIQUE:
 			cxt->ixconstraints = lappend(cxt->ixconstraints, constraint);
-			break;
-
-		case CONSTR_DEFAULT:
-			elog(ERROR, "invalid context for constraint type %d",
-				 constraint->contype);
 			break;
 
 		default:

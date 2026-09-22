@@ -28,7 +28,6 @@ OBJS = \
 	functions.o \
 	instrument.o \
 	nodeAgg.o \
-	nodeAppend.o \
 	nodeBitmapAnd.o \
 	nodeBitmapHeapscan.o \
 	nodeBitmapIndexscan.o \

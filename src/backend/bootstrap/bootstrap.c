@@ -317,9 +317,6 @@ AuxiliaryProcessMain(int argc, char *argv[])
 		case WalWriterProcess:
 			MyBackendType = B_WAL_WRITER;
 			break;
-		case WalReceiverProcess:
-			MyBackendType = B_WAL_RECEIVER;
-			break;
 		default:
 			MyBackendType = B_INVALID;
 	}

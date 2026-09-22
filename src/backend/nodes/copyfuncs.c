@@ -210,29 +210,6 @@ _copyModifyTable(const ModifyTable *from)
 }
 
 /*
- * _copyAppend
- */
-static Append *
-_copyAppend(const Append *from)
-{
-	Append	   *newnode = makeNode(Append);
-
-	/*
-	 * copy node superclass fields
-	 */
-	CopyPlanFields((const Plan *) from, (Plan *) newnode);
-
-	/*
-	 * copy remainder of node
-	 */
-	COPY_BITMAPSET_FIELD(apprelids);
-	COPY_NODE_FIELD(appendplans);
-	COPY_SCALAR_FIELD(first_partial_plan);
-
-	return newnode;
-}
-
-/*
  * _copyBitmapAnd
  */
 static BitmapAnd *
@@ -2393,9 +2370,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_ModifyTable:
 			retval = _copyModifyTable(from);
-			break;
-		case T_Append:
-			retval = _copyAppend(from);
 			break;
 		case T_BitmapAnd:
 			retval = _copyBitmapAnd(from);

@@ -272,25 +272,6 @@ assign_collations_walker(Node *node, assign_collations_context *context)
 	 */
 	switch (nodeTag(node))
 	{
-		case T_CollateExpr:
-			{
-				/*
-				 * COLLATE sets an explicitly derived collation, regardless of
-				 * what the child state is.  But we must recurse to set up
-				 * collation info below here.
-				 */
-				CollateExpr *expr = (CollateExpr *) node;
-
-				(void) expression_tree_walker(node,
-											  assign_collations_walker,
-											  (void *) &loccontext);
-
-				collation = expr->collOid;
-				Assert(OidIsValid(collation));
-				strength = COLLATE_EXPLICIT;
-				location = expr->location;
-			}
-			break;
 		case T_FieldSelect:
 			{
 				/*

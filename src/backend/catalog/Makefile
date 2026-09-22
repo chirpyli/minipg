@@ -20,7 +20,6 @@ OBJS = \
 	index.o \
 	indexing.o \
 	namespace.o \
-	objectaccess.o \
 	objectaddress.o \
 	pg_cast.o \
 	pg_constraint.o \

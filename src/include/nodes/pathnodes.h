@@ -1141,23 +1141,14 @@ typedef struct SubqueryScanPath
  * AppendPath represents an Append plan, ie, successive execution of
  * several member plans.
  *
- * For partial Append, 'subpaths' contains non-partial subpaths followed by
- * partial subpaths.
- *
- * Note: it is possible for "subpaths" to contain only one, or even no,
- * elements.  These cases are optimized during create_append_plan.
- * In particular, an AppendPath with no subpaths is a "dummy" path that
- * is created to represent the case that a relation is provably empty.
- * (This is a convenient representation because it means that when we build
- * an appendrel and find that all its children have been excluded, no extra
- * action is needed to recognize the relation as dummy.)
+ * Note: an AppendPath with no subpaths is a "dummy" path that is created to
+ * represent the case that a relation is provably empty.  It is the only
+ * form of AppendPath that this build of the code can produce.
  */
 typedef struct AppendPath
 {
 	Path		path;
 	List	   *subpaths;		/* list of component Paths */
-	/* Index of first partial path in subpaths; list_length(subpaths) if none */
-	int			first_partial_path;
 } AppendPath;
 
 #define IS_DUMMY_APPEND(p) \

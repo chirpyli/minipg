@@ -34,7 +34,6 @@
 #include "catalog/catalog.h"
 #include "catalog/dependency.h"
 #include "catalog/indexing.h"
-#include "catalog/objectaccess.h"
 #include "catalog/pg_database.h"
 #include "catalog/pg_tablespace.h"
 #include "commands/dbcommands.h"
@@ -458,9 +457,6 @@ createdb(ParseState *pstate, const CreatedbStmt *stmt)
 							new_record, new_record_nulls);
 
 	CatalogTupleInsert(pg_database_rel, tuple);
-
-	/* Post creation hook for new database */
-	InvokeObjectPostCreateHook(DatabaseRelationId, dboid, 0);
 
 	/*
 	 * Force a checkpoint before starting the copy. This will force all dirty

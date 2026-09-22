@@ -2919,12 +2919,6 @@ planstate_tree_walker(PlanState *planstate,
 	/* special child plans */
 	switch (nodeTag(plan))
 	{
-		case T_Append:
-			if (planstate_walk_members(((AppendState *) planstate)->appendplans,
-									   ((AppendState *) planstate)->as_nplans,
-									   walker, context))
-				return true;
-			break;
 		case T_BitmapAnd:
 			if (planstate_walk_members(((BitmapAndState *) planstate)->bitmapplans,
 									   ((BitmapAndState *) planstate)->nplans,

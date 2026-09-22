@@ -31,7 +31,6 @@
 #include "postgres.h"
 
 #include "access/nbtree.h"
-#include "catalog/objectaccess.h"
 #include "catalog/pg_type.h"
 #include "executor/execExpr.h"
 #include "executor/nodeSubplan.h"
@@ -1106,13 +1105,6 @@ ExecInitExprRec(Expr *node, ExprState *state,
 				scalararg = (Expr *) linitial(opexpr->args);
 				arrayarg = (Expr *) lsecond(opexpr->args);
 
-				InvokeFunctionExecuteHook(opexpr->opfuncid);
-
-				if (OidIsValid(opexpr->hashfuncid))
-				{
-					InvokeFunctionExecuteHook(opexpr->hashfuncid);
-				}
-
 				/* Set up the primary fmgr lookup information */
 				finfo = palloc0(sizeof(FmgrInfo));
 				fcinfo = palloc0(SizeForFunctionCallInfo(2));
@@ -2045,8 +2037,6 @@ ExecInitFunc(ExprEvalStep *scratch, Expr *node, List *args, Oid funcid,
 	FunctionCallInfo fcinfo;
 	int			argno;
 	ListCell   *lc;
-
-	InvokeFunctionExecuteHook(funcid);
 
 	/*
 	 * Safety check on nargs.  Under normal circumstances this should never
@@ -3021,8 +3011,6 @@ ExecBuildGroupingEqual(TupleDesc ldesc, TupleDesc rdesc,
 		FmgrInfo   *finfo;
 		FunctionCallInfo fcinfo;
 
-		InvokeFunctionExecuteHook(foid);
-
 		/* Set up the primary fmgr lookup information */
 		finfo = palloc0(sizeof(FmgrInfo));
 		fcinfo = palloc0(SizeForFunctionCallInfo(2));
@@ -3148,8 +3136,6 @@ ExecBuildParamSetEqual(TupleDesc desc,
 		Oid			collid = collations[attno];
 		FmgrInfo   *finfo;
 		FunctionCallInfo fcinfo;
-
-		InvokeFunctionExecuteHook(foid);
 
 		/* Set up the primary fmgr lookup information */
 		finfo = palloc0(sizeof(FmgrInfo));

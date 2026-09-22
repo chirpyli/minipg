@@ -24,7 +24,6 @@
 #include "catalog/dependency.h"
 #include "catalog/indexing.h"
 #include "catalog/namespace.h"
-#include "catalog/objectaccess.h"
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_operator.h"
 #include "catalog/pg_proc.h"
@@ -269,9 +268,6 @@ OperatorShellMake(const char *operatorName,
 	makeOperatorDependencies(tup, false);
 
 	heap_freetuple(tup);
-
-	/* Post creation hook for new shell operator */
-	InvokeObjectPostCreateHook(OperatorRelationId, operatorObjectId, 0);
 
 	/*
 	 * Make sure the tuple is visible for subsequent lookups/updates.
@@ -538,9 +534,6 @@ OperatorCreate(const char *operatorName,
 
 	/* Add dependencies for the entry */
 	address = makeOperatorDependencies(tup, isUpdate);
-
-	/* Post creation hook for new operator */
-	InvokeObjectPostCreateHook(OperatorRelationId, operatorObjectId, 0);
 
 	table_close(pg_operator_desc, RowExclusiveLock);
 

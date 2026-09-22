@@ -16,7 +16,6 @@
 #include "access/htup_details.h"
 #include "executor/execdebug.h"
 #include "executor/nodeAgg.h"
-#include "executor/nodeAppend.h"
 #include "executor/nodeBitmapAnd.h"
 #include "executor/nodeBitmapHeapscan.h"
 #include "executor/nodeBitmapIndexscan.h"
@@ -121,10 +120,6 @@ ExecReScan(PlanState *node)
 
 		case T_ModifyTableState:
 			ExecReScanModifyTable((ModifyTableState *) node);
-			break;
-
-		case T_AppendState:
-			ExecReScanAppend((AppendState *) node);
 			break;
 
 		case T_BitmapAndState:
@@ -368,21 +363,6 @@ ExecSupportsMarkRestore(Path *pathnode)
 				return false;	/* childless Result */
 			}
 
-		case T_Append:
-			{
-				AppendPath *appendPath = castNode(AppendPath, pathnode);
-
-				/*
-				 * If there's exactly one child, then there will be no Append
-				 * in the final plan, so we can handle mark/restore if the
-				 * child plan node can.
-				 */
-				if (list_length(appendPath->subpaths) == 1)
-					return ExecSupportsMarkRestore((Path *) linitial(appendPath->subpaths));
-				/* Otherwise, Append can't handle it */
-				return false;
-			}
-
 		default:
 			break;
 	}
@@ -411,19 +391,6 @@ ExecSupportsBackwardScan(Plan *node)
 				return ExecSupportsBackwardScan(outerPlan(node));
 			else
 				return false;
-
-		case T_Append:
-			{
-				ListCell   *l;
-
-				foreach(l, ((Append *) node)->appendplans)
-				{
-					if (!ExecSupportsBackwardScan((Plan *) lfirst(l)))
-						return false;
-				}
-				/* need not check tlist because Append doesn't evaluate it */
-				return true;
-			}
 
 		default:
 			return false;

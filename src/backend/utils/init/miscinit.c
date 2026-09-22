@@ -229,12 +229,6 @@ GetBackendTypeDesc(BackendType backendType)
 		case B_INVALID:
 			backendDesc = "not initialized";
 			break;
-		case B_AUTOVAC_LAUNCHER:
-			backendDesc = "autovacuum launcher";
-			break;
-		case B_AUTOVAC_WORKER:
-			backendDesc = "autovacuum worker";
-			break;
 		case B_BACKEND:
 			backendDesc = "client backend";
 			break;
@@ -246,9 +240,6 @@ GetBackendTypeDesc(BackendType backendType)
 			break;
 		case B_STARTUP:
 			backendDesc = "startup";
-			break;
-		case B_WAL_RECEIVER:
-			backendDesc = "walreceiver";
 			break;
 		case B_WAL_SENDER:
 			backendDesc = "walsender";
@@ -1451,100 +1442,3 @@ ValidatePgVersion(const char *path)
 						   file_version_string, my_version_string)));
 }
 
-/*-------------------------------------------------------------------------
- *				Library preload support
- *-------------------------------------------------------------------------
- */
-
-/*
- * GUC variables: lists of library names to be preloaded at postmaster
- * start and at backend start
- */
-char	   *session_preload_libraries_string = NULL;
-char	   *shared_preload_libraries_string = NULL;
-char	   *local_preload_libraries_string = NULL;
-
-/* Flag telling that we are loading shared_preload_libraries */
-bool		process_shared_preload_libraries_in_progress = false;
-
-/*
- * load the shared libraries listed in 'libraries'
- *
- * 'gucname': name of GUC variable, for error reports
- * 'restricted': if true, force libraries to be in $libdir/plugins/
- */
-static void
-load_libraries(const char *libraries, const char *gucname, bool restricted)
-{
-	char	   *rawstring;
-	List	   *elemlist;
-	ListCell   *l;
-
-	if (libraries == NULL || libraries[0] == '\0')
-		return;					/* nothing to do */
-
-	/* Need a modifiable copy of string */
-	rawstring = pstrdup(libraries);
-
-	/* Parse string into list of filename paths */
-	if (!SplitDirectoriesString(rawstring, ',', &elemlist))
-	{
-		/* syntax error in list */
-		list_free_deep(elemlist);
-		pfree(rawstring);
-		ereport(LOG,
-				(errcode(ERRCODE_SYNTAX_ERROR),
-				 errmsg("invalid list syntax in parameter \"%s\"",
-						gucname)));
-		return;
-	}
-
-	foreach(l, elemlist)
-	{
-		/* Note that filename was already canonicalized */
-		char	   *filename = (char *) lfirst(l);
-		char	   *expanded = NULL;
-
-		/* If restricting, insert $libdir/plugins if not mentioned already */
-		if (restricted && first_dir_separator(filename) == NULL)
-		{
-			expanded = psprintf("$libdir/plugins/%s", filename);
-			filename = expanded;
-		}
-		load_file(filename, restricted);
-		ereport(DEBUG1,
-				(errmsg_internal("loaded library \"%s\"", filename)));
-		if (expanded)
-			pfree(expanded);
-	}
-
-	list_free_deep(elemlist);
-	pfree(rawstring);
-}
-
-/*
- * process any libraries that should be preloaded at postmaster start
- */
-void
-process_shared_preload_libraries(void)
-{
-	process_shared_preload_libraries_in_progress = true;
-	load_libraries(shared_preload_libraries_string,
-				   "shared_preload_libraries",
-				   false);
-	process_shared_preload_libraries_in_progress = false;
-}
-
-/*
- * process any libraries that should be preloaded at backend start
- */
-void
-process_session_preload_libraries(void)
-{
-	load_libraries(session_preload_libraries_string,
-				   "session_preload_libraries",
-				   false);
-	load_libraries(local_preload_libraries_string,
-				   "local_preload_libraries",
-				   true);
-}

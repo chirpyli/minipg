@@ -32,8 +32,7 @@ char	   *const pgresStatus[] = {
 	"PGRES_TUPLES_OK",
 	"PGRES_BAD_RESPONSE",
 	"PGRES_NONFATAL_ERROR",
-	"PGRES_FATAL_ERROR",
-	"PGRES_SINGLE_TUPLE"
+	"PGRES_FATAL_ERROR"
 };
 
 /*
@@ -160,7 +159,6 @@ PQmakeEmptyPGresult(PGconn *conn, ExecStatusType status)
 			case PGRES_EMPTY_QUERY:
 			case PGRES_COMMAND_OK:
 			case PGRES_TUPLES_OK:
-			case PGRES_SINGLE_TUPLE:
 				/* non-error cases */
 				break;
 			default:
@@ -242,117 +240,6 @@ PQsetResultAttrs(PGresult *res, int numAttributes, PGresAttDesc *attDescs)
 	}
 
 	return true;
-}
-
-/*
- * PQcopyResult
- *
- * Returns a deep copy of the provided 'src' PGresult, which cannot be NULL.
- * The 'flags' argument controls which portions of the result will or will
- * NOT be copied.  The created result is always put into the
- * PGRES_TUPLES_OK status.  The source result error message is not copied,
- * although cmdStatus is.
- *
- * To set custom attributes, use PQsetResultAttrs.  That function requires
- * that there are no attrs contained in the result, so to use that
- * function you cannot use the PG_COPYRES_ATTRS or PG_COPYRES_TUPLES
- * options with this function.
- *
- * Options:
- *	 PG_COPYRES_ATTRS - Copy the source result's attributes
- *
- *	 PG_COPYRES_TUPLES - Copy the source result's tuples.  This implies
- *	 copying the attrs, seeing how the attrs are needed by the tuples.
- *
- *	 PG_COPYRES_EVENTS - Copy the source result's events.
- *
- *	 PG_COPYRES_NOTICEHOOKS - Copy the source result's notice hooks.
- */
-PGresult *
-PQcopyResult(const PGresult *src, int flags)
-{
-	PGresult   *dest;
-	int			i;
-
-	if (!src)
-		return NULL;
-
-	dest = PQmakeEmptyPGresult(NULL, PGRES_TUPLES_OK);
-	if (!dest)
-		return NULL;
-
-	/* Always copy these over.  Is cmdStatus really useful here? */
-	dest->client_encoding = src->client_encoding;
-	strcpy(dest->cmdStatus, src->cmdStatus);
-
-	/* Wants attrs? */
-	if (flags & (PG_COPYRES_ATTRS | PG_COPYRES_TUPLES))
-	{
-		if (!PQsetResultAttrs(dest, src->numAttributes, src->attDescs))
-		{
-			PQclear(dest);
-			return NULL;
-		}
-	}
-
-	/* Wants to copy tuples? */
-	if (flags & PG_COPYRES_TUPLES)
-	{
-		int			tup,
-					field;
-
-		for (tup = 0; tup < src->ntups; tup++)
-		{
-			for (field = 0; field < src->numAttributes; field++)
-			{
-				if (!PQsetvalue(dest, tup, field,
-								src->tuples[tup][field].value,
-								src->tuples[tup][field].len))
-				{
-					PQclear(dest);
-					return NULL;
-				}
-			}
-		}
-	}
-
-	/* Wants to copy notice hooks? */
-	if (flags & PG_COPYRES_NOTICEHOOKS)
-		dest->noticeHooks = src->noticeHooks;
-
-	/* Wants to copy PGEvents? */
-	if ((flags & PG_COPYRES_EVENTS) && src->nEvents > 0)
-	{
-		dest->events = dupEvents(src->events, src->nEvents,
-								 &dest->memorySize);
-		if (!dest->events)
-		{
-			PQclear(dest);
-			return NULL;
-		}
-		dest->nEvents = src->nEvents;
-	}
-
-	/* Okay, trigger PGEVT_RESULTCOPY event */
-	for (i = 0; i < dest->nEvents; i++)
-	{
-		if (src->events[i].resultInitialized)
-		{
-			PGEventResultCopy evt;
-
-			evt.src = src;
-			evt.dest = dest;
-			if (!dest->events[i].proc(PGEVT_RESULTCOPY, &evt,
-									  dest->events[i].passThrough))
-			{
-				PQclear(dest);
-				return NULL;
-			}
-			dest->events[i].resultInitialized = true;
-		}
-	}
-
-	return dest;
 }
 
 /*
@@ -719,8 +606,6 @@ PQclear(PGresult *res)
 
 /*
  * Handy subroutine to deallocate any partially constructed async result.
- *
- * Any "next" result gets cleared too.
  */
 void
 pqClearAsyncResult(PGconn *conn)
@@ -728,9 +613,6 @@ pqClearAsyncResult(PGconn *conn)
 	if (conn->result)
 		PQclear(conn->result);
 	conn->result = NULL;
-	if (conn->next_result)
-		PQclear(conn->next_result);
-	conn->next_result = NULL;
 }
 
 /*
@@ -791,14 +673,8 @@ pqPrepareAsyncResult(PGconn *conn)
 	if (!res)
 		res = PQmakeEmptyPGresult(conn, PGRES_FATAL_ERROR);
 
-	/*
-	 * Replace conn->result with next_result, if any.  In the normal case
-	 * there isn't a next result and we're just dropping ownership of the
-	 * current result.  In single-row mode this restores the situation to what
-	 * it was before we created the current single-row result.
-	 */
-	conn->result = conn->next_result;
-	conn->next_result = NULL;
+	/* We're handing off ownership of the current result, so forget it. */
+	conn->result = NULL;
 
 	return res;
 }
@@ -1074,11 +950,6 @@ pqSaveParameterStatus(PGconn *conn, const char *name, const char *value)
  *
  * On error, *errmsgp can be set to an error string to be returned.
  * If it is left NULL, the error is presumed to be "out of memory".
- *
- * In single-row mode, we create a new result holding just the current row,
- * stashing the previous result in conn->next_result so that it becomes
- * active again after pqPrepareAsyncResult().  This allows the result metadata
- * (column descriptions) to be carried forward to each result row.
  */
 int
 pqRowProcessor(PGconn *conn, const char **errmsgp)
@@ -1088,21 +959,6 @@ pqRowProcessor(PGconn *conn, const char **errmsgp)
 	const PGdataValue *columns = conn->rowBuf;
 	PGresAttValue *tup;
 	int			i;
-
-	/*
-	 * In single-row mode, make a new PGresult that will hold just this one
-	 * row; the original conn->result is left unchanged so that it can be used
-	 * again as the template for future rows.
-	 */
-	if (conn->singleRowMode)
-	{
-		/* Copy everything that should be in the result at this point */
-		res = PQcopyResult(res,
-						   PG_COPYRES_ATTRS | PG_COPYRES_EVENTS |
-						   PG_COPYRES_NOTICEHOOKS);
-		if (!res)
-			return 0;
-	}
 
 	/*
 	 * Basically we just allocate space in the PGresult for each field and
@@ -1150,27 +1006,9 @@ pqRowProcessor(PGconn *conn, const char **errmsgp)
 	if (!pqAddTuple(res, tup, errmsgp))
 		goto fail;
 
-	/*
-	 * Success.  In single-row mode, make the result available to the client
-	 * immediately.
-	 */
-	if (conn->singleRowMode)
-	{
-		/* Change result status to special single-row value */
-		res->resultStatus = PGRES_SINGLE_TUPLE;
-		/* Stash old result for re-use later */
-		conn->next_result = conn->result;
-		conn->result = res;
-		/* And mark the result ready to return */
-		conn->asyncStatus = PGASYNC_READY_MORE;
-	}
-
 	return 1;
 
 fail:
-	/* release locally allocated PGresult, if we made one */
-	if (res != conn->result)
-		PQclear(res);
 	return 0;
 }
 
@@ -1349,8 +1187,6 @@ PQsendQueryInternal(PGconn *conn, const char *query, bool newQuery)
 		return 0;
 	}
 
-	/* remember we are using simple query protocol */
-	entry->queryclass = PGQUERY_SIMPLE;
 	/* and remember the query text too, if possible */
 	entry->query = strdup(query);
 
@@ -1410,36 +1246,8 @@ PQsendQueryStart(PGconn *conn, bool newQuery)
 	 */
 	pqClearAsyncResult(conn);
 
-	/* reset single-row processing mode */
-	conn->singleRowMode = false;
-
 	/* ready to send command message */
 	return true;
-}
-
-/*
- * Select row-by-row processing mode
- */
-int
-PQsetSingleRowMode(PGconn *conn)
-{
-	/*
-	 * Only allow setting the flag when we have launched a query and not yet
-	 * received any results.
-	 */
-	if (!conn)
-		return 0;
-	if (conn->asyncStatus != PGASYNC_BUSY)
-		return 0;
-	if (!conn->cmd_queue_head ||
-		conn->cmd_queue_head->queryclass != PGQUERY_SIMPLE)
-		return 0;
-	if (conn->result)
-		return 0;
-
-	/* OK, set flag */
-	conn->singleRowMode = true;
-	return 1;
 }
 
 /*
@@ -1598,11 +1406,6 @@ PQgetResult(PGconn *conn)
 			if (res)
 				pqCommandQueueAdvance(conn, false);
 
-			/* Set the state back to BUSY, allowing parsing to proceed. */
-			conn->asyncStatus = PGASYNC_BUSY;
-			break;
-		case PGASYNC_READY_MORE:
-			res = pqPrepareAsyncResult(conn);
 			/* Set the state back to BUSY, allowing parsing to proceed. */
 			conn->asyncStatus = PGASYNC_BUSY;
 			break;

@@ -33,10 +33,6 @@
 
 static void does_not_exist_skipping(ObjectType objtype,
 									Node *object);
-static bool schema_does_not_exist_skipping(List *object,
-										   const char **msg, char **name);
-static bool type_in_list_does_not_exist_skipping(List *typenames,
-												 const char **msg, char **name);
 
 
 /*
@@ -112,78 +108,6 @@ RemoveObjects(DropStmt *stmt)
 }
 
 /*
- * schema_does_not_exist_skipping
- *		Subroutine for RemoveObjects
- *
- * After determining that a specification for a schema-qualifiable object
- * refers to an object that does not exist, test whether the specified schema
- * exists or not.  If no schema was specified, or if the schema does exist,
- * return false -- the object itself is missing instead.  If the specified
- * schema does not exist, fill the error message format string and the
- * specified schema name, and return true.
- */
-static bool
-schema_does_not_exist_skipping(List *object, const char **msg, char **name)
-{
-	RangeVar   *rel;
-
-	rel = makeRangeVarFromNameList(object);
-
-	if (rel->schemaname != NULL &&
-		!OidIsValid(LookupNamespaceNoError(rel->schemaname)))
-	{
-		*msg = gettext_noop("schema \"%s\" does not exist, skipping");
-		*name = rel->schemaname;
-
-		return true;
-	}
-
-	return false;
-}
-
-/*
- * type_in_list_does_not_exist_skipping
- *		Subroutine for RemoveObjects
- *
- * After determining that a specification for a function, cast, aggregate or
- * operator returns that the specified object does not exist, test whether the
- * involved datatypes, and their schemas, exist or not; if they do, return
- * false --- the original object itself is missing instead.  If the datatypes
- * or schemas do not exist, fill the error message format string and the
- * missing name, and return true.
- *
- * First parameter is a list of TypeNames.
- */
-static bool
-type_in_list_does_not_exist_skipping(List *typenames, const char **msg,
-									 char **name)
-{
-	ListCell   *l;
-
-	foreach(l, typenames)
-	{
-		TypeName   *typeName = lfirst_node(TypeName, l);
-
-		if (typeName != NULL)
-		{
-			if (!OidIsValid(LookupTypeNameOid(NULL, typeName, true)))
-			{
-				/* type doesn't exist, try to find why */
-				if (schema_does_not_exist_skipping(typeName->names, msg, name))
-					return true;
-
-				*msg = gettext_noop("type \"%s\" does not exist, skipping");
-				*name = TypeNameToString(typeName);
-
-				return true;
-			}
-		}
-	}
-
-	return false;
-}
-
-/*
  * does_not_exist_skipping
  *		Subroutine for RemoveObjects
  *
@@ -196,54 +120,17 @@ does_not_exist_skipping(ObjectType objtype, Node *object)
 {
 	const char *msg = NULL;
 	char	   *name = NULL;
-	char	   *args = NULL;
 
 	switch (objtype)
 	{
-		case OBJECT_COLLATION:
-			if (!schema_does_not_exist_skipping(castNode(List, object), &msg, &name))
-			{
-				msg = gettext_noop("collation \"%s\" does not exist, skipping");
-				name = NameListToString(castNode(List, object));
-			}
-			break;
 		case OBJECT_SCHEMA:
 			msg = gettext_noop("schema \"%s\" does not exist, skipping");
 			name = strVal((Value *) object);
 			break;
-		case OBJECT_FUNCTION:
-			{
-				ObjectWithArgs *owa = castNode(ObjectWithArgs, object);
-
-				if (!schema_does_not_exist_skipping(owa->objname, &msg, &name) &&
-					!type_in_list_does_not_exist_skipping(owa->objargs, &msg, &name))
-				{
-					msg = gettext_noop("function %s(%s) does not exist, skipping");
-					name = NameListToString(owa->objname);
-					args = TypeNameListToString(owa->objargs);
-				}
-				break;
-			}
-		case OBJECT_PROCEDURE:
-			{
-				ObjectWithArgs *owa = castNode(ObjectWithArgs, object);
-
-				if (!schema_does_not_exist_skipping(owa->objname, &msg, &name) &&
-					!type_in_list_does_not_exist_skipping(owa->objargs, &msg, &name))
-				{
-					msg = gettext_noop("procedure %s(%s) does not exist, skipping");
-					name = NameListToString(owa->objname);
-					args = TypeNameListToString(owa->objargs);
-				}
-				break;
-			}
 		default:
 			elog(ERROR, "unrecognized object type: %d", (int) objtype);
 			break;
 	}
 
-	if (!args)
-		ereport(NOTICE, (errmsg(msg, name)));
-	else
-		ereport(NOTICE, (errmsg(msg, name, args)));
+	ereport(NOTICE, (errmsg(msg, name)));
 }

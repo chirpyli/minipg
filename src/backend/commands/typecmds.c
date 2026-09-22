@@ -28,7 +28,6 @@
 #include "access/xact.h"
 #include "catalog/catalog.h"
 #include "catalog/heap.h"
-#include "catalog/objectaccess.h"
 #include "catalog/pg_am.h"
 #include "catalog/pg_cast.h"
 #include "catalog/pg_collation.h"
@@ -233,8 +232,6 @@ AlterTypeNamespaceInternal(Oid typeOid, Oid nspOid,
 								NamespaceRelationId, oldNspOid, nspOid) != 1)
 			elog(ERROR, "failed to change schema dependency for type %s",
 				 format_type_be(typeOid));
-
-	InvokeObjectPostAlterHook(TypeRelationId, typeOid, 0);
 
 	heap_freetuple(tup);
 

@@ -38,7 +38,6 @@
 #include "catalog/dependency.h"
 #include "catalog/heap.h"
 #include "catalog/index.h"
-#include "catalog/objectaccess.h"
 #include "catalog/pg_am.h"
 #include "catalog/pg_collation.h"
 #include "catalog/pg_constraint.h"
@@ -981,10 +980,6 @@ index_create(Relation heapRelation,
 		Assert((flags & INDEX_CREATE_ADD_CONSTRAINT) == 0);
 	}
 
-	/* Post creation hook for new index */
-	InvokeObjectPostCreateHookArg(RelationRelationId,
-								  indexRelationId, 0, is_internal);
-
 	/*
 	 * Advance the command counter so that we can see the newly-entered
 	 * catalog tuples for the index.
@@ -1658,9 +1653,6 @@ index_constraint_create(Relation heapRelation,
 			 */
 			if (marked_as_primary)
 				CacheInvalidateRelcache(heapRelation);
-
-			InvokeObjectPostAlterHookArg(IndexRelationId, indexRelationId, 0,
-										 InvalidOid, is_internal);
 		}
 
 		heap_freetuple(indexTuple);

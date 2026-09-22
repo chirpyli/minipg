@@ -937,19 +937,18 @@ create_tidrangescan_path(PlannerInfo *root, RelOptInfo *rel,
 }
 
 /*
- * create_append_path
- *	  Creates a path corresponding to an Append plan, returning the
- *	  pathnode.
+ * create_dummy_append_path
+ *	  Creates a path representing a relation that is provably empty.
  *
- * Note that we must handle subpaths = NIL, representing a dummy access path.
+ * Such a relation is represented by an AppendPath with no subpaths;
+ * create_append_plan turns it into a Result plan with a constant-false
+ * gating qual.  This is a convenient representation because it means that
+ * when we build an appendrel and find that all its children have been
+ * excluded, no extra action is needed to recognize the relation as dummy.
  * Also, there are callers that pass root = NULL.
  */
 AppendPath *
-create_append_path(PlannerInfo *root,
-				   RelOptInfo *rel,
-				   List *subpaths,
-				   List *pathkeys, Relids required_outer,
-				   double rows)
+create_dummy_append_path(PlannerInfo *root, RelOptInfo *rel)
 {
 	AppendPath *pathnode = makeNode(AppendPath);
 
@@ -962,34 +961,13 @@ create_append_path(PlannerInfo *root,
 	 * get_appendrel_parampathinfo.
 	 */
 	pathnode->path.param_info = get_appendrel_parampathinfo(rel,
-															required_outer);
+															rel->lateral_relids);
 
-	pathnode->path.pathkeys = pathkeys;
+	pathnode->path.pathkeys = NIL;
 
-	pathnode->subpaths = subpaths;
+	pathnode->subpaths = NIL;
 
-	/*
-	 * If there's exactly one child path, the Append is a no-op and will be
-	 * discarded later (in setrefs.c); therefore, we can inherit the child's
-	 * size and cost, as well as its pathkeys if any (overriding whatever the
-	 * caller might've said).  Otherwise, we must do the normal costsize
-	 * calculation.
-	 */
-	if (list_length(pathnode->subpaths) == 1)
-	{
-		Path	   *child = (Path *) linitial(pathnode->subpaths);
-
-		pathnode->path.rows = child->rows;
-		pathnode->path.startup_cost = child->startup_cost;
-		pathnode->path.total_cost = child->total_cost;
-		pathnode->path.pathkeys = child->pathkeys;
-	}
-	else
-		cost_append(pathnode);
-
-	/* If the caller provided a row estimate, override the computed value. */
-	if (rows >= 0)
-		pathnode->path.rows = rows;
+	cost_append(pathnode);
 
 	return pathnode;
 }

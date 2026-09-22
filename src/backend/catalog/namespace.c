@@ -23,7 +23,6 @@
 #include "access/xact.h"
 #include "access/xlog.h"
 #include "catalog/dependency.h"
-#include "catalog/objectaccess.h"
 #include "catalog/pg_collation.h"
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_opclass.h"
@@ -1967,9 +1966,6 @@ LookupExplicitNamespace(const char *nspname, bool missing_ok)
 	if (missing_ok && !OidIsValid(namespaceId))
 		return InvalidOid;
 
-	/* Schema search hook for this lookup */
-	InvokeNamespaceSearchHook(namespaceId, true);
-
 	return namespaceId;
 }
 
@@ -2490,9 +2486,7 @@ recomputeNamespacePath(void)
 			rname = GetUserNameFromId(roleid, false);
 			namespaceId = get_namespace_oid(rname, true);
 			if (OidIsValid(namespaceId) &&
-				!list_member_oid(oidlist, namespaceId) &&
-				true &&
-				InvokeNamespaceSearchHook(namespaceId, false))
+				!list_member_oid(oidlist, namespaceId))
 				oidlist = lappend_oid(oidlist, namespaceId);
 		}
 		else
@@ -2500,9 +2494,7 @@ recomputeNamespacePath(void)
 			/* normal namespace reference */
 			namespaceId = get_namespace_oid(curname, true);
 			if (OidIsValid(namespaceId) &&
-				!list_member_oid(oidlist, namespaceId) &&
-				true &&
-				InvokeNamespaceSearchHook(namespaceId, false))
+				!list_member_oid(oidlist, namespaceId))
 				oidlist = lappend_oid(oidlist, namespaceId);
 		}
 	}

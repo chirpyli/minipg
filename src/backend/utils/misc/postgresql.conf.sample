@@ -83,7 +83,6 @@
 #work_mem = 4MB				# min 64kB
 #hash_mem_multiplier = 1.0		# 1-1000.0 multiplier on hash table work_mem
 #maintenance_work_mem = 64MB		# min 1MB
-#autovacuum_work_mem = -1		# min 1MB, or -1 to use maintenance_work_mem
 #max_stack_depth = 2MB			# min 100kB
 #shared_memory_type = mmap		# the default is the first option
 					# supported by the operating system:
@@ -354,11 +353,6 @@
 #debug_print_rewritten = off
 #debug_print_plan = off
 #debug_pretty_print = on
-#log_autovacuum_min_duration = -1	# log autovacuum activity;
-					# -1 disables, 0 logs all actions and
-					# their durations, > 0 logs only
-					# actions running at least this number
-					# of milliseconds.
 #log_checkpoints = off
 #log_error_verbosity = default		# terse, default, or verbose messages
 #log_hostname = off
@@ -493,16 +487,6 @@
 
 # default configuration for text search
 #default_text_search_config = 'pg_catalog.simple'
-
-# - Shared Library Preloading -
-
-#local_preload_libraries = ''
-#session_preload_libraries = ''
-#shared_preload_libraries = ''	# (change requires restart)
-
-# - Other Defaults -
-
-#dynamic_library_path = '$libdir'
 
 
 #------------------------------------------------------------------------------

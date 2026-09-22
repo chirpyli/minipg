@@ -514,8 +514,8 @@ PortalStart(Portal portal, ParamListInfo params,
  *		Select the format codes for a portal's output.
  *
  * This must be run after PortalStart for a portal that will be read by
- * a DestRemote or DestRemoteExecute destination.  It is not presently needed
- * for other destination types.
+ * a DestRemote destination.  It is not presently needed for other
+ * destination types.
  *
  * formats[] is the client format request, as per Bind message conventions.
  */
@@ -1016,21 +1016,6 @@ PortalRunMulti(Portal portal,
 {
 	bool		active_snapshot_set = false;
 	ListCell   *stmtlist_item;
-
-	/*
-	 * If the destination is DestRemoteExecute, change to DestNone.  The
-	 * reason is that the client won't be expecting any tuples, and indeed has
-	 * no way to know what they are, since there is no provision for Describe
-	 * to send a RowDescription message when this portal execution strategy is
-	 * in effect.  This presently will only affect SELECT commands added to
-	 * non-SELECT queries by rewrite rules: such commands will be executed,
-	 * but the results will be discarded unless you use "simple Query"
-	 * protocol.
-	 */
-	if (dest->mydest == DestRemoteExecute)
-		dest = None_Receiver;
-	if (altdest->mydest == DestRemoteExecute)
-		altdest = None_Receiver;
 
 	/*
 	 * Loop to handle the individual queries generated from a single parsetree

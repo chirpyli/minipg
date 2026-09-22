@@ -60,10 +60,8 @@ extern TidRangePath *create_tidrangescan_path(PlannerInfo *root,
 											  RelOptInfo *rel,
 											  List *tidrangequals,
 											  Relids required_outer);
-extern AppendPath *create_append_path(PlannerInfo *root, RelOptInfo *rel,
-									  List *subpaths,
-									  List *pathkeys, Relids required_outer,
-									  double rows);
+extern AppendPath *create_dummy_append_path(PlannerInfo *root,
+											RelOptInfo *rel);
 extern GroupResultPath *create_group_result_path(PlannerInfo *root,
 												 RelOptInfo *rel,
 												 PathTarget *target,
