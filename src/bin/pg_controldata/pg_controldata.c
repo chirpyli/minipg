@@ -281,16 +281,6 @@ main(int argc, char *argv[])
 		   ckpttime_str);
 	printf(_("Fake LSN counter for unlogged rels:   %X/%X\n"),
 		   LSN_FORMAT_ARGS(ControlFile->unloggedLSN));
-	printf(_("Minimum recovery ending location:     %X/%X\n"),
-		   LSN_FORMAT_ARGS(ControlFile->minRecoveryPoint));
-	printf(_("Min recovery ending loc's timeline:   %u\n"),
-		   ControlFile->minRecoveryPointTLI);
-	printf(_("Backup start location:                %X/%X\n"),
-		   LSN_FORMAT_ARGS(ControlFile->backupStartPoint));
-	printf(_("Backup end location:                  %X/%X\n"),
-		   LSN_FORMAT_ARGS(ControlFile->backupEndPoint));
-	printf(_("End-of-backup record required:        %s\n"),
-		   ControlFile->backupEndRequired ? _("yes") : _("no"));
 	printf(_("wal_level setting:                    %s\n"),
 		   wal_level_str(ControlFile->wal_level));
 	printf(_("wal_log_hints setting:                %s\n"),

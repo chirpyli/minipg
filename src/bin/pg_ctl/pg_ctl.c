@@ -58,7 +58,6 @@ typedef enum
 	RESTART_COMMAND,
 	RELOAD_COMMAND,
 	STATUS_COMMAND,
-	PROMOTE_COMMAND,
 	LOGROTATE_COMMAND,
 	KILL_COMMAND
 } CtlCommand;
@@ -91,7 +90,6 @@ static char postopts_file[MAXPGPATH];
 static char version_file[MAXPGPATH];
 static char pid_file[MAXPGPATH];
 static char backup_file[MAXPGPATH];
-static char promote_file[MAXPGPATH];
 static char logrotate_file[MAXPGPATH];
 
 static volatile pgpid_t postmasterPID = -1;
@@ -108,7 +106,6 @@ static void do_stop(void);
 static void do_restart(void);
 static void do_reload(void);
 static void do_status(void);
-static void do_promote(void);
 static void do_logrotate(void);
 static void do_kill(pgpid_t pid);
 static void print_msg(const char *msg);
@@ -122,7 +119,6 @@ static void read_post_opts(void);
 
 static WaitPMResult wait_for_postmaster_start(pgpid_t pm_pid, bool do_checkpoint);
 static bool wait_for_postmaster_stop(void);
-static bool wait_for_postmaster_promote(void);
 static bool postmaster_is_alive(pid_t pid);
 
 #if defined(HAVE_GETRLIMIT) && defined(RLIMIT_CORE)
@@ -557,38 +553,6 @@ wait_for_postmaster_stop(void)
 }
 
 
-/*
- * Wait for the postmaster to promote.
- *
- * Returns true on success, else false.
- * To avoid waiting uselessly, we check for postmaster death here too.
- */
-static bool
-wait_for_postmaster_promote(void)
-{
-	int			cnt;
-
-	for (cnt = 0; cnt < wait_seconds * WAITS_PER_SEC; cnt++)
-	{
-		pgpid_t		pid;
-		DBState		state;
-
-		if ((pid = get_pgpid(false)) == 0)
-			return false;		/* pid file is gone */
-		if (kill((pid_t) pid, 0) != 0)
-			return false;		/* postmaster died */
-
-		state = get_control_dbstate();
-		if (state == DB_IN_PRODUCTION)
-			return true;		/* successful promotion */
-
-		if (cnt % WAITS_PER_SEC == 0)
-			print_msg(".");
-		pg_usleep(USEC_PER_SEC / WAITS_PER_SEC);
-	}
-	return false;				/* timeout reached */
-}
-
 
 #if defined(HAVE_GETRLIMIT) && defined(RLIMIT_CORE)
 static void
@@ -1014,87 +978,6 @@ do_reload(void)
 
 
 /*
- * promote
- */
-
-static void
-do_promote(void)
-{
-	FILE	   *prmfile;
-	pgpid_t		pid;
-
-	pid = get_pgpid(false);
-
-	if (pid == 0)				/* no pid file */
-	{
-		write_stderr(_("%s: PID file \"%s\" does not exist\n"), progname, pid_file);
-		write_stderr(_("Is server running?\n"));
-		exit(1);
-	}
-	else if (pid < 0)			/* standalone backend, not postmaster */
-	{
-		pid = -pid;
-		write_stderr(_("%s: cannot promote server; "
-					   "single-user server is running (PID: %ld)\n"),
-					 progname, pid);
-		exit(1);
-	}
-
-	if (get_control_dbstate() != DB_IN_ARCHIVE_RECOVERY)
-	{
-		write_stderr(_("%s: cannot promote server; "
-					   "server is not in standby mode\n"),
-					 progname);
-		exit(1);
-	}
-
-	snprintf(promote_file, MAXPGPATH, "%s/promote", pg_data);
-
-	if ((prmfile = fopen(promote_file, "w")) == NULL)
-	{
-		write_stderr(_("%s: could not create promote signal file \"%s\": %s\n"),
-					 progname, promote_file, strerror(errno));
-		exit(1);
-	}
-	if (fclose(prmfile))
-	{
-		write_stderr(_("%s: could not write promote signal file \"%s\": %s\n"),
-					 progname, promote_file, strerror(errno));
-		exit(1);
-	}
-
-	sig = SIGUSR1;
-	if (kill((pid_t) pid, sig) != 0)
-	{
-		write_stderr(_("%s: could not send promote signal (PID: %ld): %s\n"),
-					 progname, pid, strerror(errno));
-		if (unlink(promote_file) != 0)
-			write_stderr(_("%s: could not remove promote signal file \"%s\": %s\n"),
-						 progname, promote_file, strerror(errno));
-		exit(1);
-	}
-
-	if (do_wait)
-	{
-		print_msg(_("waiting for server to promote..."));
-		if (wait_for_postmaster_promote())
-		{
-			print_msg(_(" done\n"));
-			print_msg(_("server promoted\n"));
-		}
-		else
-		{
-			print_msg(_(" stopped waiting\n"));
-			write_stderr(_("%s: server did not promote in time\n"),
-						 progname);
-			exit(1);
-		}
-	}
-	else
-		print_msg(_("server promoting\n"));
-}
-
-/*
  * log rotate
  */
 
@@ -1267,7 +1150,6 @@ do_help(void)
 			 "                    [-o OPTIONS] [-c]\n"), progname);
 	printf(_("  %s reload     [-D DATADIR] [-s]\n"), progname);
 	printf(_("  %s status     [-D DATADIR]\n"), progname);
-	printf(_("  %s promote    [-D DATADIR] [-W] [-t SECS] [-s]\n"), progname);
 	printf(_("  %s logrotate  [-D DATADIR] [-s]\n"), progname);
 	printf(_("  %s kill       SIGNALNAME PID\n"), progname);
 
@@ -1641,8 +1523,6 @@ main(int argc, char **argv)
 				ctl_command = RELOAD_COMMAND;
 			else if (strcmp(argv[optind], "status") == 0)
 				ctl_command = STATUS_COMMAND;
-			else if (strcmp(argv[optind], "promote") == 0)
-				ctl_command = PROMOTE_COMMAND;
 			else if (strcmp(argv[optind], "logrotate") == 0)
 				ctl_command = LOGROTATE_COMMAND;
 			else if (strcmp(argv[optind], "kill") == 0)
@@ -1739,9 +1619,6 @@ main(int argc, char **argv)
 			break;
 		case RELOAD_COMMAND:
 			do_reload();
-			break;
-		case PROMOTE_COMMAND:
-			do_promote();
 			break;
 		case LOGROTATE_COMMAND:
 			do_logrotate();

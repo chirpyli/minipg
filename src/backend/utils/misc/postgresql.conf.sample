@@ -223,23 +223,12 @@
 				# method to choose sync standbys, number of sync standbys,
 				# and comma-separated list of application_name
 				# from standby(s); '*' = all
-#vacuum_defer_cleanup_age = 0	# number of xacts by which cleanup is delayed
 
 # - Standby Servers -
 
 # These settings are ignored on a primary server.
 
-#primary_conninfo = ''			# connection string to sending server
-#primary_slot_name = ''			# replication slot on sending server
-#promote_trigger_file = ''		# file name whose presence ends recovery
 #hot_standby = on			# "off" disallows queries during recovery
-					# (change requires restart)
-#max_standby_archive_delay = 30s	# max delay before canceling queries
-					# when reading WAL from archive;
-					# -1 allows indefinite delay
-#max_standby_streaming_delay = 30s	# max delay before canceling queries
-					# when reading streaming WAL;
-					# -1 allows indefinite delay
 #wal_retrieve_retry_interval = 5s	# time to wait before retrying to
 					# retrieve WAL after a failed attempt
 #recovery_min_apply_delay = 0		# minimum delay for applying changes during recovery
@@ -381,7 +370,6 @@
 					#   %% = '%'
 					# e.g. '<%u%%%d> '
 #log_lock_waits = off			# log lock waits >= deadlock_timeout
-#log_recovery_conflict_waits = off	# log standby recovery conflict waits
 					# >= deadlock_timeout
 #log_temp_files = -1			# log temporary files equal or larger
 					# than the specified size in kilobytes;
