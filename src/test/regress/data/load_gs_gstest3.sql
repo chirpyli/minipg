@@ -1,2 +1,0 @@
-INSERT INTO gstest3 VALUES (1,1,1,1);
-INSERT INTO gstest3 VALUES (2,2,2,2);

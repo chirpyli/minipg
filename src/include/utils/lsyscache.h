@@ -108,15 +108,11 @@ extern Datum get_attoptions(Oid relid, int16 attnum);
 extern Oid	get_cast_oid(Oid sourcetypeid, Oid targettypeid, bool missing_ok);
 extern char *get_collation_name(Oid colloid);
 extern bool get_collation_isdeterministic(Oid colloid);
-extern char *get_constraint_name(Oid conoid);
 extern Oid	get_constraint_index(Oid conoid);
 extern Oid	get_opclass_family(Oid opclass);
 extern Oid	get_opclass_input_type(Oid opclass);
-extern bool get_opclass_opfamily_and_input_type(Oid opclass,
-												Oid *opfamily, Oid *opcintype);
 extern RegProcedure get_opcode(Oid opno);
 extern char *get_opname(Oid opno);
-extern Oid	get_op_rettype(Oid opno);
 extern void op_input_types(Oid opno, Oid *lefttype, Oid *righttype);
 extern bool op_mergejoinable(Oid opno, Oid inputtype);
 extern bool op_hashjoinable(Oid opno, Oid inputtype);
@@ -127,11 +123,8 @@ extern Oid	get_negator(Oid opno);
 extern RegProcedure get_oprrest(Oid opno);
 extern RegProcedure get_oprjoin(Oid opno);
 extern char *get_func_name(Oid funcid);
-extern Oid	get_func_namespace(Oid funcid);
 extern Oid	get_func_rettype(Oid funcid);
-extern int	get_func_nargs(Oid funcid);
 extern Oid	get_func_signature(Oid funcid, Oid **argtypes, int *nargs);
-extern Oid	get_func_variadictype(Oid funcid);
 extern bool get_func_retset(Oid funcid);
 extern bool func_strict(Oid funcid);
 extern char func_volatile(Oid funcid);
@@ -144,10 +137,8 @@ extern Oid	get_rel_namespace(Oid relid);
 extern Oid	get_rel_type_id(Oid relid);
 extern char get_rel_relkind(Oid relid);
 extern Oid	get_rel_tablespace(Oid relid);
-extern char get_rel_persistence(Oid relid);
 extern bool get_typisdefined(Oid typid);
 extern int16 get_typlen(Oid typid);
-extern bool get_typbyval(Oid typid);
 extern void get_typlenbyval(Oid typid, int16 *typlen, bool *typbyval);
 extern void get_typlenbyvalalign(Oid typid, int16 *typlen, bool *typbyval,
 								 char *typalign);
@@ -175,7 +166,6 @@ extern void getTypeInputInfo(Oid type, Oid *typInput, Oid *typIOParam);
 extern void getTypeOutputInfo(Oid type, Oid *typOutput, bool *typIsVarlena);
 extern void getTypeBinaryInputInfo(Oid type, Oid *typReceive, Oid *typIOParam);
 extern void getTypeBinaryOutputInfo(Oid type, Oid *typSend, bool *typIsVarlena);
-extern Oid	get_typmodin(Oid typid);
 extern Oid	get_typcollation(Oid typid);
 extern bool type_is_collatable(Oid typid);
 extern RegProcedure get_typsubscript(Oid typid, Oid *typelemp);
@@ -189,7 +179,6 @@ extern bool get_attstatsslot(AttStatsSlot *sslot, HeapTuple statstuple,
 							 int reqkind, Oid reqop, int flags);
 extern void free_attstatsslot(AttStatsSlot *sslot);
 extern char *get_namespace_name(Oid nspid);
-extern Oid	get_index_column_opclass(Oid index_oid, int attno);
 extern bool get_index_isvalid(Oid index_oid);
 
 

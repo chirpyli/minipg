@@ -28,8 +28,6 @@
 #include "catalog/pg_type.h"
 #include "executor/executor.h"
 #include "executor/nodeAgg.h"
-#include "lib/bipartite_match.h"
-#include "lib/knapsack.h"
 #include "miscadmin.h"
 #include "nodes/makefuncs.h"
 #include "nodes/nodeFuncs.h"

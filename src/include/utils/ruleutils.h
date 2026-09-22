@@ -34,6 +34,5 @@ extern List *set_deparse_context_plan(List *dpcontext,
 extern List *select_rtable_names_for_explain(List *rtable,
 											 Bitmapset *rels_used);
 extern char *generate_collation_name(Oid collid);
-extern char *generate_opclass_name(Oid opclass);
 
 #endif							/* RULEUTILS_H */

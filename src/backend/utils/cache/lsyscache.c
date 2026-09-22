@@ -1142,33 +1142,6 @@ get_collation_isdeterministic(Oid colloid)
 
 /*				---------- CONSTRAINT CACHE ----------					 */
 
-/*
- * get_constraint_name
- *		Returns the name of a given pg_constraint entry.
- *
- * Returns a palloc'd copy of the string, or NULL if no such constraint.
- *
- * NOTE: since constraint name is not unique, be wary of code that uses this
- * for anything except preparing error messages.
- */
-char *
-get_constraint_name(Oid conoid)
-{
-	HeapTuple	tp;
-
-	tp = SearchSysCache1(CONSTROID, ObjectIdGetDatum(conoid));
-	if (HeapTupleIsValid(tp))
-	{
-		Form_pg_constraint contup = (Form_pg_constraint) GETSTRUCT(tp);
-		char	   *result;
-
-		result = pstrdup(NameStr(contup->conname));
-		ReleaseSysCache(tp);
-		return result;
-	}
-	else
-		return NULL;
-}
 
 /*
  * get_constraint_index
@@ -1252,31 +1225,6 @@ get_opclass_input_type(Oid opclass)
 	return result;
 }
 
-/*
- * get_opclass_opfamily_and_input_type
- *
- *		Returns the OID of the operator family the opclass belongs to,
- *				the OID of the datatype the opclass indexes
- */
-bool
-get_opclass_opfamily_and_input_type(Oid opclass, Oid *opfamily, Oid *opcintype)
-{
-	HeapTuple	tp;
-	Form_pg_opclass cla_tup;
-
-	tp = SearchSysCache1(CLAOID, ObjectIdGetDatum(opclass));
-	if (!HeapTupleIsValid(tp))
-		return false;
-
-	cla_tup = (Form_pg_opclass) GETSTRUCT(tp);
-
-	*opfamily = cla_tup->opcfamily;
-	*opcintype = cla_tup->opcintype;
-
-	ReleaseSysCache(tp);
-
-	return true;
-}
 
 /*				---------- OPERATOR CACHE ----------					 */
 
@@ -1330,28 +1278,6 @@ get_opname(Oid opno)
 		return NULL;
 }
 
-/*
- * get_op_rettype
- *		Given operator oid, return the operator's result type.
- */
-Oid
-get_op_rettype(Oid opno)
-{
-	HeapTuple	tp;
-
-	tp = SearchSysCache1(OPEROID, ObjectIdGetDatum(opno));
-	if (HeapTupleIsValid(tp))
-	{
-		Form_pg_operator optup = (Form_pg_operator) GETSTRUCT(tp);
-		Oid			result;
-
-		result = optup->oprresult;
-		ReleaseSysCache(tp);
-		return result;
-	}
-	else
-		return InvalidOid;
-}
 
 /*
  * op_input_types
@@ -1617,29 +1543,6 @@ get_func_name(Oid funcid)
 		return NULL;
 }
 
-/*
- * get_func_namespace
- *
- *		Returns the pg_namespace OID associated with a given function.
- */
-Oid
-get_func_namespace(Oid funcid)
-{
-	HeapTuple	tp;
-
-	tp = SearchSysCache1(PROCOID, ObjectIdGetDatum(funcid));
-	if (HeapTupleIsValid(tp))
-	{
-		Form_pg_proc functup = (Form_pg_proc) GETSTRUCT(tp);
-		Oid			result;
-
-		result = functup->pronamespace;
-		ReleaseSysCache(tp);
-		return result;
-	}
-	else
-		return InvalidOid;
-}
 
 /*
  * get_func_rettype
@@ -1660,24 +1563,6 @@ get_func_rettype(Oid funcid)
 	return result;
 }
 
-/*
- * get_func_nargs
- *		Given procedure id, return the number of arguments.
- */
-int
-get_func_nargs(Oid funcid)
-{
-	HeapTuple	tp;
-	int			result;
-
-	tp = SearchSysCache1(PROCOID, ObjectIdGetDatum(funcid));
-	if (!HeapTupleIsValid(tp))
-		elog(ERROR, "cache lookup failed for function %u", funcid);
-
-	result = ((Form_pg_proc) GETSTRUCT(tp))->pronargs;
-	ReleaseSysCache(tp);
-	return result;
-}
 
 /*
  * get_func_signature
@@ -1709,24 +1594,6 @@ get_func_signature(Oid funcid, Oid **argtypes, int *nargs)
 	return result;
 }
 
-/*
- * get_func_variadictype
- *		Given procedure id, return the function's provariadic field.
- */
-Oid
-get_func_variadictype(Oid funcid)
-{
-	HeapTuple	tp;
-	Oid			result;
-
-	tp = SearchSysCache1(PROCOID, ObjectIdGetDatum(funcid));
-	if (!HeapTupleIsValid(tp))
-		elog(ERROR, "cache lookup failed for function %u", funcid);
-
-	result = ((Form_pg_proc) GETSTRUCT(tp))->provariadic;
-	ReleaseSysCache(tp);
-	return result;
-}
 
 /*
  * get_func_retset
@@ -2021,27 +1888,6 @@ get_rel_tablespace(Oid relid)
 		return InvalidOid;
 }
 
-/*
- * get_rel_persistence
- *
- *		Returns the relpersistence associated with a given relation.
- */
-char
-get_rel_persistence(Oid relid)
-{
-	HeapTuple	tp;
-	Form_pg_class reltup;
-	char		result;
-
-	tp = SearchSysCache1(RELOID, ObjectIdGetDatum(relid));
-	if (!HeapTupleIsValid(tp))
-		elog(ERROR, "cache lookup failed for relation %u", relid);
-	reltup = (Form_pg_class) GETSTRUCT(tp);
-	result = reltup->relpersistence;
-	ReleaseSysCache(tp);
-
-	return result;
-}
 
 
 /*				---------- TYPE CACHE ----------						 */
@@ -2095,30 +1941,6 @@ get_typlen(Oid typid)
 		return 0;
 }
 
-/*
- * get_typbyval
- *
- *		Given the type OID, determine whether the type is returned by value or
- *		not.  Returns true if by value, false if by reference.
- */
-bool
-get_typbyval(Oid typid)
-{
-	HeapTuple	tp;
-
-	tp = SearchSysCache1(TYPEOID, ObjectIdGetDatum(typid));
-	if (HeapTupleIsValid(tp))
-	{
-		Form_pg_type typtup = (Form_pg_type) GETSTRUCT(tp);
-		bool		result;
-
-		result = typtup->typbyval;
-		ReleaseSysCache(tp);
-		return result;
-	}
-	else
-		return false;
-}
 
 /*
  * get_typlenbyval
@@ -2695,29 +2517,6 @@ getTypeBinaryOutputInfo(Oid type, Oid *typSend, bool *typIsVarlena)
 	ReleaseSysCache(typeTuple);
 }
 
-/*
- * get_typmodin
- *
- *		Given the type OID, return the type's typmodin procedure, if any.
- */
-Oid
-get_typmodin(Oid typid)
-{
-	HeapTuple	tp;
-
-	tp = SearchSysCache1(TYPEOID, ObjectIdGetDatum(typid));
-	if (HeapTupleIsValid(tp))
-	{
-		Form_pg_type typtup = (Form_pg_type) GETSTRUCT(tp);
-		Oid			result;
-
-		result = typtup->typmodin;
-		ReleaseSysCache(tp);
-		return result;
-	}
-	else
-		return InvalidOid;
-}
 
 #ifdef NOT_USED
 /*
@@ -3087,55 +2886,6 @@ get_namespace_name(Oid nspid)
 
 /*				---------- PG_INDEX CACHE ----------				 */
 
-/*
- * get_index_column_opclass
- *
- *		Given the index OID and column number,
- *		return opclass of the index column
- *			or InvalidOid if the index was not found
- *				or column is non-key one.
- */
-Oid
-get_index_column_opclass(Oid index_oid, int attno)
-{
-	HeapTuple	tuple;
-	Form_pg_index rd_index PG_USED_FOR_ASSERTS_ONLY;
-	Datum		datum;
-	bool		isnull;
-	oidvector  *indclass;
-	Oid			opclass;
-
-	/* First we need to know the column's opclass. */
-
-	tuple = SearchSysCache1(INDEXRELID, ObjectIdGetDatum(index_oid));
-	if (!HeapTupleIsValid(tuple))
-		return InvalidOid;
-
-	rd_index = (Form_pg_index) GETSTRUCT(tuple);
-
-	/* caller is supposed to guarantee this */
-	Assert(attno > 0 && attno <= rd_index->indnatts);
-
-	/* Non-key attributes don't have an opclass */
-	if (attno > rd_index->indnkeyatts)
-	{
-		ReleaseSysCache(tuple);
-		return InvalidOid;
-	}
-
-	datum = SysCacheGetAttr(INDEXRELID, tuple,
-							Anum_pg_index_indclass, &isnull);
-	Assert(!isnull);
-
-	indclass = ((oidvector *) DatumGetPointer(datum));
-
-	Assert(attno <= indclass->dim1);
-	opclass = indclass->values[attno - 1];
-
-	ReleaseSysCache(tuple);
-
-	return opclass;
-}
 
 /*
  * get_index_isvalid

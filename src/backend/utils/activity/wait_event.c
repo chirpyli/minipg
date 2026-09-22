@@ -252,12 +252,6 @@ pgstat_get_wait_client(WaitEventClient w)
 		case WAIT_EVENT_CLIENT_WRITE:
 			event_name = "ClientWrite";
 			break;
-		case WAIT_EVENT_LIBPQWALRECEIVER_CONNECT:
-			event_name = "LibPQWalReceiverConnect";
-			break;
-		case WAIT_EVENT_LIBPQWALRECEIVER_RECEIVE:
-			event_name = "LibPQWalReceiverReceive";
-			break;
 			/* no default case, so that compiler will warn */
 	}
 

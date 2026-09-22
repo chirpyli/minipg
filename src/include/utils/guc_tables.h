@@ -263,7 +263,6 @@ extern const char *const GucContext_Names[];
 extern const char *const GucSource_Names[];
 
 /* get the current set of variables */
-extern struct config_generic **get_guc_variables(void);
 
 extern void build_guc_variables(void);
 

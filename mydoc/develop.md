@@ -431,3 +431,108 @@ fe-protocol3.c 的 '1'/'2'/'3'/'t'/'n'/'s' 分支；每步需全量重编译 + c
 - 手工验证 pg_get_viewdef 四条路径（regclass / name / pretty / psql \d+）
   输出正确。
 - 净删除约 2400 行（10 个文件，-2462/+56）。
+
+======================================================================
+裁剪记录：A 档——死代码与残留清理（lib/ 死模块、recovery_gen、并行成本宏、
+LibPQWalReceiver 等待事件、测试残留数据文件）
+======================================================================
+裁剪范围
+--------
+- lib/ 五个零消费者模块（BRIN、postgres_fdw 已裁后的残留）：删除
+  backend/lib/bloomfilter.c、integerset.c、rbtree.c、knapsack.c、
+  bipartite_match.c 及对应 include/lib/*.h（共 10 个文件，约 2650 行）；
+  同步 backend/lib/Makefile 的 OBJS（去掉 5 个 .o）、
+  optimizer/plan/planner.c 仅有的两个 include（lib/knapsack.h、
+  lib/bipartite_match.h，实际无任何调用）。
+- fe_utils/recovery_gen.c/.h（GenerateRecoveryConfig，仅 pg_basebackup 使用，
+  已裁）：删除文件并从 fe_utils/Makefile 去掉 recovery_gen.o。
+- optimizer/cost.h：删除 DEFAULT_PARALLEL_TUPLE_COST / DEFAULT_PARALLEL_SETUP_COST
+  两个无引用的并行查询成本默认值宏（并行查询已裁）。
+- utils/activity/wait_event.{h,c}：删除 WAIT_EVENT_LIBPQWALRECEIVER_CONNECT /
+  RECEIVE 两个复制相关等待事件（walsender/walreceiver 已裁）及对应字符串映射。
+- test/regress/data/ 中 11 个无引用的残留数据文件：jsonb.data、load_numeric.sql、
+  load_interval.sql、load_enum.sql、load_plpgsql.sql、load_gs_gstest2.sql、
+  load_gs_gstest3.sql、constrf.data、constro.data、real_city.data、streets.data
+  （对应功能 numeric/interval/jsonb/enum/plpgsql/GROUPING SETS/约束/继承几何
+  均已裁；保留仍被活测试引用的 rect.data、student.data、stud_emp.data 等）。
+
+经核查无需裁剪的项（A 档原计划中的）
+--------------------------------------
+- A4 ALTER TABLE 死分支：AT_AddIndex / AT_AddIndexConstraint / CONSTR_DEFAULT
+  并非死代码，它们由 CREATE TABLE 的列 UNIQUE/PRIMARY KEY 约束在
+  parse_utilcmd.c 内部转换生成（serve 活功能），全部保留。
+- A6 tablespace DDL 死函数：前序批次已清理，tablespace.c 仅剩活的
+  TablespaceCreateDbspace（被 smgr/md.c 调用），无需再动。
+- A2 nodeAgg 分组集残骸：经深入核查，AggStatePerPhaseData 的 numsets /
+  gset_lengths / grouped_cols 实为普通聚合（尤其 AGG_HASHED）复用 grouping-sets
+  基础设施（如 nodeAgg.c:3127 `i = phasedata->numsets++`、3137
+  `gset_lengths[i]=numCols` 用于构建等式比较函数），非纯死代码；
+  仅 projected_set 因分组集语法裁掉而不可达，但与之交织的执行逻辑
+  （nodeAgg.c 1980-2175）是聚合核心，清理需重构 nodeAgg，回归风险高，故保留。
+
+为什么可裁剪
+------------
+1. lib 五个模块在全树零调用者：bloomfilter/integerset/rbtree 连 include 都没有，
+   knapsack/bipartite_match 只有 planner.c 的 include 而无任何调用（本服务于
+   BRIN / postgres_fdw，均已裁）。
+2. recovery_gen 仅被已裁的 pg_basebackup 使用；并行成本宏、LibPQWalReceiver 等待
+   事件、各测试 data 文件均对应已裁功能，是纯残留。
+3. 以上删除不改变任何功能行为，属于零功能损失的死代码清理。
+
+测试与验证
+----------
+- 全量干净重编译（先 ./configure 再 make）：0 error、0 warning（注意项目
+  configure 未启用 --enable-depend，改头文件后必须全量重编译，见文首说明）。
+- make check-world 全部通过：regress 66/66、isolation 23/23。
+
+待审计项（A 档中需配合后续决策/逐符号审计的）
+---------------------------------------------
+- A3 GUC 与配置残留：recovery_target* / max_standby_* / vacuum_defer_cleanup_age /
+  promote_trigger_file / wal_retrieve_retry_interval / trace_recovery_messages 等
+  GUC，多数因 hot standby（C 档未裁）保留仍有消费者，需配合 C 档 hot standby
+  决策做专门审计后再清理；postgresql.conf.sample 的 REPLICATION/Recovery 段同理。
+A8 死函数审计（已完成）
+----------------------
+审计方法：以目标文件编译产物（nm 的 T 符号）为导出函数全集，在全树 .c/.h 中统计
+`func(` 出现次数，=2（定义 + 头声明）判为无调用者；再逐项排除三类"伪死函数"：
+(a) 同文件内部调用（如 get_typsubscript 被 getSubscriptingRoutines 调用）；
+(b) 头文件宏间接引用（如 TypeIsToastable 宏引用 get_typstorage）；
+(c) 被 pg_proc.dat 引用的 SQL 函数（如 pg_identify_object、show_all_settings）。
+
+删除清单（共 31 个导出函数，另含级联清理的 static 辅助与前向声明）：
+- utils/cache/lsyscache.c（10）：get_constraint_name、get_func_namespace、
+  get_func_nargs、get_func_variadictype、get_index_column_opclass、
+  get_opclass_opfamily_and_input_type、get_op_rettype、get_rel_persistence、
+  get_typbyval、get_typmodin（连带 lsyscache.h 声明）。保留 get_typsubscript
+  （同文件调用）、get_typstorage（头文件宏引用）。
+- catalog/objectaddress.c（6）：get_object_address_rv、get_object_namespace、
+  get_object_catcache_name、get_object_attnum_acl、get_object_type、
+  getObjectDescriptionOids（连带 objectaddress.h 声明）。保留 4 个 SQL 函数
+  pg_describe_object / pg_get_object_address / pg_identify_object /
+  pg_identify_object_as_address。
+- utils/adt/ruleutils.c（2 + 1 级联 static）：generate_opclass_name、
+  generate_operator_clause，及其唯一调用者消失后的 static add_cast_to（连带
+  ruleutils.h / builtins.h 声明）。保留 7 个 pg_get_* SQL 函数。
+- utils/misc/guc.c（11 + 7 级联）：DefineCustom{Bool,Int,Real,String,Enum}Variable、
+  EmitWarningsOnPlaceholders、EstimateGUCStateSpace、SerializeGUCState、
+  GetConfigOptionFlags、get_guc_variables，及级联的 init_custom_variable、
+  define_custom_variable、estimate_variable_size、serialize_variable、do_serialize、
+  do_serialize_binary、reapply_stacked_values（连同 guc.h / guc_tables.h 声明）。
+  保留 flex 生成的 GUC_yy* 与 set_config_by_name / show_* 等 SQL 函数。
+- utils/misc/guc-file.l 与生成的 .c（2 + 1 级联 static）：FreeConfigVariables、
+  FreeConfigVariable。
+
+为什么可裁剪：以上函数在全树（含同文件调用与头文件宏）均无调用者，属扩展 API、
+并行 worker 的 GUC 序列化、已裁功能遗留的缓存查询辅助等，删除零功能损失。
+
+教训：仅统计"其他 .c 文件中的引用"会漏掉同文件调用与 .h 宏引用，必须用
+"定义+声明 = 2"判据并逐一复核 pg_proc.dat / flex 生成函数；否则会误删并导致
+链接失败（本次实测误删 get_typsubscript、get_typstorage 后由链接器暴露）。
+另：C 函数边界不可靠 sed/awk 按括号计数自动判定（字符串/注释会使计数失衡），
+须肉眼核对后按确认行号删除。
+
+测试与验证
+----------
+- 全量编译：0 error、0 warning（级联 -Wunused-function 警告已全部消除）。
+- make check-world 通过：regress 66/66。
+

@@ -14,13 +14,8 @@ include $(top_builddir)/src/Makefile.global
 
 OBJS = \
 	binaryheap.o \
-	bipartite_match.o \
-	bloomfilter.o \
 	hyperloglog.o \
 	ilist.o \
-	integerset.o \
-	knapsack.o \
 	pairingheap.o \
-	rbtree.o \
 
 include $(top_srcdir)/src/backend/common.mk

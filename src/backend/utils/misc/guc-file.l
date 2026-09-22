@@ -46,7 +46,6 @@ static unsigned int ConfigFileLineno;
 static const char *GUC_flex_fatal_errmsg;
 static sigjmp_buf *GUC_flex_fatal_jmp;
 
-static void FreeConfigVariable(ConfigVariable *item);
 
 static void record_config_file_error(const char *errmsg,
 						 const char *config_file,
@@ -842,40 +841,6 @@ cleanup:
 	return OK;
 }
 
-/*
- * Free a list of ConfigVariables, including the names and the values
- */
-void
-FreeConfigVariables(ConfigVariable *list)
-{
-	ConfigVariable *item;
-
-	item = list;
-	while (item)
-	{
-		ConfigVariable *next = item->next;
-
-		FreeConfigVariable(item);
-		item = next;
-	}
-}
-
-/*
- * Free a single ConfigVariable
- */
-static void
-FreeConfigVariable(ConfigVariable *item)
-{
-	if (item->name)
-		pfree(item->name);
-	if (item->value)
-		pfree(item->value);
-	if (item->errmsg)
-		pfree(item->errmsg);
-	if (item->filename)
-		pfree(item->filename);
-	pfree(item);
-}
 
 
 /*

@@ -147,7 +147,6 @@ extern bool ParseConfigFile(const char *config_file, bool strict,
 extern bool ParseConfigFp(FILE *fp, const char *config_file,
 						  int elevel,
 						  ConfigVariable **head_p, ConfigVariable **tail_p);
-extern void FreeConfigVariables(ConfigVariable *list);
 extern char *DeescapeQuotedString(const char *s);
 
 /*
@@ -267,72 +266,15 @@ extern bool trace_sort;
 extern void SetConfigOption(const char *name, const char *value,
 							GucContext context, GucSource source);
 
-extern void DefineCustomBoolVariable(const char *name,
-									 const char *short_desc,
-									 const char *long_desc,
-									 bool *valueAddr,
-									 bool bootValue,
-									 GucContext context,
-									 int flags,
-									 GucBoolCheckHook check_hook,
-									 GucBoolAssignHook assign_hook,
-									 GucShowHook show_hook);
 
-extern void DefineCustomIntVariable(const char *name,
-									const char *short_desc,
-									const char *long_desc,
-									int *valueAddr,
-									int bootValue,
-									int minValue,
-									int maxValue,
-									GucContext context,
-									int flags,
-									GucIntCheckHook check_hook,
-									GucIntAssignHook assign_hook,
-									GucShowHook show_hook);
 
-extern void DefineCustomRealVariable(const char *name,
-									 const char *short_desc,
-									 const char *long_desc,
-									 double *valueAddr,
-									 double bootValue,
-									 double minValue,
-									 double maxValue,
-									 GucContext context,
-									 int flags,
-									 GucRealCheckHook check_hook,
-									 GucRealAssignHook assign_hook,
-									 GucShowHook show_hook);
 
-extern void DefineCustomStringVariable(const char *name,
-									   const char *short_desc,
-									   const char *long_desc,
-									   char **valueAddr,
-									   const char *bootValue,
-									   GucContext context,
-									   int flags,
-									   GucStringCheckHook check_hook,
-									   GucStringAssignHook assign_hook,
-									   GucShowHook show_hook);
 
-extern void DefineCustomEnumVariable(const char *name,
-									 const char *short_desc,
-									 const char *long_desc,
-									 int *valueAddr,
-									 int bootValue,
-									 const struct config_enum_entry *options,
-									 GucContext context,
-									 int flags,
-									 GucEnumCheckHook check_hook,
-									 GucEnumAssignHook assign_hook,
-									 GucShowHook show_hook);
 
-extern void EmitWarningsOnPlaceholders(const char *className);
 
 extern const char *GetConfigOption(const char *name, bool missing_ok,
 								   bool restrict_privileged);
 extern const char *GetConfigOptionResetString(const char *name);
-extern int	GetConfigOptionFlags(const char *name, bool missing_ok);
 extern void ProcessConfigFile(GucContext context);
 extern void InitializeGUCOptions(void);
 extern bool SelectConfigFiles(const char *userDoption, const char *progname);
@@ -364,8 +306,6 @@ extern void ExecSetVariableStmt(VariableSetStmt *stmt, bool isTopLevel);
 extern char *ExtractSetVariableArgs(VariableSetStmt *stmt);
 
 /* GUC serialization */
-extern Size EstimateGUCStateSpace(void);
-extern void SerializeGUCState(Size maxsize, char *start_address);
 extern void RestoreGUCState(void *gucstate);
 
 /* Support for messages reported from GUC check hooks */

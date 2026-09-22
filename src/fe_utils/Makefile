@@ -25,7 +25,6 @@ OBJS = \
 	mbprint.o \
 	print.o \
 	psqlscan.o \
-	recovery_gen.o \
 	string_utils.o
 
 all: libpgfeutils.a

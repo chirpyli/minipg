@@ -646,30 +646,6 @@ get_object_address(ObjectType objtype, Node *object,
 	return address;
 }
 
-/*
- * Return an ObjectAddress based on a RangeVar and an object name. The
- * name of the relation identified by the RangeVar is prepended to the
- * (possibly empty) list passed in as object. This is useful to find
- * the ObjectAddress of objects that depend on a relation. All other
- * considerations are exactly as for get_object_address above.
- */
-ObjectAddress
-get_object_address_rv(ObjectType objtype, RangeVar *rel, List *object,
-					  Relation *relp, LOCKMODE lockmode,
-					  bool missing_ok)
-{
-	if (rel)
-	{
-		object = lcons(makeString(rel->relname), object);
-		if (rel->schemaname)
-			object = lcons(makeString(rel->schemaname), object);
-		if (rel->catalogname)
-			object = lcons(makeString(rel->catalogname), object);
-	}
-
-	return get_object_address(objtype, (Node *) object,
-							  relp, lockmode, missing_ok);
-}
 
 /*
  * Find an ObjectAddress for a type of object that is identified by an
@@ -1310,44 +1286,6 @@ pg_get_object_address(PG_FUNCTION_ARGS)
 }
 
 
-/*
- * get_object_namespace
- *
- * Find the schema containing the specified object.  For non-schema objects,
- * this function returns InvalidOid.
- */
-Oid
-get_object_namespace(const ObjectAddress *address)
-{
-	int			cache;
-	HeapTuple	tuple;
-	bool		isnull;
-	Oid			oid;
-	const ObjectPropertyType *property;
-
-	/* If not owned by a namespace, just return InvalidOid. */
-	property = get_object_property_data(address->classId);
-	if (property->attnum_namespace == InvalidAttrNumber)
-		return InvalidOid;
-
-	/* Currently, we can only handle object types with system caches. */
-	cache = property->oid_catcache_id;
-	Assert(cache != -1);
-
-	/* Fetch tuple from syscache and extract namespace attribute. */
-	tuple = SearchSysCache1(cache, ObjectIdGetDatum(address->objectId));
-	if (!HeapTupleIsValid(tuple))
-		elog(ERROR, "cache lookup failed for cache %d oid %u",
-			 cache, address->objectId);
-	oid = DatumGetObjectId(SysCacheGetAttr(cache,
-										   tuple,
-										   property->attnum_namespace,
-										   &isnull));
-	Assert(!isnull);
-	ReleaseSysCache(tuple);
-
-	return oid;
-}
 
 /*
  * Return ObjectType for the given object type as given by
@@ -1399,13 +1337,6 @@ get_object_catcache_oid(Oid class_id)
 	return prop->oid_catcache_id;
 }
 
-int
-get_object_catcache_name(Oid class_id)
-{
-	const ObjectPropertyType *prop = get_object_property_data(class_id);
-
-	return prop->name_catcache_id;
-}
 
 AttrNumber
 get_object_attnum_oid(Oid class_id)
@@ -1431,38 +1362,7 @@ get_object_attnum_namespace(Oid class_id)
 	return prop->attnum_namespace;
 }
 
-AttrNumber
-get_object_attnum_acl(Oid class_id)
-{
-	const ObjectPropertyType *prop = get_object_property_data(class_id);
 
-	return prop->attnum_acl;
-}
-
-/*
- * get_object_type
- *
- * Return the object type associated with a given object.  This routine
- * is primarily used to determine the object type to mention in ACL check
- * error messages, so it's desirable for it to avoid failing.
- */
-ObjectType
-get_object_type(Oid class_id, Oid object_id)
-{
-	const ObjectPropertyType *prop = get_object_property_data(class_id);
-
-	if (prop->objtype == OBJECT_TABLE)
-	{
-		/*
-		 * If the property data says it's a table, dig a little deeper to get
-		 * the real relation kind, so that callers can produce more precise
-		 * error messages.
-		 */
-		return get_relkind_objtype(get_rel_relkind(object_id));
-	}
-	else
-		return prop->objtype;
-}
 
 bool
 get_object_namensp_unique(Oid class_id)
@@ -2075,20 +1975,6 @@ getObjectDescription(const ObjectAddress *object, bool missing_ok)
 	return buffer.data;
 }
 
-/*
- * getObjectDescriptionOids: as above, except the object is specified by Oids
- */
-char *
-getObjectDescriptionOids(Oid classid, Oid objid)
-{
-	ObjectAddress address;
-
-	address.classId = classid;
-	address.objectId = objid;
-	address.objectSubId = 0;
-
-	return getObjectDescription(&address, false);
-}
 
 /*
  * subroutine for getObjectDescription: describe a relation
