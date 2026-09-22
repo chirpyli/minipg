@@ -741,13 +741,8 @@ PostmasterMain(int argc, char *argv[])
 	 * the backup taken from the new primary, the files can exist at server
 	 * startup and must be removed in order to avoid an unexpected promotion.
 	 *
-	 * Note that promotion signal files need to be removed before the startup
-	 * process is invoked. Because, after that, they can be used by
-	 * postmaster's SIGUSR1 signal handler.
+	 * Do the same for logrotate signal file
 	 */
-	RemovePromoteSignalFiles();
-
-	/* Do the same for logrotate signal file */
 	RemoveLogrotateSignalFiles();
 
 	/* Remove any outdated file holding the current log filenames. */

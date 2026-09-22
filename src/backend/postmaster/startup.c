@@ -50,7 +50,6 @@
  */
 static volatile sig_atomic_t got_SIGHUP = false;
 static volatile sig_atomic_t shutdown_requested = false;
-static volatile sig_atomic_t promote_signaled = false;
 
 /*
  * Flag set when executing a restore command, to tell SIGTERM signal handler
@@ -59,7 +58,6 @@ static volatile sig_atomic_t promote_signaled = false;
 static volatile sig_atomic_t in_restore_command = false;
 
 /* Signal handlers */
-static void StartupProcTriggerHandler(SIGNAL_ARGS);
 static void StartupProcSigHupHandler(SIGNAL_ARGS);
 
 /* Callbacks */
@@ -69,18 +67,6 @@ static void StartupProcSigHupHandler(SIGNAL_ARGS);
  *		signal handler routines
  * --------------------------------
  */
-
-/* SIGUSR2: set flag to finish recovery */
-static void
-StartupProcTriggerHandler(SIGNAL_ARGS)
-{
-	int			save_errno = errno;
-
-	promote_signaled = true;
-	WakeupRecovery();
-
-	errno = save_errno;
-}
 
 /* SIGHUP: set flag to re-read config file at next convenient time */
 static void
@@ -196,7 +182,6 @@ StartupProcessMain(void)
 	InitializeTimeouts();		/* establishes SIGALRM handler */
 	pqsignal(SIGPIPE, SIG_IGN);
 	pqsignal(SIGUSR1, procsignal_sigusr1_handler);
-	pqsignal(SIGUSR2, StartupProcTriggerHandler);
 
 	/*
 	 * Reset some signals that are accepted by postmaster but not here
@@ -220,14 +205,4 @@ StartupProcessMain(void)
 	proc_exit(0);
 }
 
-bool
-IsPromoteSignaled(void)
-{
-	return promote_signaled;
-}
 
-void
-ResetPromoteSignaled(void)
-{
-	promote_signaled = false;
-}

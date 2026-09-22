@@ -133,10 +133,7 @@ extern bool track_wal_io_timing;
 /* indirectly set via GUC system */
 extern TransactionId recoveryTargetXid;
 extern char *recovery_target_time_string;
-extern const char *recoveryTargetName;
-extern XLogRecPtr recoveryTargetLSN;
 extern RecoveryTargetType recoveryTarget;
-extern char *PromoteTriggerFile;
 extern RecoveryTargetTimeLineGoal recoveryTargetTimeLineGoal;
 extern TimeLineID recoveryTargetTLIRequested;
 extern TimeLineID recoveryTargetTLI;
@@ -296,10 +293,6 @@ extern XLogRecPtr GetRedoRecPtr(void);
 extern XLogRecPtr GetInsertRecPtr(void);
 extern XLogRecPtr GetFlushRecPtr(void);
 extern XLogRecPtr GetLastImportantRecPtr(void);
-extern void RemovePromoteSignalFiles(void);
-
-extern bool PromoteIsTriggered(void);
-extern bool CheckPromoteSignal(void);
 extern void WakeupRecovery(void);
 extern void SetWalWriterSleeping(bool sleeping);
 
@@ -346,8 +339,5 @@ extern SessionBackupState get_backup_status(void);
 
 #define TABLESPACE_MAP			"tablespace_map"
 #define TABLESPACE_MAP_OLD		"tablespace_map.old"
-
-/* files to signal promotion to primary */
-#define PROMOTE_SIGNAL_FILE		"promote"
 
 #endif							/* XLOG_H */

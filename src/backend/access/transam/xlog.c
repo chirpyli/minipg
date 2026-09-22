@@ -222,7 +222,6 @@ static bool LocalRecoveryInProgress = true;
  * Local copy of SharedHotStandbyActive variable. False actually means "not
  * known, need to check the shared state".
  */
-static bool LocalHotStandbyActive = false;
 
 /*
  * Local copy of SharedPromoteIsTriggered variable. False actually means "not
@@ -877,9 +876,6 @@ static bool holdingAllLocks = false;
 static MemoryContext walDebugCxt = NULL;
 #endif
 
-static void ConfirmRecoveryPaused(void);
-static void recoveryPausesHere(bool endOfRecovery);
-static bool recoveryApplyDelay(XLogReaderState *record);
 static void CheckRequiredParameterValues(void);
 static void XLogReportParameters(void);
 static void checkTimeLineSwitch(XLogRecPtr lsn, TimeLineID newTLI,
@@ -923,8 +919,6 @@ static void InitControlFile(uint64 sysidentifier);
 static void WriteControlFile(void);
 static void ReadControlFile(void);
 static char *str_time(pg_time_t tnow);
-static void SetPromoteIsTriggered(void);
-static bool CheckForStandbyTrigger(void);
 
 #ifdef WAL_DEBUG
 static void xlog_outrec(StringInfo buf, XLogReaderState *record);
@@ -4258,11 +4252,8 @@ ReadRecord(XLogReaderState *xlogreader, int emode,
 				continue;
 			}
 
-			/* In standby mode, loop back to retry. Otherwise, give up. */
-			if (StandbyMode && !CheckForStandbyTrigger())
-				continue;
-			else
-				return NULL;
+			/* Not in standby mode, give up. */
+			return NULL;
 		}
 	}
 }
@@ -5038,245 +5029,7 @@ str_time(pg_time_t tnow)
 	return buf;
 }
 
-/*
- * Extract timestamp from WAL record.
- *
- * If the record contains a timestamp, returns true, and saves the timestamp
- * in *recordXtime. If the record type has no timestamp, returns false.
- * Currently, only transaction commit/abort records and restore points contain
- * timestamps.
- */
-static bool
-getRecordTimestamp(XLogReaderState *record, TimestampTz *recordXtime)
-{
-	uint8		info = XLogRecGetInfo(record) & ~XLR_INFO_MASK;
-	uint8		xact_info = info & XLOG_XACT_OPMASK;
-	uint8		rmid = XLogRecGetRmid(record);
 
-	if (rmid == RM_XLOG_ID && info == XLOG_RESTORE_POINT)
-	{
-		*recordXtime = ((xl_restore_point *) XLogRecGetData(record))->rp_time;
-		return true;
-	}
-	if (rmid == RM_XACT_ID && (xact_info == XLOG_XACT_COMMIT ||
-							   xact_info == XLOG_XACT_COMMIT_PREPARED))
-	{
-		*recordXtime = ((xl_xact_commit *) XLogRecGetData(record))->xact_time;
-		return true;
-	}
-	if (rmid == RM_XACT_ID && (xact_info == XLOG_XACT_ABORT ||
-							   xact_info == XLOG_XACT_ABORT_PREPARED))
-	{
-		*recordXtime = ((xl_xact_abort *) XLogRecGetData(record))->xact_time;
-		return true;
-	}
-	return false;
-}
-
-/*
- * Wait until shared recoveryPauseState is set to RECOVERY_NOT_PAUSED.
- *
- * endOfRecovery is true if the recovery target is reached and
- * the paused state starts at the end of recovery because of
- * recovery_target_action=pause, and false otherwise.
- */
-static void
-recoveryPausesHere(bool endOfRecovery)
-{
-	/* Don't pause unless users can connect! */
-	if (!LocalHotStandbyActive)
-		return;
-
-	/* Don't pause after standby promotion has been triggered */
-	if (LocalPromoteIsTriggered)
-		return;
-
-	if (endOfRecovery)
-		ereport(LOG,
-				(errmsg("pausing at the end of recovery"),
-				 errhint("Execute pg_wal_replay_resume() to promote.")));
-	else
-		ereport(LOG,
-				(errmsg("recovery has paused"),
-				 errhint("Execute pg_wal_replay_resume() to continue.")));
-
-	/* loop until recoveryPauseState is set to RECOVERY_NOT_PAUSED */
-	while (GetRecoveryPauseState() != RECOVERY_NOT_PAUSED)
-	{
-		HandleStartupProcInterrupts();
-		if (CheckForStandbyTrigger())
-			return;
-
-		/*
-		 * If recovery pause is requested then set it paused.  While we are in
-		 * the loop, user might resume and pause again so set this every time.
-		 */
-		ConfirmRecoveryPaused();
-
-		/*
-		 * We wait on a condition variable that will wake us as soon as the
-		 * pause ends, but we use a timeout so we can check the above exit
-		 * condition periodically too.
-		 */
-		ConditionVariableTimedSleep(&XLogCtl->recoveryNotPausedCV, 1000,
-									WAIT_EVENT_RECOVERY_PAUSE);
-	}
-	ConditionVariableCancelSleep();
-}
-
-/*
- * Get the current state of the recovery pause request.
- */
-RecoveryPauseState
-GetRecoveryPauseState(void)
-{
-	RecoveryPauseState state;
-
-	SpinLockAcquire(&XLogCtl->info_lck);
-	state = XLogCtl->recoveryPauseState;
-	SpinLockRelease(&XLogCtl->info_lck);
-
-	return state;
-}
-
-/*
- * Set the recovery pause state.
- *
- * If recovery pause is requested then sets the recovery pause state to
- * 'pause requested' if it is not already 'paused'.  Otherwise, sets it
- * to 'not paused' to resume the recovery.  The recovery pause will be
- * confirmed by the ConfirmRecoveryPaused.
- */
-void
-SetRecoveryPause(bool recoveryPause)
-{
-	SpinLockAcquire(&XLogCtl->info_lck);
-
-	if (!recoveryPause)
-		XLogCtl->recoveryPauseState = RECOVERY_NOT_PAUSED;
-	else if (XLogCtl->recoveryPauseState == RECOVERY_NOT_PAUSED)
-		XLogCtl->recoveryPauseState = RECOVERY_PAUSE_REQUESTED;
-
-	SpinLockRelease(&XLogCtl->info_lck);
-
-	if (!recoveryPause)
-		ConditionVariableBroadcast(&XLogCtl->recoveryNotPausedCV);
-}
-
-/*
- * Confirm the recovery pause by setting the recovery pause state to
- * RECOVERY_PAUSED.
- */
-static void
-ConfirmRecoveryPaused(void)
-{
-	/* If recovery pause is requested then set it paused */
-	SpinLockAcquire(&XLogCtl->info_lck);
-	if (XLogCtl->recoveryPauseState == RECOVERY_PAUSE_REQUESTED)
-		XLogCtl->recoveryPauseState = RECOVERY_PAUSED;
-	SpinLockRelease(&XLogCtl->info_lck);
-}
-
-/*
- * When recovery_min_apply_delay is set, we wait long enough to make sure
- * certain record types are applied at least that interval behind the primary.
- *
- * Returns true if we waited.
- *
- * Note that the delay is calculated between the WAL record log time and
- * the current time on standby. We would prefer to keep track of when this
- * standby received each WAL record, which would allow a more consistent
- * approach and one not affected by time synchronisation issues, but that
- * is significantly more effort and complexity for little actual gain in
- * usability.
- */
-static bool
-recoveryApplyDelay(XLogReaderState *record)
-{
-	uint8		xact_info;
-	TimestampTz xtime;
-	TimestampTz delayUntil;
-	long		msecs;
-
-	/* nothing to do if no delay configured */
-	if (recovery_min_apply_delay <= 0)
-		return false;
-
-	/* no delay is applied on a database not yet consistent */
-	if (!reachedConsistency)
-		return false;
-
-	/* nothing to do if crash recovery is requested */
-	if (!ArchiveRecoveryRequested)
-		return false;
-
-	/*
-	 * Is it a COMMIT record?
-	 *
-	 * We deliberately choose not to delay aborts since they have no effect on
-	 * MVCC. We already allow replay of records that don't have a timestamp,
-	 * so there is already opportunity for issues caused by early conflicts on
-	 * standbys.
-	 */
-	if (XLogRecGetRmid(record) != RM_XACT_ID)
-		return false;
-
-	xact_info = XLogRecGetInfo(record) & XLOG_XACT_OPMASK;
-
-	if (xact_info != XLOG_XACT_COMMIT &&
-		xact_info != XLOG_XACT_COMMIT_PREPARED)
-		return false;
-
-	if (!getRecordTimestamp(record, &xtime))
-		return false;
-
-	delayUntil = TimestampTzPlusMilliseconds(xtime, recovery_min_apply_delay);
-
-	/*
-	 * Exit without arming the latch if it's already past time to apply this
-	 * record
-	 */
-	msecs = TimestampDifferenceMilliseconds(GetCurrentTimestamp(), delayUntil);
-	if (msecs <= 0)
-		return false;
-
-	while (true)
-	{
-		ResetLatch(&XLogCtl->recoveryWakeupLatch);
-
-		/*
-		 * This might change recovery_min_apply_delay or the trigger file's
-		 * location.
-		 */
-		HandleStartupProcInterrupts();
-
-		if (CheckForStandbyTrigger())
-			break;
-
-		/*
-		 * Recalculate delayUntil as recovery_min_apply_delay could have
-		 * changed while waiting in this loop.
-		 */
-		delayUntil = TimestampTzPlusMilliseconds(xtime, recovery_min_apply_delay);
-
-		/*
-		 * Wait for difference between GetCurrentTimestamp() and delayUntil.
-		 */
-		msecs = TimestampDifferenceMilliseconds(GetCurrentTimestamp(),
-												delayUntil);
-
-		if (msecs <= 0)
-			break;
-
-		elog(DEBUG2, "recovery apply delay %ld milliseconds", msecs);
-
-		(void) WaitLatch(&XLogCtl->recoveryWakeupLatch,
-						 WL_LATCH_SET | WL_TIMEOUT | WL_EXIT_ON_PM_DEATH,
-						 msecs,
-						 WAIT_EVENT_RECOVERY_APPLY_DELAY);
-	}
-	return true;
-}
 
 /*
  * Fetch timestamp of latest processed commit/abort record.
@@ -5310,86 +5063,6 @@ GetXLogReceiptTime(TimestampTz *rtime, bool *fromStream)
 	*fromStream = (XLogReceiptSource == XLOG_FROM_STREAM);
 }
 
-/*
- * Note that text field supplied is a parameter name and does not require
- * translation
- */
-static void
-RecoveryRequiresIntParameter(const char *param_name, int currValue, int minValue)
-{
-	if (currValue < minValue)
-	{
-		if (LocalHotStandbyActive)
-		{
-			bool		warned_for_promote = false;
-
-			ereport(WARNING,
-					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-					 errmsg("hot standby is not possible because of insufficient parameter settings"),
-					 errdetail("%s = %d is a lower setting than on the primary server, where its value was %d.",
-							   param_name,
-							   currValue,
-							   minValue)));
-
-			SetRecoveryPause(true);
-
-			ereport(LOG,
-					(errmsg("recovery has paused"),
-					 errdetail("If recovery is unpaused, the server will shut down."),
-					 errhint("You can then restart the server after making the necessary configuration changes.")));
-
-			while (GetRecoveryPauseState() != RECOVERY_NOT_PAUSED)
-			{
-				HandleStartupProcInterrupts();
-
-				if (CheckForStandbyTrigger())
-				{
-					if (!warned_for_promote)
-						ereport(WARNING,
-								(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-								 errmsg("promotion is not possible because of insufficient parameter settings"),
-
-						/*
-						 * Repeat the detail from above so it's easy to find
-						 * in the log.
-						 */
-								 errdetail("%s = %d is a lower setting than on the primary server, where its value was %d.",
-										   param_name,
-										   currValue,
-										   minValue),
-								 errhint("Restart the server after making the necessary configuration changes.")));
-					warned_for_promote = true;
-				}
-
-				/*
-				 * If recovery pause is requested then set it paused.  While
-				 * we are in the loop, user might resume and pause again so
-				 * set this every time.
-				 */
-				ConfirmRecoveryPaused();
-
-				/*
-				 * We wait on a condition variable that will wake us as soon
-				 * as the pause ends, but we use a timeout so we can check the
-				 * above conditions periodically too.
-				 */
-				ConditionVariableTimedSleep(&XLogCtl->recoveryNotPausedCV, 1000,
-											WAIT_EVENT_RECOVERY_PAUSE);
-			}
-			ConditionVariableCancelSleep();
-		}
-
-		ereport(FATAL,
-				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				 errmsg("recovery aborted because of insufficient parameter settings"),
-		/* Repeat the detail from above so it's easy to find in the log. */
-				 errdetail("%s = %d is a lower setting than on the primary server, where its value was %d.",
-						   param_name,
-						   currValue,
-						   minValue),
-				 errhint("You can restart the server after making the necessary configuration changes.")));
-	}
-}
 
 /*
  * Check to see if required parameters are set high enough on this server
@@ -5414,22 +5087,6 @@ CheckRequiredParameterValues(void)
 				 errhint("Use a backup taken after setting wal_level to higher than minimal.")));
 	}
 
-	/*
-	 * For Hot Standby, the WAL must be generated with 'replica' mode, and we
-	 * must have at least as many backend slots as the primary.
-	 */
-	if (ArchiveRecoveryRequested && EnableHotStandby)
-	{
-		RecoveryRequiresIntParameter("max_connections",
-									 MaxConnections,
-									 ControlFile->MaxConnections);
-		RecoveryRequiresIntParameter("max_prepared_transactions",
-									 max_prepared_xacts,
-									 ControlFile->max_prepared_xacts);
-		RecoveryRequiresIntParameter("max_locks_per_transaction",
-									 max_locks_per_xact,
-									 ControlFile->max_locks_per_xact);
-	}
 }
 
 /*
@@ -6229,43 +5886,6 @@ StartupXLOG(void)
 				/* Handle interrupt signals of startup process */
 				HandleStartupProcInterrupts();
 
-				/*
-				 * Pause WAL replay, if requested by a hot-standby session via
-				 * SetRecoveryPause().
-				 *
-				 * Note that we intentionally don't take the info_lck spinlock
-				 * here.  We might therefore read a slightly stale value of
-				 * the recoveryPause flag, but it can't be very stale (no
-				 * worse than the last spinlock we did acquire).  Since a
-				 * pause request is a pretty asynchronous thing anyway,
-				 * possibly responding to it one WAL record later than we
-				 * otherwise would is a minor issue, so it doesn't seem worth
-				 * adding another spinlock cycle to prevent that.
-				 */
-				if (((volatile XLogCtlData *) XLogCtl)->recoveryPauseState !=
-					RECOVERY_NOT_PAUSED)
-					recoveryPausesHere(false);
-
-
-
-				/*
-				 * If we've been asked to lag the primary, wait on latch until
-				 * enough time has passed.
-				 */
-				if (recoveryApplyDelay(xlogreader))
-				{
-					/*
-					 * We test for paused recovery again here. If user sets
-					 * delayed apply, it may be because they expect to pause
-					 * recovery in case of problems, so we must test again
-					 * here otherwise pausing during the delay-wait wouldn't
-					 * work.
-					 */
-					if (((volatile XLogCtlData *) XLogCtl)->recoveryPauseState !=
-						RECOVERY_NOT_PAUSED)
-						recoveryPausesHere(false);
-				}
-
 				/* Setup error traceback support for ereport() */
 				errcallback.callback = rm_redo_error_callback;
 				errcallback.arg = (void *) xlogreader;
@@ -6404,9 +6024,6 @@ StartupXLOG(void)
 						proc_exit(3);
 
 					case RECOVERY_TARGET_ACTION_PAUSE:
-						SetRecoveryPause(true);
-						recoveryPausesHere(true);
-
 						/* drop into promote */
 
 					case RECOVERY_TARGET_ACTION_PROMOTE:
@@ -10869,22 +10486,10 @@ WaitForWALToBecomeAvailable(XLogRecPtr RecPtr, bool randAccess,
 				case XLOG_FROM_PG_WAL:
 
 					/*
-					 * Check to see if the trigger file exists. Note that we
-					 * do this only after failure, so when you create the
-					 * trigger file, we still finish replaying as much as we
-					 * can from archive and pg_wal before failover.
-					 */
-					if (StandbyMode && CheckForStandbyTrigger())
-					{
-						return false;
-					}
-
-					/*
 					 * Not in standby mode, and we've now tried the archive
 					 * and pg_wal.
 					 */
-					if (!StandbyMode)
-						return false;
+					return false;
 
 					/*
 					 * In standby mode with streaming replication removed,
@@ -10978,14 +10583,6 @@ WaitForWALToBecomeAvailable(XLogRecPtr RecPtr, bool randAccess,
 		}
 
 		/*
-		 * Check for recovery pause here so that we can confirm more quickly
-		 * that a requested pause has actually taken effect.
-		 */
-		if (((volatile XLogCtlData *) XLogCtl)->recoveryPauseState !=
-			RECOVERY_NOT_PAUSED)
-			recoveryPausesHere(false);
-
-		/*
 		 * This possibly-long loop needs to handle interrupts of startup
 		 * process.
 		 */
@@ -11052,87 +10649,6 @@ PromoteIsTriggered(void)
 	return LocalPromoteIsTriggered;
 }
 
-static void
-SetPromoteIsTriggered(void)
-{
-	SpinLockAcquire(&XLogCtl->info_lck);
-	XLogCtl->SharedPromoteIsTriggered = true;
-	SpinLockRelease(&XLogCtl->info_lck);
-
-	/*
-	 * Mark the recovery pause state as 'not paused' because the paused state
-	 * ends and promotion continues if a promotion is triggered while recovery
-	 * is paused. Otherwise pg_get_wal_replay_pause_state() can mistakenly
-	 * return 'paused' while a promotion is ongoing.
-	 */
-	SetRecoveryPause(false);
-
-	LocalPromoteIsTriggered = true;
-}
-
-/*
- * Check to see whether the user-specified trigger file exists and whether a
- * promote request has arrived.  If either condition holds, return true.
- */
-static bool
-CheckForStandbyTrigger(void)
-{
-	struct stat stat_buf;
-
-	if (LocalPromoteIsTriggered)
-		return true;
-
-	if (IsPromoteSignaled() && CheckPromoteSignal())
-	{
-		ereport(LOG, (errmsg("received promote request")));
-		RemovePromoteSignalFiles();
-		ResetPromoteSignaled();
-		SetPromoteIsTriggered();
-		return true;
-	}
-
-	if (PromoteTriggerFile == NULL || strcmp(PromoteTriggerFile, "") == 0)
-		return false;
-
-	if (stat(PromoteTriggerFile, &stat_buf) == 0)
-	{
-		ereport(LOG,
-				(errmsg("promote trigger file found: %s", PromoteTriggerFile)));
-		unlink(PromoteTriggerFile);
-		SetPromoteIsTriggered();
-		return true;
-	}
-	else if (errno != ENOENT)
-		ereport(ERROR,
-				(errcode_for_file_access(),
-				 errmsg("could not stat promote trigger file \"%s\": %m",
-						PromoteTriggerFile)));
-
-	return false;
-}
-
-/*
- * Remove the files signaling a standby promotion request.
- */
-void
-RemovePromoteSignalFiles(void)
-{
-	unlink(PROMOTE_SIGNAL_FILE);
-}
-
-/*
- * Check to see if a promote request has arrived.
- */
-bool
-CheckPromoteSignal(void)
-{
-	struct stat stat_buf;
-
-	if (stat(PROMOTE_SIGNAL_FILE, &stat_buf) == 0)
-		return true;
-
-	return false;
-}
 
 /*
  * Wake up startup process to replay newly arrived WAL, or to notice that
