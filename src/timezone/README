@@ -5,51 +5,25 @@ This is a PostgreSQL adapted version of the IANA timezone library from
 	https://www.iana.org/time-zones
 
 The latest version of the timezone data and library source code is
-available right from that page.  It's best to get the merged file
-tzdb-NNNNX.tar.lz, since the other archive formats omit tzdata.zi.
-Historical versions, as well as release announcements, can be found
-elsewhere on the site.
-
-Since time zone rules change frequently in some parts of the world,
-we should endeavor to update the data files before each PostgreSQL
-release.  The code need not be updated as often, but we must track
-changes that might affect interpretation of the data files.
+available right from that page.  Historical versions, as well as release
+announcements, can be found elsewhere on the site.
 
 
 Time Zone data
 ==============
 
-We distribute the time zone source data as-is under src/timezone/data/.
-Currently, we distribute just the abbreviated single-file format
-"tzdata.zi", to reduce the size of our tarballs as well as churn
-in our git repo.  Feeding that file to zic produces the same compiled
-output as feeding the bulkier individual data files would do.
+minipg does not ship any IANA timezone data, and there is no timezone
+compiler (zic) in the source tree.  The only timezones available are the
+fixed-offset UTC zones ("UTC" and the historical "Etc" area, including their
+legacy aliases) and POSIX-style specifications such as "UTC-2" or "<+08>-8".
+The fixed-offset zones are defined by a built-in table in pgtz.c, so no data
+files are installed and nothing is read from the filesystem at run time.
 
-While data/tzdata.zi can just be duplicated when updating, manual effort
-is needed to update the time zone abbreviation lists under tznames/.
-These need to be changed whenever new abbreviations are invented or the
-UTC offset associated with an existing abbreviation changes.  To detect
-if this has happened, after installing new files under data/ do
-	make abbrevs.txt
-which will produce a file showing all abbreviations that are in current
-use according to the data/ files.  Compare this to known_abbrevs.txt,
-which is the list that existed last time the tznames/ files were updated.
-Update tznames/ as seems appropriate, then replace known_abbrevs.txt
-in the same commit.  Usually, if a known abbreviation has changed meaning,
-the appropriate fix is to make it refer to a long-form zone name instead
-of a fixed GMT offset.
-
-The core regression test suite does some simple validation of the zone
-data and abbreviations data (notably by checking that the pg_timezone_names
-and pg_timezone_abbrevs views don't throw errors).  It's worth running it
-as a cross-check on proposed updates.
-
-When there has been a new release of Windows (probably including Service
-Packs), the list of matching timezones need to be updated. Run the
-script in src/tools/win32tzlist.pl on a Windows machine running this new
-release and apply any new timezones that it detects. Never remove any
-mappings in case they are removed in Windows, since we still need to
-match properly on the old version.
+The abbreviation sets under tznames/ are unaffected by this: they define time
+zone abbreviations as fixed UTC offsets, for use by the
+timezone_abbreviations parameter.  The core regression test suite does some
+simple validation of the abbreviation data, so it's worth running it as a
+cross-check on proposed updates to those files.
 
 
 Time Zone code
@@ -75,7 +49,7 @@ includes relying on configure's results rather than hand-hacked
 
 * Similarly, avoid relying on <stdint.h> features that may not exist on old
 systems.  In particular this means using Postgres' definitions of the int32
-and int64 typedefs, not int_fast32_t/int_fast64_t.  Likewise we use
+and int64 typedefs, not int_fast32_t/int64_t.  Likewise we use
 PG_INT32_MIN/MAX not INT32_MIN/MAX.  (Once we desupport all PG versions
 that don't require C99, it'd be practical to rely on <stdint.h> and remove
 this set of diffs; but that day is not yet.)
@@ -85,23 +59,15 @@ of the <time.h> functions, we must avoid conflicting with those.  This
 mandates renaming typedef time_t to pg_time_t, and similarly for most
 other exposed names.
 
-* zic.c's typedef "lineno" is renamed to "lineno_t", because having
-"lineno" in our typedefs list would cause unfortunate pgindent behavior
-in some other files where we have variables named that.
-
-* We have exposed the tzload() and tzparse() internal functions, and
-slightly modified the API of the former, in part because it now relies
-on our own pg_open_tzfile() rather than opening files for itself.
-
-* tzparse() is adjusted to never try to load the TZDEFRULES zone.
+* We have exposed the tzparse() internal function rather than including a
+copy of it.  The TZif file loader (tzload() and friends) has been removed
+along with support for timezone files, so tzparse() is now the only way to
+build a zone definition.  Note that tzparse() is adjusted to never try to
+load the TZDEFRULES zone.
 
 * There's a fair amount of code we don't need and have removed,
 including all the nonstandard optional APIs.  We have also added
 a few functions of our own at the bottom of localtime.c.
-
-* In zic.c, we have added support for a -P (print_abbrevs) switch, which
-is used to create the "abbrevs.txt" summary of currently-in-use zone
-abbreviations that was described above.
 
 
 The most convenient way to compare a new tzcode release to our code is
@@ -122,7 +88,6 @@ to first run the tzcode source files through a sed filter like this:
         -e 's/INTMAX_MAX/PG_INT64_MAX/g' \
         -e 's/struct[ \t]+tm\b/struct pg_tm/g' \
         -e 's/\btime_t\b/pg_time_t/g' \
-        -e 's/lineno/lineno_t/g' \
 
 and then run them through pgindent.  (The first three sed patterns deal
 with conversion of their block comment style to something pgindent

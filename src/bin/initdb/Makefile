@@ -16,7 +16,7 @@ subdir = src/bin/initdb
 top_builddir = ../../..
 include $(top_builddir)/src/Makefile.global
 
-override CPPFLAGS := -DFRONTEND -I$(libpq_srcdir) -I$(top_srcdir)/src/timezone $(CPPFLAGS)
+override CPPFLAGS := -DFRONTEND -I$(libpq_srcdir) $(CPPFLAGS)
 
 # Note: it's important that we link to encnames.o from libpgcommon, not
 # from libpq, else we have risks of version skew if we run with a libpq
@@ -26,25 +26,14 @@ override CPPFLAGS := -DFRONTEND -I$(libpq_srcdir) -I$(top_srcdir)/src/timezone $
 # We need libpq only because fe_utils does.
 LDFLAGS_INTERNAL += -L$(top_builddir)/src/fe_utils -lpgfeutils $(libpq_pgport)
 
-# use system timezone data?
-ifneq (,$(with_system_tzdata))
-override CPPFLAGS += '-DSYSTEMTZDIR="$(with_system_tzdata)"'
-endif
-
 OBJS = \
 	$(WIN32RES) \
-	findtimezone.o \
-	initdb.o \
-	localtime.o
+	initdb.o
 
 all: initdb
 
 initdb: $(OBJS) | submake-libpq submake-libpgport submake-libpgfeutils
 	$(CC) $(CFLAGS) $(OBJS) $(LDFLAGS) $(LDFLAGS_EX) $(LIBS) -o $@$(X)
-
-# We must pull in localtime.c from src/timezones
-localtime.c: % : $(top_srcdir)/src/timezone/%
-	rm -f $@ && $(LN_S) $< .
 
 install: all installdirs
 	$(INSTALL_PROGRAM) initdb$(X) '$(DESTDIR)$(bindir)/initdb$(X)'
@@ -56,7 +45,7 @@ uninstall:
 	rm -f '$(DESTDIR)$(bindir)/initdb$(X)'
 
 clean distclean maintainer-clean:
-	rm -f initdb$(X) $(OBJS) localtime.c
+	rm -f initdb$(X) $(OBJS)
 	rm -rf tmp_check
 
 # ensure that changes in datadir propagate into object file

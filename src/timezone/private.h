@@ -26,9 +26,6 @@
 
 #include "pgtime.h"
 
-/* This string was in the Factory zone through version 2016f.  */
-#define GRANDPARENTED	"Local time zone must be set--see zic manual page"
-
 /*
  * IANA has a bunch of HAVE_FOO #defines here, but in PG we want pretty
  * much all of that to be done by PG's configure script.
@@ -94,7 +91,7 @@
 #undef _
 #define _(msgid) (msgid)
 
-/* Handy macros that are independent of tzfile implementation.  */
+/* Handy time-unit and calendar macros.  */
 
 #define YEARSPERREPEAT		400 /* years before a Gregorian repeat */
 

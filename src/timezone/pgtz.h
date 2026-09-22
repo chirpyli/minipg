@@ -17,11 +17,20 @@
 #define _PGTZ_H
 
 #include "pgtime.h"
-#include "tzfile.h"
 
 
 #define SMALLEST(a, b)	(((a) < (b)) ? (a) : (b))
 #define BIGGEST(a, b)	(((a) > (b)) ? (a) : (b))
+
+/*
+ * Limits on the contents of a struct state.  These used to be limits imposed
+ * by the TZif file format; we no longer read such files, but keep them as
+ * (generous) bounds for the zones we build from POSIX specifications.
+ */
+#define TZ_MAX_TIMES	2000
+#define TZ_MAX_TYPES	256		/* Limited by what (unsigned char)'s can hold */
+#define TZ_MAX_CHARS	50		/* Maximum number of abbreviation characters */
+#define TZ_MAX_LEAPS	50		/* Maximum number of leap second corrections */
 
 struct ttinfo
 {								/* time type information */
@@ -70,12 +79,7 @@ struct pg_tz
 };
 
 
-/* in pgtz.c */
-extern int	pg_open_tzfile(const char *name, char *canonname);
-
 /* in localtime.c */
-extern int	tzload(const char *name, char *canonname, struct state *sp,
-				   bool doextend);
 extern bool tzparse(const char *name, struct state *sp, bool lastditch);
 
 #endif							/* _PGTZ_H */

@@ -12,15 +12,8 @@
  */
 #include "postgres.h"
 
-#include <ctype.h>
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <time.h>
-
 #include "datatype/timestamp.h"
-#include "miscadmin.h"
 #include "pgtz.h"
-#include "storage/fd.h"
 #include "utils/hsearch.h"
 
 
@@ -31,155 +24,79 @@ pg_tz	   *session_timezone = NULL;
 pg_tz	   *log_timezone = NULL;
 
 
-static bool scan_directory_ci(const char *dirname,
-							  const char *fname, int fnamelen,
-							  char *canonname, int canonnamelen);
-
-
 /*
- * Return full pathname of timezone data directory
- */
-static const char *
-pg_TZDIR(void)
-{
-#ifndef SYSTEMTZDIR
-	/* normal case: timezone stuff is under our share dir */
-	static bool done_tzdir = false;
-	static char tzdir[MAXPGPATH];
-
-	if (done_tzdir)
-		return tzdir;
-
-	get_share_path(my_exec_path, tzdir);
-	strlcpy(tzdir + strlen(tzdir), "/timezone", MAXPGPATH - strlen(tzdir));
-
-	done_tzdir = true;
-	return tzdir;
-#else
-	/* we're configured to use system's timezone database */
-	return SYSTEMTZDIR;
-#endif
-}
-
-
-/*
- * Given a timezone name, open() the timezone data file.  Return the
- * file descriptor if successful, -1 if not.
+ * minipg: built-in fixed-offset timezones.
  *
- * The input name is searched for case-insensitively (we assume that the
- * timezone database does not contain case-equivalent names).
+ * We do not ship the IANA timezone database, so there are no timezone files
+ * to load.  Besides POSIX-style specifications, the only timezones available
+ * are the fixed-offset zones: UTC and its aliases, plus the historical "Etc"
+ * area, all of which are pure UTC offsets.
  *
- * If "canonname" is not NULL, then on success the canonical spelling of the
- * given name is stored there (the buffer must be > TZ_STRLEN_MAX bytes!).
+ * Each entry maps a zone name to an equivalent POSIX TZ specification.  The
+ * quoted abbreviation in that specification is the one the IANA timezone
+ * compiler generates for the corresponding "Etc" zone, so tzparse() builds a
+ * definition that is indistinguishable from the compiled one.  Note that the
+ * specification must contain an offset: tzparse() rejects a bare abbreviation
+ * such as "UTC".
+ *
+ * Names are matched case-insensitively (the lookup key is the upper-cased
+ * input), and "name" is the canonical spelling reported for the zone.
  */
-int
-pg_open_tzfile(const char *name, char *canonname)
+static const struct
 {
-	const char *fname;
-	char		fullname[MAXPGPATH];
-	int			fullnamelen;
-	int			orignamelen;
-
-	/* Initialize fullname with base name of tzdata directory */
-	strlcpy(fullname, pg_TZDIR(), sizeof(fullname));
-	orignamelen = fullnamelen = strlen(fullname);
-
-	if (fullnamelen + 1 + strlen(name) >= MAXPGPATH)
-		return -1;				/* not gonna fit */
-
-	/*
-	 * If the caller doesn't need the canonical spelling, first just try to
-	 * open the name as-is.  This can be expected to succeed if the given name
-	 * is already case-correct, or if the filesystem is case-insensitive; and
-	 * we don't need to distinguish those situations if we aren't tasked with
-	 * reporting the canonical spelling.
-	 */
-	if (canonname == NULL)
-	{
-		int			result;
-
-		fullname[fullnamelen] = '/';
-		/* test above ensured this will fit: */
-		strcpy(fullname + fullnamelen + 1, name);
-		result = open(fullname, O_RDONLY | PG_BINARY, 0);
-		if (result >= 0)
-			return result;
-		/* If that didn't work, fall through to do it the hard way */
-		fullname[fullnamelen] = '\0';
-	}
-
-	/*
-	 * Loop to split the given name into directory levels; for each level,
-	 * search using scan_directory_ci().
-	 */
-	fname = name;
-	for (;;)
-	{
-		const char *slashptr;
-		int			fnamelen;
-
-		slashptr = strchr(fname, '/');
-		if (slashptr)
-			fnamelen = slashptr - fname;
-		else
-			fnamelen = strlen(fname);
-		if (!scan_directory_ci(fullname, fname, fnamelen,
-							   fullname + fullnamelen + 1,
-							   MAXPGPATH - fullnamelen - 1))
-			return -1;
-		fullname[fullnamelen++] = '/';
-		fullnamelen += strlen(fullname + fullnamelen);
-		if (slashptr)
-			fname = slashptr + 1;
-		else
-			break;
-	}
-
-	if (canonname)
-		strlcpy(canonname, fullname + orignamelen + 1, TZ_STRLEN_MAX + 1);
-
-	return open(fullname, O_RDONLY | PG_BINARY, 0);
-}
-
-
-/*
- * Scan specified directory for a case-insensitive match to fname
- * (of length fnamelen --- fname may not be null terminated!).  If found,
- * copy the actual filename into canonname and return true.
- */
-static bool
-scan_directory_ci(const char *dirname, const char *fname, int fnamelen,
-				  char *canonname, int canonnamelen)
+	const char *name;			/* canonical zone name */
+	const char *posixspec;		/* equivalent POSIX TZ specification */
+}	builtin_fixed_zones[] =
 {
-	bool		found = false;
-	DIR		   *dirdesc;
-	struct dirent *direntry;
+	/* UTC and its historical aliases */
+	{"UTC", "UTC0"},
+	{"Etc/UTC", "UTC0"},
+	{"Etc/UCT", "UTC0"},
+	{"Etc/Universal", "UTC0"},
+	{"Etc/Zulu", "UTC0"},
 
-	dirdesc = AllocateDir(dirname);
+	/* GMT and its historical aliases */
+	{"GMT", "GMT0"},
+	{"Etc/GMT", "GMT0"},
+	{"Etc/GMT+0", "GMT0"},
+	{"Etc/GMT-0", "GMT0"},
+	{"Etc/GMT0", "GMT0"},
+	{"Etc/Greenwich", "GMT0"},
+	{"GMT+0", "GMT0"},
+	{"GMT-0", "GMT0"},
+	{"GMT0", "GMT0"},
+	{"Greenwich", "GMT0"},
 
-	while ((direntry = ReadDirExtended(dirdesc, dirname, LOG)) != NULL)
-	{
-		/*
-		 * Ignore . and .., plus any other "hidden" files.  This is a security
-		 * measure to prevent access to files outside the timezone directory.
-		 */
-		if (direntry->d_name[0] == '.')
-			continue;
+	/* Etc/GMT-N: N hours east of Greenwich */
+	{"Etc/GMT-1", "<+01>-1"},
+	{"Etc/GMT-2", "<+02>-2"},
+	{"Etc/GMT-3", "<+03>-3"},
+	{"Etc/GMT-4", "<+04>-4"},
+	{"Etc/GMT-5", "<+05>-5"},
+	{"Etc/GMT-6", "<+06>-6"},
+	{"Etc/GMT-7", "<+07>-7"},
+	{"Etc/GMT-8", "<+08>-8"},
+	{"Etc/GMT-9", "<+09>-9"},
+	{"Etc/GMT-10", "<+10>-10"},
+	{"Etc/GMT-11", "<+11>-11"},
+	{"Etc/GMT-12", "<+12>-12"},
+	{"Etc/GMT-13", "<+13>-13"},
+	{"Etc/GMT-14", "<+14>-14"},
 
-		if (strlen(direntry->d_name) == fnamelen &&
-			pg_strncasecmp(direntry->d_name, fname, fnamelen) == 0)
-		{
-			/* Found our match */
-			strlcpy(canonname, direntry->d_name, canonnamelen);
-			found = true;
-			break;
-		}
-	}
-
-	FreeDir(dirdesc);
-
-	return found;
-}
+	/* Etc/GMT+N: N hours west of Greenwich */
+	{"Etc/GMT+1", "<-01>1"},
+	{"Etc/GMT+2", "<-02>2"},
+	{"Etc/GMT+3", "<-03>3"},
+	{"Etc/GMT+4", "<-04>4"},
+	{"Etc/GMT+5", "<-05>5"},
+	{"Etc/GMT+6", "<-06>6"},
+	{"Etc/GMT+7", "<-07>7"},
+	{"Etc/GMT+8", "<-08>8"},
+	{"Etc/GMT+9", "<-09>9"},
+	{"Etc/GMT+10", "<-10>10"},
+	{"Etc/GMT+11", "<-11>11"},
+	{"Etc/GMT+12", "<-12>12"},
+};
 
 
 /*
@@ -217,14 +134,14 @@ init_timezone_hashtable(void)
 }
 
 /*
- * Load a timezone from file or from cache.
+ * Load a timezone from cache, from the built-in fixed-offset table, or from a
+ * POSIX-style specification.
  * Does not verify that the timezone is acceptable!
  *
- * "GMT" is always interpreted as the tzparse() definition, without attempting
- * to load a definition from the filesystem.  This has a number of benefits:
- * 1. It's guaranteed to succeed, so we don't have the failure mode wherein
- * the bootstrap default timezone setting doesn't work (as could happen if
- * the OS attempts to supply a leap-second-aware version of "GMT").
+ * "GMT" and the other built-in zones are handled without any reference to the
+ * filesystem.  This has a number of benefits:
+ * 1. "GMT" is guaranteed to succeed, so we don't have the failure mode wherein
+ * the bootstrap default timezone setting doesn't work.
  * 2. Because we aren't accessing the filesystem, we can safely initialize
  * the "GMT" zone definition before my_exec_path is known.
  * 3. It's quick enough that we don't waste much time when the bootstrap
@@ -236,8 +153,10 @@ pg_tzset(const char *name)
 	pg_tz_cache *tzp;
 	struct state tzstate;
 	char		uppername[TZ_STRLEN_MAX + 1];
-	char		canonname[TZ_STRLEN_MAX + 1];
+	const char *canonname = NULL;
+	const char *posixspec = NULL;
 	char	   *p;
+	int			i;
 
 	if (strlen(name) > TZ_STRLEN_MAX)
 		return NULL;			/* not going to fit */
@@ -267,28 +186,35 @@ pg_tzset(const char *name)
 		return &tzp->tz;
 	}
 
-	/*
-	 * "GMT" is always sent to tzparse(), as per discussion above.
-	 */
-	if (strcmp(uppername, "GMT") == 0)
+	/* Look for a built-in fixed-offset zone, case-insensitively. */
+	for (i = 0; i < lengthof(builtin_fixed_zones); i++)
 	{
-		if (!tzparse(uppername, &tzstate, true))
+		if (pg_strcasecmp(uppername, builtin_fixed_zones[i].name) == 0)
 		{
-			/* This really, really should not happen ... */
-			elog(ERROR, "could not initialize GMT time zone");
+			canonname = builtin_fixed_zones[i].name;
+			posixspec = builtin_fixed_zones[i].posixspec;
+			break;
 		}
-		/* Use uppercase name as canonical */
-		strcpy(canonname, uppername);
 	}
-	else if (tzload(uppername, canonname, &tzstate, true) != 0)
+
+	/*
+	 * Otherwise, interpret the name as a POSIX-style timezone specification
+	 * ("UTC-2", "<+08>-8", ...), for which the upper-cased name is canonical.
+	 * A leading ":" requests a timezone file, which we cannot provide.
+	 */
+	if (posixspec == NULL)
 	{
-		if (uppername[0] == ':' || !tzparse(uppername, &tzstate, false))
-		{
-			/* Unknown timezone. Fail our call instead of loading GMT! */
+		if (uppername[0] == ':')
 			return NULL;
-		}
-		/* For POSIX timezone specs, use uppercase name as canonical */
-		strcpy(canonname, uppername);
+
+		canonname = uppername;
+		posixspec = uppername;
+	}
+
+	if (!tzparse(posixspec, &tzstate, false))
+	{
+		/* Unknown timezone. Fail our call instead of loading GMT! */
+		return NULL;
 	}
 
 	/* Save timezone in the cache */
@@ -314,7 +240,7 @@ pg_tzset(const char *name)
  * sign convention in the displayable abbreviation for the zone.
  *
  * Caution: this can fail (return NULL) if the specified offset is outside
- * the range allowed by the zic library.
+ * the range allowed by tzparse().
  */
 pg_tz *
 pg_tzset_offset(long gmtoffset)
@@ -361,141 +287,11 @@ void
 pg_timezone_initialize(void)
 {
 	/*
-	 * We may not yet know where PGSHAREDIR is.  So use "GMT", which
-	 * pg_tzset forces to be interpreted without reference to the filesystem.
+	 * We may not yet know where PGSHAREDIR is.  So use "GMT", which pg_tzset
+	 * resolves from its built-in table without reference to the filesystem.
 	 * This corresponds to the bootstrap default for these variables in
 	 * guc.c, although in principle it could be different.
 	 */
 	session_timezone = pg_tzset("GMT");
 	log_timezone = session_timezone;
-}
-
-
-/*
- * Functions to enumerate available timezones
- *
- * Note that pg_tzenumerate_next() will return a pointer into the pg_tzenum
- * structure, so the data is only valid up to the next call.
- *
- * All data is allocated using palloc in the current context.
- */
-#define MAX_TZDIR_DEPTH 10
-
-struct pg_tzenum
-{
-	int			baselen;
-	int			depth;
-	DIR		   *dirdesc[MAX_TZDIR_DEPTH];
-	char	   *dirname[MAX_TZDIR_DEPTH];
-	struct pg_tz tz;
-};
-
-/* typedef pg_tzenum is declared in pgtime.h */
-
-pg_tzenum *
-pg_tzenumerate_start(void)
-{
-	pg_tzenum  *ret = (pg_tzenum *) palloc0(sizeof(pg_tzenum));
-	char	   *startdir = pstrdup(pg_TZDIR());
-
-	ret->baselen = strlen(startdir) + 1;
-	ret->depth = 0;
-	ret->dirname[0] = startdir;
-	ret->dirdesc[0] = AllocateDir(startdir);
-	if (!ret->dirdesc[0])
-		ereport(ERROR,
-				(errcode_for_file_access(),
-				 errmsg("could not open directory \"%s\": %m", startdir)));
-	return ret;
-}
-
-void
-pg_tzenumerate_end(pg_tzenum *dir)
-{
-	while (dir->depth >= 0)
-	{
-		FreeDir(dir->dirdesc[dir->depth]);
-		pfree(dir->dirname[dir->depth]);
-		dir->depth--;
-	}
-	pfree(dir);
-}
-
-pg_tz *
-pg_tzenumerate_next(pg_tzenum *dir)
-{
-	while (dir->depth >= 0)
-	{
-		struct dirent *direntry;
-		char		fullname[MAXPGPATH * 2];
-		struct stat statbuf;
-
-		direntry = ReadDir(dir->dirdesc[dir->depth], dir->dirname[dir->depth]);
-
-		if (!direntry)
-		{
-			/* End of this directory */
-			FreeDir(dir->dirdesc[dir->depth]);
-			pfree(dir->dirname[dir->depth]);
-			dir->depth--;
-			continue;
-		}
-
-		if (direntry->d_name[0] == '.')
-			continue;
-
-		snprintf(fullname, sizeof(fullname), "%s/%s",
-				 dir->dirname[dir->depth], direntry->d_name);
-		if (stat(fullname, &statbuf) != 0)
-			ereport(ERROR,
-					(errcode_for_file_access(),
-					 errmsg("could not stat \"%s\": %m", fullname)));
-
-		if (S_ISDIR(statbuf.st_mode))
-		{
-			/* Step into the subdirectory */
-			if (dir->depth >= MAX_TZDIR_DEPTH - 1)
-				ereport(ERROR,
-						(errmsg_internal("timezone directory stack overflow")));
-			dir->depth++;
-			dir->dirname[dir->depth] = pstrdup(fullname);
-			dir->dirdesc[dir->depth] = AllocateDir(fullname);
-			if (!dir->dirdesc[dir->depth])
-				ereport(ERROR,
-						(errcode_for_file_access(),
-						 errmsg("could not open directory \"%s\": %m",
-								fullname)));
-
-			/* Start over reading in the new directory */
-			continue;
-		}
-
-		/*
-		 * Load this timezone using tzload() not pg_tzset(), so we don't fill
-		 * the cache.  Also, don't ask for the canonical spelling: we already
-		 * know it, and pg_open_tzfile's way of finding it out is pretty
-		 * inefficient.
-		 */
-		if (tzload(fullname + dir->baselen, NULL, &dir->tz.state, true) != 0)
-		{
-			/* Zone could not be loaded, ignore it */
-			continue;
-		}
-
-		if (!pg_tz_acceptable(&dir->tz))
-		{
-			/* Ignore leap-second zones */
-			continue;
-		}
-
-		/* OK, return the canonical zone name spelling. */
-		strlcpy(dir->tz.TZname, fullname + dir->baselen,
-				sizeof(dir->tz.TZname));
-
-		/* Timezone loaded OK. */
-		return &dir->tz;
-	}
-
-	/* Nothing more found */
-	return NULL;
 }

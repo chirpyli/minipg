@@ -995,8 +995,6 @@ acquire_sample_rows(Relation onerel, int elevel,
 	ReservoirStateData rstate;
 	TupleTableSlot *slot;
 	TableScanDesc scan;
-	BlockNumber nblocks;
-	BlockNumber blksdone = 0;
 #ifdef USE_PREFETCH
 	int			prefetch_maximum = 0;	/* blocks to prefetch if enabled */
 	BlockSamplerData prefetch_bs;
@@ -1011,7 +1009,7 @@ acquire_sample_rows(Relation onerel, int elevel,
 
 	/* Prepare for sampling block numbers */
 	randseed = random();
-	nblocks = BlockSampler_Init(&bs, totalblocks, targrows, randseed);
+	(void) BlockSampler_Init(&bs, totalblocks, targrows, randseed);
 
 #ifdef USE_PREFETCH
 	prefetch_maximum = maintenance_io_concurrency;

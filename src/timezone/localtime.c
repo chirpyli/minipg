@@ -16,13 +16,10 @@
 /* this file needs to build in both frontend and backend contexts */
 #include "c.h"
 
-#include <fcntl.h>
-
 #include "datatype/timestamp.h"
 #include "pgtz.h"
 
 #include "private.h"
-#include "tzfile.h"
 
 
 #ifndef WILDABBR
@@ -85,10 +82,8 @@ struct rule
 static struct pg_tm *gmtsub(pg_time_t const *, int32, struct pg_tm *);
 static bool increment_overflow(int *, int);
 static bool increment_overflow_time(pg_time_t *, int32);
-static int64 leapcorr(struct state const *, pg_time_t);
 static struct pg_tm *timesub(pg_time_t const *, int32, struct state const *,
 							 struct pg_tm *);
-static bool typesequiv(struct state const *, int, int);
 
 
 /*
@@ -112,514 +107,6 @@ init_ttinfo(struct ttinfo *s, int32 utoff, bool isdst, int desigidx)
 	s->tt_ttisut = false;
 }
 
-static int32
-detzcode(const char *const codep)
-{
-	int32		result;
-	int			i;
-	int32		one = 1;
-	int32		halfmaxval = one << (32 - 2);
-	int32		maxval = halfmaxval - 1 + halfmaxval;
-	int32		minval = -1 - maxval;
-
-	result = codep[0] & 0x7f;
-	for (i = 1; i < 4; ++i)
-		result = (result << 8) | (codep[i] & 0xff);
-
-	if (codep[0] & 0x80)
-	{
-		/*
-		 * Do two's-complement negation even on non-two's-complement machines.
-		 * If the result would be minval - 1, return minval.
-		 */
-		result -= !TWOS_COMPLEMENT(int32) && result != 0;
-		result += minval;
-	}
-	return result;
-}
-
-static int64
-detzcode64(const char *const codep)
-{
-	uint64		result;
-	int			i;
-	int64		one = 1;
-	int64		halfmaxval = one << (64 - 2);
-	int64		maxval = halfmaxval - 1 + halfmaxval;
-	int64		minval = -TWOS_COMPLEMENT(int64) - maxval;
-
-	result = codep[0] & 0x7f;
-	for (i = 1; i < 8; ++i)
-		result = (result << 8) | (codep[i] & 0xff);
-
-	if (codep[0] & 0x80)
-	{
-		/*
-		 * Do two's-complement negation even on non-two's-complement machines.
-		 * If the result would be minval - 1, return minval.
-		 */
-		result -= !TWOS_COMPLEMENT(int64) && result != 0;
-		result += minval;
-	}
-	return result;
-}
-
-static bool
-differ_by_repeat(const pg_time_t t1, const pg_time_t t0)
-{
-	if (TYPE_BIT(pg_time_t) - TYPE_SIGNED(pg_time_t) < SECSPERREPEAT_BITS)
-		return 0;
-	return t1 - t0 == SECSPERREPEAT;
-}
-
-/* Input buffer for data read from a compiled tz file.  */
-union input_buffer
-{
-	/* The first part of the buffer, interpreted as a header.  */
-	struct tzhead tzhead;
-
-	/* The entire buffer.  */
-	char		buf[2 * sizeof(struct tzhead) + 2 * sizeof(struct state)
-					+ 4 * TZ_MAX_TIMES];
-};
-
-/* Local storage needed for 'tzloadbody'.  */
-union local_storage
-{
-	/* The results of analyzing the file's contents after it is opened.  */
-	struct file_analysis
-	{
-		/* The input buffer.  */
-		union input_buffer u;
-
-		/* A temporary state used for parsing a TZ string in the file.  */
-		struct state st;
-	}			u;
-
-	/* We don't need the "fullname" member */
-};
-
-/* Load tz data from the file named NAME into *SP.  Read extended
- * format if DOEXTEND.  Use *LSP for temporary storage.  Return 0 on
- * success, an errno value on failure.
- * PG: If "canonname" is not NULL, then on success the canonical spelling of
- * given name is stored there (the buffer must be > TZ_STRLEN_MAX bytes!).
- */
-static int
-tzloadbody(char const *name, char *canonname, struct state *sp, bool doextend,
-		   union local_storage *lsp)
-{
-	int			i;
-	int			fid;
-	int			stored;
-	ssize_t		nread;
-	union input_buffer *up = &lsp->u.u;
-	int			tzheadsize = sizeof(struct tzhead);
-
-	sp->goback = sp->goahead = false;
-
-	if (!name)
-	{
-		name = TZDEFAULT;
-		if (!name)
-			return EINVAL;
-	}
-
-	if (name[0] == ':')
-		++name;
-
-	fid = pg_open_tzfile(name, canonname);
-	if (fid < 0)
-		return ENOENT;			/* pg_open_tzfile may not set errno */
-
-	nread = read(fid, up->buf, sizeof up->buf);
-	if (nread < tzheadsize)
-	{
-		int			err = nread < 0 ? errno : EINVAL;
-
-		close(fid);
-		return err;
-	}
-	if (close(fid) < 0)
-		return errno;
-	for (stored = 4; stored <= 8; stored *= 2)
-	{
-		int32		ttisstdcnt = detzcode(up->tzhead.tzh_ttisstdcnt);
-		int32		ttisutcnt = detzcode(up->tzhead.tzh_ttisutcnt);
-		int64		prevtr = 0;
-		int32		prevcorr = 0;
-		int32		leapcnt = detzcode(up->tzhead.tzh_leapcnt);
-		int32		timecnt = detzcode(up->tzhead.tzh_timecnt);
-		int32		typecnt = detzcode(up->tzhead.tzh_typecnt);
-		int32		charcnt = detzcode(up->tzhead.tzh_charcnt);
-		char const *p = up->buf + tzheadsize;
-
-		/*
-		 * Although tzfile(5) currently requires typecnt to be nonzero,
-		 * support future formats that may allow zero typecnt in files that
-		 * have a TZ string and no transitions.
-		 */
-		if (!(0 <= leapcnt && leapcnt < TZ_MAX_LEAPS
-			  && 0 <= typecnt && typecnt < TZ_MAX_TYPES
-			  && 0 <= timecnt && timecnt < TZ_MAX_TIMES
-			  && 0 <= charcnt && charcnt < TZ_MAX_CHARS
-			  && (ttisstdcnt == typecnt || ttisstdcnt == 0)
-			  && (ttisutcnt == typecnt || ttisutcnt == 0)))
-			return EINVAL;
-		if (nread
-			< (tzheadsize		/* struct tzhead */
-			   + timecnt * stored	/* ats */
-			   + timecnt		/* types */
-			   + typecnt * 6	/* ttinfos */
-			   + charcnt		/* chars */
-			   + leapcnt * (stored + 4) /* lsinfos */
-			   + ttisstdcnt		/* ttisstds */
-			   + ttisutcnt))	/* ttisuts */
-			return EINVAL;
-		sp->leapcnt = leapcnt;
-		sp->timecnt = timecnt;
-		sp->typecnt = typecnt;
-		sp->charcnt = charcnt;
-
-		/*
-		 * Read transitions, discarding those out of pg_time_t range. But
-		 * pretend the last transition before TIME_T_MIN occurred at
-		 * TIME_T_MIN.
-		 */
-		timecnt = 0;
-		for (i = 0; i < sp->timecnt; ++i)
-		{
-			int64		at
-			= stored == 4 ? detzcode(p) : detzcode64(p);
-
-			sp->types[i] = at <= TIME_T_MAX;
-			if (sp->types[i])
-			{
-				pg_time_t	attime
-				= ((TYPE_SIGNED(pg_time_t) ? at < TIME_T_MIN : at < 0)
-				   ? TIME_T_MIN : at);
-
-				if (timecnt && attime <= sp->ats[timecnt - 1])
-				{
-					if (attime < sp->ats[timecnt - 1])
-						return EINVAL;
-					sp->types[i - 1] = 0;
-					timecnt--;
-				}
-				sp->ats[timecnt++] = attime;
-			}
-			p += stored;
-		}
-
-		timecnt = 0;
-		for (i = 0; i < sp->timecnt; ++i)
-		{
-			unsigned char typ = *p++;
-
-			if (sp->typecnt <= typ)
-				return EINVAL;
-			if (sp->types[i])
-				sp->types[timecnt++] = typ;
-		}
-		sp->timecnt = timecnt;
-		for (i = 0; i < sp->typecnt; ++i)
-		{
-			struct ttinfo *ttisp;
-			unsigned char isdst,
-						desigidx;
-
-			ttisp = &sp->ttis[i];
-			ttisp->tt_utoff = detzcode(p);
-			p += 4;
-			isdst = *p++;
-			if (!(isdst < 2))
-				return EINVAL;
-			ttisp->tt_isdst = isdst;
-			desigidx = *p++;
-			if (!(desigidx < sp->charcnt))
-				return EINVAL;
-			ttisp->tt_desigidx = desigidx;
-		}
-		for (i = 0; i < sp->charcnt; ++i)
-			sp->chars[i] = *p++;
-		sp->chars[i] = '\0';	/* ensure '\0' at end */
-
-		/* Read leap seconds, discarding those out of pg_time_t range.  */
-		leapcnt = 0;
-		for (i = 0; i < sp->leapcnt; ++i)
-		{
-			int64		tr = stored == 4 ? detzcode(p) : detzcode64(p);
-			int32		corr = detzcode(p + stored);
-
-			p += stored + 4;
-			/* Leap seconds cannot occur before the Epoch.  */
-			if (tr < 0)
-				return EINVAL;
-			if (tr <= TIME_T_MAX)
-			{
-				/*
-				 * Leap seconds cannot occur more than once per UTC month, and
-				 * UTC months are at least 28 days long (minus 1 second for a
-				 * negative leap second).  Each leap second's correction must
-				 * differ from the previous one's by 1 second.
-				 */
-				if (tr - prevtr < 28 * SECSPERDAY - 1
-					|| (corr != prevcorr - 1 && corr != prevcorr + 1))
-					return EINVAL;
-				sp->lsis[leapcnt].ls_trans = prevtr = tr;
-				sp->lsis[leapcnt].ls_corr = prevcorr = corr;
-				leapcnt++;
-			}
-		}
-		sp->leapcnt = leapcnt;
-
-		for (i = 0; i < sp->typecnt; ++i)
-		{
-			struct ttinfo *ttisp;
-
-			ttisp = &sp->ttis[i];
-			if (ttisstdcnt == 0)
-				ttisp->tt_ttisstd = false;
-			else
-			{
-				if (*p != true && *p != false)
-					return EINVAL;
-				ttisp->tt_ttisstd = *p++;
-			}
-		}
-		for (i = 0; i < sp->typecnt; ++i)
-		{
-			struct ttinfo *ttisp;
-
-			ttisp = &sp->ttis[i];
-			if (ttisutcnt == 0)
-				ttisp->tt_ttisut = false;
-			else
-			{
-				if (*p != true && *p != false)
-					return EINVAL;
-				ttisp->tt_ttisut = *p++;
-			}
-		}
-
-		/*
-		 * If this is an old file, we're done.
-		 */
-		if (up->tzhead.tzh_version[0] == '\0')
-			break;
-		nread -= p - up->buf;
-		memmove(up->buf, p, nread);
-	}
-	if (doextend && nread > 2 &&
-		up->buf[0] == '\n' && up->buf[nread - 1] == '\n' &&
-		sp->typecnt + 2 <= TZ_MAX_TYPES)
-	{
-		struct state *ts = &lsp->u.st;
-
-		up->buf[nread - 1] = '\0';
-		if (tzparse(&up->buf[1], ts, false))
-		{
-			/*
-			 * Attempt to reuse existing abbreviations. Without this,
-			 * America/Anchorage would be right on the edge after 2037 when
-			 * TZ_MAX_CHARS is 50, as sp->charcnt equals 40 (for LMT AST AWT
-			 * APT AHST AHDT YST AKDT AKST) and ts->charcnt equals 10 (for
-			 * AKST AKDT).  Reusing means sp->charcnt can stay 40 in this
-			 * example.
-			 */
-			int			gotabbr = 0;
-			int			charcnt = sp->charcnt;
-
-			for (i = 0; i < ts->typecnt; i++)
-			{
-				char	   *tsabbr = ts->chars + ts->ttis[i].tt_desigidx;
-				int			j;
-
-				for (j = 0; j < charcnt; j++)
-					if (strcmp(sp->chars + j, tsabbr) == 0)
-					{
-						ts->ttis[i].tt_desigidx = j;
-						gotabbr++;
-						break;
-					}
-				if (!(j < charcnt))
-				{
-					int			tsabbrlen = strlen(tsabbr);
-
-					if (j + tsabbrlen < TZ_MAX_CHARS)
-					{
-						strcpy(sp->chars + j, tsabbr);
-						charcnt = j + tsabbrlen + 1;
-						ts->ttis[i].tt_desigidx = j;
-						gotabbr++;
-					}
-				}
-			}
-			if (gotabbr == ts->typecnt)
-			{
-				sp->charcnt = charcnt;
-
-				/*
-				 * Ignore any trailing, no-op transitions generated by zic as
-				 * they don't help here and can run afoul of bugs in zic 2016j
-				 * or earlier.
-				 */
-				while (1 < sp->timecnt
-					   && (sp->types[sp->timecnt - 1]
-						   == sp->types[sp->timecnt - 2]))
-					sp->timecnt--;
-
-				for (i = 0; i < ts->timecnt; i++)
-					if (sp->timecnt == 0
-						|| (sp->ats[sp->timecnt - 1]
-							< ts->ats[i] + leapcorr(sp, ts->ats[i])))
-						break;
-				while (i < ts->timecnt
-					   && sp->timecnt < TZ_MAX_TIMES)
-				{
-					sp->ats[sp->timecnt]
-						= ts->ats[i] + leapcorr(sp, ts->ats[i]);
-					sp->types[sp->timecnt] = (sp->typecnt
-											  + ts->types[i]);
-					sp->timecnt++;
-					i++;
-				}
-				for (i = 0; i < ts->typecnt; i++)
-					sp->ttis[sp->typecnt++] = ts->ttis[i];
-			}
-		}
-	}
-	if (sp->typecnt == 0)
-		return EINVAL;
-	if (sp->timecnt > 1)
-	{
-		for (i = 1; i < sp->timecnt; ++i)
-			if (typesequiv(sp, sp->types[i], sp->types[0]) &&
-				differ_by_repeat(sp->ats[i], sp->ats[0]))
-			{
-				sp->goback = true;
-				break;
-			}
-		for (i = sp->timecnt - 2; i >= 0; --i)
-			if (typesequiv(sp, sp->types[sp->timecnt - 1],
-						   sp->types[i]) &&
-				differ_by_repeat(sp->ats[sp->timecnt - 1],
-								 sp->ats[i]))
-			{
-				sp->goahead = true;
-				break;
-			}
-	}
-
-	/*
-	 * Infer sp->defaulttype from the data.  Although this default type is
-	 * always zero for data from recent tzdb releases, things are trickier for
-	 * data from tzdb 2018e or earlier.
-	 *
-	 * The first set of heuristics work around bugs in 32-bit data generated
-	 * by tzdb 2013c or earlier.  The workaround is for zones like
-	 * Australia/Macquarie where timestamps before the first transition have a
-	 * time type that is not the earliest standard-time type.  See:
-	 * https://mm.icann.org/pipermail/tz/2013-May/019368.html
-	 */
-
-	/*
-	 * If type 0 is unused in transitions, it's the type to use for early
-	 * times.
-	 */
-	for (i = 0; i < sp->timecnt; ++i)
-		if (sp->types[i] == 0)
-			break;
-	i = i < sp->timecnt ? -1 : 0;
-
-	/*
-	 * Absent the above, if there are transition times and the first
-	 * transition is to a daylight time find the standard type less than and
-	 * closest to the type of the first transition.
-	 */
-	if (i < 0 && sp->timecnt > 0 && sp->ttis[sp->types[0]].tt_isdst)
-	{
-		i = sp->types[0];
-		while (--i >= 0)
-			if (!sp->ttis[i].tt_isdst)
-				break;
-	}
-
-	/*
-	 * The next heuristics are for data generated by tzdb 2018e or earlier,
-	 * for zones like EST5EDT where the first transition is to DST.
-	 */
-
-	/*
-	 * If no result yet, find the first standard type. If there is none, punt
-	 * to type zero.
-	 */
-	if (i < 0)
-	{
-		i = 0;
-		while (sp->ttis[i].tt_isdst)
-			if (++i >= sp->typecnt)
-			{
-				i = 0;
-				break;
-			}
-	}
-
-	/*
-	 * A simple 'sp->defaulttype = 0;' would suffice here if we didn't have to
-	 * worry about 2018e-or-earlier data.  Even simpler would be to remove the
-	 * defaulttype member and just use 0 in its place.
-	 */
-	sp->defaulttype = i;
-
-	return 0;
-}
-
-/* Load tz data from the file named NAME into *SP.  Read extended
- * format if DOEXTEND.  Return 0 on success, an errno value on failure.
- * PG: If "canonname" is not NULL, then on success the canonical spelling of
- * given name is stored there (the buffer must be > TZ_STRLEN_MAX bytes!).
- */
-int
-tzload(const char *name, char *canonname, struct state *sp, bool doextend)
-{
-	union local_storage *lsp = malloc(sizeof *lsp);
-
-	if (!lsp)
-		return errno;
-	else
-	{
-		int			err = tzloadbody(name, canonname, sp, doextend, lsp);
-
-		free(lsp);
-		return err;
-	}
-}
-
-static bool
-typesequiv(const struct state *sp, int a, int b)
-{
-	bool		result;
-
-	if (sp == NULL ||
-		a < 0 || a >= sp->typecnt ||
-		b < 0 || b >= sp->typecnt)
-		result = false;
-	else
-	{
-		const struct ttinfo *ap = &sp->ttis[a];
-		const struct ttinfo *bp = &sp->ttis[b];
-
-		result = (ap->tt_utoff == bp->tt_utoff
-				  && ap->tt_isdst == bp->tt_isdst
-				  && ap->tt_ttisstd == bp->tt_ttisstd
-				  && ap->tt_ttisut == bp->tt_ttisut
-				  && (strcmp(&sp->chars[ap->tt_desigidx],
-							 &sp->chars[bp->tt_desigidx])
-					  == 0));
-	}
-	return result;
-}
 
 static const int mon_lengths[2][MONSPERYEAR] = {
 	{31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31},
@@ -941,7 +428,6 @@ tzparse(const char *name, struct state *sp, bool lastditch)
 	int32		stdoffset;
 	int32		dstoffset;
 	char	   *cp;
-	bool		load_ok;
 
 	stdname = name;
 	if (lastditch)
@@ -979,16 +465,11 @@ tzparse(const char *name, struct state *sp, bool lastditch)
 		return false;
 
 	/*
-	 * The IANA code always tries to tzload(TZDEFRULES) here.  We do not want
-	 * to do that; it would be bad news in the lastditch case, where we can't
-	 * assume pg_open_tzfile() is sane yet.  Moreover, if we did load it and
-	 * it contains leap-second-dependent info, that would cause problems too.
-	 * Finally, IANA has deprecated the TZDEFRULES feature, so it presumably
-	 * will die at some point.  Desupporting it now seems like good
-	 * future-proofing.
+	 * Unlike IANA's tzcode, we never try to load the TZDEFRULES zone: minipg
+	 * has no timezone files at all.  Loading it could also bring in
+	 * leap-second-dependent info, which we do not want.
 	 */
-	load_ok = false;
-	sp->goback = sp->goahead = false;	/* simulate failed tzload() */
+	sp->goback = sp->goahead = false;	/* no transitions beyond the rules */
 	sp->leapcnt = 0;			/* intentionally assume no leap seconds */
 
 	if (*name != '\0')
@@ -1021,7 +502,7 @@ tzparse(const char *name, struct state *sp, bool lastditch)
 		}
 		else
 			dstoffset = stdoffset - SECSPERHOUR;
-		if (*name == '\0' && !load_ok)
+		if (*name == '\0')
 			name = TZDEFRULESTRING;
 		if (*name == ',' || *name == ';')
 		{
@@ -1242,8 +723,11 @@ tzparse(const char *name, struct state *sp, bool lastditch)
 static void
 gmtload(struct state *const sp)
 {
-	if (tzload(gmt, NULL, sp, true) != 0)
-		tzparse(gmt, sp, true);
+	/*
+	 * There are no timezone files to load, so build the GMT definition
+	 * directly from its POSIX specification.
+	 */
+	tzparse(gmt, sp, true);
 }
 
 
@@ -1566,22 +1050,6 @@ increment_overflow_time(pg_time_t *tp, int32 j)
 		return true;
 	*tp += j;
 	return false;
-}
-
-static int64
-leapcorr(struct state const *sp, pg_time_t t)
-{
-	struct lsinfo const *lp;
-	int			i;
-
-	i = sp->leapcnt;
-	while (--i >= 0)
-	{
-		lp = &sp->lsis[i];
-		if (t >= lp->ls_trans)
-			return lp->ls_corr;
-	}
-	return 0;
 }
 
 /*

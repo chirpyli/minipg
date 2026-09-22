@@ -1426,7 +1426,7 @@ DecodeDateTime(char **field, int *ftype, int nf,
 /* DetermineTimeZoneOffset()
  *
  * Given a struct pg_tm in which tm_year, tm_mon, tm_mday, tm_hour, tm_min,
- * and tm_sec fields are set, and a zic-style time zone definition, determine
+ * and tm_sec fields are set, and a time zone definition, determine
  * the applicable GMT offset and daylight-savings status at that time.
  * Set the struct pg_tm's tm_isdst field accordingly, and return the GMT
  * offset as the function result.

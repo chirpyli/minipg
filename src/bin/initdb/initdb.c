@@ -72,9 +72,6 @@
 #include "miscadmin.h"
 
 
-/* Ideally this would be in a .h file, but it hardly seems worth the trouble */
-extern const char *select_default_timezone(const char *share_path);
-
 /*
  * these values are passed in by makefile defines
  */
@@ -120,7 +117,6 @@ static char *pgdata_native;
 /* defaults */
 static int	n_connections = 10;
 static int	n_buffers = 50;
-static const char *default_timezone = NULL;
 
 /*
  * Centralized knowledge of switches to pass to backend
@@ -702,10 +698,11 @@ test_config_settings(void)
 	else
 		printf("%dkB\n", n_buffers * (BLCKSZ / 1024));
 
-	printf(_("selecting default time zone ... "));
-	fflush(stdout);
-	default_timezone = select_default_timezone(share_path);
-	printf("%s\n", default_timezone ? default_timezone : "GMT");
+	/*
+	 * minipg does not ship the IANA timezone database and does not probe the
+	 * system timezone, so the default is always the built-in "GMT".
+	 */
+	printf(_("selecting default time zone ... GMT\n"));
 }
 
 /*
@@ -783,15 +780,10 @@ setup_config(void)
 	}
 	conflines = replace_token(conflines, "#datestyle = 'iso, mdy'", repltok);
 
-	if (default_timezone)
-	{
-		snprintf(repltok, sizeof(repltok), "timezone = '%s'",
-				 escape_quotes(default_timezone));
-		conflines = replace_token(conflines, "#timezone = 'GMT'", repltok);
-		snprintf(repltok, sizeof(repltok), "log_timezone = '%s'",
-				 escape_quotes(default_timezone));
-		conflines = replace_token(conflines, "#log_timezone = 'GMT'", repltok);
-	}
+	/*
+	 * The timezone and log_timezone settings are left at their bootstrap
+	 * defaults ("GMT") in postgresql.conf.
+	 */
 
 #if DEFAULT_BACKEND_FLUSH_AFTER > 0
 	snprintf(repltok, sizeof(repltok), "#backend_flush_after = %dkB",

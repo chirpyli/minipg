@@ -770,13 +770,6 @@ AC_SUBST(with_uuid)
 
 
 #
-# tzdata
-#
-PGAC_ARG_REQ(with, system-tzdata,
-             [DIR], [use system time zone data in DIR])
-AC_SUBST(with_system_tzdata)
-
-#
 # Zlib
 #
 PGAC_ARG_BOOL(with, zlib, yes,
@@ -854,16 +847,6 @@ PGAC_PATH_BISON
 PGAC_PATH_FLEX
 
 PGAC_PATH_PERL
-
-if test x"$cross_compiling" = x"yes" && test -z "$with_system_tzdata"; then
-  PGAC_PATH_PROGS(ZIC, zic)
-  if test -z "$ZIC"; then
-    AC_MSG_ERROR([
-When cross-compiling, either use the option --with-system-tzdata to use
-existing time-zone data, or set the environment variable ZIC to a zic
-program to use during the build.])
-  fi
-fi
 
 #
 # Pthreads

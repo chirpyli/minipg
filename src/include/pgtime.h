@@ -38,7 +38,6 @@ struct pg_tm
 };
 
 typedef struct pg_tz pg_tz;
-typedef struct pg_tzenum pg_tzenum;
 
 /* Maximum length of a timezone name (not including trailing null) */
 #define TZ_STRLEN_MAX 255
@@ -76,9 +75,5 @@ extern pg_tz *log_timezone;
 extern void pg_timezone_initialize(void);
 extern pg_tz *pg_tzset(const char *tzname);
 extern pg_tz *pg_tzset_offset(long gmtoffset);
-
-extern pg_tzenum *pg_tzenumerate_start(void);
-extern pg_tz *pg_tzenumerate_next(pg_tzenum *dir);
-extern void pg_tzenumerate_end(pg_tzenum *dir);
 
 #endif							/* _PGTIME_H */
