@@ -880,12 +880,9 @@ static MemoryContext walDebugCxt = NULL;
 #endif
 
 static void exitArchiveRecovery(TimeLineID endTLI, XLogRecPtr endOfLog);
-static bool recoveryStopsBefore(XLogReaderState *record);
-static bool recoveryStopsAfter(XLogReaderState *record);
 static void ConfirmRecoveryPaused(void);
 static void recoveryPausesHere(bool endOfRecovery);
 static bool recoveryApplyDelay(XLogReaderState *record);
-static void SetLatestXTime(TimestampTz xtime);
 static void CheckRequiredParameterValues(void);
 static void XLogReportParameters(void);
 static void checkTimeLineSwitch(XLogRecPtr lsn, TimeLineID newTLI,
@@ -5333,323 +5330,6 @@ getRecordTimestamp(XLogReaderState *record, TimestampTz *recordXtime)
 }
 
 /*
- * For point-in-time recovery, this function decides whether we want to
- * stop applying the XLOG before the current record.
- *
- * Returns true if we are stopping, false otherwise. If stopping, some
- * information is saved in recoveryStopXid et al for use in annotating the
- * new timeline's history file.
- */
-static bool
-recoveryStopsBefore(XLogReaderState *record)
-{
-	bool		stopsHere = false;
-	uint8		xact_info;
-	bool		isCommit;
-	TimestampTz recordXtime = 0;
-	TransactionId recordXid;
-
-	/*
-	 * Ignore recovery target settings when not in archive recovery (meaning
-	 * we are in crash recovery).
-	 */
-	if (!ArchiveRecoveryRequested)
-		return false;
-
-	/* Check if we should stop as soon as reaching consistency */
-	if (recoveryTarget == RECOVERY_TARGET_IMMEDIATE && reachedConsistency)
-	{
-		ereport(LOG,
-				(errmsg("recovery stopping after reaching consistency")));
-
-		recoveryStopAfter = false;
-		recoveryStopXid = InvalidTransactionId;
-		recoveryStopLSN = InvalidXLogRecPtr;
-		recoveryStopTime = 0;
-		recoveryStopName[0] = '\0';
-		return true;
-	}
-
-	/* Check if target LSN has been reached */
-	if (recoveryTarget == RECOVERY_TARGET_LSN &&
-		!recoveryTargetInclusive &&
-		record->ReadRecPtr >= recoveryTargetLSN)
-	{
-		recoveryStopAfter = false;
-		recoveryStopXid = InvalidTransactionId;
-		recoveryStopLSN = record->ReadRecPtr;
-		recoveryStopTime = 0;
-		recoveryStopName[0] = '\0';
-		ereport(LOG,
-				(errmsg("recovery stopping before WAL location (LSN) \"%X/%X\"",
-						LSN_FORMAT_ARGS(recoveryStopLSN))));
-		return true;
-	}
-
-	/* Otherwise we only consider stopping before COMMIT or ABORT records. */
-	if (XLogRecGetRmid(record) != RM_XACT_ID)
-		return false;
-
-	xact_info = XLogRecGetInfo(record) & XLOG_XACT_OPMASK;
-
-	if (xact_info == XLOG_XACT_COMMIT)
-	{
-		isCommit = true;
-		recordXid = XLogRecGetXid(record);
-	}
-	else if (xact_info == XLOG_XACT_COMMIT_PREPARED)
-	{
-		xl_xact_commit *xlrec = (xl_xact_commit *) XLogRecGetData(record);
-		xl_xact_parsed_commit parsed;
-
-		isCommit = true;
-		ParseCommitRecord(XLogRecGetInfo(record),
-						  xlrec,
-						  &parsed);
-		recordXid = parsed.twophase_xid;
-	}
-	else if (xact_info == XLOG_XACT_ABORT)
-	{
-		isCommit = false;
-		recordXid = XLogRecGetXid(record);
-	}
-	else if (xact_info == XLOG_XACT_ABORT_PREPARED)
-	{
-		xl_xact_abort *xlrec = (xl_xact_abort *) XLogRecGetData(record);
-		xl_xact_parsed_abort parsed;
-
-		isCommit = false;
-		ParseAbortRecord(XLogRecGetInfo(record),
-						 xlrec,
-						 &parsed);
-		recordXid = parsed.twophase_xid;
-	}
-	else
-		return false;
-
-	if (recoveryTarget == RECOVERY_TARGET_XID && !recoveryTargetInclusive)
-	{
-		/*
-		 * There can be only one transaction end record with this exact
-		 * transactionid
-		 *
-		 * when testing for an xid, we MUST test for equality only, since
-		 * transactions are numbered in the order they start, not the order
-		 * they complete. A higher numbered xid will complete before you about
-		 * 50% of the time...
-		 */
-		stopsHere = (recordXid == recoveryTargetXid);
-	}
-
-	/*
-	 * Note: we must fetch recordXtime regardless of recoveryTarget setting.
-	 * We don't expect getRecordTimestamp ever to fail, since we already know
-	 * this is a commit or abort record; but test its result anyway.
-	 */
-	if (getRecordTimestamp(record, &recordXtime) &&
-		recoveryTarget == RECOVERY_TARGET_TIME)
-	{
-		/*
-		 * There can be many transactions that share the same commit time, so
-		 * we stop after the last one, if we are inclusive, or stop at the
-		 * first one if we are exclusive
-		 */
-		if (recoveryTargetInclusive)
-			stopsHere = (recordXtime > recoveryTargetTime);
-		else
-			stopsHere = (recordXtime >= recoveryTargetTime);
-	}
-
-	if (stopsHere)
-	{
-		recoveryStopAfter = false;
-		recoveryStopXid = recordXid;
-		recoveryStopTime = recordXtime;
-		recoveryStopLSN = InvalidXLogRecPtr;
-		recoveryStopName[0] = '\0';
-
-		if (isCommit)
-		{
-			ereport(LOG,
-					(errmsg("recovery stopping before commit of transaction %u, time %s",
-							recoveryStopXid,
-							timestamptz_to_str(recoveryStopTime))));
-		}
-		else
-		{
-			ereport(LOG,
-					(errmsg("recovery stopping before abort of transaction %u, time %s",
-							recoveryStopXid,
-							timestamptz_to_str(recoveryStopTime))));
-		}
-	}
-
-	return stopsHere;
-}
-
-/*
- * Same as recoveryStopsBefore, but called after applying the record.
- *
- * We also track the timestamp of the latest applied COMMIT/ABORT
- * record in XLogCtl->recoveryLastXTime.
- */
-static bool
-recoveryStopsAfter(XLogReaderState *record)
-{
-	uint8		info;
-	uint8		xact_info;
-	uint8		rmid;
-	TimestampTz recordXtime = 0;
-
-	/*
-	 * Ignore recovery target settings when not in archive recovery (meaning
-	 * we are in crash recovery).
-	 */
-	if (!ArchiveRecoveryRequested)
-		return false;
-
-	info = XLogRecGetInfo(record) & ~XLR_INFO_MASK;
-	rmid = XLogRecGetRmid(record);
-
-	/*
-	 * There can be many restore points that share the same name; we stop at
-	 * the first one.
-	 */
-	if (recoveryTarget == RECOVERY_TARGET_NAME &&
-		rmid == RM_XLOG_ID && info == XLOG_RESTORE_POINT)
-	{
-		xl_restore_point *recordRestorePointData;
-
-		recordRestorePointData = (xl_restore_point *) XLogRecGetData(record);
-
-		if (strcmp(recordRestorePointData->rp_name, recoveryTargetName) == 0)
-		{
-			recoveryStopAfter = true;
-			recoveryStopXid = InvalidTransactionId;
-			recoveryStopLSN = InvalidXLogRecPtr;
-			(void) getRecordTimestamp(record, &recoveryStopTime);
-			strlcpy(recoveryStopName, recordRestorePointData->rp_name, MAXFNAMELEN);
-
-			ereport(LOG,
-					(errmsg("recovery stopping at restore point \"%s\", time %s",
-							recoveryStopName,
-							timestamptz_to_str(recoveryStopTime))));
-			return true;
-		}
-	}
-
-	/* Check if the target LSN has been reached */
-	if (recoveryTarget == RECOVERY_TARGET_LSN &&
-		recoveryTargetInclusive &&
-		record->ReadRecPtr >= recoveryTargetLSN)
-	{
-		recoveryStopAfter = true;
-		recoveryStopXid = InvalidTransactionId;
-		recoveryStopLSN = record->ReadRecPtr;
-		recoveryStopTime = 0;
-		recoveryStopName[0] = '\0';
-		ereport(LOG,
-				(errmsg("recovery stopping after WAL location (LSN) \"%X/%X\"",
-						LSN_FORMAT_ARGS(recoveryStopLSN))));
-		return true;
-	}
-
-	if (rmid != RM_XACT_ID)
-		return false;
-
-	xact_info = info & XLOG_XACT_OPMASK;
-
-	if (xact_info == XLOG_XACT_COMMIT ||
-		xact_info == XLOG_XACT_COMMIT_PREPARED ||
-		xact_info == XLOG_XACT_ABORT ||
-		xact_info == XLOG_XACT_ABORT_PREPARED)
-	{
-		TransactionId recordXid;
-
-		/* Update the last applied transaction timestamp */
-		if (getRecordTimestamp(record, &recordXtime))
-			SetLatestXTime(recordXtime);
-
-		/* Extract the XID of the committed/aborted transaction */
-		if (xact_info == XLOG_XACT_COMMIT_PREPARED)
-		{
-			xl_xact_commit *xlrec = (xl_xact_commit *) XLogRecGetData(record);
-			xl_xact_parsed_commit parsed;
-
-			ParseCommitRecord(XLogRecGetInfo(record),
-							  xlrec,
-							  &parsed);
-			recordXid = parsed.twophase_xid;
-		}
-		else if (xact_info == XLOG_XACT_ABORT_PREPARED)
-		{
-			xl_xact_abort *xlrec = (xl_xact_abort *) XLogRecGetData(record);
-			xl_xact_parsed_abort parsed;
-
-			ParseAbortRecord(XLogRecGetInfo(record),
-							 xlrec,
-							 &parsed);
-			recordXid = parsed.twophase_xid;
-		}
-		else
-			recordXid = XLogRecGetXid(record);
-
-		/*
-		 * There can be only one transaction end record with this exact
-		 * transactionid
-		 *
-		 * when testing for an xid, we MUST test for equality only, since
-		 * transactions are numbered in the order they start, not the order
-		 * they complete. A higher numbered xid will complete before you about
-		 * 50% of the time...
-		 */
-		if (recoveryTarget == RECOVERY_TARGET_XID && recoveryTargetInclusive &&
-			recordXid == recoveryTargetXid)
-		{
-			recoveryStopAfter = true;
-			recoveryStopXid = recordXid;
-			recoveryStopTime = recordXtime;
-			recoveryStopLSN = InvalidXLogRecPtr;
-			recoveryStopName[0] = '\0';
-
-			if (xact_info == XLOG_XACT_COMMIT ||
-				xact_info == XLOG_XACT_COMMIT_PREPARED)
-			{
-				ereport(LOG,
-						(errmsg("recovery stopping after commit of transaction %u, time %s",
-								recoveryStopXid,
-								timestamptz_to_str(recoveryStopTime))));
-			}
-			else if (xact_info == XLOG_XACT_ABORT ||
-					 xact_info == XLOG_XACT_ABORT_PREPARED)
-			{
-				ereport(LOG,
-						(errmsg("recovery stopping after abort of transaction %u, time %s",
-								recoveryStopXid,
-								timestamptz_to_str(recoveryStopTime))));
-			}
-			return true;
-		}
-	}
-
-	/* Check if we should stop as soon as reaching consistency */
-	if (recoveryTarget == RECOVERY_TARGET_IMMEDIATE && reachedConsistency)
-	{
-		ereport(LOG,
-				(errmsg("recovery stopping after reaching consistency")));
-
-		recoveryStopAfter = true;
-		recoveryStopXid = InvalidTransactionId;
-		recoveryStopTime = 0;
-		recoveryStopLSN = InvalidXLogRecPtr;
-		recoveryStopName[0] = '\0';
-		return true;
-	}
-
-	return false;
-}
-
-/*
  * Wait until shared recoveryPauseState is set to RECOVERY_NOT_PAUSED.
  *
  * endOfRecovery is true if the recovery target is reached and
@@ -5852,21 +5532,6 @@ recoveryApplyDelay(XLogReaderState *record)
 						 WAIT_EVENT_RECOVERY_APPLY_DELAY);
 	}
 	return true;
-}
-
-/*
- * Save timestamp of latest processed commit/abort record.
- *
- * We keep this in XLogCtl, not a simple static variable, so that it can be
- * seen by processes other than the startup process.  Note in particular
- * that CreateRestartPoint is executed in the checkpointer.
- */
-static void
-SetLatestXTime(TimestampTz xtime)
-{
-	SpinLockAcquire(&XLogCtl->info_lck);
-	XLogCtl->recoveryLastXTime = xtime;
-	SpinLockRelease(&XLogCtl->info_lck);
 }
 
 /*
@@ -6838,14 +6503,7 @@ StartupXLOG(void)
 					RECOVERY_NOT_PAUSED)
 					recoveryPausesHere(false);
 
-				/*
-				 * Have we reached our recovery target?
-				 */
-				if (recoveryStopsBefore(xlogreader))
-				{
-					reachedRecoveryTarget = true;
-					break;
-				}
+
 
 				/*
 				 * If we've been asked to lag the primary, wait on latch until
@@ -6969,12 +6627,7 @@ StartupXLOG(void)
 					RemoveNonParentXlogFiles(EndRecPtr, ThisTimeLineID);
 				}
 
-				/* Exit loop if we reached inclusive recovery target */
-				if (recoveryStopsAfter(xlogreader))
-				{
-					reachedRecoveryTarget = true;
-					break;
-				}
+
 
 				/* Else, try to fetch the next WAL record */
 				record = ReadRecord(xlogreader, LOG, false);
