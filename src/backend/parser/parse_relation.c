@@ -2309,28 +2309,6 @@ specialAttNum(const char *attname)
 
 
 /*
- * given attribute id, return name of that attribute
- *
- *	This should only be used if the relation is already
- *	table_open()'ed.  Use the cache version get_atttype()
- *	for access to non-opened relations.
- */
-const NameData *
-attnumAttName(Relation rd, int attid)
-{
-	if (attid <= 0)
-	{
-		const FormData_pg_attribute *sysatt;
-
-		sysatt = SystemAttributeDefinition(attid);
-		return &sysatt->attname;
-	}
-	if (attid > rd->rd_att->natts)
-		elog(ERROR, "invalid attribute number %d", attid);
-	return &TupleDescAttr(rd->rd_att, attid - 1)->attname;
-}
-
-/*
  * given attribute id, return type of that attribute
  *
  *	This should only be used if the relation is already
@@ -2350,24 +2328,6 @@ attnumTypeId(Relation rd, int attid)
 	if (attid > rd->rd_att->natts)
 		elog(ERROR, "invalid attribute number %d", attid);
 	return TupleDescAttr(rd->rd_att, attid - 1)->atttypid;
-}
-
-/*
- * given attribute id, return collation of that attribute
- *
- *	This should only be used if the relation is already table_open()'ed.
- */
-Oid
-attnumCollationId(Relation rd, int attid)
-{
-	if (attid <= 0)
-	{
-		/* All system attributes are of noncollatable types. */
-		return InvalidOid;
-	}
-	if (attid > rd->rd_att->natts)
-		elog(ERROR, "invalid attribute number %d", attid);
-	return DEFAULT_COLLATION_OID;
 }
 
 /*

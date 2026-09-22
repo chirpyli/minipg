@@ -220,22 +220,6 @@ pg_lsn_hash_extended(PG_FUNCTION_ARGS)
  *	Arithmetic operators on PostgreSQL LSNs.
  *---------------------------------------------------------*/
 
-Datum
-pg_lsn_mi(PG_FUNCTION_ARGS)
-{
-	XLogRecPtr	lsn1 = PG_GETARG_LSN(0);
-	XLogRecPtr	lsn2 = PG_GETARG_LSN(1);
-	int64		diff;
-
-	/* Output could be as large as plus or minus 2^63 - 1. */
-	if (lsn1 < lsn2)
-		diff = -((int64) (lsn2 - lsn1));
-	else
-		diff = (int64) (lsn1 - lsn2);
-
-	return Float8GetDatum((double) diff);
-}
-
 /*
  * Add the number of bytes to pg_lsn, giving a new pg_lsn.
  * Must handle both positive and negative numbers of bytes.

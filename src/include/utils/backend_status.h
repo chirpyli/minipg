@@ -221,7 +221,6 @@ extern void CreateSharedBackendStatus(void);
 extern void pgstat_beinit(void);
 extern void pgstat_bestart(void);
 
-extern void pgstat_clear_backend_activity_snapshot(void);
 
 /* Activity reporting functions */
 extern void pgstat_report_activity(BackendState state, const char *cmd_str);

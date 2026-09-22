@@ -24,24 +24,6 @@
 #include "common/string.h"
 
 
-/*
- * Returns whether the string `str' has the postfix `end'.
- */
-bool
-pg_str_endswith(const char *str, const char *end)
-{
-	size_t		slen = strlen(str);
-	size_t		elen = strlen(end);
-
-	/* can't be a postfix if longer */
-	if (elen > slen)
-		return false;
-
-	/* compare the end of the strings */
-	str += slen - elen;
-	return strcmp(str, end) == 0;
-}
-
 
 /*
  * strtoint --- just like strtol, but returns int not long

@@ -71,29 +71,6 @@ wait_result_to_str(int exitstatus)
 
 /*
  * Return true if a wait(2) result indicates that the child process
- * died due to the specified signal.
- *
- * The reason this is worth having a wrapper function for is that
- * there are two cases: the signal might have been received by our
- * immediate child process, or there might've been a shell process
- * between us and the child that died.  The shell will, per POSIX,
- * report the child death using exit code 128 + signal number.
- *
- * If there is no possibility of an intermediate shell, this function
- * need not (and probably should not) be used.
- */
-bool
-wait_result_is_signal(int exit_status, int signum)
-{
-	if (WIFSIGNALED(exit_status) && WTERMSIG(exit_status) == signum)
-		return true;
-	if (WIFEXITED(exit_status) && WEXITSTATUS(exit_status) == 128 + signum)
-		return true;
-	return false;
-}
-
-/*
- * Return true if a wait(2) result indicates that the child process
  * died due to any signal.  We consider either direct child death
  * or a shell report of child process death as matching the condition.
  *

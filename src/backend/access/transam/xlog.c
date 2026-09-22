@@ -3911,61 +3911,6 @@ PreallocXlogFiles(XLogRecPtr endptr)
 	}
 }
 
-/*
- * Throws an error if the given log segment has already been removed or
- * recycled. The caller should only pass a segment that it knows to have
- * existed while the server has been running, as this function always
- * succeeds if no WAL segments have been removed since startup.
- * 'tli' is only used in the error message.
- *
- * Note: this function guarantees to keep errno unchanged on return.
- * This supports callers that use this to possibly deliver a better
- * error message about a missing file, while still being able to throw
- * a normal file-access error afterwards, if this does return.
- */
-void
-CheckXLogRemoved(XLogSegNo segno, TimeLineID tli)
-{
-	int			save_errno = errno;
-	XLogSegNo	lastRemovedSegNo;
-
-	SpinLockAcquire(&XLogCtl->info_lck);
-	lastRemovedSegNo = XLogCtl->lastRemovedSegNo;
-	SpinLockRelease(&XLogCtl->info_lck);
-
-	if (segno <= lastRemovedSegNo)
-	{
-		char		filename[MAXFNAMELEN];
-
-		XLogFileName(filename, tli, segno, wal_segment_size);
-		errno = save_errno;
-		ereport(ERROR,
-				(errcode_for_file_access(),
-				 errmsg("requested WAL segment %s has already been removed",
-						filename)));
-	}
-	errno = save_errno;
-}
-
-/*
- * Return the last WAL segment removed, or 0 if no segment has been removed
- * since startup.
- *
- * NB: the result can be out of date arbitrarily fast, the caller has to deal
- * with that.
- */
-XLogSegNo
-XLogGetLastRemovedSegno(void)
-{
-	XLogSegNo	lastRemovedSegNo;
-
-	SpinLockAcquire(&XLogCtl->info_lck);
-	lastRemovedSegNo = XLogCtl->lastRemovedSegNo;
-	SpinLockRelease(&XLogCtl->info_lck);
-
-	return lastRemovedSegNo;
-}
-
 
 /*
  * Update the last removed segno pointer in shared memory, to reflect that the
@@ -4803,26 +4748,6 @@ void
 UpdateControlFile(void)
 {
 	update_controlfile(DataDir, ControlFile, true);
-}
-
-/*
- * Returns the unique system identifier from control file.
- */
-uint64
-GetSystemIdentifier(void)
-{
-	Assert(ControlFile != NULL);
-	return ControlFile->system_identifier;
-}
-
-/*
- * Returns the random nonce from control file.
- */
-char *
-GetMockAuthenticationNonce(void)
-{
-	Assert(ControlFile != NULL);
-	return ControlFile->mock_authentication_nonce;
 }
 
 /*
@@ -6130,22 +6055,6 @@ GetLatestXTime(void)
 
 	SpinLockAcquire(&XLogCtl->info_lck);
 	xtime = XLogCtl->recoveryLastXTime;
-	SpinLockRelease(&XLogCtl->info_lck);
-
-	return xtime;
-}
-
-/*
- * Fetch timestamp of latest processed commit/abort record.
- * Startup process maintains an accurate local copy in XLogReceiptTime
- */
-TimestampTz
-GetCurrentChunkReplayStartTime(void)
-{
-	TimestampTz xtime;
-
-	SpinLockAcquire(&XLogCtl->info_lck);
-	xtime = XLogCtl->currentChunkStartTime;
 	SpinLockRelease(&XLogCtl->info_lck);
 
 	return xtime;
@@ -8079,65 +7988,6 @@ RecoveryInProgress(void)
 }
 
 /*
- * Returns current recovery state from shared memory.
- *
- * This returned state is kept consistent with the contents of the control
- * file.  See details about the possible values of RecoveryState in xlog.h.
- */
-RecoveryState
-GetRecoveryState(void)
-{
-	RecoveryState retval;
-
-	SpinLockAcquire(&XLogCtl->info_lck);
-	retval = XLogCtl->SharedRecoveryState;
-	SpinLockRelease(&XLogCtl->info_lck);
-
-	return retval;
-}
-
-/*
- * Is HotStandby active yet? This is only important in special backends
- * since normal backends won't ever be able to connect until this returns
- * true. Postmaster knows this by way of signal, not via shared memory.
- *
- * Unlike testing standbyState, this works in any process that's connected to
- * shared memory.  (And note that standbyState alone doesn't tell the truth
- * anyway.)
- */
-bool
-HotStandbyActive(void)
-{
-	/*
-	 * We check shared state each time only until Hot Standby is active. We
-	 * can't de-activate Hot Standby, so there's no need to keep checking
-	 * after the shared variable has once been seen true.
-	 */
-	if (LocalHotStandbyActive)
-		return true;
-	else
-	{
-		/* spinlock is essential on machines with weak memory ordering! */
-		SpinLockAcquire(&XLogCtl->info_lck);
-		LocalHotStandbyActive = XLogCtl->SharedHotStandbyActive;
-		SpinLockRelease(&XLogCtl->info_lck);
-
-		return LocalHotStandbyActive;
-	}
-}
-
-/*
- * Like HotStandbyActive(), but to be used only in WAL replay code,
- * where we don't need to ask any other process what the state is.
- */
-bool
-HotStandbyActiveInReplay(void)
-{
-	Assert(AmStartupProcess() || !IsPostmasterEnvironment);
-	return LocalHotStandbyActive;
-}
-
-/*
  * Is this process allowed to insert new WAL records?
  *
  * Ordinarily this is essentially equivalent to !RecoveryInProgress().
@@ -8425,23 +8275,6 @@ GetLastImportantRecPtr(void)
 	}
 
 	return res;
-}
-
-/*
- * Get the time and LSN of the last xlog segment switch
- */
-pg_time_t
-GetLastSegSwitchData(XLogRecPtr *lastSwitchLSN)
-{
-	pg_time_t	result;
-
-	/* Need WALWriteLock, but shared lock is sufficient */
-	LWLockAcquire(WALWriteLock, LW_SHARED);
-	result = XLogCtl->lastSegSwitchTime;
-	*lastSwitchLSN = XLogCtl->lastSegSwitchLSN;
-	LWLockRelease(WALWriteLock);
-
-	return result;
 }
 
 /*
@@ -11435,22 +11268,6 @@ GetXLogInsertRecPtr(void)
 	SpinLockRelease(&Insert->insertpos_lck);
 
 	return XLogBytePosToRecPtr(current_bytepos);
-}
-
-/*
- * Get latest WAL record end pointer
- */
-XLogRecPtr
-GetXLogInsertEndRecPtr(void)
-{
-	XLogCtlInsert *Insert = &XLogCtl->Insert;
-	uint64		current_bytepos;
-
-	SpinLockAcquire(&Insert->insertpos_lck);
-	current_bytepos = Insert->CurrBytePos;
-	SpinLockRelease(&Insert->insertpos_lck);
-
-	return XLogBytePosToEndRecPtr(current_bytepos);
 }
 
 /*

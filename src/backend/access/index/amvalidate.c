@@ -264,13 +264,3 @@ opclass_for_family_datatype(Oid amoid, Oid opfamilyoid, Oid datatypeoid)
 	return result;
 }
 
-/*
- * Is the datatype a legitimate input type for the btree opfamily?
- */
-bool
-opfamily_can_sort_type(Oid opfamilyoid, Oid datatypeoid)
-{
-	return OidIsValid(opclass_for_family_datatype(BTREE_AM_OID,
-												  opfamilyoid,
-												  datatypeoid));
-}

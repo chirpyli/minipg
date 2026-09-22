@@ -619,55 +619,6 @@ get_relation_constraint_attnos(Oid relid, const char *conname,
 }
 
 /*
- * Return the OID of the constraint enforced by the given index in the
- * given relation; or InvalidOid if no such index is catalogued.
- *
- * Much like get_constraint_index, this function is concerned only with the
- * one constraint that "owns" the given index.  Therefore, constraints of
- * types other than unique, primary-key, and exclusion are ignored.
- */
-Oid
-get_relation_idx_constraint_oid(Oid relationId, Oid indexId)
-{
-	Relation	pg_constraint;
-	SysScanDesc scan;
-	ScanKeyData key;
-	HeapTuple	tuple;
-	Oid			constraintId = InvalidOid;
-
-	pg_constraint = table_open(ConstraintRelationId, AccessShareLock);
-
-	ScanKeyInit(&key,
-				Anum_pg_constraint_conrelid,
-				BTEqualStrategyNumber,
-				F_OIDEQ,
-				ObjectIdGetDatum(relationId));
-	scan = systable_beginscan(pg_constraint, ConstraintRelidNameIndexId,
-							  true, NULL, 1, &key);
-	while ((tuple = systable_getnext(scan)) != NULL)
-	{
-		Form_pg_constraint constrForm;
-
-		constrForm = (Form_pg_constraint) GETSTRUCT(tuple);
-
-		/* See above */
-		if (constrForm->contype != CONSTRAINT_PRIMARY &&
-			constrForm->contype != CONSTRAINT_UNIQUE)
-			continue;
-
-		if (constrForm->conindid == indexId)
-		{
-			constraintId = constrForm->oid;
-			break;
-		}
-	}
-	systable_endscan(scan);
-
-	table_close(pg_constraint, AccessShareLock);
-	return constraintId;
-}
-
-/*
  * get_primary_key_attnos
  *		Identify the columns in a relation's primary key, if any.
  *

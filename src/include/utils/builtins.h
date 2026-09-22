@@ -53,7 +53,6 @@ extern uint64 pg_strtouint64(const char *str, char **endptr, int base);
 extern oidvector *buildoidvector(const Oid *oids, int n);
 extern void check_valid_oidvector(const oidvector *oidArray);
 extern Oid	oidparse(Node *node);
-extern int	oid_cmp(const void *p1, const void *p2);
 
 /* ruleutils.c */
 extern bool quote_all_identifiers;

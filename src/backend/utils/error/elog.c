@@ -881,28 +881,6 @@ errmsg(const char *fmt,...)
 }
 
 /*
- * Add a backtrace to the containing ereport() call.  This is intended to be
- * added temporarily during debugging.
- */
-int
-errbacktrace(void)
-{
-	ErrorData  *edata = &errordata[errordata_stack_depth];
-	MemoryContext oldcontext;
-
-	recursion_depth++;
-	CHECK_STACK_DEPTH();
-	oldcontext = MemoryContextSwitchTo(edata->assoc_context);
-
-	set_backtrace(edata, 1);
-
-	MemoryContextSwitchTo(oldcontext);
-	recursion_depth--;
-
-	return 0;
-}
-
-/*
  * Compute backtrace data and add it to the supplied ErrorData.  num_skip
  * specifies how many inner frames to skip.  Use this to avoid showing the
  * internal backtrace support functions in the backtrace.  This requires that
@@ -2387,31 +2365,6 @@ log_line_prefix(StringInfo buf, ErrorData *edata)
 				break;
 		}
 	}
-}
-
-/*
- * append a CSV'd version of a string to a StringInfo
- * We use the PostgreSQL defaults for CSV, i.e. quote = escape = '"'
- * If it's NULL, append nothing.
- */
-static inline void
-appendCSVLiteral(StringInfo buf, const char *data)
-{
-	const char *p = data;
-	char		c;
-
-	/* avoid confusing an empty string with NULL */
-	if (p == NULL)
-		return;
-
-	appendStringInfoCharMacro(buf, '"');
-	while ((c = *p++) != '\0')
-	{
-		if (c == '"')
-			appendStringInfoCharMacro(buf, '"');
-		appendStringInfoCharMacro(buf, c);
-	}
-	appendStringInfoCharMacro(buf, '"');
 }
 
 

@@ -210,7 +210,6 @@ extern int	errcontext_msg(const char *fmt,...) pg_attribute_printf(1, 2);
 extern int	errhidestmt(bool hide_stmt);
 extern int	errhidecontext(bool hide_ctx);
 
-extern int	errbacktrace(void);
 
 extern int	errposition(int cursorpos);
 

@@ -18,12 +18,7 @@
 #include "executor/instrument.h"
 
 BufferUsage pgBufferUsage;
-static BufferUsage save_pgBufferUsage;
 WalUsage	pgWalUsage;
-static WalUsage save_pgWalUsage;
-
-static void BufferUsageAdd(BufferUsage *dst, const BufferUsage *add);
-static void WalUsageAdd(WalUsage *dst, WalUsage *add);
 
 
 /* Allocate new instrumentation structure(s) */
@@ -51,16 +46,6 @@ InstrAlloc(int n, int instrument_options, bool async_mode)
 	}
 
 	return instr;
-}
-
-/* Initialize a pre-allocated instrumentation structure. */
-void
-InstrInit(Instrumentation *instr, int instrument_options)
-{
-	memset(instr, 0, sizeof(Instrumentation));
-	instr->need_bufusage = (instrument_options & INSTRUMENT_BUFFERS) != 0;
-	instr->need_walusage = (instrument_options & INSTRUMENT_WAL) != 0;
-	instr->need_timer = (instrument_options & INSTRUMENT_TIMER) != 0;
 }
 
 /* Entry to a plan node */
@@ -127,14 +112,6 @@ InstrStopNode(Instrumentation *instr, double nTuples)
 	}
 }
 
-/* Update tuple count */
-void
-InstrUpdateTupleCount(Instrumentation *instr, double nTuples)
-{
-	/* count the returned tuples */
-	instr->tuplecount += nTuples;
-}
-
 /* Finish a run cycle for a plan node */
 void
 InstrEndLoop(Instrumentation *instr)
@@ -164,81 +141,6 @@ InstrEndLoop(Instrumentation *instr)
 	instr->tuplecount = 0;
 }
 
-/* aggregate instrumentation information */
-void
-InstrAggNode(Instrumentation *dst, Instrumentation *add)
-{
-	if (!dst->running && add->running)
-	{
-		dst->running = true;
-		dst->firsttuple = add->firsttuple;
-	}
-	else if (dst->running && add->running && dst->firsttuple > add->firsttuple)
-		dst->firsttuple = add->firsttuple;
-
-	INSTR_TIME_ADD(dst->counter, add->counter);
-
-	dst->tuplecount += add->tuplecount;
-	dst->startup += add->startup;
-	dst->total += add->total;
-	dst->ntuples += add->ntuples;
-	dst->ntuples2 += add->ntuples2;
-	dst->nloops += add->nloops;
-	dst->nfiltered1 += add->nfiltered1;
-	dst->nfiltered2 += add->nfiltered2;
-
-	/* Add delta of buffer usage since entry to node's totals */
-	if (dst->need_bufusage)
-		BufferUsageAdd(&dst->bufusage, &add->bufusage);
-
-	if (dst->need_walusage)
-		WalUsageAdd(&dst->walusage, &add->walusage);
-}
-
-/* note current values during parallel executor startup */
-void
-InstrStartParallelQuery(void)
-{
-	save_pgBufferUsage = pgBufferUsage;
-	save_pgWalUsage = pgWalUsage;
-}
-
-/* report usage after parallel executor shutdown */
-void
-InstrEndParallelQuery(BufferUsage *bufusage, WalUsage *walusage)
-{
-	memset(bufusage, 0, sizeof(BufferUsage));
-	BufferUsageAccumDiff(bufusage, &pgBufferUsage, &save_pgBufferUsage);
-	memset(walusage, 0, sizeof(WalUsage));
-	WalUsageAccumDiff(walusage, &pgWalUsage, &save_pgWalUsage);
-}
-
-/* accumulate work done by workers in leader's stats */
-void
-InstrAccumParallelQuery(BufferUsage *bufusage, WalUsage *walusage)
-{
-	BufferUsageAdd(&pgBufferUsage, bufusage);
-	WalUsageAdd(&pgWalUsage, walusage);
-}
-
-/* dst += add */
-static void
-BufferUsageAdd(BufferUsage *dst, const BufferUsage *add)
-{
-	dst->shared_blks_hit += add->shared_blks_hit;
-	dst->shared_blks_read += add->shared_blks_read;
-	dst->shared_blks_dirtied += add->shared_blks_dirtied;
-	dst->shared_blks_written += add->shared_blks_written;
-	dst->local_blks_hit += add->local_blks_hit;
-	dst->local_blks_read += add->local_blks_read;
-	dst->local_blks_dirtied += add->local_blks_dirtied;
-	dst->local_blks_written += add->local_blks_written;
-	dst->temp_blks_read += add->temp_blks_read;
-	dst->temp_blks_written += add->temp_blks_written;
-	INSTR_TIME_ADD(dst->blk_read_time, add->blk_read_time);
-	INSTR_TIME_ADD(dst->blk_write_time, add->blk_write_time);
-}
-
 /* dst += add - sub */
 void
 BufferUsageAccumDiff(BufferUsage *dst,
@@ -259,15 +161,6 @@ BufferUsageAccumDiff(BufferUsage *dst,
 						  add->blk_read_time, sub->blk_read_time);
 	INSTR_TIME_ACCUM_DIFF(dst->blk_write_time,
 						  add->blk_write_time, sub->blk_write_time);
-}
-
-/* helper functions for WAL usage accumulation */
-static void
-WalUsageAdd(WalUsage *dst, WalUsage *add)
-{
-	dst->wal_bytes += add->wal_bytes;
-	dst->wal_records += add->wal_records;
-	dst->wal_fpi += add->wal_fpi;
 }
 
 void

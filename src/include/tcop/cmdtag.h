@@ -51,7 +51,5 @@ CopyQueryCompletion(QueryCompletion *dst, const QueryCompletion *src)
 extern void InitializeQueryCompletion(QueryCompletion *qc);
 extern const char *GetCommandTagName(CommandTag commandTag);
 extern bool command_tag_display_rowcount(CommandTag commandTag);
-extern bool command_tag_table_rewrite_ok(CommandTag commandTag);
-extern CommandTag GetCommandTagEnum(const char *tagname);
 
 #endif							/* CMDTAG_H */

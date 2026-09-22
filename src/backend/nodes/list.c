@@ -425,34 +425,6 @@ list_insert_nth(List *list, int pos, void *datum)
 	return list;
 }
 
-List *
-list_insert_nth_int(List *list, int pos, int datum)
-{
-	if (list == NIL)
-	{
-		Assert(pos == 0);
-		return list_make1_int(datum);
-	}
-	Assert(IsIntegerList(list));
-	lfirst_int(insert_new_cell(list, pos)) = datum;
-	check_list_invariants(list);
-	return list;
-}
-
-List *
-list_insert_nth_oid(List *list, int pos, Oid datum)
-{
-	if (list == NIL)
-	{
-		Assert(pos == 0);
-		return list_make1_oid(datum);
-	}
-	Assert(IsOidList(list));
-	lfirst_oid(insert_new_cell(list, pos)) = datum;
-	check_list_invariants(list);
-	return list;
-}
-
 /*
  * Prepend a new element to the list. A pointer to the modified list
  * is returned. Note that this function may or may not destructively
@@ -825,25 +797,6 @@ list_delete_ptr(List *list, void *datum)
 	return list;
 }
 
-/* As above, but for integers */
-List *
-list_delete_int(List *list, int datum)
-{
-	ListCell   *cell;
-
-	Assert(IsIntegerList(list));
-	check_list_invariants(list);
-
-	foreach(cell, list)
-	{
-		if (lfirst_int(cell) == datum)
-			return list_delete_cell(list, cell);
-	}
-
-	/* Didn't find a match: return the list unmodified */
-	return list;
-}
-
 /* As above, but for OIDs */
 List *
 list_delete_oid(List *list, Oid datum)
@@ -1013,76 +966,6 @@ list_union(const List *list1, const List *list2)
 }
 
 /*
- * This variant of list_union() determines duplicates via simple
- * pointer comparison.
- */
-List *
-list_union_ptr(const List *list1, const List *list2)
-{
-	List	   *result;
-	const ListCell *cell;
-
-	Assert(IsPointerList(list1));
-	Assert(IsPointerList(list2));
-
-	result = list_copy(list1);
-	foreach(cell, list2)
-	{
-		if (!list_member_ptr(result, lfirst(cell)))
-			result = lappend(result, lfirst(cell));
-	}
-
-	check_list_invariants(result);
-	return result;
-}
-
-/*
- * This variant of list_union() operates upon lists of integers.
- */
-List *
-list_union_int(const List *list1, const List *list2)
-{
-	List	   *result;
-	const ListCell *cell;
-
-	Assert(IsIntegerList(list1));
-	Assert(IsIntegerList(list2));
-
-	result = list_copy(list1);
-	foreach(cell, list2)
-	{
-		if (!list_member_int(result, lfirst_int(cell)))
-			result = lappend_int(result, lfirst_int(cell));
-	}
-
-	check_list_invariants(result);
-	return result;
-}
-
-/*
- * This variant of list_union() operates upon lists of OIDs.
- */
-List *
-list_union_oid(const List *list1, const List *list2)
-{
-	List	   *result;
-	const ListCell *cell;
-
-	Assert(IsOidList(list1));
-	Assert(IsOidList(list2));
-
-	result = list_copy(list1);
-	foreach(cell, list2)
-	{
-		if (!list_member_oid(result, lfirst_oid(cell)))
-			result = lappend_oid(result, lfirst_oid(cell));
-	}
-
-	check_list_invariants(result);
-	return result;
-}
-
-/*
  * Return a list that contains all the cells that are in both list1 and
  * list2.  The returned list is freshly allocated via palloc(), but the
  * cells themselves point to the same objects as the cells of the
@@ -1112,32 +995,6 @@ list_intersection(const List *list1, const List *list2)
 	{
 		if (list_member(list2, lfirst(cell)))
 			result = lappend(result, lfirst(cell));
-	}
-
-	check_list_invariants(result);
-	return result;
-}
-
-/*
- * As list_intersection but operates on lists of integers.
- */
-List *
-list_intersection_int(const List *list1, const List *list2)
-{
-	List	   *result;
-	const ListCell *cell;
-
-	if (list1 == NIL || list2 == NIL)
-		return NIL;
-
-	Assert(IsIntegerList(list1));
-	Assert(IsIntegerList(list2));
-
-	result = NIL;
-	foreach(cell, list1)
-	{
-		if (list_member_int(list2, lfirst_int(cell)))
-			result = lappend_int(result, lfirst_int(cell));
 	}
 
 	check_list_invariants(result);
@@ -1202,56 +1059,6 @@ list_difference_ptr(const List *list1, const List *list2)
 }
 
 /*
- * This variant of list_difference() operates upon lists of integers.
- */
-List *
-list_difference_int(const List *list1, const List *list2)
-{
-	const ListCell *cell;
-	List	   *result = NIL;
-
-	Assert(IsIntegerList(list1));
-	Assert(IsIntegerList(list2));
-
-	if (list2 == NIL)
-		return list_copy(list1);
-
-	foreach(cell, list1)
-	{
-		if (!list_member_int(list2, lfirst_int(cell)))
-			result = lappend_int(result, lfirst_int(cell));
-	}
-
-	check_list_invariants(result);
-	return result;
-}
-
-/*
- * This variant of list_difference() operates upon lists of OIDs.
- */
-List *
-list_difference_oid(const List *list1, const List *list2)
-{
-	const ListCell *cell;
-	List	   *result = NIL;
-
-	Assert(IsOidList(list1));
-	Assert(IsOidList(list2));
-
-	if (list2 == NIL)
-		return list_copy(list1);
-
-	foreach(cell, list1)
-	{
-		if (!list_member_oid(list2, lfirst_oid(cell)))
-			result = lappend_oid(result, lfirst_oid(cell));
-	}
-
-	check_list_invariants(result);
-	return result;
-}
-
-/*
  * Append datum to list, but only if it isn't already in the list.
  *
  * Whether an element is already a member of the list is determined
@@ -1277,18 +1084,6 @@ list_append_unique_ptr(List *list, void *datum)
 		return list;
 	else
 		return lappend(list, datum);
-}
-
-/*
- * This variant of list_append_unique() operates upon lists of integers.
- */
-List *
-list_append_unique_int(List *list, int datum)
-{
-	if (list_member_int(list, datum))
-		return list;
-	else
-		return lappend_int(list, datum);
 }
 
 /*
@@ -1330,98 +1125,6 @@ list_concat_unique(List *list1, const List *list2)
 
 	check_list_invariants(list1);
 	return list1;
-}
-
-/*
- * This variant of list_concat_unique() determines list membership via
- * simple pointer equality.
- */
-List *
-list_concat_unique_ptr(List *list1, const List *list2)
-{
-	ListCell   *cell;
-
-	Assert(IsPointerList(list1));
-	Assert(IsPointerList(list2));
-
-	foreach(cell, list2)
-	{
-		if (!list_member_ptr(list1, lfirst(cell)))
-			list1 = lappend(list1, lfirst(cell));
-	}
-
-	check_list_invariants(list1);
-	return list1;
-}
-
-/*
- * This variant of list_concat_unique() operates upon lists of integers.
- */
-List *
-list_concat_unique_int(List *list1, const List *list2)
-{
-	ListCell   *cell;
-
-	Assert(IsIntegerList(list1));
-	Assert(IsIntegerList(list2));
-
-	foreach(cell, list2)
-	{
-		if (!list_member_int(list1, lfirst_int(cell)))
-			list1 = lappend_int(list1, lfirst_int(cell));
-	}
-
-	check_list_invariants(list1);
-	return list1;
-}
-
-/*
- * This variant of list_concat_unique() operates upon lists of OIDs.
- */
-List *
-list_concat_unique_oid(List *list1, const List *list2)
-{
-	ListCell   *cell;
-
-	Assert(IsOidList(list1));
-	Assert(IsOidList(list2));
-
-	foreach(cell, list2)
-	{
-		if (!list_member_oid(list1, lfirst_oid(cell)))
-			list1 = lappend_oid(list1, lfirst_oid(cell));
-	}
-
-	check_list_invariants(list1);
-	return list1;
-}
-
-/*
- * Remove adjacent duplicates in a list of OIDs.
- *
- * It is caller's responsibility to have sorted the list to bring duplicates
- * together, perhaps via list_sort(list, list_oid_cmp).
- */
-void
-list_deduplicate_oid(List *list)
-{
-	int			len;
-
-	Assert(IsOidList(list));
-	len = list_length(list);
-	if (len > 1)
-	{
-		ListCell   *elements = list->elements;
-		int			i = 0;
-
-		for (int j = 1; j < len; j++)
-		{
-			if (elements[i].oid_value != elements[j].oid_value)
-				elements[++i].oid_value = elements[j].oid_value;
-		}
-		list->length = i + 1;
-	}
-	check_list_invariants(list);
 }
 
 /*
@@ -1570,22 +1273,6 @@ list_sort(List *list, list_sort_comparator cmp)
 	len = list_length(list);
 	if (len > 1)
 		qsort(list->elements, len, sizeof(ListCell), (qsort_comparator) cmp);
-}
-
-/*
- * list_sort comparator for sorting a list into ascending int order.
- */
-int
-list_int_cmp(const ListCell *p1, const ListCell *p2)
-{
-	int			v1 = lfirst_int(p1);
-	int			v2 = lfirst_int(p2);
-
-	if (v1 < v2)
-		return -1;
-	if (v1 > v2)
-		return 1;
-	return 0;
 }
 
 /*

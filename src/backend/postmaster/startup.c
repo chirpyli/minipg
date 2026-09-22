@@ -241,26 +241,6 @@ StartupProcessMain(void)
 	proc_exit(0);
 }
 
-void
-PreRestoreCommand(void)
-{
-	/*
-	 * Set in_restore_command to tell the signal handler that we should exit
-	 * right away on SIGTERM. We know that we're at a safe point to do that.
-	 * Check if we had already received the signal, so that we don't miss a
-	 * shutdown request received just before this.
-	 */
-	in_restore_command = true;
-	if (shutdown_requested)
-		proc_exit(1);
-}
-
-void
-PostRestoreCommand(void)
-{
-	in_restore_command = false;
-}
-
 bool
 IsPromoteSignaled(void)
 {

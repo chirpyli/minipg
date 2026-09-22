@@ -140,18 +140,6 @@ ResourceOwner CurTransactionResourceOwner = NULL;
 ResourceOwner TopTransactionResourceOwner = NULL;
 ResourceOwner AuxProcessResourceOwner = NULL;
 
-/*
- * List of add-on callbacks for resource releasing
- */
-typedef struct ResourceReleaseCallbackItem
-{
-	struct ResourceReleaseCallbackItem *next;
-	ResourceReleaseCallback callback;
-	void	   *arg;
-} ResourceReleaseCallbackItem;
-
-static ResourceReleaseCallbackItem *ResourceRelease_callbacks = NULL;
-
 
 /* Internal routines */
 static void ResourceArrayInit(ResourceArray *resarr, Datum invalidval);
@@ -483,7 +471,6 @@ ResourceOwnerReleaseInternal(ResourceOwner owner,
 {
 	ResourceOwner child;
 	ResourceOwner save;
-	ResourceReleaseCallbackItem *item;
 	Datum		foundres;
 
 	/* Recurse to handle descendants */
@@ -634,10 +621,6 @@ ResourceOwnerReleaseInternal(ResourceOwner owner,
 		}
 	}
 
-	/* Let add-on modules get a chance too */
-	for (item = ResourceRelease_callbacks; item; item = item->next)
-		item->callback(phase, isCommit, isTopLevel, item->arg);
-
 	CurrentResourceOwner = save;
 }
 
@@ -737,50 +720,6 @@ ResourceOwnerNewParent(ResourceOwner owner,
 	{
 		owner->parent = NULL;
 		owner->nextchild = NULL;
-	}
-}
-
-/*
- * Register or deregister callback functions for resource cleanup
- *
- * These functions are intended for use by dynamically loaded modules.
- * For built-in modules we generally just hardwire the appropriate calls.
- *
- * Note that the callback occurs post-commit or post-abort, so the callback
- * functions can only do noncritical cleanup.
- */
-void
-RegisterResourceReleaseCallback(ResourceReleaseCallback callback, void *arg)
-{
-	ResourceReleaseCallbackItem *item;
-
-	item = (ResourceReleaseCallbackItem *)
-		MemoryContextAlloc(TopMemoryContext,
-						   sizeof(ResourceReleaseCallbackItem));
-	item->callback = callback;
-	item->arg = arg;
-	item->next = ResourceRelease_callbacks;
-	ResourceRelease_callbacks = item;
-}
-
-void
-UnregisterResourceReleaseCallback(ResourceReleaseCallback callback, void *arg)
-{
-	ResourceReleaseCallbackItem *item;
-	ResourceReleaseCallbackItem *prev;
-
-	prev = NULL;
-	for (item = ResourceRelease_callbacks; item; prev = item, item = item->next)
-	{
-		if (item->callback == callback && item->arg == arg)
-		{
-			if (prev)
-				prev->next = item->next;
-			else
-				ResourceRelease_callbacks = item->next;
-			pfree(item);
-			break;
-		}
 	}
 }
 

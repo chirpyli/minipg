@@ -1875,24 +1875,3 @@ get_hash_memory_limit(void)
 	return (size_t) mem_limit;
 }
 
-/*
- * Convert the hash memory limit to an integer number of kilobytes,
- * that is something comparable to work_mem.  Like work_mem, we clamp
- * the result to ensure that multiplying it by 1024 fits in a long int.
- *
- * This is deprecated since it may understate the actual memory limit.
- * It is unused in core and will eventually be removed.
- */
-int
-get_hash_mem(void)
-{
-	size_t		mem_limit = get_hash_memory_limit();
-
-	/* Remove the kilobyte factor */
-	mem_limit /= 1024;
-
-	/* Clamp to MAX_KILOBYTES, like work_mem */
-	mem_limit = Min(mem_limit, (size_t) MAX_KILOBYTES);
-
-	return (int) mem_limit;
-}

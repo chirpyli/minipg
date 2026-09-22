@@ -13424,11 +13424,7 @@ _ACEOF
 if test $ac_have_decl = 1; then :
 
 else
-  case " $LIBOBJS " in
-  *" preadv.$ac_objext "* ) ;;
-  *) LIBOBJS="$LIBOBJS preadv.$ac_objext"
- ;;
-esac
+  :
 
 fi
 
@@ -13446,11 +13442,7 @@ _ACEOF
 if test $ac_have_decl = 1; then :
 
 else
-  case " $LIBOBJS " in
-  *" pwritev.$ac_objext "* ) ;;
-  *) LIBOBJS="$LIBOBJS pwritev.$ac_objext"
- ;;
-esac
+  :
 
 fi
 
@@ -13559,11 +13551,7 @@ if test "x$ac_cv_func_dlopen" = xyes; then :
   $as_echo "#define HAVE_DLOPEN 1" >>confdefs.h
 
 else
-  case " $LIBOBJS " in
-  *" dlopen.$ac_objext "* ) ;;
-  *) LIBOBJS="$LIBOBJS dlopen.$ac_objext"
- ;;
-esac
+  :
 
 fi
 
@@ -13572,11 +13560,7 @@ if test "x$ac_cv_func_explicit_bzero" = xyes; then :
   $as_echo "#define HAVE_EXPLICIT_BZERO 1" >>confdefs.h
 
 else
-  case " $LIBOBJS " in
-  *" explicit_bzero.$ac_objext "* ) ;;
-  *) LIBOBJS="$LIBOBJS explicit_bzero.$ac_objext"
- ;;
-esac
+  :
 
 fi
 
@@ -13598,11 +13582,7 @@ if test "x$ac_cv_func_getopt" = xyes; then :
   $as_echo "#define HAVE_GETOPT 1" >>confdefs.h
 
 else
-  case " $LIBOBJS " in
-  *" getopt.$ac_objext "* ) ;;
-  *) LIBOBJS="$LIBOBJS getopt.$ac_objext"
- ;;
-esac
+  :
 
 fi
 
@@ -13624,11 +13604,7 @@ if test "x$ac_cv_func_getrusage" = xyes; then :
   $as_echo "#define HAVE_GETRUSAGE 1" >>confdefs.h
 
 else
-  case " $LIBOBJS " in
-  *" getrusage.$ac_objext "* ) ;;
-  *) LIBOBJS="$LIBOBJS getrusage.$ac_objext"
- ;;
-esac
+  :
 
 fi
 
@@ -13637,11 +13613,7 @@ if test "x$ac_cv_func_inet_aton" = xyes; then :
   $as_echo "#define HAVE_INET_ATON 1" >>confdefs.h
 
 else
-  case " $LIBOBJS " in
-  *" inet_aton.$ac_objext "* ) ;;
-  *) LIBOBJS="$LIBOBJS inet_aton.$ac_objext"
- ;;
-esac
+  :
 
 fi
 
@@ -13650,11 +13622,7 @@ if test "x$ac_cv_func_link" = xyes; then :
   $as_echo "#define HAVE_LINK 1" >>confdefs.h
 
 else
-  case " $LIBOBJS " in
-  *" link.$ac_objext "* ) ;;
-  *) LIBOBJS="$LIBOBJS link.$ac_objext"
- ;;
-esac
+  :
 
 fi
 
@@ -13663,11 +13631,7 @@ if test "x$ac_cv_func_mkdtemp" = xyes; then :
   $as_echo "#define HAVE_MKDTEMP 1" >>confdefs.h
 
 else
-  case " $LIBOBJS " in
-  *" mkdtemp.$ac_objext "* ) ;;
-  *) LIBOBJS="$LIBOBJS mkdtemp.$ac_objext"
- ;;
-esac
+  :
 
 fi
 
@@ -13676,11 +13640,7 @@ if test "x$ac_cv_func_pread" = xyes; then :
   $as_echo "#define HAVE_PREAD 1" >>confdefs.h
 
 else
-  case " $LIBOBJS " in
-  *" pread.$ac_objext "* ) ;;
-  *) LIBOBJS="$LIBOBJS pread.$ac_objext"
- ;;
-esac
+  :
 
 fi
 
@@ -13689,11 +13649,7 @@ if test "x$ac_cv_func_pwrite" = xyes; then :
   $as_echo "#define HAVE_PWRITE 1" >>confdefs.h
 
 else
-  case " $LIBOBJS " in
-  *" pwrite.$ac_objext "* ) ;;
-  *) LIBOBJS="$LIBOBJS pwrite.$ac_objext"
- ;;
-esac
+  :
 
 fi
 
@@ -13702,11 +13658,7 @@ if test "x$ac_cv_func_random" = xyes; then :
   $as_echo "#define HAVE_RANDOM 1" >>confdefs.h
 
 else
-  case " $LIBOBJS " in
-  *" random.$ac_objext "* ) ;;
-  *) LIBOBJS="$LIBOBJS random.$ac_objext"
- ;;
-esac
+  :
 
 fi
 
@@ -13715,11 +13667,7 @@ if test "x$ac_cv_func_srandom" = xyes; then :
   $as_echo "#define HAVE_SRANDOM 1" >>confdefs.h
 
 else
-  case " $LIBOBJS " in
-  *" srandom.$ac_objext "* ) ;;
-  *) LIBOBJS="$LIBOBJS srandom.$ac_objext"
- ;;
-esac
+  :
 
 fi
 
@@ -13754,11 +13702,7 @@ if test "x$ac_cv_func_strnlen" = xyes; then :
   $as_echo "#define HAVE_STRNLEN 1" >>confdefs.h
 
 else
-  case " $LIBOBJS " in
-  *" strnlen.$ac_objext "* ) ;;
-  *) LIBOBJS="$LIBOBJS strnlen.$ac_objext"
- ;;
-esac
+  :
 
 fi
 
@@ -13767,11 +13711,7 @@ if test "x$ac_cv_func_strtof" = xyes; then :
   $as_echo "#define HAVE_STRTOF 1" >>confdefs.h
 
 else
-  case " $LIBOBJS " in
-  *" strtof.$ac_objext "* ) ;;
-  *) LIBOBJS="$LIBOBJS strtof.$ac_objext"
- ;;
-esac
+  :
 
 fi
 
@@ -13796,11 +13736,7 @@ if test "x$ac_cv_func_pthread_barrier_wait" = xyes; then :
   $as_echo "#define HAVE_PTHREAD_BARRIER_WAIT 1" >>confdefs.h
 
 else
-  case " $LIBOBJS " in
-  *" pthread_barrier_wait.$ac_objext "* ) ;;
-  *) LIBOBJS="$LIBOBJS pthread_barrier_wait.$ac_objext"
- ;;
-esac
+  :
 
 fi
 
@@ -13814,11 +13750,7 @@ if test "x$ac_cv_func_setenv" = xyes; then :
   $as_echo "#define HAVE_SETENV 1" >>confdefs.h
 
 else
-  case " $LIBOBJS " in
-  *" setenv.$ac_objext "* ) ;;
-  *) LIBOBJS="$LIBOBJS setenv.$ac_objext"
- ;;
-esac
+  :
 
 fi
 
@@ -13827,11 +13759,7 @@ if test "x$ac_cv_func_unsetenv" = xyes; then :
   $as_echo "#define HAVE_UNSETENV 1" >>confdefs.h
 
 else
-  case " $LIBOBJS " in
-  *" unsetenv.$ac_objext "* ) ;;
-  *) LIBOBJS="$LIBOBJS unsetenv.$ac_objext"
- ;;
-esac
+  :
 
 fi
 
@@ -13849,21 +13777,13 @@ if test "x$ac_cv_func_getaddrinfo" = xyes; then :
   $as_echo "#define HAVE_GETADDRINFO 1" >>confdefs.h
 
 else
-  case " $LIBOBJS " in
-  *" getaddrinfo.$ac_objext "* ) ;;
-  *) LIBOBJS="$LIBOBJS getaddrinfo.$ac_objext"
- ;;
-esac
+  :
 
 fi
 
 
 else
-  case " $LIBOBJS " in
-  *" getaddrinfo.$ac_objext "* ) ;;
-  *) LIBOBJS="$LIBOBJS getaddrinfo.$ac_objext"
- ;;
-esac
+  :
 
 fi
 
@@ -13874,32 +13794,20 @@ if test "x$ac_cv_func_getopt_long" = xyes; then :
   $as_echo "#define HAVE_GETOPT_LONG 1" >>confdefs.h
 
 else
-  case " $LIBOBJS " in
-  *" getopt_long.$ac_objext "* ) ;;
-  *) LIBOBJS="$LIBOBJS getopt_long.$ac_objext"
- ;;
-esac
+  :
 
 fi
 
 
 else
-  case " $LIBOBJS " in
-  *" getopt_long.$ac_objext "* ) ;;
-  *) LIBOBJS="$LIBOBJS getopt_long.$ac_objext"
- ;;
-esac
+  :
 
 fi
 
 # On OpenBSD and Solaris, getopt() doesn't do what we want for long options
 # (i.e., allow '-' as a flag character), so use our version on those platforms.
 if test "$PORTNAME" = "openbsd" -o "$PORTNAME" = "solaris"; then
-  case " $LIBOBJS " in
-  *" getopt.$ac_objext "* ) ;;
-  *) LIBOBJS="$LIBOBJS getopt.$ac_objext"
- ;;
-esac
+  :
 
 fi
 

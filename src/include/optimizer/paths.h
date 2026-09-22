@@ -128,7 +128,6 @@ extern EquivalenceMember *find_computable_ec_member(PlannerInfo *root,
 													EquivalenceClass *ec,
 													List *exprs,
 													Relids relids);
-extern Expr *find_em_expr_for_rel(EquivalenceClass *ec, RelOptInfo *rel);
 extern bool relation_can_be_sorted_early(PlannerInfo *root, RelOptInfo *rel,
 										 EquivalenceClass *ec);
 extern void generate_base_implied_equalities(PlannerInfo *root);

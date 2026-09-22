@@ -348,28 +348,6 @@ pgstat_beshutdown_hook(int code, Datum arg)
 	MyBEEntry = NULL;
 }
 
-/*
- * Discard any data collected in the current transaction.  Any subsequent
- * request will cause new snapshots to be read.
- *
- * This is also invoked during transaction commit or abort to discard the
- * no-longer-wanted snapshot.
- */
-void
-pgstat_clear_backend_activity_snapshot(void)
-{
-	/* Release memory, if any was allocated */
-	if (backendStatusSnapContext)
-	{
-		MemoryContextDelete(backendStatusSnapContext);
-		backendStatusSnapContext = NULL;
-	}
-
-	/* Reset variables */
-	localBackendStatusTable = NULL;
-	localNumBackends = 0;
-}
-
 static void
 pgstat_setup_backend_status_context(void)
 {

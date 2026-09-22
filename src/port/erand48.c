@@ -41,17 +41,6 @@
 #define RAND48_MULT		UINT64CONST(0x0005deece66d)
 #define RAND48_ADD		UINT64CONST(0x000b)
 
-/* POSIX specifies 0x330e's use in srand48, but the other bits are arbitrary */
-#define RAND48_SEED_0	(0x330e)
-#define RAND48_SEED_1	(0xabcd)
-#define RAND48_SEED_2	(0x1234)
-
-static unsigned short _rand48_seed[3] = {
-	RAND48_SEED_0,
-	RAND48_SEED_1,
-	RAND48_SEED_2
-};
-
 
 /*
  * Advance the 48-bit value stored in xseed[] to the next "random" number.
@@ -92,45 +81,3 @@ pg_erand48(unsigned short xseed[3])
 	return ldexp((double) (x & UINT64CONST(0xFFFFFFFFFFFF)), -48);
 }
 
-/*
- * Generate a random non-negative integral value using internal state.
- * Values are uniformly distributed over the interval [0, 2^31).
- */
-long
-pg_lrand48(void)
-{
-	uint64		x = _dorand48(_rand48_seed);
-
-	return (x >> 17) & UINT64CONST(0x7FFFFFFF);
-}
-
-/*
- * Generate a random signed integral value using caller-supplied state.
- * Values are uniformly distributed over the interval [-2^31, 2^31).
- */
-long
-pg_jrand48(unsigned short xseed[3])
-{
-	uint64		x = _dorand48(xseed);
-
-	return (int32) ((x >> 16) & UINT64CONST(0xFFFFFFFF));
-}
-
-/*
- * Initialize the internal state using the given seed.
- *
- * Per POSIX, this uses only 32 bits from "seed" even if "long" is wider.
- * Hence, the set of possible seed values is smaller than it could be.
- * Better practice is to use caller-supplied state and initialize it with
- * random bits obtained from a high-quality source of random bits.
- *
- * Note: POSIX specifies a function seed48() that allows all 48 bits
- * of the internal state to be set, but we don't currently support that.
- */
-void
-pg_srand48(long seed)
-{
-	_rand48_seed[0] = RAND48_SEED_0;
-	_rand48_seed[1] = (unsigned short) seed;
-	_rand48_seed[2] = (unsigned short) (seed >> 16);
-}

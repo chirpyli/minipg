@@ -156,7 +156,6 @@ extern bool GlobalVisTestIsRemovableXid(GlobalVisState *state, TransactionId xid
 extern bool GlobalVisTestIsRemovableFullXid(GlobalVisState *state, FullTransactionId fxid);
 extern FullTransactionId GlobalVisTestNonRemovableFullHorizon(GlobalVisState *state);
 extern TransactionId GlobalVisTestNonRemovableHorizon(GlobalVisState *state);
-extern bool GlobalVisCheckRemovableXid(Relation rel, TransactionId xid);
 extern bool GlobalVisCheckRemovableFullXid(Relation rel, FullTransactionId fxid);
 
 /*
@@ -164,9 +163,5 @@ extern bool GlobalVisCheckRemovableFullXid(Relation rel, FullTransactionId fxid)
  */
 extern bool XidInMVCCSnapshot(TransactionId xid, Snapshot snapshot);
 
-extern Size EstimateSnapshotSpace(Snapshot snapshot);
-extern void SerializeSnapshot(Snapshot snapshot, char *start_address);
-extern Snapshot RestoreSnapshot(char *start_address);
-extern void RestoreTransactionSnapshot(Snapshot snapshot, void *source_pgproc);
 
 #endif							/* SNAPMGR_H */

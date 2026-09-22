@@ -115,25 +115,6 @@ fsync_pgdata(const char *pg_data,
 }
 
 /*
- * Issue fsync recursively on the given directory and all its contents.
- *
- * This is a convenient wrapper on top of walkdir().
- */
-void
-fsync_dir_recurse(const char *dir)
-{
-	/*
-	 * If possible, hint to the kernel that we're soon going to fsync the data
-	 * directory and its contents.
-	 */
-#ifdef PG_FLUSH_DATA_WORKS
-	walkdir(dir, pre_sync_fname, false);
-#endif
-
-	walkdir(dir, fsync_fname, false);
-}
-
-/*
  * walkdir: recursively walk a directory, applying the action to each
  * regular file and directory (including the named directory itself).
  *

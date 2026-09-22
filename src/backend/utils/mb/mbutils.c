@@ -179,15 +179,6 @@ pg_get_client_encoding(void)
 }
 
 /*
- * returns the current client encoding name
- */
-const char *
-pg_get_client_encoding_name(void)
-{
-	return ClientEncoding->name;
-}
-
-/*
  * Convert src string to another encoding (general case).
  *
  * See the notes about string conversion functions at the top of this file.
@@ -601,40 +592,12 @@ pg_unicode_to_server(pg_wchar c, unsigned char *s)
 }
 
 
-/* convert a multibyte string to a wchar */
-int
-pg_mb2wchar(const char *from, pg_wchar *to)
-{
-	return pg_wchar_table[DatabaseEncoding->encoding].mb2wchar_with_len((const unsigned char *) from, to, strlen(from));
-}
-
-/* convert a multibyte string to a wchar with a limited length */
-int
-pg_mb2wchar_with_len(const char *from, pg_wchar *to, int len)
-{
-	return pg_wchar_table[DatabaseEncoding->encoding].mb2wchar_with_len((const unsigned char *) from, to, len);
-}
-
 /* same, with any encoding */
 int
 pg_encoding_mb2wchar_with_len(int encoding,
 							  const char *from, pg_wchar *to, int len)
 {
 	return pg_wchar_table[encoding].mb2wchar_with_len((const unsigned char *) from, to, len);
-}
-
-/* convert a wchar string to a multibyte */
-int
-pg_wchar2mb(const pg_wchar *from, char *to)
-{
-	return pg_wchar_table[DatabaseEncoding->encoding].wchar2mb_with_len(from, (unsigned char *) to, pg_wchar_strlen(from));
-}
-
-/* convert a wchar string to a multibyte with a limited length */
-int
-pg_wchar2mb_with_len(const pg_wchar *from, char *to, int len)
-{
-	return pg_wchar_table[DatabaseEncoding->encoding].wchar2mb_with_len(from, (unsigned char *) to, len);
 }
 
 /* same, with any encoding */
@@ -767,13 +730,6 @@ int
 pg_mblen(const char *mbstr)
 {
 	return pg_mblen_unbounded(mbstr);
-}
-
-/* returns the display length of a multibyte character */
-int
-pg_dsplen(const char *mbstr)
-{
-	return pg_wchar_table[DatabaseEncoding->encoding].dsplen((const unsigned char *) mbstr);
 }
 
 /* returns the length (counted in wchars) of a multibyte string */
@@ -965,18 +921,6 @@ PG_encoding_to_char(PG_FUNCTION_ARGS)
 	const char *encoding_name = pg_encoding_to_char(encoding);
 
 	return DirectFunctionCall1(namein, CStringGetDatum(encoding_name));
-}
-
-/*
- * gettext() returns messages in this encoding.  This often matches the
- * database encoding, but it differs for SQL_ASCII databases, for processes
- * not attached to a database, and under a database encoding lacking iconv
- * support (MULE_INTERNAL).
- */
-int
-GetMessageEncoding(void)
-{
-	return MessageEncoding->encoding;
 }
 
 

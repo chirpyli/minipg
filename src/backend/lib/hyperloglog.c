@@ -109,39 +109,6 @@ initHyperLogLog(hyperLogLogState *cState, uint8 bwidth)
 }
 
 /*
- * Initialize HyperLogLog track state, by error rate
- *
- * Instead of specifying bwidth (number of bits used for addressing the
- * register), this method allows sizing the counter for particular error
- * rate using a simple formula from the paper:
- *
- *	 e = 1.04 / sqrt(m)
- *
- * where 'm' is the number of registers, i.e. (2^bwidth). The method
- * finds the lowest bwidth with 'e' below the requested error rate, and
- * then uses it to initialize the counter.
- *
- * As bwidth has to be between 4 and 16, the worst possible error rate
- * is between ~25% (bwidth=4) and 0.4% (bwidth=16).
- */
-void
-initHyperLogLogError(hyperLogLogState *cState, double error)
-{
-	uint8		bwidth = 4;
-
-	while (bwidth < 16)
-	{
-		double		m = (Size) 1 << bwidth;
-
-		if (1.04 / sqrt(m) < error)
-			break;
-		bwidth++;
-	}
-
-	initHyperLogLog(cState, bwidth);
-}
-
-/*
  * Free HyperLogLog track state
  *
  * Releases allocated resources, but not the state itself (in case it's not

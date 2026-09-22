@@ -60,7 +60,6 @@ typedef struct hyperLogLogState
 } hyperLogLogState;
 
 extern void initHyperLogLog(hyperLogLogState *cState, uint8 bwidth);
-extern void initHyperLogLogError(hyperLogLogState *cState, double error);
 extern void addHyperLogLog(hyperLogLogState *cState, uint32 hash);
 extern double estimateHyperLogLog(hyperLogLogState *cState);
 extern void freeHyperLogLog(hyperLogLogState *cState);

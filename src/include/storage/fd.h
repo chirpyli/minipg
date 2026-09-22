@@ -92,16 +92,10 @@ extern off_t FileSize(File file);
 extern int	FileTruncate(File file, off_t offset, uint32 wait_event_info);
 extern void FileWriteback(File file, off_t offset, off_t nbytes, uint32 wait_event_info);
 extern char *FilePathName(File file);
-extern int	FileGetRawDesc(File file);
 extern int	FileGetRawFlags(File file);
 extern mode_t FileGetRawMode(File file);
 
 /* Operations used for sharing named temporary files */
-extern File PathNameCreateTemporaryFile(const char *name, bool error_on_failure);
-extern File PathNameOpenTemporaryFile(const char *path, int mode);
-extern bool PathNameDeleteTemporaryFile(const char *name, bool error_on_failure);
-extern void PathNameCreateTemporaryDir(const char *base, const char *name);
-extern void PathNameDeleteTemporaryDir(const char *name);
 extern void TempTablespacePath(char *path, Oid tablespace);
 
 /* Operations that allow use of regular stdio --- USE WITH CAUTION */

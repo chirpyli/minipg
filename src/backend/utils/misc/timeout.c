@@ -720,18 +720,6 @@ disable_all_timeouts(bool keep_indicators)
 }
 
 /*
- * Return true if the timeout is active (enabled and not yet fired)
- *
- * This is, of course, subject to race conditions, as the timeout could fire
- * immediately after we look.
- */
-bool
-get_timeout_active(TimeoutId id)
-{
-	return all_timeouts[id].active;
-}
-
-/*
  * Return the timeout's I've-been-fired indicator
  *
  * If reset_indicator is true, reset the indicator when returning true.

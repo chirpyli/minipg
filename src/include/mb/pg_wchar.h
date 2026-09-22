@@ -211,18 +211,10 @@ extern int	pg_utf_mblen(const unsigned char *s);
 /*
  * The remaining functions are backend-only.
  */
-extern int	pg_mb2wchar(const char *from, pg_wchar *to);
-extern int	pg_mb2wchar_with_len(const char *from, pg_wchar *to, int len);
 extern int	pg_encoding_mb2wchar_with_len(int encoding,
 										  const char *from, pg_wchar *to, int len);
-extern int	pg_wchar2mb(const pg_wchar *from, char *to);
-extern int	pg_wchar2mb_with_len(const pg_wchar *from, char *to, int len);
 extern int	pg_encoding_wchar2mb_with_len(int encoding,
 										  const pg_wchar *from, char *to, int len);
-extern int	pg_char_and_wchar_strcmp(const char *s1, const pg_wchar *s2);
-extern int	pg_wchar_strncmp(const pg_wchar *s1, const pg_wchar *s2, size_t n);
-extern int	pg_char_and_wchar_strncmp(const char *s1, const pg_wchar *s2, size_t n);
-extern size_t pg_wchar_strlen(const pg_wchar *wstr);
 extern int	pg_mblen_cstr(const char *mbstr);
 extern int	pg_mblen_range(const char *mbstr, const char *end);
 extern int	pg_mblen_with_len(const char *mbstr, int limit);
@@ -231,7 +223,6 @@ extern int	pg_mblen_unbounded(const char *mbstr);
 /* deprecated */
 extern int	pg_mblen(const char *mbstr);
 
-extern int	pg_dsplen(const char *mbstr);
 extern int	pg_mbstrlen(const char *mbstr);
 extern int	pg_mbstrlen_with_len(const char *mbstr, int len);
 extern int	pg_mbcliplen(const char *mbstr, int len, int limit);
@@ -245,13 +236,11 @@ extern int	PrepareClientEncoding(int encoding);
 extern int	SetClientEncoding(int encoding);
 extern void InitializeClientEncoding(void);
 extern int	pg_get_client_encoding(void);
-extern const char *pg_get_client_encoding_name(void);
 
 extern void SetDatabaseEncoding(int encoding);
 extern int	GetDatabaseEncoding(void);
 extern const char *GetDatabaseEncodingName(void);
 extern void SetMessageEncoding(int encoding);
-extern int	GetMessageEncoding(void);
 
 extern unsigned char *pg_do_encoding_conversion(unsigned char *src, int len,
 												int src_encoding,

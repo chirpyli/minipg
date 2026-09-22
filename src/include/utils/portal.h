@@ -195,6 +195,5 @@ extern void PortalDefineQuery(Portal portal,
 							  List *stmts);
 extern PlannedStmt *PortalGetPrimaryStmt(Portal portal);
 extern void PortalCreateHoldStore(Portal portal);
-extern void ForgetPortalSnapshots(void);
 
 #endif							/* PORTAL_H */

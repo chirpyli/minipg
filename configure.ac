@@ -1344,8 +1344,9 @@ AC_CHECK_DECLS([strlcat, strlcpy, strnlen, timingsafe_bcmp])
 
 # We can't use AC_REPLACE_FUNCS to replace these functions, because it
 # won't handle deployment target restrictions on macOS
-AC_CHECK_DECLS([preadv], [], [AC_LIBOBJ(preadv)], [#include <sys/uio.h>])
-AC_CHECK_DECLS([pwritev], [], [AC_LIBOBJ(pwritev)], [#include <sys/uio.h>])
+dnl minipg: 不再提供 preadv/pwritev 的回退实现，直接要求平台提供
+AC_CHECK_DECLS([preadv], [], [], [#include <sys/uio.h>])
+AC_CHECK_DECLS([pwritev], [], [], [#include <sys/uio.h>])
 AC_CHECK_DECLS([strchrnul], [], [], [#include <string.h>])
 AC_CHECK_DECLS([memset_s], [], [], [#define __STDC_WANT_LIB_EXT1__ 1
 #include <string.h>])
@@ -1371,12 +1372,22 @@ if test "$pgac_cv_var_PS_STRINGS" = yes ; then
   AC_DEFINE([HAVE_PS_STRINGS], 1, [Define to 1 if the PS_STRINGS thing exists.])
 fi
 
+dnl minipg: 平台缺失函数的回退实现已裁剪为最小集——只保留 glibc 不提供的
+dnl fls/getpeereid/timingsafe_bcmp，以及 glibc < 2.38 才提供的 strlcat/strlcpy。
 AC_REPLACE_FUNCS(m4_normalize([
+	fls
+	getpeereid
+	strlcat
+	strlcpy
+	timingsafe_bcmp
+]))
+
+dnl minipg: 以下函数在 Linux/glibc 上必定存在，仅探测以定义对应的 HAVE_* 宏，
+dnl 不再提供回退实现。
+AC_CHECK_FUNCS(m4_normalize([
 	dlopen
 	explicit_bzero
-	fls
 	getopt
-	getpeereid
 	getrusage
 	inet_aton
 	link
@@ -1384,45 +1395,28 @@ AC_REPLACE_FUNCS(m4_normalize([
 	pread
 	pwrite
 	random
+	setenv
 	srandom
-	strlcat
-	strlcpy
 	strnlen
 	strtof
-	timingsafe_bcmp
+	unsetenv
 ]))
 
 if test "$enable_thread_safety" = yes; then
-  AC_REPLACE_FUNCS(pthread_barrier_wait)
+  AC_CHECK_FUNCS(pthread_barrier_wait)
 fi
-
-case $host_os in
-        *)
-                AC_REPLACE_FUNCS([setenv unsetenv])
-                ;;
-esac
 
 # System's version of getaddrinfo(), if any, may be used only if we found
 # a definition for struct addrinfo; see notes in src/include/getaddrinfo.h.
-# We use only our own getaddrinfo.c on Windows, but it's time to revisit that.
-if test x"$ac_cv_type_struct_addrinfo" = xyes && \
-   test "$PORTNAME" != "win32"; then
-  AC_REPLACE_FUNCS([getaddrinfo])
-else
-  AC_LIBOBJ(getaddrinfo)
+dnl minipg: 回退实现已裁剪，只做可用性探测。
+if test x"$ac_cv_type_struct_addrinfo" = xyes; then
+  AC_CHECK_FUNCS([getaddrinfo])
 fi
 
 # Similarly, use system's getopt_long() only if system provides struct option.
+dnl minipg: 回退实现已裁剪，只做可用性探测。
 if test x"$ac_cv_type_struct_option" = xyes ; then
-  AC_REPLACE_FUNCS([getopt_long])
-else
-  AC_LIBOBJ(getopt_long)
-fi
-
-# On OpenBSD and Solaris, getopt() doesn't do what we want for long options
-# (i.e., allow '-' as a flag character), so use our version on those platforms.
-if test "$PORTNAME" = "openbsd" -o "$PORTNAME" = "solaris"; then
-  AC_LIBOBJ(getopt)
+  AC_CHECK_FUNCS([getopt_long])
 fi
 
 AC_CACHE_CHECK([for opterr], pgac_cv_var_int_opterr,

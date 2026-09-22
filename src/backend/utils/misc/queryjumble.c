@@ -140,19 +140,6 @@ JumbleQuery(Query *query, const char *querytext)
 }
 
 /*
- * Enables query identifier computation.
- *
- * Third-party plugins can use this function to inform core that they require
- * a query identifier to be computed.
- */
-void
-EnableQueryId(void)
-{
-	if (compute_query_id != COMPUTE_QUERY_ID_OFF)
-		query_id_enabled = true;
-}
-
-/*
  * Compute a query identifier for the given utility query string.
  */
 static uint64

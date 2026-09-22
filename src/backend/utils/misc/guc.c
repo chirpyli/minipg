@@ -383,8 +383,6 @@ bool		session_auth_is_superuser;
 int			log_min_error_statement = ERROR;
 int			log_min_messages = WARNING;
 int			client_min_messages = NOTICE;
-int			log_parameter_max_length = -1;
-int			log_parameter_max_length_on_error = 0;
 int			log_temp_files = -1;
 int			trace_recovery_messages = LOG;
 char	   *backtrace_functions;
@@ -2042,28 +2040,6 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 
-
-	{
-		{"log_parameter_max_length", PGC_SUSET, LOGGING_WHAT,
-			gettext_noop("When logging statements, limit logged parameter values to first N bytes."),
-			gettext_noop("-1 to print values in full."),
-			GUC_UNIT_BYTE
-		},
-		&log_parameter_max_length,
-		-1, -1, INT_MAX / 2,
-		NULL, NULL, NULL
-	},
-
-	{
-		{"log_parameter_max_length_on_error", PGC_USERSET, LOGGING_WHAT,
-			gettext_noop("When reporting an error, limit logged parameter values to first N bytes."),
-			gettext_noop("-1 to print values in full."),
-			GUC_UNIT_BYTE
-		},
-		&log_parameter_max_length_on_error,
-		0, -1, INT_MAX / 2,
-		NULL, NULL, NULL
-	},
 
 	{
 		{"bgwriter_delay", PGC_SIGHUP, RESOURCES_BGWRITER,

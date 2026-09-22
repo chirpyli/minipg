@@ -410,7 +410,6 @@ extern void *stringToNode(const char *str);
 #ifdef WRITE_READ_PARSE_PLAN_TREES
 extern void *stringToNodeWithLocations(const char *str);
 #endif
-extern struct Bitmapset *readBitmapset(void);
 extern uintptr_t readDatum(bool typbyval);
 extern bool *readBoolCols(int numCols);
 extern int *readIntCols(int numCols);

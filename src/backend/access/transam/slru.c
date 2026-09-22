@@ -1496,18 +1496,6 @@ SlruScanDirCbDeleteCutoff(SlruCtl ctl, char *filename, int segpage, void *data)
 }
 
 /*
- * SlruScanDirectory callback.
- *		This callback deletes all segments.
- */
-bool
-SlruScanDirCbDeleteAll(SlruCtl ctl, char *filename, int segpage, void *data)
-{
-	SlruInternalDeleteSegment(ctl, segpage / SLRU_PAGES_PER_SEGMENT);
-
-	return false;				/* keep going */
-}
-
-/*
  * Scan the SimpleLru directory and apply a callback to each file found in it.
  *
  * If the callback returns true, the scan is stopped.  The last return value

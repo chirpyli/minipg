@@ -252,15 +252,6 @@ oprid(Operator op)
 	return ((Form_pg_operator) GETSTRUCT(op))->oid;
 }
 
-/* given operator tuple, return the underlying function's OID */
-Oid
-oprfuncid(Operator op)
-{
-	Form_pg_operator pgopform = (Form_pg_operator) GETSTRUCT(op);
-
-	return pgopform->oprcode;
-}
-
 
 /* binary_oper_exact()
  * Check for an "exact" match to the specified operand types.

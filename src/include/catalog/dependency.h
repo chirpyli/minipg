@@ -109,7 +109,6 @@ extern void record_object_address_dependencies(const ObjectAddress *depender,
 											   ObjectAddresses *referenced,
 											   DependencyType behavior);
 
-extern void sort_object_addresses(ObjectAddresses *addrs);
 
 extern void free_object_addresses(ObjectAddresses *addrs);
 

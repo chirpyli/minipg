@@ -474,13 +474,6 @@ GetSessionUserId(void)
 	return SessionUserId;
 }
 
-bool
-GetSessionUserIsSuperuser(void)
-{
-	Assert(OidIsValid(SessionUserId));
-	return SessionUserIsSuperuser;
-}
-
 static void
 SetSessionUserId(Oid userid, bool is_superuser)
 {
@@ -499,16 +492,6 @@ GetAuthenticatedUserId(void)
 {
 	AssertState(OidIsValid(AuthenticatedUserId));
 	return AuthenticatedUserId;
-}
-
-/*
- * Return whether the authenticated user was superuser at connection start.
- */
-bool
-GetAuthenticatedUserIsSuperuser(void)
-{
-	Assert(OidIsValid(AuthenticatedUserId));
-	return AuthenticatedUserIsSuperuser;
 }
 
 void
@@ -615,53 +598,6 @@ InNoForceRLSOperation(void)
 }
 
 
-/*
- * These are obsolete versions of Get/SetUserIdAndSecContext that are
- * only provided for bug-compatibility with some rather dubious code in
- * pljava.  We allow the userid to be set, but only when not inside a
- * security restriction context.
- */
-void
-GetUserIdAndContext(Oid *userid, bool *sec_def_context)
-{
-	*userid = CurrentUserId;
-	*sec_def_context = InLocalUserIdChange();
-}
-
-void
-SetUserIdAndContext(Oid userid, bool sec_def_context)
-{
-	/* We throw the same error SET ROLE would. */
-	if (InSecurityRestrictedOperation())
-		ereport(ERROR,
-				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				 errmsg("cannot set parameter \"%s\" within security-restricted operation",
-						"role")));
-	CurrentUserId = userid;
-	if (sec_def_context)
-		SecurityRestrictionContext |= SECURITY_LOCAL_USERID_CHANGE;
-	else
-		SecurityRestrictionContext &= ~SECURITY_LOCAL_USERID_CHANGE;
-}
-
-/*
- * Initialize user identity during normal backend startup
- *
- * minipg 没有用户/角色概念，任何连接都直接以超级用户身份操作，不再查询
- * pg_authid。实现退化为与 InitializeSessionUserIdStandalone 相同的语义。
- */
-void
-InitializeSessionUserId(const char *rolename, Oid roleid)
-{
-	AssertState(!OidIsValid(AuthenticatedUserId));
-
-	AuthenticatedUserId = BOOTSTRAP_SUPERUSERID;
-	AuthenticatedUserIsSuperuser = true;
-
-	SetSessionAuthorization(BOOTSTRAP_SUPERUSERID, true);
-	SetCurrentRoleId(InvalidOid, false);
-}
-
 
 /*
  * Initialize user identity during special backend startup
@@ -713,21 +649,6 @@ SetSessionAuthorization(Oid userid, bool is_superuser)
 
 	if (!SetRoleIsActive)
 		SetOuterUserId(userid, is_superuser);
-}
-
-/*
- * Report current role id
- *		This follows the semantics of SET ROLE, ie return the outer-level ID
- *		not the current effective ID, and return InvalidOid when the setting
- *		is logically SET ROLE NONE.
- */
-Oid
-GetCurrentRoleId(void)
-{
-	if (SetRoleIsActive)
-		return OuterUserId;
-	else
-		return InvalidOid;
 }
 
 /*

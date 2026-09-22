@@ -335,10 +335,6 @@ extern struct varlena *pg_detoast_datum_packed(struct varlena *datum);
 #define PG_GETARG_BPCHAR_P(n)		DatumGetBpCharP(PG_GETARG_DATUM(n))
 #define PG_GETARG_VARCHAR_P(n)		DatumGetVarCharP(PG_GETARG_DATUM(n))
 
-/* To access options from opclass support functions use this: */
-#define PG_HAS_OPCLASS_OPTIONS()	has_fn_opclass_options(fcinfo->flinfo)
-#define PG_GET_OPCLASS_OPTIONS()	get_fn_opclass_options(fcinfo->flinfo)
-
 /* To return a NULL do this: */
 #define PG_RETURN_NULL()  \
 	do { fcinfo->isnull = true; return (Datum) 0; } while (0)
@@ -535,10 +531,6 @@ extern Datum DirectFunctionCall9Coll(PGFunction func, Oid collation,
  * not the callee.  Conversely, the calling function should not have
  * used fn_extra, unless its use is known to be compatible with the callee's.
  */
-extern Datum CallerFInfoFunctionCall1(PGFunction func, FmgrInfo *flinfo,
-									  Oid collation, Datum arg1);
-extern Datum CallerFInfoFunctionCall2(PGFunction func, FmgrInfo *flinfo,
-									  Oid collation, Datum arg1, Datum arg2);
 
 /* These are for invocation of a previously-looked-up function with a
  * directly-computed parameter list.  Note that neither arguments nor result
@@ -688,20 +680,16 @@ extern Datum ReceiveFunctionCall(FmgrInfo *flinfo, fmStringInfo buf,
 extern Datum OidReceiveFunctionCall(Oid functionId, fmStringInfo buf,
 									Oid typioparam, int32 typmod);
 extern bytea *SendFunctionCall(FmgrInfo *flinfo, Datum val);
-extern bytea *OidSendFunctionCall(Oid functionId, Datum val);
 
 
 /*
  * Routines in fmgr.c
  */
-extern Oid	get_fn_expr_rettype(FmgrInfo *flinfo);
 extern Oid	get_fn_expr_argtype(FmgrInfo *flinfo, int argnum);
 extern Oid	get_call_expr_argtype(fmNodePtr expr, int argnum);
 extern bool get_fn_expr_arg_stable(FmgrInfo *flinfo, int argnum);
 extern bool get_call_expr_arg_stable(fmNodePtr expr, int argnum);
 extern bool get_fn_expr_variadic(FmgrInfo *flinfo);
-extern bytea *get_fn_opclass_options(FmgrInfo *flinfo);
-extern bool has_fn_opclass_options(FmgrInfo *flinfo);
 extern void set_fn_opclass_options(FmgrInfo *flinfo, bytea *options);
 
 /*

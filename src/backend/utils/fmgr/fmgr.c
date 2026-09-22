@@ -504,48 +504,6 @@ DirectFunctionCall9Coll(PGFunction func, Oid collation, Datum arg1, Datum arg2,
  * used fn_extra, unless its use is known to be compatible with the callee's.
  */
 
-Datum
-CallerFInfoFunctionCall1(PGFunction func, FmgrInfo *flinfo, Oid collation, Datum arg1)
-{
-	LOCAL_FCINFO(fcinfo, 1);
-	Datum		result;
-
-	InitFunctionCallInfoData(*fcinfo, flinfo, 1, collation, NULL, NULL);
-
-	fcinfo->args[0].value = arg1;
-	fcinfo->args[0].isnull = false;
-
-	result = (*func) (fcinfo);
-
-	/* Check for null result, since caller is clearly not expecting one */
-	if (fcinfo->isnull)
-		elog(ERROR, "function %p returned NULL", (void *) func);
-
-	return result;
-}
-
-Datum
-CallerFInfoFunctionCall2(PGFunction func, FmgrInfo *flinfo, Oid collation, Datum arg1, Datum arg2)
-{
-	LOCAL_FCINFO(fcinfo, 2);
-	Datum		result;
-
-	InitFunctionCallInfoData(*fcinfo, flinfo, 2, collation, NULL, NULL);
-
-	fcinfo->args[0].value = arg1;
-	fcinfo->args[0].isnull = false;
-	fcinfo->args[1].value = arg2;
-	fcinfo->args[1].isnull = false;
-
-	result = (*func) (fcinfo);
-
-	/* Check for null result, since caller is clearly not expecting one */
-	if (fcinfo->isnull)
-		elog(ERROR, "function %p returned NULL", (void *) func);
-
-	return result;
-}
-
 /*
  * These are for invocation of a previously-looked-up function with a
  * directly-computed parameter list.  Note that neither arguments nor result
@@ -1112,15 +1070,6 @@ OidReceiveFunctionCall(Oid functionId, StringInfo buf,
 	return ReceiveFunctionCall(&flinfo, buf, typioparam, typmod);
 }
 
-bytea *
-OidSendFunctionCall(Oid functionId, Datum val)
-{
-	FmgrInfo	flinfo;
-
-	fmgr_info(functionId, &flinfo);
-	return SendFunctionCall(&flinfo, val);
-}
-
 
 /*-------------------------------------------------------------------------
  *		Support routines for standard maybe-pass-by-reference datatypes
@@ -1212,28 +1161,6 @@ pg_detoast_datum_packed(struct varlena *datum)
  * Functions taking VARIADIC ANY also need to know about the VARIADIC keyword.
  *-------------------------------------------------------------------------
  */
-
-/*
- * Get the actual type OID of the function return type
- *
- * Returns InvalidOid if information is not available
- */
-Oid
-get_fn_expr_rettype(FmgrInfo *flinfo)
-{
-	Node	   *expr;
-
-	/*
-	 * can't return anything useful if we have no FmgrInfo or if its fn_expr
-	 * node has not been initialized
-	 */
-	if (!flinfo || !flinfo->fn_expr)
-		return InvalidOid;
-
-	expr = flinfo->fn_expr;
-
-	return exprType(expr);
-}
 
 /*
  * Get the actual type OID of a specific function argument (counting from 0)
@@ -1398,43 +1325,6 @@ set_fn_opclass_options(FmgrInfo *flinfo, bytea *options)
 	flinfo->fn_expr = (Node *) makeConst(BYTEAOID, -1, InvalidOid, -1,
 										 PointerGetDatum(options),
 										 options == NULL, false);
-}
-
-/*
- * Check if options are defined for opclass support function.
- */
-bool
-has_fn_opclass_options(FmgrInfo *flinfo)
-{
-	if (flinfo && flinfo->fn_expr && IsA(flinfo->fn_expr, Const))
-	{
-		Const	   *expr = (Const *) flinfo->fn_expr;
-
-		if (expr->consttype == BYTEAOID)
-			return !expr->constisnull;
-	}
-	return false;
-}
-
-/*
- * Get options for opclass support function.
- */
-bytea *
-get_fn_opclass_options(FmgrInfo *flinfo)
-{
-	if (flinfo && flinfo->fn_expr && IsA(flinfo->fn_expr, Const))
-	{
-		Const	   *expr = (Const *) flinfo->fn_expr;
-
-		if (expr->consttype == BYTEAOID)
-			return expr->constisnull ? NULL : DatumGetByteaP(expr->constvalue);
-	}
-
-	ereport(ERROR,
-			(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-			 errmsg("operator class options info is absent in function call context")));
-
-	return NULL;
 }
 
 /* (validator support removed: no procedural languages and no CREATE FUNCTION) */

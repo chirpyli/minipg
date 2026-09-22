@@ -233,8 +233,6 @@ extern bool Debug_print_rewritten;
 extern bool Debug_pretty_print;
 extern bool session_auth_is_superuser;
 
-extern int	log_parameter_max_length;
-extern int	log_parameter_max_length_on_error;
 extern int	log_min_error_statement;
 extern PGDLLIMPORT int log_min_messages;
 extern PGDLLIMPORT int client_min_messages;

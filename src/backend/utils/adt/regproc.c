@@ -322,12 +322,6 @@ format_procedure(Oid procedure_oid)
 	return format_procedure_extended(procedure_oid, 0);
 }
 
-char *
-format_procedure_qualified(Oid procedure_oid)
-{
-	return format_procedure_extended(procedure_oid, FORMAT_PROC_FORCE_QUALIFY);
-}
-
 /*
  * format_procedure_extended - converts procedure OID to "pro_name(args)"
  *
@@ -849,13 +843,6 @@ char *
 format_operator(Oid operator_oid)
 {
 	return format_operator_extended(operator_oid, 0);
-}
-
-char *
-format_operator_qualified(Oid operator_oid)
-{
-	return format_operator_extended(operator_oid,
-									FORMAT_OPERATOR_FORCE_QUALIFY);
 }
 
 void

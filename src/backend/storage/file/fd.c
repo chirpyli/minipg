@@ -325,7 +325,6 @@ static void walkdir(const char *path,
 static void pre_sync_fname(const char *fname, bool isdir, int elevel);
 #endif
 static void datadir_fsync_fname(const char *fname, bool isdir, int elevel);
-static void unlink_if_exists_fname(const char *fname, bool isdir, int elevel);
 
 static int	fsync_parent_path(const char *fname, int elevel);
 
@@ -1496,67 +1495,6 @@ PathNameOpenFilePerm(const char *fileName, int fileFlags, mode_t fileMode)
 }
 
 /*
- * Create directory 'directory'.  If necessary, create 'basedir', which must
- * be the directory above it.  This is designed for creating the top-level
- * temporary directory on demand before creating a directory underneath it.
- * Do nothing if the directory already exists.
- *
- * Directories created within the top-level temporary directory should begin
- * with PG_TEMP_FILE_PREFIX, so that they can be identified as temporary and
- * deleted at startup by RemovePgTempFiles().  Further subdirectories below
- * that do not need any particular prefix.
-*/
-void
-PathNameCreateTemporaryDir(const char *basedir, const char *directory)
-{
-	if (MakePGDirectory(directory) < 0)
-	{
-		if (errno == EEXIST)
-			return;
-
-		/*
-		 * Failed.  Try to create basedir first in case it's missing. Tolerate
-		 * EEXIST to close a race against another process following the same
-		 * algorithm.
-		 */
-		if (MakePGDirectory(basedir) < 0 && errno != EEXIST)
-			ereport(ERROR,
-					(errcode_for_file_access(),
-					 errmsg("cannot create temporary directory \"%s\": %m",
-							basedir)));
-
-		/* Try again. */
-		if (MakePGDirectory(directory) < 0 && errno != EEXIST)
-			ereport(ERROR,
-					(errcode_for_file_access(),
-					 errmsg("cannot create temporary subdirectory \"%s\": %m",
-							directory)));
-	}
-}
-
-/*
- * Delete a directory and everything in it, if it exists.
- */
-void
-PathNameDeleteTemporaryDir(const char *dirname)
-{
-	struct stat statbuf;
-
-	/* Silently ignore missing directory. */
-	if (stat(dirname, &statbuf) != 0 && errno == ENOENT)
-		return;
-
-	/*
-	 * Currently, walkdir doesn't offer a way for our passed in function to
-	 * maintain state.  Perhaps it should, so that we could tell the caller
-	 * whether this operation succeeded or failed.  Since this operation is
-	 * used in a cleanup path, we wouldn't actually behave differently: we'll
-	 * just log failures.
-	 */
-	walkdir(dirname, unlink_if_exists_fname, false, LOG);
-}
-
-/*
  * Open a temporary file that will disappear when we close it.
  *
  * This routine takes care of generating an appropriate tempfile name.
@@ -1673,128 +1611,6 @@ OpenTemporaryFileInTablespace(Oid tblspcOid, bool rejectError)
 	return file;
 }
 
-
-/*
- * Create a new file.  The directory containing it must already exist.  Files
- * created this way are subject to temp_file_limit and are automatically
- * closed at end of transaction, but are not automatically deleted on close
- * because they are intended to be shared between cooperating backends.
- *
- * If the file is inside the top-level temporary directory, its name should
- * begin with PG_TEMP_FILE_PREFIX so that it can be identified as temporary
- * and deleted at startup by RemovePgTempFiles().  Alternatively, it can be
- * inside a directory created with PathNameCreateTemporaryDir(), in which case
- * the prefix isn't needed.
- */
-File
-PathNameCreateTemporaryFile(const char *path, bool error_on_failure)
-{
-	File		file;
-
-	ResourceOwnerEnlargeFiles(CurrentResourceOwner);
-
-	/*
-	 * Open the file.  Note: we don't use O_EXCL, in case there is an orphaned
-	 * temp file that can be reused.
-	 */
-	file = PathNameOpenFile(path, O_RDWR | O_CREAT | O_TRUNC | PG_BINARY);
-	if (file <= 0)
-	{
-		if (error_on_failure)
-			ereport(ERROR,
-					(errcode_for_file_access(),
-					 errmsg("could not create temporary file \"%s\": %m",
-							path)));
-		else
-			return file;
-	}
-
-	/* Mark it for temp_file_limit accounting. */
-	VfdCache[file].fdstate |= FD_TEMP_FILE_LIMIT;
-
-	/* Register it for automatic close. */
-	RegisterTemporaryFile(file);
-
-	return file;
-}
-
-/*
- * Open a file that was created with PathNameCreateTemporaryFile, possibly in
- * another backend.  Files opened this way don't count against the
- * temp_file_limit of the caller, are automatically closed at the end of the
- * transaction but are not deleted on close.
- */
-File
-PathNameOpenTemporaryFile(const char *path, int mode)
-{
-	File		file;
-
-	ResourceOwnerEnlargeFiles(CurrentResourceOwner);
-
-	file = PathNameOpenFile(path, mode | PG_BINARY);
-
-	/* If no such file, then we don't raise an error. */
-	if (file <= 0 && errno != ENOENT)
-		ereport(ERROR,
-				(errcode_for_file_access(),
-				 errmsg("could not open temporary file \"%s\": %m",
-						path)));
-
-	if (file > 0)
-	{
-		/* Register it for automatic close. */
-		RegisterTemporaryFile(file);
-	}
-
-	return file;
-}
-
-/*
- * Delete a file by pathname.  Return true if the file existed, false if
- * didn't.
- */
-bool
-PathNameDeleteTemporaryFile(const char *path, bool error_on_failure)
-{
-	struct stat filestats;
-	int			stat_errno;
-
-	/* Get the final size for temp file logging. */
-	if (stat(path, &filestats) != 0)
-		stat_errno = errno;
-	else
-		stat_errno = 0;
-
-	/*
-	 * Unlike FileClose's automatic file deletion code, we tolerate
-	 * non-existence to support BufFileDeleteShared which doesn't know how
-	 * many segments it has to delete until it runs out.
-	 */
-	if (stat_errno == ENOENT)
-		return false;
-
-	if (unlink(path) < 0)
-	{
-		if (errno != ENOENT)
-			ereport(error_on_failure ? ERROR : LOG,
-					(errcode_for_file_access(),
-					 errmsg("could not unlink temporary file \"%s\": %m",
-							path)));
-		return false;
-	}
-
-	if (stat_errno == 0)
-		ReportTemporaryFileUsage(path, filestats.st_size);
-	else
-	{
-		errno = stat_errno;
-		ereport(LOG,
-				(errcode_for_file_access(),
-				 errmsg("could not stat file \"%s\": %m", path)));
-	}
-
-	return true;
-}
 
 /*
  * close a file when done with it
@@ -2152,21 +1968,6 @@ FilePathName(File file)
 	Assert(FileIsValid(file));
 
 	return VfdCache[file].fileName;
-}
-
-/*
- * Return the raw file descriptor of an opened file.
- *
- * The returned file descriptor will be valid until the file is closed, but
- * there are a lot of things that can make that happen.  So the caller should
- * be careful not to do much of anything else before it finishes using the
- * returned file descriptor.
- */
-int
-FileGetRawDesc(File file)
-{
-	Assert(FileIsValid(file));
-	return VfdCache[file].fd;
 }
 
 /*
@@ -3214,23 +3015,6 @@ datadir_fsync_fname(const char *fname, bool isdir, int elevel)
 	 * desire on to fsync_fname_ext().
 	 */
 	fsync_fname_ext(fname, isdir, true, elevel);
-}
-
-static void
-unlink_if_exists_fname(const char *fname, bool isdir, int elevel)
-{
-	if (isdir)
-	{
-		if (rmdir(fname) != 0 && errno != ENOENT)
-			ereport(elevel,
-					(errcode_for_file_access(),
-					 errmsg("could not remove directory \"%s\": %m", fname)));
-	}
-	else
-	{
-		/* Use PathNameDeleteTemporaryFile to report filesize */
-		PathNameDeleteTemporaryFile(fname, false);
-	}
 }
 
 /*

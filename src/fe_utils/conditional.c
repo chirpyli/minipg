@@ -66,28 +66,6 @@ conditional_stack_pop(ConditionalStack cstack)
 }
 
 /*
- * Returns current stack depth, for debugging purposes.
- */
-int
-conditional_stack_depth(ConditionalStack cstack)
-{
-	if (cstack == NULL)
-		return -1;
-	else
-	{
-		IfStackElem *p = cstack->head;
-		int			depth = 0;
-
-		while (p != NULL)
-		{
-			depth++;
-			p = p->next;
-		}
-		return depth;
-	}
-}
-
-/*
  * Fetch the current state of the top of the stack.
  */
 ifState

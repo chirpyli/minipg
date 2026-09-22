@@ -621,31 +621,6 @@ GetStartupBufferPinWaitBufId(void)
 }
 
 /*
- * Check whether there are at least N free PGPROC objects.
- *
- * Note: this is designed on the assumption that N will generally be small.
- */
-bool
-HaveNFreeProcs(int n)
-{
-	PGPROC	   *proc;
-
-	SpinLockAcquire(ProcStructLock);
-
-	proc = ProcGlobal->freeProcs;
-
-	while (n > 0 && proc != NULL)
-	{
-		proc = (PGPROC *) proc->links.next;
-		n--;
-	}
-
-	SpinLockRelease(ProcStructLock);
-
-	return (n <= 0);
-}
-
-/*
  * Check if the current process is awaiting a lock.
  */
 bool

@@ -326,7 +326,6 @@ extern bool DecodeXLogRecord(XLogReaderState *state, XLogRecord *record,
 	((decoder)->blocks[block_id].apply_image)
 
 #ifndef FRONTEND
-extern FullTransactionId XLogRecGetFullXid(XLogReaderState *record);
 #endif
 
 extern bool RestoreBlockImage(XLogReaderState *record, uint8 block_id, char *page);

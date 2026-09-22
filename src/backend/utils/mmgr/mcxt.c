@@ -1494,16 +1494,3 @@ pnstrdup(const char *in, Size len)
 	return out;
 }
 
-/*
- * Make copy of string with all trailing newline characters removed.
- */
-char *
-pchomp(const char *in)
-{
-	size_t		n;
-
-	n = strlen(in);
-	while (n > 0 && in[n - 1] == '\n')
-		n--;
-	return pnstrdup(in, n);
-}

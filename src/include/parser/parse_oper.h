@@ -53,7 +53,6 @@ extern Oid	compatible_oper_opid(List *op, Oid arg1, Oid arg2, bool noError);
 
 /* Extract operator OID or underlying-function OID from an Operator tuple */
 extern Oid	oprid(Operator op);
-extern Oid	oprfuncid(Operator op);
 
 /* Build expression tree for an operator invocation */
 extern Expr *make_op(ParseState *pstate, List *opname,

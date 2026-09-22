@@ -4088,20 +4088,6 @@ GlobalVisCheckRemovableFullXid(Relation rel, FullTransactionId fxid)
 }
 
 /*
- * Convenience wrapper around GlobalVisTestFor() and
- * GlobalVisTestIsRemovableXid(), see their comments.
- */
-bool
-GlobalVisCheckRemovableXid(Relation rel, TransactionId xid)
-{
-	GlobalVisState *state;
-
-	state = GlobalVisTestFor(rel);
-
-	return GlobalVisTestIsRemovableXid(state, xid);
-}
-
-/*
  * Safely retract *xid by retreat_by, store the result in *xid.
  *
  * Need to be careful to prevent *xid from retreating below

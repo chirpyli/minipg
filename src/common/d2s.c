@@ -1056,17 +1056,3 @@ double_to_shortest_decimal_buf(double f, char *result)
 	return index;
 }
 
-/*
- * Return the shortest decimal representation as a null-terminated palloc'd
- * string (outside the backend, uses malloc() instead).
- *
- * Caller is responsible for freeing the result.
- */
-char *
-double_to_shortest_decimal(double f)
-{
-	char	   *const result = (char *) palloc(DOUBLE_SHORTEST_DECIMAL_LEN);
-
-	double_to_shortest_decimal_buf(f, result);
-	return result;
-}

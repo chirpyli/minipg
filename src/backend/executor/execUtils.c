@@ -1087,23 +1087,6 @@ ExecCleanTargetListLength(List *targetlist)
 }
 
 
-/* Return a bitmap representing columns being inserted */
-Bitmapset *
-ExecGetInsertedCols(ResultRelInfo *relinfo, EState *estate)
-{
-	RangeTblEntry *rte;
-
-	if (relinfo->ri_RangeTableIndex != 0)
-		rte = exec_rt_fetch(relinfo->ri_RangeTableIndex, estate);
-	else if (relinfo->ri_RootResultRelInfo)
-		rte = exec_rt_fetch(relinfo->ri_RootResultRelInfo->ri_RangeTableIndex,
-							estate);
-	else
-		return NULL;
-
-	return rte->insertedCols;
-}
-
 /* Return a bitmap representing columns being updated */
 Bitmapset *
 ExecGetUpdatedCols(ResultRelInfo *relinfo, EState *estate)

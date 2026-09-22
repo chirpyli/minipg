@@ -105,26 +105,6 @@ float_zero_divide_error(void)
 }
 
 
-/*
- * Returns -1 if 'val' represents negative infinity, 1 if 'val'
- * represents (positive) infinity, and 0 otherwise. On some platforms,
- * this is equivalent to the isinf() macro, but not everywhere: C99
- * does not specify that isinf() needs to distinguish between positive
- * and negative infinity.
- */
-int
-is_infinite(double val)
-{
-	int			inf = isinf(val);
-
-	if (inf == 0)
-		return 0;
-	else if (val > 0)
-		return 1;
-	else
-		return -1;
-}
-
 
 /* ========== USER I/O ROUTINES ========== */
 

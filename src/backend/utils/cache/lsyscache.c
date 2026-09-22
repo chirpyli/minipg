@@ -2099,27 +2099,6 @@ get_type_io_data(Oid typid,
 	ReleaseSysCache(typeTuple);
 }
 
-#ifdef NOT_USED
-char
-get_typalign(Oid typid)
-{
-	HeapTuple	tp;
-
-	tp = SearchSysCache1(TYPEOID, ObjectIdGetDatum(typid));
-	if (HeapTupleIsValid(tp))
-	{
-		Form_pg_type typtup = (Form_pg_type) GETSTRUCT(tp);
-		char		result;
-
-		result = typtup->typalign;
-		ReleaseSysCache(tp);
-		return result;
-	}
-	else
-		return TYPALIGN_INT;
-}
-#endif
-
 char
 get_typstorage(Oid typid)
 {

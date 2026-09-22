@@ -23,7 +23,6 @@ typedef int pgsocket;
 
 /* non-blocking */
 extern bool pg_set_noblock(pgsocket sock);
-extern bool pg_set_block(pgsocket sock);
 
 /* Portable path handling for Unix/Win32 (in path.c) */
 
@@ -37,10 +36,6 @@ extern void canonicalize_path(char *path);
 extern void canonicalize_path_enc(char *path, int encoding);
 extern void make_native_path(char *path);
 extern void cleanup_path(char *path);
-extern bool path_contains_parent_reference(const char *path);
-extern bool path_is_relative_and_below_cwd(const char *path);
-extern bool path_is_safe_for_extraction(const char *path);
-extern bool path_is_prefix_of_path(const char *path1, const char *path2);
 extern char *make_absolute_path(const char *path);
 extern const char *get_progname(const char *argv0);
 extern void get_share_path(const char *my_exec_path, char *ret_path);
@@ -246,9 +241,6 @@ extern bool rmtree(const char *path, bool rmtopdir);
 #define pgoff_t off_t
 
 extern double pg_erand48(unsigned short xseed[3]);
-extern long pg_lrand48(void);
-extern long pg_jrand48(unsigned short xseed[3]);
-extern void pg_srand48(long seed);
 
 #ifndef HAVE_FLS
 extern int	fls(int mask);
@@ -387,7 +379,6 @@ extern int	timingsafe_bcmp(const void *b1, const void *b2, size_t len);
 
 extern void pg_qsort(void *base, size_t nel, size_t elsize,
 					 int (*cmp) (const void *, const void *));
-extern int	pg_qsort_strcmp(const void *a, const void *b);
 
 #define qsort(a,b,c,d) pg_qsort(a,b,c,d)
 
@@ -439,7 +430,6 @@ extern char *escape_single_quotes_ascii(const char *src);
 
 /* common/wait_error.c */
 extern char *wait_result_to_str(int exit_status);
-extern bool wait_result_is_signal(int exit_status, int signum);
 extern bool wait_result_is_any_signal(int exit_status, bool include_command_not_found);
 
 #endif							/* PG_PORT_H */

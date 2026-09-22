@@ -35,6 +35,5 @@ extern bool check_amop_signature(Oid opno, Oid restype,
 								 Oid lefttype, Oid righttype);
 extern Oid	opclass_for_family_datatype(Oid amoid, Oid opfamilyoid,
 										Oid datatypeoid);
-extern bool opfamily_can_sort_type(Oid opfamilyoid, Oid datatypeoid);
 
 #endif							/* AMVALIDATE_H */

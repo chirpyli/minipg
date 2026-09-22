@@ -787,17 +787,3 @@ float_to_shortest_decimal_buf(float f, char *result)
 	return index;
 }
 
-/*
- * Return the shortest decimal representation as a null-terminated palloc'd
- * string (outside the backend, uses malloc() instead).
- *
- * Caller is responsible for freeing the result.
- */
-char *
-float_to_shortest_decimal(float f)
-{
-	char	   *const result = (char *) palloc(FLOAT_SHORTEST_DECIMAL_LEN);
-
-	float_to_shortest_decimal_buf(f, result);
-	return result;
-}

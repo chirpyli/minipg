@@ -232,15 +232,6 @@ _readBitmapset(void)
 }
 
 /*
- * Public routine to read a bitmapset
- */
-Bitmapset *
-readBitmapset(void)
-{
-	return _readBitmapset();
-}
-
-/*
  * _readQuery
  */
 static Query *

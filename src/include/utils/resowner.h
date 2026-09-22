@@ -50,15 +50,6 @@ typedef enum
 	RESOURCE_RELEASE_AFTER_LOCKS
 } ResourceReleasePhase;
 
-/*
- *	Dynamically loaded modules can get control during ResourceOwnerRelease
- *	by providing a callback of this form.
- */
-typedef void (*ResourceReleaseCallback) (ResourceReleasePhase phase,
-										 bool isCommit,
-										 bool isTopLevel,
-										 void *arg);
-
 
 /*
  * Functions in resowner.c
@@ -75,10 +66,6 @@ extern void ResourceOwnerDelete(ResourceOwner owner);
 extern ResourceOwner ResourceOwnerGetParent(ResourceOwner owner);
 extern void ResourceOwnerNewParent(ResourceOwner owner,
 								   ResourceOwner newparent);
-extern void RegisterResourceReleaseCallback(ResourceReleaseCallback callback,
-											void *arg);
-extern void UnregisterResourceReleaseCallback(ResourceReleaseCallback callback,
-											  void *arg);
 extern void CreateAuxProcessResourceOwner(void);
 extern void ReleaseAuxProcessResources(bool isCommit);
 

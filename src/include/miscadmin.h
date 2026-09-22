@@ -347,12 +347,8 @@ extern void SetUserIdAndSecContext(Oid userid, int sec_context);
 extern bool InLocalUserIdChange(void);
 extern bool InSecurityRestrictedOperation(void);
 extern bool InNoForceRLSOperation(void);
-extern void GetUserIdAndContext(Oid *userid, bool *sec_def_context);
-extern void SetUserIdAndContext(Oid userid, bool sec_def_context);
-extern void InitializeSessionUserId(const char *rolename, Oid useroid);
 extern void InitializeSessionUserIdStandalone(void);
 extern void SetSessionAuthorization(Oid userid, bool is_superuser);
-extern Oid	GetCurrentRoleId(void);
 extern void SetCurrentRoleId(Oid roleid, bool is_superuser);
 
 /* in utils/misc/superuser.c */
@@ -463,6 +459,5 @@ extern void CancelBackup(void);
 
 /* in executor/nodeHash.c */
 extern size_t get_hash_memory_limit(void);
-extern int	get_hash_mem(void);
 
 #endif							/* MISCADMIN_H */

@@ -12,11 +12,3 @@
 #define ST_DEFINE
 #include "lib/sort_template.h"
 
-/*
- * qsort comparator wrapper for strcmp.
- */
-int
-pg_qsort_strcmp(const void *a, const void *b)
-{
-	return strcmp(*(const char *const *) a, *(const char *const *) b);
-}

@@ -166,7 +166,5 @@ extern int	SlruSyncFileTag(SlruCtl ctl, const FileTag *ftag, char *path);
 /* SlruScanDirectory public callbacks */
 extern bool SlruScanDirCbReportPresence(SlruCtl ctl, char *filename,
 										int segpage, void *data);
-extern bool SlruScanDirCbDeleteAll(SlruCtl ctl, char *filename, int segpage,
-								   void *data);
 
 #endif							/* SLRU_H */

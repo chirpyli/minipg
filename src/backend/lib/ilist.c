@@ -20,37 +20,6 @@
 
 #include "lib/ilist.h"
 
-/*
- * Delete 'node' from list.
- *
- * It is not allowed to delete a 'node' which is not in the list 'head'
- *
- * Caution: this is O(n); consider using slist_delete_current() instead.
- */
-void
-slist_delete(slist_head *head, slist_node *node)
-{
-	slist_node *last = &head->head;
-	slist_node *cur;
-	bool		found PG_USED_FOR_ASSERTS_ONLY = false;
-
-	while ((cur = last->next) != NULL)
-	{
-		if (cur == node)
-		{
-			last->next = cur->next;
-#ifdef USE_ASSERT_CHECKING
-			found = true;
-#endif
-			break;
-		}
-		last = cur;
-	}
-	Assert(found);
-
-	slist_check(head);
-}
-
 #ifdef ILIST_DEBUG
 /*
  * Verify integrity of a doubly linked list

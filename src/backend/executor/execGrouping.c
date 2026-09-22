@@ -282,28 +282,6 @@ LookupTupleHashEntry(TupleHashTable hashtable, TupleTableSlot *slot,
 }
 
 /*
- * Compute the hash value for a tuple
- */
-uint32
-TupleHashTableHash(TupleHashTable hashtable, TupleTableSlot *slot)
-{
-	MemoryContext oldContext;
-	uint32		hash;
-
-	hashtable->inputslot = slot;
-	hashtable->in_hash_funcs = hashtable->tab_hash_funcs;
-
-	/* Need to run the hash functions in short-lived context */
-	oldContext = MemoryContextSwitchTo(hashtable->tempcxt);
-
-	hash = TupleHashTableHash_internal(hashtable->hashtab, NULL);
-
-	MemoryContextSwitchTo(oldContext);
-
-	return hash;
-}
-
-/*
  * A variant of LookupTupleHashEntry for callers that have already computed
  * the hash value.
  */

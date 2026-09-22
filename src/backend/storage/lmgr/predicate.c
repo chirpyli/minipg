@@ -5068,27 +5068,4 @@ predicatelock_twophase_recover(TransactionId xid, uint16 info,
 	}
 }
 
-/*
- * Prepare to share the current SERIALIZABLEXACT with parallel workers.
- * Return a handle object that can be used by AttachSerializableXact() in a
- * parallel worker.
- */
-SerializableXactHandle
-ShareSerializableXact(void)
-{
-	return MySerializableXact;
-}
 
-/*
- * Allow parallel workers to import the leader's SERIALIZABLEXACT.
- */
-void
-AttachSerializableXact(SerializableXactHandle handle)
-{
-
-	Assert(MySerializableXact == InvalidSerializableXact);
-
-	MySerializableXact = (SERIALIZABLEXACT *) handle;
-	if (MySerializableXact != InvalidSerializableXact)
-		CreateLocalPredicateLockHash();
-}
