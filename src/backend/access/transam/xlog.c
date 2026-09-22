@@ -256,8 +256,6 @@ static int	LocalXLogInsertAllowed = -1;
 bool		ArchiveRecoveryRequested = false;
 bool		InArchiveRecovery = false;
 
-static bool standby_signal_file_found = false;
-static bool recovery_signal_file_found = false;
 
 /* Was the last xlog file restored from archive, or local? */
 static bool restoredFromArchive = false;
@@ -879,7 +877,6 @@ static bool holdingAllLocks = false;
 static MemoryContext walDebugCxt = NULL;
 #endif
 
-static void exitArchiveRecovery(TimeLineID endTLI, XLogRecPtr endOfLog);
 static void ConfirmRecoveryPaused(void);
 static void recoveryPausesHere(bool endOfRecovery);
 static bool recoveryApplyDelay(XLogReaderState *record);
@@ -890,7 +887,6 @@ static void checkTimeLineSwitch(XLogRecPtr lsn, TimeLineID newTLI,
 static void VerifyOverwriteContrecord(xl_overwrite_contrecord *xlrec,
 									  XLogReaderState *state);
 static void LocalSetXLogInsertAllowed(void);
-static void CreateEndOfRecoveryRecord(void);
 static XLogRecPtr CreateOverwriteContrecordRecord(XLogRecPtr aborted_lsn);
 static void CheckPointGuts(XLogRecPtr checkPointRedo, int flags);
 static void KeepLogSeg(XLogRecPtr recptr, XLogSegNo *logSegNo);
@@ -3422,139 +3418,6 @@ XLogFileInit(XLogSegNo logsegno)
 }
 
 /*
- * Create a new XLOG file segment by copying a pre-existing one.
- *
- * destsegno: identify segment to be created.
- *
- * srcTLI, srcsegno: identify segment to be copied (could be from
- *		a different timeline)
- *
- * upto: how much of the source file to copy (the rest is filled with
- *		zeros)
- *
- * Currently this is only used during recovery, and so there are no locking
- * considerations.  But we should be just as tense as XLogFileInit to avoid
- * emplacing a bogus file.
- */
-static void
-XLogFileCopy(XLogSegNo destsegno, TimeLineID srcTLI, XLogSegNo srcsegno,
-			 int upto)
-{
-	char		path[MAXPGPATH];
-	char		tmppath[MAXPGPATH];
-	PGAlignedXLogBlock buffer;
-	int			srcfd;
-	int			fd;
-	int			nbytes;
-
-	/*
-	 * Open the source file
-	 */
-	XLogFilePath(path, srcTLI, srcsegno, wal_segment_size);
-	srcfd = OpenTransientFile(path, O_RDONLY | PG_BINARY);
-	if (srcfd < 0)
-		ereport(ERROR,
-				(errcode_for_file_access(),
-				 errmsg("could not open file \"%s\": %m", path)));
-
-	/*
-	 * Copy into a temp file name.
-	 */
-	snprintf(tmppath, MAXPGPATH, XLOGDIR "/xlogtemp.%d", (int) getpid());
-
-	unlink(tmppath);
-
-	/* do not use get_sync_bit() here --- want to fsync only at end of fill */
-	fd = OpenTransientFile(tmppath, O_RDWR | O_CREAT | O_EXCL | PG_BINARY);
-	if (fd < 0)
-		ereport(ERROR,
-				(errcode_for_file_access(),
-				 errmsg("could not create file \"%s\": %m", tmppath)));
-
-	/*
-	 * Do the data copying.
-	 */
-	for (nbytes = 0; nbytes < wal_segment_size; nbytes += sizeof(buffer))
-	{
-		int			nread;
-
-		nread = upto - nbytes;
-
-		/*
-		 * The part that is not read from the source file is filled with
-		 * zeros.
-		 */
-		if (nread < sizeof(buffer))
-			memset(buffer.data, 0, sizeof(buffer));
-
-		if (nread > 0)
-		{
-			int			r;
-
-			if (nread > sizeof(buffer))
-				nread = sizeof(buffer);
-			pgstat_report_wait_start(WAIT_EVENT_WAL_COPY_READ);
-			r = read(srcfd, buffer.data, nread);
-			if (r != nread)
-			{
-				if (r < 0)
-					ereport(ERROR,
-							(errcode_for_file_access(),
-							 errmsg("could not read file \"%s\": %m",
-									path)));
-				else
-					ereport(ERROR,
-							(errcode(ERRCODE_DATA_CORRUPTED),
-							 errmsg("could not read file \"%s\": read %d of %zu",
-									path, r, (Size) nread)));
-			}
-			pgstat_report_wait_end();
-		}
-		errno = 0;
-		pgstat_report_wait_start(WAIT_EVENT_WAL_COPY_WRITE);
-		if ((int) write(fd, buffer.data, sizeof(buffer)) != (int) sizeof(buffer))
-		{
-			int			save_errno = errno;
-
-			/*
-			 * If we fail to make the file, delete it to release disk space
-			 */
-			unlink(tmppath);
-			/* if write didn't set errno, assume problem is no disk space */
-			errno = save_errno ? save_errno : ENOSPC;
-
-			ereport(ERROR,
-					(errcode_for_file_access(),
-					 errmsg("could not write to file \"%s\": %m", tmppath)));
-		}
-		pgstat_report_wait_end();
-	}
-
-	pgstat_report_wait_start(WAIT_EVENT_WAL_COPY_SYNC);
-	if (pg_fsync(fd) != 0)
-		ereport(data_sync_elevel(ERROR),
-				(errcode_for_file_access(),
-				 errmsg("could not fsync file \"%s\": %m", tmppath)));
-	pgstat_report_wait_end();
-
-	if (CloseTransientFile(fd) != 0)
-		ereport(ERROR,
-				(errcode_for_file_access(),
-				 errmsg("could not close file \"%s\": %m", tmppath)));
-
-	if (CloseTransientFile(srcfd) != 0)
-		ereport(ERROR,
-				(errcode_for_file_access(),
-				 errmsg("could not close file \"%s\": %m", path)));
-
-	/*
-	 * Now move the segment into place with its final name.
-	 */
-	if (!InstallXLogFileSegment(&destsegno, tmppath, false, 0))
-		elog(ERROR, "InstallXLogFileSegment should not have failed");
-}
-
-/*
  * Install a new XLOG segment file as a current or future log segment.
  *
  * This is used both to install a newly-created segment (which has a temp
@@ -5176,125 +5039,6 @@ str_time(pg_time_t tnow)
 }
 
 /*
- * Exit archive-recovery state
- */
-static void
-exitArchiveRecovery(TimeLineID endTLI, XLogRecPtr endOfLog)
-{
-	char		xlogfname[MAXFNAMELEN];
-	XLogSegNo	endLogSegNo;
-	XLogSegNo	startLogSegNo;
-
-	/* we always switch to a new timeline after archive recovery */
-	Assert(endTLI != ThisTimeLineID);
-
-	/*
-	 * We are no longer in archive recovery state.
-	 */
-	InArchiveRecovery = false;
-
-	/*
-	 * Update min recovery point one last time.
-	 */
-	UpdateMinRecoveryPoint(InvalidXLogRecPtr, true);
-
-	/*
-	 * If the ending log segment is still open, close it (to avoid problems on
-	 * Windows with trying to rename or delete an open file).
-	 */
-	if (readFile >= 0)
-	{
-		close(readFile);
-		readFile = -1;
-	}
-
-	/*
-	 * Calculate the last segment on the old timeline, and the first segment
-	 * on the new timeline. If the switch happens in the middle of a segment,
-	 * they are the same, but if the switch happens exactly at a segment
-	 * boundary, startLogSegNo will be endLogSegNo + 1.
-	 */
-	XLByteToPrevSeg(endOfLog, endLogSegNo, wal_segment_size);
-	XLByteToSeg(endOfLog, startLogSegNo, wal_segment_size);
-
-	/*
-	 * Initialize the starting WAL segment for the new timeline. If the switch
-	 * happens in the middle of a segment, copy data from the last WAL segment
-	 * of the old timeline up to the switch point, to the starting WAL segment
-	 * on the new timeline.
-	 */
-	if (endLogSegNo == startLogSegNo)
-	{
-		/*
-		 * Make a copy of the file on the new timeline.
-		 *
-		 * Writing WAL isn't allowed yet, so there are no locking
-		 * considerations. But we should be just as tense as XLogFileInit to
-		 * avoid emplacing a bogus file.
-		 */
-		XLogFileCopy(endLogSegNo, endTLI, endLogSegNo,
-					 XLogSegmentOffset(endOfLog, wal_segment_size));
-	}
-	else
-	{
-		/*
-		 * The switch happened at a segment boundary, so just create the next
-		 * segment on the new timeline.
-		 */
-		int			fd;
-
-		fd = XLogFileInit(startLogSegNo);
-
-		if (close(fd) != 0)
-		{
-			char		xlogfname[MAXFNAMELEN];
-			int			save_errno = errno;
-
-			XLogFileName(xlogfname, ThisTimeLineID, startLogSegNo,
-						 wal_segment_size);
-			errno = save_errno;
-			ereport(ERROR,
-					(errcode_for_file_access(),
-					 errmsg("could not close file \"%s\": %m", xlogfname)));
-		}
-	}
-
-	/*
-	 * Let's just make real sure there are not .ready or .done flags posted
-	 * for the new segment.
-	 */
-	XLogFileName(xlogfname, ThisTimeLineID, startLogSegNo, wal_segment_size);
-
-	/*
-	 * Let's just make real sure there are not stale .ready or .done flags
-	 * posted for the new segment.
-	 */
-	{
-		char		archiveStatusPath[MAXPGPATH];
-
-		snprintf(archiveStatusPath, MAXPGPATH,
-				 XLOGDIR "/archive_status/%s.done", xlogfname);
-		unlink(archiveStatusPath);
-		snprintf(archiveStatusPath, MAXPGPATH,
-				 XLOGDIR "/archive_status/%s.ready", xlogfname);
-		unlink(archiveStatusPath);
-	}
-
-	/*
-	 * Remove the signal files out of the way, so that we don't accidentally
-	 * re-enter archive recovery mode in a subsequent crash.
-	 */
-	if (standby_signal_file_found)
-		durable_unlink(STANDBY_SIGNAL_FILE, FATAL);
-
-	if (recovery_signal_file_found)
-		durable_unlink(RECOVERY_SIGNAL_FILE, FATAL);
-
-	ereport(LOG,
-			(errmsg("archive recovery complete")));
-}
-
-/*
  * Extract timestamp from WAL record.
  *
  * If the record contains a timestamp, returns true, and saves the timestamp
@@ -5703,7 +5447,6 @@ StartupXLOG(void)
 	XLogRecPtr	RecPtr,
 				checkPointLoc,
 				EndOfLog;
-	TimeLineID	EndOfLogTLI;
 	TimeLineID	PrevTimeLineID;
 	XLogRecord *record;
 	TransactionId oldestActiveXID;
@@ -6742,7 +6485,6 @@ StartupXLOG(void)
 	 * and we were reading the old WAL from a segment belonging to a higher
 	 * timeline.
 	 */
-	EndOfLogTLI = xlogreader->seg.ws_tli;
 
 	/*
 	 * Complain if we did not roll forward far enough to render the backup
@@ -6848,14 +6590,6 @@ StartupXLOG(void)
 			snprintf(reason, sizeof(reason), "reached consistency");
 		else
 			snprintf(reason, sizeof(reason), "no recovery target specified");
-
-		/*
-		 * We are now done reading the old WAL.  Turn off archive fetching if
-		 * it was active, and make a writable copy of the last WAL segment.
-		 * (Note that we also have a copy of the last block of the old WAL in
-		 * readBuf; we will use that below.)
-		 */
-		exitArchiveRecovery(EndOfLogTLI, EndOfLog);
 
 		/*
 		 * Write the timeline history file, and have it archived. After this
@@ -7020,7 +6754,6 @@ StartupXLOG(void)
 					 * restartpoint and then checkpoint. We request a
 					 * checkpoint later anyway, just for safety.
 					 */
-					CreateEndOfRecoveryRecord();
 				}
 			}
 
@@ -8285,57 +8018,6 @@ CreateCheckPoint(int flags)
 									 CheckpointStats.ckpt_segs_added,
 									 CheckpointStats.ckpt_segs_removed,
 									 CheckpointStats.ckpt_segs_recycled);
-}
-
-/*
- * Mark the end of recovery in WAL though without running a full checkpoint.
- * We can expect that a restartpoint is likely to be in progress as we
- * do this, though we are unwilling to wait for it to complete.
- *
- * CreateRestartPoint() allows for the case where recovery may end before
- * the restartpoint completes so there is no concern of concurrent behaviour.
- */
-static void
-CreateEndOfRecoveryRecord(void)
-{
-	xl_end_of_recovery xlrec;
-	XLogRecPtr	recptr;
-
-	/* sanity check */
-	if (!RecoveryInProgress())
-		elog(ERROR, "can only be used to end recovery");
-
-	xlrec.end_time = GetCurrentTimestamp();
-
-	WALInsertLockAcquireExclusive();
-	xlrec.ThisTimeLineID = ThisTimeLineID;
-	xlrec.PrevTimeLineID = XLogCtl->PrevTimeLineID;
-	WALInsertLockRelease();
-
-	LocalSetXLogInsertAllowed();
-
-	START_CRIT_SECTION();
-
-	XLogBeginInsert();
-	XLogRegisterData((char *) &xlrec, sizeof(xl_end_of_recovery));
-	recptr = XLogInsert(RM_XLOG_ID, XLOG_END_OF_RECOVERY);
-
-	XLogFlush(recptr);
-
-	/*
-	 * Update the control file so that crash recovery can follow the timeline
-	 * changes to this point.
-	 */
-	LWLockAcquire(ControlFileLock, LW_EXCLUSIVE);
-	ControlFile->time = (pg_time_t) time(NULL);
-	ControlFile->minRecoveryPoint = recptr;
-	ControlFile->minRecoveryPointTLI = ThisTimeLineID;
-	UpdateControlFile();
-	LWLockRelease(ControlFileLock);
-
-	END_CRIT_SECTION();
-
-	LocalXLogInsertAllowed = -1;	/* return to "check" state */
 }
 
 /*
