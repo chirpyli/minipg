@@ -44,10 +44,4 @@ const TwoPhaseCallback twophase_postabort_callbacks[TWOPHASE_RM_MAX_ID + 1] =
 	NULL						/* PredicateLock */
 };
 
-const TwoPhaseCallback twophase_standby_recover_callbacks[TWOPHASE_RM_MAX_ID + 1] =
-{
-	NULL,						/* END ID */
-	lock_twophase_standby_recover,	/* Lock */
-	NULL,						/* MultiXact */
-	NULL						/* PredicateLock */
-};
+

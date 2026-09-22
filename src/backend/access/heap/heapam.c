@@ -64,7 +64,6 @@
 #include "storage/procarray.h"
 #include "storage/smgr.h"
 #include "storage/spin.h"
-#include "storage/standby.h"
 #include "utils/datum.h"
 #include "utils/inval.h"
 #include "utils/lsyscache.h"
@@ -8359,13 +8358,6 @@ heap_xlog_prune(XLogReaderState *record)
 	XLogRecGetBlockTag(record, 0, &rnode, NULL, &blkno);
 
 	/*
-	 * We're about to remove tuples. In Hot Standby mode, ensure that there's
-	 * no queries running for which the removed tuples are still visible.
-	 */
-	if (InHotStandby)
-		ResolveRecoveryConflictWithSnapshot(xlrec->latestRemovedXid, rnode);
-
-	/*
 	 * If we have a full-page image, restore it (using a cleanup lock) and
 	 * we're done.
 	 */
@@ -8522,18 +8514,6 @@ heap_xlog_visible(XLogReaderState *record)
 	XLogRecGetBlockTag(record, 1, &rnode, NULL, &blkno);
 
 	/*
-	 * If there are any Hot Standby transactions running that have an xmin
-	 * horizon old enough that this page isn't all-visible for them, they
-	 * might incorrectly decide that an index-only scan can skip a heap fetch.
-	 *
-	 * NB: It might be better to throw some kind of "soft" conflict here that
-	 * forces any index-only scan that is in flight to perform heap fetches,
-	 * rather than killing the transaction outright.
-	 */
-	if (InHotStandby)
-		ResolveRecoveryConflictWithSnapshot(xlrec->cutoff_xid, rnode);
-
-	/*
 	 * Read the heap page, if it still exists. If the heap file has dropped or
 	 * truncated later in recovery, we don't need to update the page, but we'd
 	 * better still update the visibility map.
@@ -8654,24 +8634,8 @@ heap_xlog_freeze_page(XLogReaderState *record)
 {
 	XLogRecPtr	lsn = record->EndRecPtr;
 	xl_heap_freeze_page *xlrec = (xl_heap_freeze_page *) XLogRecGetData(record);
-	TransactionId cutoff_xid = xlrec->cutoff_xid;
 	Buffer		buffer;
 	int			ntup;
-
-	/*
-	 * In Hot Standby mode, ensure that there's no queries running which still
-	 * consider the frozen xids as running.
-	 */
-	if (InHotStandby)
-	{
-		RelFileNode rnode;
-		TransactionId latestRemovedXid = cutoff_xid;
-
-		TransactionIdRetreat(latestRemovedXid);
-
-		XLogRecGetBlockTag(record, 0, &rnode, NULL, NULL);
-		ResolveRecoveryConflictWithSnapshot(latestRemovedXid, rnode);
-	}
 
 	if (XLogReadBufferForRedo(record, 0, &buffer) == BLK_NEEDS_REDO)
 	{

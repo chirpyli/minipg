@@ -20,6 +20,5 @@ OBJS = \
 	signalfuncs.o \
 	sinval.o \
 	sinvaladt.o \
-	standby.o
 
 include $(top_srcdir)/src/backend/common.mk

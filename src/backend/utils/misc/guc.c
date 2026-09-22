@@ -59,11 +59,11 @@
 #include "postmaster/syslogger.h"
 #include "postmaster/walwriter.h"
 #include "storage/bufmgr.h"
+#include "storage/procarray.h"
 #include "storage/fd.h"
 #include "storage/pg_shmem.h"
 #include "storage/predicate.h"
 #include "storage/proc.h"
-#include "storage/standby.h"
 #include "tcop/tcopprot.h"
 #include "utils/backend_status.h"
 #include "utils/builtins.h"
@@ -1150,15 +1150,6 @@ static struct config_bool ConfigureNamesBool[] =
 		NULL, NULL, NULL
 	},
 	{
-		{"log_recovery_conflict_waits", PGC_SIGHUP, LOGGING_WHAT,
-			gettext_noop("Logs standby recovery conflict waits."),
-			NULL
-		},
-		&log_recovery_conflict_waits,
-		false,
-		NULL, NULL, NULL
-	},
-	{
 		{"log_hostname", PGC_SIGHUP, LOGGING_WHAT,
 			gettext_noop("Logs the host name in the connection logs."),
 			gettext_noop("By default, connection logs only show the IP address "
@@ -1491,28 +1482,6 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 	{
-		{"max_standby_archive_delay", PGC_SIGHUP, REPLICATION_STANDBY,
-			gettext_noop("Sets the maximum delay before canceling queries when a hot standby server is processing archived WAL data."),
-			NULL,
-			GUC_UNIT_MS
-		},
-		&max_standby_archive_delay,
-		30 * 1000, -1, INT_MAX,
-		NULL, NULL, NULL
-	},
-
-	{
-		{"max_standby_streaming_delay", PGC_SIGHUP, REPLICATION_STANDBY,
-			gettext_noop("Sets the maximum delay before canceling queries when a hot standby server is processing streamed WAL data."),
-			NULL,
-			GUC_UNIT_MS
-		},
-		&max_standby_streaming_delay,
-		30 * 1000, -1, INT_MAX,
-		NULL, NULL, NULL
-	},
-
-	{
 		{"recovery_min_apply_delay", PGC_SIGHUP, REPLICATION_STANDBY,
 			gettext_noop("Sets the minimum delay for applying changes during recovery."),
 			NULL,
@@ -1810,15 +1779,6 @@ static struct config_int ConfigureNamesInt[] =
 		NULL, NULL, NULL
 	},
 
-	{
-		{"vacuum_defer_cleanup_age", PGC_SIGHUP, REPLICATION_PRIMARY,
-			gettext_noop("Number of transactions by which VACUUM and HOT cleanup should be deferred, if any."),
-			NULL
-		},
-		&vacuum_defer_cleanup_age,
-		0, 0, 1000000,			/* see ComputeXidHorizons */
-		NULL, NULL, NULL
-	},
 	{
 		{"vacuum_failsafe_age", PGC_USERSET, CLIENT_CONN_STATEMENT,
 			gettext_noop("Age at which VACUUM should trigger failsafe to avoid a wraparound outage."),
@@ -2618,16 +2578,6 @@ static struct config_string ConfigureNamesString[] =
 		&recovery_target_lsn_string,
 		"",
 		check_recovery_target_lsn, assign_recovery_target_lsn, NULL
-	},
-
-	{
-		{"promote_trigger_file", PGC_SIGHUP, REPLICATION_STANDBY,
-			gettext_noop("Specifies a file name whose presence ends recovery in the standby."),
-			NULL
-		},
-		&PromoteTriggerFile,
-		"",
-		NULL, NULL, NULL
 	},
 
 	{

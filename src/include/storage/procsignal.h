@@ -33,13 +33,6 @@ typedef enum
 	PROCSIG_BARRIER,			/* global barrier interrupt  */
 	PROCSIG_LOG_MEMORY_CONTEXT, /* ask backend to log the memory contexts */
 
-	/* Recovery conflict reasons */
-	PROCSIG_RECOVERY_CONFLICT_DATABASE,
-	PROCSIG_RECOVERY_CONFLICT_LOCK,
-	PROCSIG_RECOVERY_CONFLICT_SNAPSHOT,
-	PROCSIG_RECOVERY_CONFLICT_BUFFERPIN,
-	PROCSIG_RECOVERY_CONFLICT_STARTUP_DEADLOCK,
-
 	NUM_PROCSIGNALS				/* Must be last! */
 } ProcSignalReason;
 

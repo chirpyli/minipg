@@ -575,8 +575,6 @@ extern void lock_twophase_postcommit(TransactionId xid, uint16 info,
 									 void *recdata, uint32 len);
 extern void lock_twophase_postabort(TransactionId xid, uint16 info,
 									void *recdata, uint32 len);
-extern void lock_twophase_standby_recover(TransactionId xid, uint16 info,
-										  void *recdata, uint32 len);
 
 extern DeadLockState DeadLockCheck(PGPROC *proc);
 extern void DeadLockReport(void) pg_attribute_noreturn();

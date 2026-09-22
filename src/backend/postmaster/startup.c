@@ -30,7 +30,6 @@
 #include "storage/latch.h"
 #include "storage/pmsignal.h"
 #include "storage/procsignal.h"
-#include "storage/standby.h"
 #include "utils/guc.h"
 #include "utils/timeout.h"
 
@@ -64,7 +63,6 @@ static void StartupProcTriggerHandler(SIGNAL_ARGS);
 static void StartupProcSigHupHandler(SIGNAL_ARGS);
 
 /* Callbacks */
-static void StartupProcExit(int code, Datum arg);
 
 
 /* --------------------------------
@@ -181,15 +179,6 @@ HandleStartupProcInterrupts(void)
  *		signal handler routines
  * --------------------------------
  */
-static void
-StartupProcExit(int code, Datum arg)
-{
-	/* Shutdown the recovery environment */
-	if (standbyState != STANDBY_DISABLED)
-		ShutdownRecoveryTransactionEnvironment();
-}
-
-
 /* ----------------------------------
  *	Startup Process main entry point
  * ----------------------------------
@@ -197,9 +186,6 @@ StartupProcExit(int code, Datum arg)
 void
 StartupProcessMain(void)
 {
-	/* Arrange to clean up at startup process exit */
-	on_shmem_exit(StartupProcExit, 0);
-
 	/*
 	 * Properly accept or ignore signals the postmaster might send us.
 	 */
@@ -216,13 +202,6 @@ StartupProcessMain(void)
 	 * Reset some signals that are accepted by postmaster but not here
 	 */
 	pqsignal(SIGCHLD, SIG_DFL);
-
-	/*
-	 * Register timeouts needed for standby mode
-	 */
-	RegisterTimeout(STANDBY_DEADLOCK_TIMEOUT, StandbyDeadLockHandler);
-	RegisterTimeout(STANDBY_TIMEOUT, StandbyTimeoutHandler);
-	RegisterTimeout(STANDBY_LOCK_TIMEOUT, StandbyLockTimeoutHandler);
 
 	/*
 	 * Unblock signals (they were blocked when the postmaster forked us)

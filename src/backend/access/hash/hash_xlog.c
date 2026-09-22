@@ -984,26 +984,6 @@ hash_xlog_vacuum_one_page(XLogReaderState *record)
 
 	xldata = (xl_hash_vacuum_one_page *) XLogRecGetData(record);
 
-	/*
-	 * If we have any conflict processing to do, it must happen before we
-	 * update the page.
-	 *
-	 * Hash index records that are marked as LP_DEAD and being removed during
-	 * hash index tuple insertion can conflict with standby queries. You might
-	 * think that vacuum records would conflict as well, but we've handled
-	 * that already.  XLOG_HEAP2_PRUNE records provide the highest xid cleaned
-	 * by the vacuum of the heap and so we can resolve any conflicts just once
-	 * when that arrives.  After that we know that no conflicts exist from
-	 * individual hash index vacuum records on that index.
-	 */
-	if (InHotStandby)
-	{
-		RelFileNode rnode;
-
-		XLogRecGetBlockTag(record, 0, &rnode, NULL, NULL);
-		ResolveRecoveryConflictWithSnapshot(xldata->latestRemovedXid, rnode);
-	}
-
 	action = XLogReadBufferForRedoExtended(record, 0, RBM_NORMAL, true, &buffer);
 
 	if (action == BLK_NEEDS_REDO)

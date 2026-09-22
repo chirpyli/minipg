@@ -253,8 +253,6 @@ typedef enum
 {
 	PM_INIT,					/* postmaster starting */
 	PM_STARTUP,					/* waiting for startup subprocess */
-	PM_RECOVERY,				/* in archive recovery mode */
-	PM_HOT_STANDBY,				/* in hot standby mode */
 	PM_RUN,						/* normal "database is alive" state */
 	PM_STOP_BACKENDS,			/* need to stop remaining backends */
 	PM_WAIT_BACKENDS,			/* waiting for live backends to exit */
@@ -1166,8 +1164,7 @@ ServerLoop(void)
 		 * state that prevents it, start one.  It doesn't matter if this
 		 * fails, we'll just try again later.  Likewise for the checkpointer.
 		 */
-		if (pmState == PM_RUN || pmState == PM_RECOVERY ||
-			pmState == PM_HOT_STANDBY)
+		if (pmState == PM_RUN)
 		{
 			if (CheckpointerPID == 0)
 				CheckpointerPID = StartCheckpointer();
@@ -1676,15 +1673,12 @@ canAcceptConnections(void)
 	 * Can't start backends when in startup/shutdown/inconsistent recovery
 	 * state.
 	 */
-	if (pmState != PM_RUN && pmState != PM_HOT_STANDBY)
+	if (pmState != PM_RUN)
 	{
 		if (Shutdown > NoShutdown)
 			return CAC_SHUTDOWN;	/* shutdown is pending */
 		else if (!FatalError && pmState == PM_STARTUP)
 			return CAC_STARTUP; /* normal startup */
-		else if (!FatalError && pmState == PM_RECOVERY)
-			return CAC_NOTCONSISTENT;	/* not yet at consistent recovery
-										 * state */
 		else
 			return CAC_RECOVERY;	/* else must be crash recovery */
 	}
@@ -1953,9 +1947,7 @@ pmdie(SIGNAL_ARGS)
 			 */
 			if (pmState == PM_RUN)
 				connsAllowed = ALLOW_SUPERUSER_CONNS;
-			else if (pmState == PM_HOT_STANDBY)
-				connsAllowed = ALLOW_NO_CONNS;
-			else if (pmState == PM_STARTUP || pmState == PM_RECOVERY)
+			else if (pmState == PM_STARTUP)
 			{
 				/* There should be no clients, so proceed to stop children */
 				pmState = PM_STOP_BACKENDS;
@@ -1986,13 +1978,12 @@ pmdie(SIGNAL_ARGS)
 			/* Report status */
 			AddToDataDirLockFile(LOCK_FILE_LINE_PM_STATUS, PM_STATUS_STOPPING);
 
-			if (pmState == PM_STARTUP || pmState == PM_RECOVERY)
+			if (pmState == PM_STARTUP)
 			{
 				/* Just shut down background processes silently */
 				pmState = PM_STOP_BACKENDS;
 			}
-			else if (pmState == PM_RUN ||
-					 pmState == PM_HOT_STANDBY)
+			else if (pmState == PM_RUN)
 			{
 				/* Report that we're about to zap live client sessions */
 				ereport(LOG,
@@ -2459,9 +2450,7 @@ HandleChildCrash(int pid, int exitstatus, const char *procname)
 		FatalError = true;
 
 	/* We now transit into a state of waiting for children to die */
-	if (pmState == PM_RECOVERY ||
-		pmState == PM_HOT_STANDBY ||
-		pmState == PM_RUN ||
+	if (pmState == PM_RUN ||
 		pmState == PM_STOP_BACKENDS ||
 		pmState == PM_SHUTDOWN)
 		pmState = PM_WAIT_BACKENDS;
@@ -2534,7 +2523,7 @@ static void
 PostmasterStateMachine(void)
 {
 	/* If we're doing a smart shutdown, try to advance that state. */
-	if (pmState == PM_RUN || pmState == PM_HOT_STANDBY)
+	if (pmState == PM_RUN)
 	{
 		if (connsAllowed == ALLOW_SUPERUSER_CONNS)
 		{
@@ -3219,54 +3208,6 @@ sigusr1_handler(SIGNAL_ARGS)
 {
 	int			save_errno = errno;
 
-	/*
-	 * RECOVERY_STARTED and BEGIN_HOT_STANDBY signals are ignored in
-	 * unexpected states. If the startup process quickly starts up, completes
-	 * recovery, exits, we might process the death of the startup process
-	 * first. We don't want to go back to recovery in that case.
-	 */
-	if (CheckPostmasterSignal(PMSIGNAL_RECOVERY_STARTED) &&
-		pmState == PM_STARTUP && Shutdown == NoShutdown)
-	{
-		/* WAL redo has started. We're out of reinitialization. */
-		FatalError = false;
-		AbortStartTime = 0;
-
-		/*
-		 * Crank up the background tasks.  It doesn't matter if this fails,
-		 * we'll just try again later.
-		 */
-		Assert(CheckpointerPID == 0);
-		CheckpointerPID = StartCheckpointer();
-		Assert(BgWriterPID == 0);
-		BgWriterPID = StartBackgroundWriter();
-
-		/*
-		 * If we aren't planning to enter hot standby mode later, treat
-		 * RECOVERY_STARTED as meaning we're out of startup, and report status
-		 * accordingly.
-		 */
-		if (!EnableHotStandby)
-		{
-			AddToDataDirLockFile(LOCK_FILE_LINE_PM_STATUS, PM_STATUS_STANDBY);
-		}
-
-		pmState = PM_RECOVERY;
-	}
-
-	if (CheckPostmasterSignal(PMSIGNAL_BEGIN_HOT_STANDBY) &&
-		pmState == PM_RECOVERY && Shutdown == NoShutdown)
-	{
-		ereport(LOG,
-				(errmsg("database system is ready to accept read-only connections")));
-
-		/* Report status */
-		AddToDataDirLockFile(LOCK_FILE_LINE_PM_STATUS, PM_STATUS_READY);
-
-		pmState = PM_HOT_STANDBY;
-		connsAllowed = ALLOW_ALL_CONNS;
-	}
-
 	/* Tell syslogger to rotate logfile if requested */
 	if (SysLoggerPID != 0)
 	{
@@ -3294,20 +3235,6 @@ sigusr1_handler(SIGNAL_ARGS)
 	if (CheckPostmasterSignal(PMSIGNAL_ADVANCE_STATE_MACHINE))
 	{
 		PostmasterStateMachine();
-	}
-
-	if (StartupPID != 0 &&
-		(pmState == PM_STARTUP || pmState == PM_RECOVERY ||
-		 pmState == PM_HOT_STANDBY) &&
-		CheckPromoteSignal())
-	{
-		/*
-		 * Tell startup process to finish recovery.
-		 *
-		 * Leave the promote signal file in place and let the Startup process
-		 * do the unlink.
-		 */
-		signal_child(StartupPID, SIGUSR2);
 	}
 
 	errno = save_errno;

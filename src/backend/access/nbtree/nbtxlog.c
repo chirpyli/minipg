@@ -659,19 +659,6 @@ btree_xlog_delete(XLogReaderState *record)
 	BTPageOpaque opaque;
 
 	/*
-	 * If we have any conflict processing to do, it must happen before we
-	 * update the page
-	 */
-	if (InHotStandby)
-	{
-		RelFileNode rnode;
-
-		XLogRecGetBlockTag(record, 0, &rnode, NULL, NULL);
-
-		ResolveRecoveryConflictWithSnapshot(xlrec->latestRemovedXid, rnode);
-	}
-
-	/*
 	 * We don't need to take a cleanup lock to apply these changes. See
 	 * nbtree/README for details.
 	 */
@@ -973,42 +960,6 @@ btree_xlog_newroot(XLogReaderState *record)
 	_bt_restore_meta(record, 2);
 }
 
-/*
- * In general VACUUM must defer recycling as a way of avoiding certain race
- * conditions.  Deleted pages contain a safexid value that is used by VACUUM
- * to determine whether or not it's safe to place a page that was deleted by
- * VACUUM earlier into the FSM now.  See nbtree/README.
- *
- * As far as any backend operating during original execution is concerned, the
- * FSM is a cache of recycle-safe pages; the mere presence of the page in the
- * FSM indicates that the page must already be safe to recycle (actually,
- * _bt_getbuf() verifies it's safe using BTPageIsRecyclable(), but that's just
- * because it would be unwise to completely trust the FSM, given its current
- * limitations).
- *
- * This isn't sufficient to prevent similar concurrent recycling race
- * conditions during Hot Standby, though.  For that we need to log a
- * xl_btree_reuse_page record at the point that a page is actually recycled
- * and reused for an entirely unrelated page inside _bt_split().  These
- * records include the same safexid value from the original deleted page,
- * stored in the record's latestRemovedFullXid field.
- *
- * The GlobalVisCheckRemovableFullXid() test in BTPageIsRecyclable() is used
- * to determine if it's safe to recycle a page.  This mirrors our own test:
- * the PGPROC->xmin > limitXmin test inside GetConflictingVirtualXIDs().
- * Consequently, one XID value achieves the same exclusion effect on primary
- * and standby.
- */
-static void
-btree_xlog_reuse_page(XLogReaderState *record)
-{
-	xl_btree_reuse_page *xlrec = (xl_btree_reuse_page *) XLogRecGetData(record);
-
-	if (InHotStandby)
-		ResolveRecoveryConflictWithSnapshotFullXid(xlrec->latestRemovedFullXid,
-												   xlrec->node);
-}
-
 void
 btree_redo(XLogReaderState *record)
 {
@@ -1054,9 +1005,6 @@ btree_redo(XLogReaderState *record)
 			break;
 		case XLOG_BTREE_NEWROOT:
 			btree_xlog_newroot(record);
-			break;
-		case XLOG_BTREE_REUSE_PAGE:
-			btree_xlog_reuse_page(record);
 			break;
 		case XLOG_BTREE_META_CLEANUP:
 			_bt_restore_meta(record, 0);

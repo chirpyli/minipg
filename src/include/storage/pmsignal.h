@@ -32,10 +32,7 @@
  */
 typedef enum
 {
-	PMSIGNAL_RECOVERY_STARTED,	/* recovery has started */
-	PMSIGNAL_BEGIN_HOT_STANDBY, /* begin Hot Standby */
 	PMSIGNAL_ROTATE_LOGFILE,	/* send SIGUSR1 to syslogger to rotate logfile */
-	PMSIGNAL_START_WALRECEIVER, /* start a walreceiver */
 	PMSIGNAL_ADVANCE_STATE_MACHINE, /* advance postmaster's state machine */
 
 	NUM_PMSIGNALS				/* Must be last value of enum! */

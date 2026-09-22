@@ -15,7 +15,6 @@
 #define PROCARRAY_H
 
 #include "storage/lock.h"
-#include "storage/standby.h"
 #include "utils/relcache.h"
 #include "utils/snapshot.h"
 
@@ -28,18 +27,32 @@ extern void ProcArrayRemove(PGPROC *proc, TransactionId latestXid);
 extern void ProcArrayEndTransaction(PGPROC *proc, TransactionId latestXid);
 extern void ProcArrayClearTransaction(PGPROC *proc);
 
-extern void ProcArrayInitRecovery(TransactionId initializedUptoXID);
-extern void ProcArrayApplyRecoveryInfo(RunningTransactions running);
-extern void ProcArrayApplyXidAssignment(TransactionId topxid,
-										int nsubxids, TransactionId *subxids);
+/*
+ * Data structure for GetRunningTransactionData(). Similar to Snapshots, but
+ * not quite. This has nothing at all to do with visibility on this server,
+ * so this is completely separate from snapmgr.c and snapmgr.h.
+ */
+typedef enum
+{
+	SUBXIDS_IN_ARRAY,			/* xids array includes all running subxids */
+	SUBXIDS_MISSING,			/* snapshot overflowed, subxids are missing */
+	SUBXIDS_IN_SUBTRANS,		/* subxids are not included in 'xids', but
+								 * pg_subtrans is fully up-to-date */
+} subxids_array_status;
 
-extern void RecordKnownAssignedTransactionIds(TransactionId xid);
-extern void ExpireTreeKnownAssignedTransactionIds(TransactionId xid,
-												  int nsubxids, TransactionId *subxids,
-												  TransactionId max_xid);
-extern void ExpireAllKnownAssignedTransactionIds(void);
-extern void ExpireOldKnownAssignedTransactionIds(TransactionId xid);
-extern void KnownAssignedTransactionIdsIdleMaintenance(void);
+typedef struct RunningTransactionsData
+{
+	int			xcnt;			/* # of xact ids in xids[] */
+	int			subxcnt;		/* # of subxact ids in xids[] */
+	subxids_array_status subxid_status;
+	TransactionId nextXid;		/* xid from ShmemVariableCache->nextXid */
+	TransactionId oldestRunningXid; /* *not* oldestXmin */
+	TransactionId latestCompletedXid;	/* so we can set xmax */
+
+	TransactionId *xids;		/* array of (sub)xids still running */
+} RunningTransactionsData;
+
+typedef RunningTransactionsData *RunningTransactions;
 
 extern int	GetMaxSnapshotXidCount(void);
 extern int	GetMaxSnapshotSubxidCount(void);
@@ -75,14 +88,10 @@ extern VirtualTransactionId *GetCurrentVirtualXIDs(TransactionId limitXmin,
 												   bool excludeXmin0, bool allDbs, int excludeVacuum,
 												   int *nvxids);
 extern VirtualTransactionId *GetConflictingVirtualXIDs(TransactionId limitXmin, Oid dbOid);
-extern pid_t CancelVirtualTransaction(VirtualTransactionId vxid, ProcSignalReason sigmode);
-extern pid_t SignalVirtualTransaction(VirtualTransactionId vxid, ProcSignalReason sigmode,
-									  bool conflictPending);
 
 extern bool MinimumActiveBackends(int min);
 extern int	CountDBBackends(Oid databaseid);
 extern int	CountDBConnections(Oid databaseid);
-extern void CancelDBBackends(Oid databaseid, ProcSignalReason sigmode, bool conflictPending);
 extern int	CountUserBackends(Oid roleid);
 extern bool CountOtherDBBackends(Oid databaseId,
 								 int *nbackends, int *nprepared);

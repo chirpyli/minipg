@@ -14,6 +14,7 @@
  */
 
 #include "postgres.h"
+#include "storage/procsignal.h"
 
 #include "funcapi.h"
 #include "miscadmin.h"

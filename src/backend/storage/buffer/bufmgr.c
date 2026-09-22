@@ -47,11 +47,11 @@
 #include "utils/wait_event.h"
 #include "postmaster/bgwriter.h"
 #include "storage/buf_internals.h"
+#include "storage/procsignal.h"
 #include "storage/bufmgr.h"
 #include "storage/ipc.h"
 #include "storage/proc.h"
 #include "storage/smgr.h"
-#include "storage/standby.h"
 #include "utils/memdebug.h"
 #include "utils/ps_status.h"
 #include "utils/rel.h"
@@ -4012,9 +4012,6 @@ void
 LockBufferForCleanup(Buffer buffer)
 {
 	BufferDesc *bufHdr;
-	char	   *new_status = NULL;
-	TimestampTz waitStart = 0;
-	bool		logged_recovery_conflict = false;
 
 	Assert(BufferIsPinned(buffer));
 	Assert(PinCountWaitBuf == NULL);
@@ -4049,23 +4046,6 @@ LockBufferForCleanup(Buffer buffer)
 		{
 			/* Successfully acquired exclusive lock with pincount 1 */
 			UnlockBufHdr(bufHdr, buf_state);
-
-			/*
-			 * Emit the log message if recovery conflict on buffer pin was
-			 * resolved but the startup process waited longer than
-			 * deadlock_timeout for it.
-			 */
-			if (logged_recovery_conflict)
-				LogRecoveryConflict(PROCSIG_RECOVERY_CONFLICT_BUFFERPIN,
-									waitStart, GetCurrentTimestamp(),
-									NULL, false);
-
-			/* Report change to non-waiting status */
-			if (new_status)
-			{
-				set_ps_display(new_status);
-				pfree(new_status);
-			}
 			return;
 		}
 		/* Failed, so mark myself as waiting for pincount 1 */
@@ -4082,59 +4062,7 @@ LockBufferForCleanup(Buffer buffer)
 		LockBuffer(buffer, BUFFER_LOCK_UNLOCK);
 
 		/* Wait to be signaled by UnpinBuffer() */
-		if (InHotStandby)
-		{
-			/* Report change to waiting status */
-			if (update_process_title && new_status == NULL)
-			{
-				const char *old_status;
-				int			len;
-
-				old_status = get_ps_display(&len);
-				new_status = (char *) palloc(len + 8 + 1);
-				memcpy(new_status, old_status, len);
-				strcpy(new_status + len, " waiting");
-				set_ps_display(new_status);
-				new_status[len] = '\0'; /* truncate off " waiting" */
-			}
-
-			/*
-			 * Emit the log message if the startup process is waiting longer
-			 * than deadlock_timeout for recovery conflict on buffer pin.
-			 *
-			 * Skip this if first time through because the startup process has
-			 * not started waiting yet in this case. So, the wait start
-			 * timestamp is set after this logic.
-			 */
-			if (waitStart != 0 && !logged_recovery_conflict)
-			{
-				TimestampTz now = GetCurrentTimestamp();
-
-				if (TimestampDifferenceExceeds(waitStart, now,
-											   DeadlockTimeout))
-				{
-					LogRecoveryConflict(PROCSIG_RECOVERY_CONFLICT_BUFFERPIN,
-										waitStart, now, NULL, true);
-					logged_recovery_conflict = true;
-				}
-			}
-
-			/*
-			 * Set the wait start timestamp if logging is enabled and first
-			 * time through.
-			 */
-			if (log_recovery_conflict_waits && waitStart == 0)
-				waitStart = GetCurrentTimestamp();
-
-			/* Publish the bufid that Startup process waits on */
-			SetStartupBufferPinWaitBufId(buffer - 1);
-			/* Set alarm and then wait to be signaled by UnpinBuffer() */
-			ResolveRecoveryConflictWithBufferPin();
-			/* Reset the published bufid */
-			SetStartupBufferPinWaitBufId(-1);
-		}
-		else
-			ProcWaitForSignal(PG_WAIT_BUFFER_PIN);
+		ProcWaitForSignal(PG_WAIT_BUFFER_PIN);
 
 		/*
 		 * Remove flag marking us as waiter. Normally this will not be set
@@ -4153,30 +4081,6 @@ LockBufferForCleanup(Buffer buffer)
 		PinCountWaitBuf = NULL;
 		/* Loop back and try again */
 	}
-}
-
-/*
- * Check called from RecoveryConflictInterrupt handler when Startup
- * process requests cancellation of all pin holders that are blocking it.
- */
-bool
-HoldingBufferPinThatDelaysRecovery(void)
-{
-	int			bufid = GetStartupBufferPinWaitBufId();
-
-	/*
-	 * If we get woken slowly then it's possible that the Startup process was
-	 * already woken by other backends before we got here. Also possible that
-	 * we get here by multiple interrupts or interrupts at inappropriate
-	 * times, so make sure we do nothing if the bufid is not set.
-	 */
-	if (bufid < 0)
-		return false;
-
-	if (GetPrivateRefCount(bufid + 1) > 0)
-		return true;
-
-	return false;
 }
 
 /*

@@ -187,9 +187,6 @@ extern PGDLLIMPORT int wal_level;
  */
 #define XLogHintBitIsNeeded() (wal_log_hints)
 
-/* Do we need to WAL-log information required only for Hot Standby and logical replication? */
-#define XLogStandbyInfoActive() (wal_level >= WAL_LEVEL_REPLICA)
-
 #ifdef WAL_DEBUG
 extern bool XLOG_DEBUG;
 #endif

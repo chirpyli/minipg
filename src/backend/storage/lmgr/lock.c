@@ -43,7 +43,6 @@
 #include "storage/procarray.h"
 #include "storage/sinvaladt.h"
 #include "storage/spin.h"
-#include "storage/standby.h"
 #include "utils/memutils.h"
 #include "utils/ps_status.h"
 #include "utils/resowner_private.h"
@@ -804,7 +803,6 @@ LockAcquireExtended(const LOCKTAG *locktag,
 	uint32		hashcode;
 	LWLock	   *partitionLock;
 	bool		found_conflict;
-	bool		log_lock = false;
 
 	if (lockmethodid <= 0 || lockmethodid >= lengthof(LockMethods))
 		elog(ERROR, "unrecognized lock method: %d", lockmethodid);
@@ -903,27 +901,6 @@ LockAcquireExtended(const LOCKTAG *locktag,
 	 * lock more than once but that case won't reach here.
 	 */
 	Assert(!IsRelationExtensionLockHeld);
-
-	/*
-	 * Prepare to emit a WAL record if acquisition of this lock needs to be
-	 * replayed in a standby server.
-	 *
-	 * Here we prepare to log; after lock is acquired we'll issue log record.
-	 * This arrangement simplifies error recovery in case the preparation step
-	 * fails.
-	 *
-	 * Only AccessExclusiveLocks can conflict with lock types that read-only
-	 * transactions can acquire in a standby server. Make sure this definition
-	 * matches the one in GetRunningTransactionLocks().
-	 */
-	if (lockmode >= AccessExclusiveLock &&
-		locktag->locktag_type == LOCKTAG_RELATION &&
-		!RecoveryInProgress() &&
-		XLogStandbyInfoActive())
-	{
-		LogAccessExclusiveLockPrepare();
-		log_lock = true;
-	}
 
 	/*
 	 * Attempt to take lock via fast path, if eligible.  But if we remember
@@ -1148,21 +1125,6 @@ LockAcquireExtended(const LOCKTAG *locktag,
 	FinishStrongLockAcquire();
 
 	LWLockRelease(partitionLock);
-
-	/*
-	 * Emit a WAL record if acquisition of this lock needs to be replayed in a
-	 * standby server.
-	 */
-	if (log_lock)
-	{
-		/*
-		 * Decode the locktag back to the original values, to avoid sending
-		 * lots of empty bytes with every message.  See lock.h to check how a
-		 * locktag is defined for LOCKTAG_RELATION
-		 */
-		LogAccessExclusiveLock(locktag->locktag_field1,
-							   locktag->locktag_field2);
-	}
 
 	return LOCKACQUIRE_OK;
 }
@@ -2950,20 +2912,10 @@ GetLockConflicts(const LOCKTAG *locktag, LOCKMODE lockmode, int *countp)
 	/*
 	 * Allocate memory to store results, and fill with InvalidVXID.  We only
 	 * need enough space for MaxBackends + max_prepared_xacts + a terminator.
-	 * InHotStandby allocate once in TopMemoryContext.
 	 */
-	if (InHotStandby)
-	{
-		if (vxids == NULL)
-			vxids = (VirtualTransactionId *)
-				MemoryContextAlloc(TopMemoryContext,
-								   sizeof(VirtualTransactionId) *
-								   (MaxBackends + max_prepared_xacts + 1));
-	}
-	else
-		vxids = (VirtualTransactionId *)
-			palloc0(sizeof(VirtualTransactionId) *
-					(MaxBackends + max_prepared_xacts + 1));
+	vxids = (VirtualTransactionId *)
+		palloc0(sizeof(VirtualTransactionId) *
+				(MaxBackends + max_prepared_xacts + 1));
 
 	/* Compute hash code and partition lock, and look up conflicting modes. */
 	hashcode = LockTagHashCode(locktag);
@@ -4401,37 +4353,6 @@ lock_twophase_recover(TransactionId xid, uint16 info,
 
 	LWLockRelease(partitionLock);
 }
-
-/*
- * Re-acquire a lock belonging to a transaction that was prepared, when
- * starting up into hot standby mode.
- */
-void
-lock_twophase_standby_recover(TransactionId xid, uint16 info,
-							  void *recdata, uint32 len)
-{
-	TwoPhaseLockRecord *rec = (TwoPhaseLockRecord *) recdata;
-	LOCKTAG    *locktag;
-	LOCKMODE	lockmode;
-	LOCKMETHODID lockmethodid;
-
-	Assert(len == sizeof(TwoPhaseLockRecord));
-	locktag = &rec->locktag;
-	lockmode = rec->lockmode;
-	lockmethodid = locktag->locktag_lockmethodid;
-
-	if (lockmethodid <= 0 || lockmethodid >= lengthof(LockMethods))
-		elog(ERROR, "unrecognized lock method: %d", lockmethodid);
-
-	if (lockmode == AccessExclusiveLock &&
-		locktag->locktag_type == LOCKTAG_RELATION)
-	{
-		StandbyAcquireAccessExclusiveLock(xid,
-										  locktag->locktag_field1 /* dboid */ ,
-										  locktag->locktag_field2 /* reloid */ );
-	}
-}
-
 
 /*
  * 2PC processing routine for COMMIT PREPARED case.

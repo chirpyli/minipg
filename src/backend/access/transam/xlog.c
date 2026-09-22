@@ -177,9 +177,6 @@ TimeLineID	ThisTimeLineID = 0;
  */
 bool		InRecovery = false;
 
-/* Are we in Hot Standby mode? Only valid in startup process, see xlog.h */
-HotStandbyState standbyState = STANDBY_DISABLED;
-
 static XLogRecPtr LastRec;
 
 /* Local copy of WalRcv->flushedUpto (used by recovery) */
@@ -882,8 +879,6 @@ static bool holdingAllLocks = false;
 static MemoryContext walDebugCxt = NULL;
 #endif
 
-static void readRecoverySignalFile(void);
-static void validateRecoveryParameters(void);
 static void exitArchiveRecovery(TimeLineID endTLI, XLogRecPtr endOfLog);
 static bool recoveryStopsBefore(XLogReaderState *record);
 static bool recoveryStopsAfter(XLogReaderState *record);
@@ -1151,8 +1146,6 @@ XLogInsertRecord(XLogRecData *rdata,
 	 * Done! Let others know that we're finished.
 	 */
 	WALInsertLockRelease();
-
-	MarkCurrentTransactionIdLoggedIfAny();
 
 	END_CRIT_SECTION();
 
@@ -5186,175 +5179,6 @@ str_time(pg_time_t tnow)
 }
 
 /*
- * See if there are any recovery signal files and if so, set state for
- * recovery.
- *
- * See if there is a recovery command file (recovery.conf), and if so
- * throw an ERROR since as of PG12 we no longer recognize that.
- */
-static void
-readRecoverySignalFile(void)
-{
-	struct stat stat_buf;
-
-	if (IsBootstrapProcessingMode())
-		return;
-
-	/*
-	 * Check for old recovery API file: recovery.conf
-	 */
-	if (stat(RECOVERY_COMMAND_FILE, &stat_buf) == 0)
-		ereport(FATAL,
-				(errcode_for_file_access(),
-				 errmsg("using recovery command file \"%s\" is not supported",
-						RECOVERY_COMMAND_FILE)));
-
-	/*
-	 * Remove unused .done file, if present. Ignore if absent.
-	 */
-	unlink(RECOVERY_COMMAND_DONE);
-
-	/*
-	 * Check for recovery signal files and if found, fsync them since they
-	 * represent server state information.  We don't sweat too much about the
-	 * possibility of fsync failure, however.
-	 *
-	 * If present, standby signal file takes precedence. If neither is present
-	 * then we won't enter archive recovery.
-	 */
-	if (stat(STANDBY_SIGNAL_FILE, &stat_buf) == 0)
-	{
-		int			fd;
-
-		fd = BasicOpenFilePerm(STANDBY_SIGNAL_FILE, O_RDWR | PG_BINARY | get_sync_bit(sync_method),
-							   S_IRUSR | S_IWUSR);
-		if (fd >= 0)
-		{
-			(void) pg_fsync(fd);
-			close(fd);
-		}
-		standby_signal_file_found = true;
-	}
-	else if (stat(RECOVERY_SIGNAL_FILE, &stat_buf) == 0)
-	{
-		int			fd;
-
-		fd = BasicOpenFilePerm(RECOVERY_SIGNAL_FILE, O_RDWR | PG_BINARY | get_sync_bit(sync_method),
-							   S_IRUSR | S_IWUSR);
-		if (fd >= 0)
-		{
-			(void) pg_fsync(fd);
-			close(fd);
-		}
-		recovery_signal_file_found = true;
-	}
-
-	StandbyModeRequested = false;
-	ArchiveRecoveryRequested = false;
-	if (standby_signal_file_found)
-	{
-		StandbyModeRequested = true;
-		ArchiveRecoveryRequested = true;
-	}
-	else if (recovery_signal_file_found)
-	{
-		StandbyModeRequested = false;
-		ArchiveRecoveryRequested = true;
-	}
-	else
-		return;
-
-	/*
-	 * We don't support standby mode in standalone backends; that requires
-	 * other processes such as the WAL receiver to be alive.
-	 */
-	if (StandbyModeRequested && !IsUnderPostmaster)
-		ereport(FATAL,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("standby mode is not supported by single-user servers")));
-}
-
-static void
-validateRecoveryParameters(void)
-{
-	if (!ArchiveRecoveryRequested)
-		return;
-
-	/*
-	 * Check for compulsory parameters
-	 */
-	if (StandbyModeRequested)
-	{
-		if ((PrimaryConnInfo == NULL || strcmp(PrimaryConnInfo, "") == 0) &&
-			(recoveryRestoreCommand == NULL || strcmp(recoveryRestoreCommand, "") == 0))
-			ereport(WARNING,
-					(errmsg("specified neither primary_conninfo nor restore_command"),
-					 errhint("The database server will regularly poll the pg_wal subdirectory to check for files placed there.")));
-	}
-	else
-	{
-		if (recoveryRestoreCommand == NULL ||
-			strcmp(recoveryRestoreCommand, "") == 0)
-			ereport(FATAL,
-					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-					 errmsg("must specify restore_command when standby mode is not enabled")));
-	}
-
-	/*
-	 * Override any inconsistent requests. Note that this is a change of
-	 * behaviour in 9.5; prior to this we simply ignored a request to pause if
-	 * hot_standby = off, which was surprising behaviour.
-	 */
-	if (recoveryTargetAction == RECOVERY_TARGET_ACTION_PAUSE &&
-		!EnableHotStandby)
-		recoveryTargetAction = RECOVERY_TARGET_ACTION_SHUTDOWN;
-
-	/*
-	 * Final parsing of recovery_target_time string; see also
-	 * check_recovery_target_time().
-	 */
-	if (recoveryTarget == RECOVERY_TARGET_TIME)
-	{
-		recoveryTargetTime = DatumGetTimestampTz(DirectFunctionCall3(timestamptz_in,
-																	 CStringGetDatum(recovery_target_time_string),
-																	 ObjectIdGetDatum(InvalidOid),
-																	 Int32GetDatum(-1)));
-	}
-
-	/*
-	 * If user specified recovery_target_timeline, validate it or compute the
-	 * "latest" value.  We can't do this until after we've gotten the restore
-	 * command and set InArchiveRecovery, because we need to fetch timeline
-	 * history files from the archive.
-	 */
-	if (recoveryTargetTimeLineGoal == RECOVERY_TARGET_TIMELINE_NUMERIC)
-	{
-		TimeLineID	rtli = recoveryTargetTLIRequested;
-
-		/* Timeline 1 does not have a history file, all else should */
-		if (rtli != 1 && !existsTimeLineHistory(rtli))
-			ereport(FATAL,
-					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-					 errmsg("recovery target timeline %u does not exist",
-							rtli)));
-		recoveryTargetTLI = rtli;
-	}
-	else if (recoveryTargetTimeLineGoal == RECOVERY_TARGET_TIMELINE_LATEST)
-	{
-		/* We start the "latest" search from pg_control's timeline */
-		recoveryTargetTLI = findNewestTimeLine(recoveryTargetTLI);
-	}
-	else
-	{
-		/*
-		 * else we just use the recoveryTargetTLI as already read from
-		 * ControlFile
-		 */
-		Assert(recoveryTargetTimeLineGoal == RECOVERY_TARGET_TIMELINE_CONTROLFILE);
-	}
-}
-
-/*
  * Exit archive-recovery state
  */
 static void
@@ -6338,12 +6162,6 @@ StartupXLOG(void)
 	else
 		recoveryTargetTLI = ControlFile->checkPointCopy.ThisTimeLineID;
 
-	/*
-	 * Check for signal files, and if so set up state for offline recovery
-	 */
-	readRecoverySignalFile();
-	validateRecoveryParameters();
-
 	if (ArchiveRecoveryRequested)
 	{
 		if (StandbyModeRequested)
@@ -6909,72 +6727,6 @@ StartupXLOG(void)
 		 */
 		DeleteAllExportedSnapshotFiles();
 
-		/*
-		 * Initialize for Hot Standby, if enabled. We won't let backends in
-		 * yet, not until we've reached the min recovery point specified in
-		 * control file and we've established a recovery snapshot from a
-		 * running-xacts WAL record.
-		 */
-		if (ArchiveRecoveryRequested && EnableHotStandby)
-		{
-			TransactionId *xids;
-			int			nxids;
-
-			ereport(DEBUG1,
-					(errmsg_internal("initializing for hot standby")));
-
-			InitRecoveryTransactionEnvironment();
-
-			if (wasShutdown)
-				oldestActiveXID = PrescanPreparedTransactions(&xids, &nxids);
-			else
-				oldestActiveXID = checkPoint.oldestActiveXid;
-			Assert(TransactionIdIsValid(oldestActiveXID));
-
-			/* Tell procarray about the range of xids it has to deal with */
-			ProcArrayInitRecovery(XidFromFullTransactionId(ShmemVariableCache->nextXid));
-
-			/*
-			 * Startup subtrans only.  CLOG, MultiXact and commit timestamp
-			 * have already been started up and other SLRUs are not maintained
-			 * during recovery and need not be started yet.
-			 */
-			StartupSUBTRANS(oldestActiveXID);
-
-			/*
-			 * If we're beginning at a shutdown checkpoint, we know that
-			 * nothing was running on the primary at this point. So fake-up an
-			 * empty running-xacts record and use that here and now. Recover
-			 * additional standby state for prepared transactions.
-			 */
-			if (wasShutdown)
-			{
-				RunningTransactionsData running;
-				TransactionId latestCompletedXid;
-
-				/* Update pg_subtrans entries for any prepared transactions */
-				StandbyRecoverPreparedTransactions();
-
-				/*
-				 * Construct a RunningTransactions snapshot representing a
-				 * shut down server, with only prepared transactions still
-				 * alive. We're never overflowed at this point because all
-				 * subxids are listed with their parent prepared transactions.
-				 */
-				running.xcnt = nxids;
-				running.subxcnt = 0;
-				running.subxid_status = SUBXIDS_IN_SUBTRANS;
-				running.nextXid = XidFromFullTransactionId(checkPoint.nextXid);
-				running.oldestRunningXid = oldestActiveXID;
-				latestCompletedXid = XidFromFullTransactionId(checkPoint.nextXid);
-				TransactionIdRetreat(latestCompletedXid);
-				Assert(TransactionIdIsNormal(latestCompletedXid));
-				running.latestCompletedXid = latestCompletedXid;
-				running.xids = xids;
-
-				ProcArrayApplyRecoveryInfo(&running);
-			}
-		}
 
 		/* Initialize resource managers */
 		for (rmid = 0; rmid <= RM_MAX_ID; rmid++)
@@ -7003,26 +6755,6 @@ StartupXLOG(void)
 
 		/* Also ensure XLogReceiptTime has a sane value */
 		XLogReceiptTime = GetCurrentTimestamp();
-
-		/*
-		 * Let postmaster know we've started redo now, so that it can launch
-		 * checkpointer to perform restartpoints.  We don't bother during
-		 * crash recovery as restartpoints can only be performed during
-		 * archive recovery.  And we'd like to keep crash recovery simple, to
-		 * avoid introducing bugs that could affect you when recovering after
-		 * crash.
-		 *
-		 * After this point, we can no longer assume that we're the only
-		 * process in addition to postmaster!  Also, fsync requests are
-		 * subsequently to be handled by the checkpointer, not locally.
-		 */
-		if (ArchiveRecoveryRequested && IsUnderPostmaster)
-		{
-			PublishStartupProcessInformation();
-			EnableSyncRequestForwarding();
-			SendPostmasterSignal(PMSIGNAL_RECOVERY_STARTED);
-			bgwriterLaunched = true;
-		}
 
 		/*
 		 * Allow read-only connections immediately if we're consistent
@@ -7195,14 +6927,6 @@ StartupXLOG(void)
 				XLogCtl->replayEndRecPtr = EndRecPtr;
 				XLogCtl->replayEndTLI = ThisTimeLineID;
 				SpinLockRelease(&XLogCtl->info_lck);
-
-				/*
-				 * If we are attempting to enter Hot Standby mode, process
-				 * XIDs we see
-				 */
-				if (standbyState >= STANDBY_INITIALIZED &&
-					TransactionIdIsValid(record->xl_xid))
-					RecordKnownAssignedTransactionIds(record->xl_xid);
 
 				/* Now apply the WAL record itself */
 				RmgrTable[record->xl_rmid].rm_redo(xlogreader);
@@ -7701,11 +7425,10 @@ StartupXLOG(void)
 	LWLockRelease(ProcArrayLock);
 
 	/*
-	 * Start up subtrans, if not already done for hot standby.  (commit
-	 * timestamps are started below, if necessary.)
+	 * Start up subtrans.  (commit timestamps are started below, if
+	 * necessary.)
 	 */
-	if (standbyState == STANDBY_DISABLED)
-		StartupSUBTRANS(oldestActiveXID);
+	StartupSUBTRANS(oldestActiveXID);
 
 	/*
 	 * Perform end of recovery actions for any SLRUs that need it.
@@ -7822,9 +7545,6 @@ StartupXLOG(void)
 	 * particularly critical for prepared 2PC transactions, that would still
 	 * need to be included in snapshots once recovery has ended.
 	 */
-	if (standbyState != STANDBY_DISABLED)
-		ShutdownRecoveryTransactionEnvironment();
-
 	/*
 	 * If this was a promotion, request an (online) checkpoint now. This isn't
 	 * required for consistency, but the last restartpoint might be far back,
@@ -7911,24 +7631,6 @@ CheckRecoveryConsistency(void)
 						LSN_FORMAT_ARGS(lastReplayedEndRecPtr))));
 	}
 
-	/*
-	 * Have we got a valid starting snapshot that will allow queries to be
-	 * run? If so, we can tell postmaster that the database is consistent now,
-	 * enabling connections.
-	 */
-	if (standbyState == STANDBY_SNAPSHOT_READY &&
-		!LocalHotStandbyActive &&
-		reachedConsistency &&
-		IsUnderPostmaster)
-	{
-		SpinLockAcquire(&XLogCtl->info_lck);
-		XLogCtl->SharedHotStandbyActive = true;
-		SpinLockRelease(&XLogCtl->info_lck);
-
-		LocalHotStandbyActive = true;
-
-		SendPostmasterSignal(PMSIGNAL_BEGIN_HOT_STANDBY);
-	}
 }
 
 /*
@@ -8599,11 +8301,10 @@ CreateCheckPoint(int flags)
 	checkPoint.time = (pg_time_t) time(NULL);
 
 	/*
-	 * For Hot Standby, derive the oldestActiveXid before we fix the redo
-	 * pointer. This allows us to begin accumulating changes to assemble our
-	 * starting snapshot of locks and transactions.
+	 * Derive the oldestActiveXid before we fix the redo pointer, so that
+	 * recovery can initialize the subtransaction SLRU from a valid XID.
 	 */
-	if (!shutdown && XLogStandbyInfoActive())
+	if (!shutdown)
 		checkPoint.oldestActiveXid = GetOldestActiveTransactionId();
 	else
 		checkPoint.oldestActiveXid = InvalidTransactionId;
@@ -8803,17 +8504,6 @@ CreateCheckPoint(int flags)
 		} while (HaveVirtualXIDsDelayingChkptEnd(vxids, nvxids));
 	}
 	pfree(vxids);
-
-	/*
-	 * Take a snapshot of running transactions and write this to WAL. This
-	 * allows us to reconstruct the state of running transactions during
-	 * archive recovery, if required. Skip, if this info disabled.
-	 *
-	 * If we are shutting down, or Startup process is completing crash
-	 * recovery we don't need to write running xact data.
-	 */
-	if (!shutdown && XLogStandbyInfoActive())
-		LogStandbySnapshot();
 
 	START_CRIT_SECTION();
 
@@ -9538,8 +9228,7 @@ XLogReportParameters(void)
 }
 
 /*
- * Update full_page_writes in shared memory, and write an
- * XLOG_FPW_CHANGE record if necessary.
+ * Update full_page_writes in shared memory.
  *
  * Note: this function assumes there is no other process running
  * concurrently that could update it.
@@ -9548,7 +9237,6 @@ void
 UpdateFullPageWrites(void)
 {
 	XLogCtlInsert *Insert = &XLogCtl->Insert;
-	bool		recoveryInProgress;
 
 	/*
 	 * Do nothing if full_page_writes has not been changed.
@@ -9560,47 +9248,12 @@ UpdateFullPageWrites(void)
 	if (fullPageWrites == Insert->fullPageWrites)
 		return;
 
-	/*
-	 * Perform this outside critical section so that the WAL insert
-	 * initialization done by RecoveryInProgress() doesn't trigger an
-	 * assertion failure.
-	 */
-	recoveryInProgress = RecoveryInProgress();
-
 	START_CRIT_SECTION();
 
-	/*
-	 * It's always safe to take full page images, even when not strictly
-	 * required, but not the other round. So if we're setting full_page_writes
-	 * to true, first set it true and then write the WAL record. If we're
-	 * setting it to false, first write the WAL record and then set the global
-	 * flag.
-	 */
-	if (fullPageWrites)
-	{
-		WALInsertLockAcquireExclusive();
-		Insert->fullPageWrites = true;
-		WALInsertLockRelease();
-	}
+	WALInsertLockAcquireExclusive();
+	Insert->fullPageWrites = fullPageWrites;
+	WALInsertLockRelease();
 
-	/*
-	 * Write an XLOG_FPW_CHANGE record. This allows us to keep track of
-	 * full_page_writes during archive recovery, if required.
-	 */
-	if (XLogStandbyInfoActive() && !recoveryInProgress)
-	{
-		XLogBeginInsert();
-		XLogRegisterData((char *) (&fullPageWrites), sizeof(bool));
-
-		XLogInsert(RM_XLOG_ID, XLOG_FPW_CHANGE);
-	}
-
-	if (!fullPageWrites)
-	{
-		WALInsertLockAcquireExclusive();
-		Insert->fullPageWrites = false;
-		WALInsertLockRelease();
-	}
 	END_CRIT_SECTION();
 }
 
@@ -9706,45 +9359,6 @@ xlog_redo(XLogReaderState *record)
 		 * redo an xl_clog_truncate if it changed since initialization.
 		 */
 		SetTransactionIdLimit(checkPoint.oldestXid, checkPoint.oldestXidDB);
-
-		/*
-		 * If we see a shutdown checkpoint, we know that nothing was running
-		 * on the primary at this point. So fake-up an empty running-xacts
-		 * record and use that here and now. Recover additional standby state
-		 * for prepared transactions.
-		 */
-		if (standbyState >= STANDBY_INITIALIZED)
-		{
-			TransactionId *xids;
-			int			nxids;
-			TransactionId oldestActiveXID;
-			TransactionId latestCompletedXid;
-			RunningTransactionsData running;
-
-			oldestActiveXID = PrescanPreparedTransactions(&xids, &nxids);
-
-			/* Update pg_subtrans entries for any prepared transactions */
-			StandbyRecoverPreparedTransactions();
-
-			/*
-			 * Construct a RunningTransactions snapshot representing a shut
-			 * down server, with only prepared transactions still alive. We're
-			 * never overflowed at this point because all subxids are listed
-			 * with their parent prepared transactions.
-			 */
-			running.xcnt = nxids;
-			running.subxcnt = 0;
-			running.subxid_status = SUBXIDS_IN_SUBTRANS;
-			running.nextXid = XidFromFullTransactionId(checkPoint.nextXid);
-			running.oldestRunningXid = oldestActiveXID;
-			latestCompletedXid = XidFromFullTransactionId(checkPoint.nextXid);
-			TransactionIdRetreat(latestCompletedXid);
-			Assert(TransactionIdIsNormal(latestCompletedXid));
-			running.latestCompletedXid = latestCompletedXid;
-			running.xids = xids;
-
-			ProcArrayApplyRecoveryInfo(&running);
-		}
 
 		/* ControlFile->checkPointCopy always tracks the latest ckpt XID */
 		LWLockAcquire(ControlFileLock, LW_EXCLUSIVE);
@@ -11951,9 +11565,6 @@ WaitForWALToBecomeAvailable(XLogRecPtr RecPtr, bool randAccess,
 
 						wait_time = wal_retrieve_retry_interval -
 							TimestampDifferenceMilliseconds(last_fail_time, now);
-
-						/* Do background tasks that might benefit us later. */
-						KnownAssignedTransactionIdsIdleMaintenance();
 
 						(void) WaitLatch(&XLogCtl->recoveryWakeupLatch,
 										 WL_LATCH_SET | WL_TIMEOUT |

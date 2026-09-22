@@ -30,7 +30,7 @@ typedef uint8 TwoPhaseRmgrId;
 extern const TwoPhaseCallback twophase_recover_callbacks[];
 extern const TwoPhaseCallback twophase_postcommit_callbacks[];
 extern const TwoPhaseCallback twophase_postabort_callbacks[];
-extern const TwoPhaseCallback twophase_standby_recover_callbacks[];
+
 
 
 extern void RegisterTwoPhaseRecord(TwoPhaseRmgrId rmid, uint16 info,

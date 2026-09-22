@@ -1369,24 +1369,8 @@ dbase_redo(XLogReaderState *record)
 		char	   *dst_path;
 		int			i;
 
-		if (InHotStandby)
-		{
-			/*
-			 * Lock database while we resolve conflicts to ensure that
-			 * InitPostgres() cannot fully re-execute concurrently. This
-			 * avoids backends re-connecting automatically to same database,
-			 * which can happen in some cases.
-			 *
-			 * This will lock out walsenders trying to connect to db-specific
-			 * slots for logical decoding too, so it's safe for us to drop
-			 * slots.
-			 */
-			LockSharedObjectForSession(DatabaseRelationId, xlrec->db_id, 0, AccessExclusiveLock);
-			ResolveRecoveryConflictWithDatabase(xlrec->db_id);
-			}
-
-			/* Drop pages for this database that are in the shared buffer cache */
-			DropDatabaseBuffers(xlrec->db_id);
+		/* Drop pages for this database that are in the shared buffer cache */
+		DropDatabaseBuffers(xlrec->db_id);
 
 		/* Also, clean out any fsync requests that might be pending in md.c */
 		ForgetDatabaseSyncRequests(xlrec->db_id);
@@ -1406,17 +1390,6 @@ dbase_redo(XLogReaderState *record)
 			pfree(dst_path);
 		}
 
-		if (InHotStandby)
-		{
-			/*
-			 * Release locks prior to commit. XXX There is a race condition
-			 * here that may allow backends to reconnect, but the window for
-			 * this is small because the gap between here and commit is mostly
-			 * fairly small and it is unlikely that people will be dropping
-			 * databases that we are trying to connect to anyway.
-			 */
-			UnlockSharedObjectForSession(DatabaseRelationId, xlrec->db_id, 0, AccessExclusiveLock);
-		}
 	}
 	else
 		elog(PANIC, "dbase_redo: unknown op code %u", info);

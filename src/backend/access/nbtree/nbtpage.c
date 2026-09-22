@@ -38,8 +38,6 @@
 #include "utils/snapmgr.h"
 
 static BTMetaPageData *_bt_getmeta(Relation rel, Buffer metabuf);
-static void _bt_log_reuse_page(Relation rel, BlockNumber blkno,
-							   FullTransactionId safexid);
 static void _bt_delitems_delete(Relation rel, Buffer buf,
 								TransactionId latestRemovedXid,
 								OffsetNumber *deletable, int ndeletable,
@@ -822,31 +820,6 @@ _bt_checkpage(Relation rel, Buffer buf)
 }
 
 /*
- * Log the reuse of a page from the FSM.
- */
-static void
-_bt_log_reuse_page(Relation rel, BlockNumber blkno, FullTransactionId safexid)
-{
-	xl_btree_reuse_page xlrec_reuse;
-
-	/*
-	 * Note that we don't register the buffer with the record, because this
-	 * operation doesn't modify the page. This record only exists to provide a
-	 * conflict point for Hot Standby.
-	 */
-
-	/* XLOG stuff */
-	xlrec_reuse.node = rel->rd_node;
-	xlrec_reuse.block = blkno;
-	xlrec_reuse.latestRemovedFullXid = safexid;
-
-	XLogBeginInsert();
-	XLogRegisterData((char *) &xlrec_reuse, SizeOfBtreeReusePage);
-
-	XLogInsert(RM_BTREE_ID, XLOG_BTREE_REUSE_PAGE);
-}
-
-/*
  *	_bt_getbuf() -- Get a buffer by block number for read or write.
  *
  *		blkno == P_NEW means to get an unallocated index page.  The page
@@ -936,16 +909,6 @@ _bt_getbuf(Relation rel, BlockNumber blkno, int access)
 
 				if (BTPageIsRecyclable(page))
 				{
-					/*
-					 * If we are generating WAL for Hot Standby then create a
-					 * WAL record that will allow us to conflict with queries
-					 * running on standby, in case they have snapshots older
-					 * than safexid value
-					 */
-					if (XLogStandbyInfoActive() && RelationNeedsWAL(rel))
-						_bt_log_reuse_page(rel, blkno,
-										   BTPageGetDeleteXid(page));
-
 					/* Okay to use page.  Re-initialize and return it. */
 					_bt_pageinit(page, BufferGetPageSize(buf));
 					return buf;
@@ -1538,7 +1501,7 @@ _bt_delitems_delete_check(Relation rel, Buffer buf, Relation heapRel,
 	latestRemovedXid = table_index_delete_tuples(heapRel, delstate);
 
 	/* Should not WAL-log latestRemovedXid unless it's required */
-	if (!XLogStandbyInfoActive() || !RelationNeedsWAL(rel))
+	if (!RelationNeedsWAL(rel))
 		latestRemovedXid = InvalidTransactionId;
 
 	/*

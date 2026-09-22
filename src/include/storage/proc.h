@@ -112,8 +112,8 @@ typedef enum
  * 中的信号量（semaphore）和锁活动相关字段未被使用，但它的 myProcLocks[] 链表
  * 是有效的。
  *
- * 我们允许在没有锁的情况下访问该结构体的许多字段，例如 delayChkpt 和
- * recoveryConflictPending。但是请注意，写入那些被镜像的字段（见下文）需要至少以
+ * 我们允许在没有锁的情况下访问该结构体的许多字段，例如 delayChkpt。
+ * 但是请注意，写入那些被镜像的字段（见下文）需要至少以
  * 共享模式持有 ProcArrayLock 或 XidGenLock，以免 pgxactoff 被并发地修改。
  *
  * 镜像字段（Mirrored fields）：
@@ -161,13 +161,6 @@ struct PGPROC
 	BackendId	backendId;		/* This backend's backend ID (if assigned) */
 	Oid			databaseId;		/* OID of database this backend is using */
 	Oid			roleId;			/* OID of role using this backend */
-
-	/*
-	 * While in hot standby mode, shows that a conflict signal has been sent
-	 * for the current transaction. Set/cleared while holding ProcArrayLock,
-	 * though not required. Accessed without lock, if needed.
-	 */
-	bool		recoveryConflictPending;
 
 	/* Info about LWLock the process is currently waiting for, if any. */
 	uint8		lwWaiting;		/* see LWLockWaitState */
@@ -345,8 +338,6 @@ typedef struct PROC_HDR
 	/* The proc of the Startup process, since not in ProcArray */
 	PGPROC	   *startupProc;
 	int			startupProcPid;
-	/* Buffer id of the buffer that Startup process waits for pin on, or -1 */
-	int			startupBufferPinWaitBufId;
 } PROC_HDR;
 
 extern PGDLLIMPORT PROC_HDR *ProcGlobal;
@@ -385,8 +376,6 @@ extern void InitProcessPhase2(void);
 extern void InitAuxiliaryProcess(void);
 
 extern void PublishStartupProcessInformation(void);
-extern void SetStartupBufferPinWaitBufId(int bufid);
-extern int	GetStartupBufferPinWaitBufId(void);
 
 extern void ProcReleaseLocks(bool isCommit);
 
@@ -395,7 +384,6 @@ extern ProcWaitStatus ProcSleep(LOCALLOCK *locallock, LockMethod lockMethodTable
 extern PGPROC *ProcWakeup(PGPROC *proc, ProcWaitStatus waitStatus);
 extern void ProcLockWakeup(LockMethod lockMethodTable, LOCK *lock);
 extern void CheckDeadLockAlert(void);
-extern bool IsWaitingForLock(void);
 extern void LockErrorCleanup(void);
 
 extern void ProcWaitForSignal(uint32 wait_event_info);

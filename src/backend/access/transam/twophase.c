@@ -2070,14 +2070,6 @@ RecoverPreparedTransactions(void)
 		ProcessRecords(bufptr, xid, twophase_recover_callbacks);
 
 		/*
-		 * Release locks held by the standby process after we process each
-		 * prepared transaction. As a result, we don't need too many
-		 * additional locks at any one time.
-		 */
-		if (InHotStandby)
-			StandbyReleaseLockTree(xid, hdr->nsubxacts, subxids);
-
-		/*
 		 * We're done with recovering this transaction. Clear MyLockedGxact,
 		 * like we do in PrepareTransaction() during normal operation.
 		 */
