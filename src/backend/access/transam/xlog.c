@@ -10626,31 +10626,6 @@ emode_for_corrupt_record(int emode, XLogRecPtr RecPtr)
 }
 
 /*
- * Has a standby promotion already been triggered?
- *
- * Unlike CheckForStandbyTrigger(), this works in any process
- * that's connected to shared memory.
- */
-bool
-PromoteIsTriggered(void)
-{
-	/*
-	 * We check shared state each time only until a standby promotion is
-	 * triggered. We can't trigger a promotion again, so there's no need to
-	 * keep checking after the shared variable has once been seen true.
-	 */
-	if (LocalPromoteIsTriggered)
-		return true;
-
-	SpinLockAcquire(&XLogCtl->info_lck);
-	LocalPromoteIsTriggered = XLogCtl->SharedPromoteIsTriggered;
-	SpinLockRelease(&XLogCtl->info_lck);
-
-	return LocalPromoteIsTriggered;
-}
-
-
-/*
  * Wake up startup process to replay newly arrived WAL, or to notice that
  * failover has been requested.
  */
