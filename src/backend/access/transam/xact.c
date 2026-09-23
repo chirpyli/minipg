@@ -23,7 +23,6 @@
 #include "access/multixact.h"
 #include "access/subtrans.h"
 #include "access/transam.h"
-#include "access/twophase.h"
 #include "access/xact.h"
 #include "access/xlog.h"
 #include "access/xloginsert.h"
@@ -108,8 +107,7 @@ typedef enum TransState
 	TRANS_START,				/* transaction starting */
 	TRANS_INPROGRESS,			/* inside a valid transaction */
 	TRANS_COMMIT,				/* commit in progress */
-	TRANS_ABORT,				/* abort in progress */
-	TRANS_PREPARE				/* prepare in progress */
+	TRANS_ABORT					/* abort in progress */
 } TransState;
 
 /*
@@ -132,7 +130,6 @@ typedef enum TBlockState
 	TBLOCK_ABORT,				/* failed xact, awaiting ROLLBACK */
 	TBLOCK_ABORT_END,			/* failed xact, ROLLBACK received */
 	TBLOCK_ABORT_PENDING,		/* live xact, ROLLBACK received */
-	TBLOCK_PREPARE,				/* live xact, PREPARE received */
 
 	/* subtransaction states */
 	TBLOCK_SUBBEGIN,			/* starting a subtransaction */
@@ -207,12 +204,6 @@ static TimestampTz stmtStartTimestamp;
 static TimestampTz xactStopTimestamp;
 
 /*
- * GID to be used for preparing the current transaction.  This is also
- * global to a whole transaction, so we don't keep it in the state stack.
- */
-static char *prepareGID;
-
-/*
  * Some commands want to force synchronous commit.
  */
 static bool forceSyncCommit = false;
@@ -279,10 +270,10 @@ IsTransactionState(void)
 
 	/*
 	 * TRANS_DEFAULT and TRANS_ABORT are obviously unsafe states.  However, we
-	 * also reject the startup/shutdown states TRANS_START, TRANS_COMMIT,
-	 * TRANS_PREPARE since it might be too soon or too late within those
-	 * transition states to do anything interesting.  Hence, the only "valid"
-	 * state is TRANS_INPROGRESS.
+	 * also reject the startup/shutdown states TRANS_START, TRANS_COMMIT
+	 * since it might be too soon or too late within those transition states
+	 * to do anything interesting.  Hence, the only "valid" state is
+	 * TRANS_INPROGRESS.
 	 */
 	return (s->state == TRANS_INPROGRESS);
 }
@@ -1004,9 +995,7 @@ RecordTransactionCommit(void)
 		XactLogCommitRecord(xactStopTimestamp,
 							nchildren, children, nrels, rels,
 							0, NULL,
-							false,
-							MyXactFlags,
-							InvalidTransactionId, NULL /* plain commit */ );
+							false);
 	}
 
 	/*
@@ -1327,9 +1316,7 @@ RecordTransactionAbort(bool isSubXact)
 
 	XactLogAbortRecord(xact_time,
 					   nchildren, children,
-					   nrels, rels,
-					   MyXactFlags, InvalidTransactionId,
-					   NULL);
+					   nrels, rels);
 
 	/*
 	 * Report the latest async abort LSN, so that the WAL writer knows to
@@ -1666,8 +1653,6 @@ StartTransaction(void)
 
 /*
  *	CommitTransaction
- *
- * NB: if you change this routine, better look at PrepareTransaction too!
  */
 static void
 CommitTransaction(void)
@@ -1837,225 +1822,6 @@ CommitTransaction(void)
 }
 
 /*
- *	PrepareTransaction
- *
- * NB: if you change this routine, better look at CommitTransaction too!
- */
-static void
-PrepareTransaction(void)
-{
-	TransactionState s = CurrentTransactionState;
-	TransactionId xid = GetCurrentTransactionId();
-	GlobalTransaction gxact;
-	TimestampTz prepared_at;
-
-	ShowTransactionState("PrepareTransaction");
-
-	/*
-	 * check the current transaction state
-	 */
-	if (s->state != TRANS_INPROGRESS)
-		elog(WARNING, "PrepareTransaction while in %s state",
-			 TransStateAsString(s->state));
-	Assert(s->parent == NULL);
-
-	/*
-	 * Do pre-commit processing that involves closing open portals
-	 * (converting holdable ones into static portals).
-	 */
-	PreCommit_Portals(true);
-
-
-	/*
-	 * The remaining actions cannot call any user-defined code, so it's safe
-	 * to start shutting down within-transaction services.  But note that most
-	 * of this stuff could still throw an error, which would switch us into
-	 * the transaction-abort path.
-	 */
-
-	/*
-	 * Synchronize files that are created and not WAL-logged during this
-	 * transaction. This must happen before EndPrepare(), so that we don't see
-	 * committed-but-broken files after a crash and COMMIT PREPARED.
-	 */
-	smgrDoPendingSyncs(true);
-
-	/*
-	 * Mark serializable transaction as complete for predicate locking
-	 * purposes.  This should be done as late as we can put it and still allow
-	 * errors to be raised for failure patterns found at commit.
-	 */
-	PreCommit_CheckForSerializationFailure();
-
-	/*
-	 * Likewise, don't allow PREPARE after pg_export_snapshot.  This could be
-	 * supported if we added cleanup logic to twophase.c, but for now it
-	 * doesn't seem worth the trouble.
-	 */
-	if (XactHasExportedSnapshots())
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot PREPARE a transaction that has exported snapshots")));
-
-	/* Prevent cancel/die interrupt while cleaning up */
-	HOLD_INTERRUPTS();
-
-	/*
-	 * set the current transaction state information appropriately during
-	 * prepare processing
-	 */
-	s->state = TRANS_PREPARE;
-
-	prepared_at = GetCurrentTimestamp();
-
-	/* Tell bufmgr and smgr to prepare for commit */
-	BufmgrCommit();
-
-	/*
-	 * Reserve the GID for this transaction. This could fail if the requested
-	 * GID is invalid or already in use.
-	 */
-	gxact = MarkAsPreparing(xid, prepareGID, prepared_at,
-							GetUserId(), MyDatabaseId);
-	prepareGID = NULL;
-
-	/*
-	 * Collect data for the 2PC state file.  Note that in general, no actual
-	 * state change should happen in the called modules during this step,
-	 * since it's still possible to fail before commit, and in that case we
-	 * want transaction abort to be able to clean up.  (In particular, the
-	 * AtPrepare routines may error out if they find cases they cannot
-	 * handle.)  State cleanup should happen in the PostPrepare routines
-	 * below.  However, some modules can go ahead and clear state here because
-	 * they wouldn't do anything with it during abort anyway.
-	 *
-	 * Note: because the 2PC state file records will be replayed in the same
-	 * order they are made, the order of these calls has to match the order in
-	 * which we want things to happen during COMMIT PREPARED or ROLLBACK
-	 * PREPARED; in particular, pay attention to whether things should happen
-	 * before or after releasing the transaction's locks.
-	 */
-	StartPrepare(gxact);
-
-	AtPrepare_Locks();
-	AtPrepare_PredicateLocks();
-	AtPrepare_MultiXact();
-	AtPrepare_RelationMap();
-
-	/*
-	 * Here is where we really truly prepare.
-	 *
-	 * We have to record transaction prepares even if we didn't make any
-	 * updates, because the transaction manager might get confused if we lose
-	 * a global transaction.
-	 */
-	EndPrepare(gxact);
-
-	/*
-	 * Now we clean up backend-internal state and release internal resources.
-	 */
-
-	/* Reset XactLastRecEnd until the next transaction writes something */
-	XactLastRecEnd = 0;
-
-	/*
-	 * Transfer our locks to a dummy PGPROC.  This has to be done before
-	 * ProcArrayClearTransaction().  Otherwise, a GetLockConflicts() would
-	 * conclude "xact already committed or aborted" for our locks.
-	 */
-	PostPrepare_Locks(xid);
-
-	/*
-	 * Let others know about no transaction in progress by me.  This has to be
-	 * done *after* the prepared transaction has been marked valid, else
-	 * someone may think it is unlocked and recyclable.
-	 */
-	ProcArrayClearTransaction(MyProc);
-
-	/*
-	 * In normal commit-processing, this is all non-critical post-transaction
-	 * cleanup.  When the transaction is prepared, however, it's important
-	 * that the locks and other per-backend resources are transferred to the
-	 * prepared transaction's PGPROC entry.  Note that if an error is raised
-	 * here, it's too late to abort the transaction. XXX: This probably should
-	 * be in a critical section, to force a PANIC if any of this fails, but
-	 * that cure could be worse than the disease.
-	 */
-
-
-	ResourceOwnerRelease(TopTransactionResourceOwner,
-						 RESOURCE_RELEASE_BEFORE_LOCKS,
-						 true, true);
-
-	/* Check we've released all buffer pins */
-	AtEOXact_Buffers(true);
-
-	/* Clean up the relation cache */
-	AtEOXact_RelationCache(true);
-
-	/* notify doesn't need a postprepare call */
-
-
-	PostPrepare_Inval();
-
-	PostPrepare_smgr();
-
-	PostPrepare_MultiXact(xid);
-
-	PostPrepare_PredicateLocks(xid);
-
-	ResourceOwnerRelease(TopTransactionResourceOwner,
-						 RESOURCE_RELEASE_LOCKS,
-						 true, true);
-	ResourceOwnerRelease(TopTransactionResourceOwner,
-						 RESOURCE_RELEASE_AFTER_LOCKS,
-						 true, true);
-
-	/*
-	 * Allow another backend to finish the transaction.  After
-	 * PostPrepare_Twophase(), the transaction is completely detached from our
-	 * backend.  The rest is just non-critical cleanup of backend-local state.
-	 */
-	PostPrepare_Twophase();
-
-	/* PREPARE acts the same as COMMIT as far as GUC is concerned */
-	AtEOXact_GUC(true, 1);
-	AtEOXact_Namespace(true);
-	AtEOXact_SMgr();
-	AtEOXact_Files(true);
-	AtEOXact_ComboCid();
-	AtEOXact_HashTables(true);
-	AtEOXact_Snapshot(true, true);
-	pgstat_report_xact_timestamp(0);
-
-	CurrentResourceOwner = NULL;
-	ResourceOwnerDelete(TopTransactionResourceOwner);
-	s->curTransactionOwner = NULL;
-	CurTransactionResourceOwner = NULL;
-	TopTransactionResourceOwner = NULL;
-
-	AtCommit_Memory();
-
-	s->fullTransactionId = InvalidFullTransactionId;
-	s->subTransactionId = InvalidSubTransactionId;
-	s->nestingLevel = 0;
-	s->gucNestLevel = 0;
-	s->childXids = NULL;
-	s->nChildXids = 0;
-	s->maxChildXids = 0;
-
-	XactTopFullTransactionId = InvalidFullTransactionId;
-
-	/*
-	 * done with 1st phase commit processing, set current transaction state
-	 * back to default
-	 */
-	s->state = TRANS_DEFAULT;
-
-	RESUME_INTERRUPTS();
-}
-
-/*
  *	AbortTransaction
  */
 static void
@@ -2117,7 +1883,7 @@ AbortTransaction(void)
 	/*
 	 * check the current transaction state
 	 */
-	if (s->state != TRANS_INPROGRESS && s->state != TRANS_PREPARE)
+	if (s->state != TRANS_INPROGRESS)
 		elog(WARNING, "AbortTransaction while in %s state",
 			 TransStateAsString(s->state));
 	Assert(s->parent == NULL);
@@ -2149,7 +1915,6 @@ AbortTransaction(void)
 	AtAbort_Portals();
 	smgrDoPendingSyncs(false);
 	AtEOXact_RelationMap(false);
-	AtAbort_Twophase();
 
 	/*
 	 * Advertise the fact that we aborted in pg_xact (assuming that we got as
@@ -2308,7 +2073,6 @@ StartTransactionCommand(void)
 		case TBLOCK_SUBABORT_PENDING:
 		case TBLOCK_SUBRESTART:
 		case TBLOCK_SUBABORT_RESTART:
-		case TBLOCK_PREPARE:
 			elog(ERROR, "StartTransactionCommand: unexpected state %s",
 				 BlockStateAsString(s->blockState));
 			break;
@@ -2412,15 +2176,6 @@ CommitTransactionCommand(void)
 			break;
 
 			/*
-			 * We are completing a "PREPARE TRANSACTION" command.  Do it and
-			 * return to the idle state.
-			 */
-		case TBLOCK_PREPARE:
-			PrepareTransaction();
-			s->blockState = TBLOCK_DEFAULT;
-			break;
-
-			/*
 			 * We were just issued a SAVEPOINT inside a transaction block.
 			 * Start a subtransaction.  (DefineSavepoint already did
 			 * PushTransaction, so as to have someplace to put the SUBBEGIN
@@ -2468,12 +2223,6 @@ CommitTransactionCommand(void)
 			{
 				Assert(s->parent == NULL);
 				CommitTransaction();
-				s->blockState = TBLOCK_DEFAULT;
-			}
-			else if (s->blockState == TBLOCK_PREPARE)
-			{
-				Assert(s->parent == NULL);
-				PrepareTransaction();
 				s->blockState = TBLOCK_DEFAULT;
 			}
 			else
@@ -2662,17 +2411,6 @@ AbortCurrentTransaction(void)
 			 * Abort, cleanup, go to idle state.
 			 */
 		case TBLOCK_ABORT_PENDING:
-			AbortTransaction();
-			CleanupTransaction();
-			s->blockState = TBLOCK_DEFAULT;
-			break;
-
-			/*
-			 * Here, we failed while trying to PREPARE.  Clean up the
-			 * transaction and return to idle state (we do not want to stay in
-			 * the transaction).
-			 */
-		case TBLOCK_PREPARE:
 			AbortTransaction();
 			CleanupTransaction();
 			s->blockState = TBLOCK_DEFAULT;
@@ -2953,63 +2691,10 @@ BeginTransactionBlock(void)
 		case TBLOCK_SUBABORT_PENDING:
 		case TBLOCK_SUBRESTART:
 		case TBLOCK_SUBABORT_RESTART:
-		case TBLOCK_PREPARE:
 			elog(FATAL, "BeginTransactionBlock: unexpected state %s",
 				 BlockStateAsString(s->blockState));
 			break;
 	}
-}
-
-/*
- *	PrepareTransactionBlock
- *		This executes a PREPARE command.
- *
- * Since PREPARE may actually do a ROLLBACK, the result indicates what
- * happened: true for PREPARE, false for ROLLBACK.
- *
- * Note that we don't actually do anything here except change blockState.
- * The real work will be done in the upcoming PrepareTransaction().
- * We do it this way because it's not convenient to change memory context,
- * resource owner, etc while executing inside a Portal.
- */
-bool
-PrepareTransactionBlock(const char *gid)
-{
-	TransactionState s;
-	bool		result;
-
-	/* Set up to commit the current transaction */
-	result = EndTransactionBlock();
-
-	/* If successful, change outer tblock state to PREPARE */
-	if (result)
-	{
-		s = CurrentTransactionState;
-
-		while (s->parent != NULL)
-			s = s->parent;
-
-		if (s->blockState == TBLOCK_END)
-		{
-			/* Save GID where PrepareTransaction can find it again */
-			prepareGID = MemoryContextStrdup(TopTransactionContext, gid);
-
-			s->blockState = TBLOCK_PREPARE;
-		}
-		else
-		{
-			/*
-			 * ignore case where we are not in a transaction;
-			 * EndTransactionBlock already issued a warning.
-			 */
-			Assert(s->blockState == TBLOCK_STARTED ||
-				   s->blockState == TBLOCK_IMPLICIT_INPROGRESS);
-			/* Don't send back a PREPARE result tag... */
-			result = false;
-		}
-	}
-
-	return result;
 }
 
 /*
@@ -3135,7 +2820,6 @@ EndTransactionBlock(void)
 		case TBLOCK_SUBABORT_PENDING:
 		case TBLOCK_SUBRESTART:
 		case TBLOCK_SUBABORT_RESTART:
-		case TBLOCK_PREPARE:
 			elog(FATAL, "EndTransactionBlock: unexpected state %s",
 				 BlockStateAsString(s->blockState));
 			break;
@@ -3239,7 +2923,6 @@ UserAbortTransactionBlock(void)
 		case TBLOCK_SUBABORT_PENDING:
 		case TBLOCK_SUBRESTART:
 		case TBLOCK_SUBABORT_RESTART:
-		case TBLOCK_PREPARE:
 			elog(FATAL, "UserAbortTransactionBlock: unexpected state %s",
 				 BlockStateAsString(s->blockState));
 			break;
@@ -3365,7 +3048,6 @@ DefineSavepoint(const char *name)
 		case TBLOCK_SUBABORT_PENDING:
 		case TBLOCK_SUBRESTART:
 		case TBLOCK_SUBABORT_RESTART:
-		case TBLOCK_PREPARE:
 			elog(FATAL, "DefineSavepoint: unexpected state %s",
 				 BlockStateAsString(s->blockState));
 			break;
@@ -3429,7 +3111,6 @@ ReleaseSavepoint(const char *name)
 		case TBLOCK_SUBABORT_PENDING:
 		case TBLOCK_SUBRESTART:
 		case TBLOCK_SUBABORT_RESTART:
-		case TBLOCK_PREPARE:
 			elog(FATAL, "ReleaseSavepoint: unexpected state %s",
 				 BlockStateAsString(s->blockState));
 			break;
@@ -3526,7 +3207,6 @@ RollbackToSavepoint(const char *name)
 		case TBLOCK_SUBABORT_PENDING:
 		case TBLOCK_SUBRESTART:
 		case TBLOCK_SUBABORT_RESTART:
-		case TBLOCK_PREPARE:
 			elog(FATAL, "RollbackToSavepoint: unexpected state %s",
 				 BlockStateAsString(s->blockState));
 			break;
@@ -3583,12 +3263,11 @@ RollbackToSavepoint(const char *name)
 /*
  * BeginInternalSubTransaction
  *		This is the same as DefineSavepoint except it allows TBLOCK_STARTED,
- *		TBLOCK_IMPLICIT_INPROGRESS, TBLOCK_END, and TBLOCK_PREPARE states,
- *		and therefore it can safely be used in functions that might be called
- *		when not inside a BEGIN block or when running deferred triggers at
- *		COMMIT/PREPARE time.  Also, it automatically does
- *		CommitTransactionCommand/StartTransactionCommand instead of expecting
- *		the caller to do it.
+ *		TBLOCK_IMPLICIT_INPROGRESS, and TBLOCK_END states, and therefore it
+ *		can safely be used in functions that might be called when not inside
+ *		a BEGIN block or when running deferred triggers at COMMIT time.  Also,
+ *		it automatically does CommitTransactionCommand/StartTransactionCommand
+ *		instead of expecting the caller to do it.
  */
 void
 BeginInternalSubTransaction(const char *name)
@@ -3601,7 +3280,6 @@ BeginInternalSubTransaction(const char *name)
 		case TBLOCK_INPROGRESS:
 		case TBLOCK_IMPLICIT_INPROGRESS:
 		case TBLOCK_END:
-		case TBLOCK_PREPARE:
 		case TBLOCK_SUBINPROGRESS:
 			/* Normal subtransaction start */
 			PushTransaction();
@@ -3706,7 +3384,6 @@ RollbackAndReleaseCurrentSubTransaction(void)
 		case TBLOCK_SUBABORT_PENDING:
 		case TBLOCK_SUBRESTART:
 		case TBLOCK_SUBABORT_RESTART:
-		case TBLOCK_PREPARE:
 			elog(FATAL, "RollbackAndReleaseCurrentSubTransaction: unexpected state %s",
 				 BlockStateAsString(s->blockState));
 			break;
@@ -3777,7 +3454,6 @@ AbortOutOfAnyTransaction(void)
 
 			case TBLOCK_END:
 			case TBLOCK_ABORT_PENDING:
-			case TBLOCK_PREPARE:
 				/* In a transaction, so clean up */
 				AbortTransaction();
 				CleanupTransaction();
@@ -3890,7 +3566,6 @@ TransactionBlockStatusCode(void)
 		case TBLOCK_END:
 		case TBLOCK_SUBRELEASE:
 		case TBLOCK_SUBCOMMIT:
-		case TBLOCK_PREPARE:
 			return 'T';			/* in transaction */
 		case TBLOCK_ABORT:
 		case TBLOCK_SUBABORT:
@@ -4395,8 +4070,6 @@ BlockStateAsString(TBlockState blockState)
 			return "ABORT_END";
 		case TBLOCK_ABORT_PENDING:
 			return "ABORT_PENDING";
-		case TBLOCK_PREPARE:
-			return "PREPARE";
 		case TBLOCK_SUBBEGIN:
 			return "SUBBEGIN";
 		case TBLOCK_SUBINPROGRESS:
@@ -4438,8 +4111,6 @@ TransStateAsString(TransState state)
 			return "COMMIT";
 		case TRANS_ABORT:
 			return "ABORT";
-		case TRANS_PREPARE:
-			return "PREPARE";
 	}
 	return "UNRECOGNIZED";
 }
@@ -4471,19 +4142,14 @@ xactGetCommittedChildren(TransactionId **ptr)
  */
 
 /*
- * Log the commit record for a plain or twophase transaction commit.
- *
- * A 2pc commit will be emitted when twophase_xid is valid, a plain one
- * otherwise.
+ * Log the commit record for a plain transaction commit.
  */
 XLogRecPtr
 XactLogCommitRecord(TimestampTz commit_time,
 					int nsubxacts, TransactionId *subxacts,
 					int nrels, RelFileNode *rels,
 					int nmsgs, SharedInvalidationMessage *msgs,
-					bool relcacheInval,
-					int xactflags, TransactionId twophase_xid,
-					const char *twophase_gid)
+					bool relcacheInval)
 {
 	xl_xact_commit xlrec;
 	xl_xact_xinfo xl_xinfo;
@@ -4491,18 +4157,13 @@ XactLogCommitRecord(TimestampTz commit_time,
 	xl_xact_subxacts xl_subxacts;
 	xl_xact_relfilenodes xl_relfilenodes;
 	xl_xact_invals xl_invals;
-	xl_xact_twophase xl_twophase;
 	uint8		info;
 
 	Assert(CritSectionCount > 0);
 
 	xl_xinfo.xinfo = 0;
 
-	/* decide between a plain and 2pc commit */
-	if (!TransactionIdIsValid(twophase_xid))
-		info = XLOG_XACT_COMMIT;
-	else
-		info = XLOG_XACT_COMMIT_PREPARED;
+	info = XLOG_XACT_COMMIT;
 
 	/* First figure out and collect all the information needed */
 
@@ -4512,8 +4173,6 @@ XactLogCommitRecord(TimestampTz commit_time,
 		xl_xinfo.xinfo |= XACT_COMPLETION_UPDATE_RELCACHE_FILE;
 	if (forceSyncCommit)
 		xl_xinfo.xinfo |= XACT_COMPLETION_FORCE_SYNC_COMMIT;
-	if ((xactflags & XACT_FLAGS_ACQUIREDACCESSEXCLUSIVELOCK))
-		xl_xinfo.xinfo |= XACT_XINFO_HAS_AE_LOCKS;
 
 	/*
 	 * Check if the caller would like to ask standbys for immediate feedback
@@ -4549,15 +4208,6 @@ XactLogCommitRecord(TimestampTz commit_time,
 	{
 		xl_xinfo.xinfo |= XACT_XINFO_HAS_INVALS;
 		xl_invals.nmsgs = nmsgs;
-	}
-
-	if (TransactionIdIsValid(twophase_xid))
-	{
-		xl_xinfo.xinfo |= XACT_XINFO_HAS_TWOPHASE;
-		xl_twophase.xid = twophase_xid;
-		Assert(twophase_gid != NULL);
-
-		xl_xinfo.xinfo |= XACT_XINFO_HAS_GID;
 	}
 
 	if (xl_xinfo.xinfo != 0)
@@ -4598,34 +4248,21 @@ XactLogCommitRecord(TimestampTz commit_time,
 						 nmsgs * sizeof(SharedInvalidationMessage));
 	}
 
-	if (xl_xinfo.xinfo & XACT_XINFO_HAS_TWOPHASE)
-	{
-		XLogRegisterData((char *) (&xl_twophase), sizeof(xl_xact_twophase));
-		if (xl_xinfo.xinfo & XACT_XINFO_HAS_GID)
-			XLogRegisterData(unconstify(char *, twophase_gid), strlen(twophase_gid) + 1);
-	}
-
 	return XLogInsert(RM_XACT_ID, info);
 }
 
 /*
- * Log the commit record for a plain or twophase transaction abort.
- *
- * A 2pc abort will be emitted when twophase_xid is valid, a plain one
- * otherwise.
+ * Log the commit record for a plain transaction abort.
  */
 XLogRecPtr
 XactLogAbortRecord(TimestampTz abort_time,
 				   int nsubxacts, TransactionId *subxacts,
-				   int nrels, RelFileNode *rels,
-				   int xactflags, TransactionId twophase_xid,
-				   const char *twophase_gid)
+				   int nrels, RelFileNode *rels)
 {
 	xl_xact_abort xlrec;
 	xl_xact_xinfo xl_xinfo;
 	xl_xact_subxacts xl_subxacts;
 	xl_xact_relfilenodes xl_relfilenodes;
-	xl_xact_twophase xl_twophase;
 	xl_xact_dbinfo xl_dbinfo;
 
 	uint8		info;
@@ -4634,18 +4271,11 @@ XactLogAbortRecord(TimestampTz abort_time,
 
 	xl_xinfo.xinfo = 0;
 
-	/* decide between a plain and 2pc abort */
-	if (!TransactionIdIsValid(twophase_xid))
-		info = XLOG_XACT_ABORT;
-	else
-		info = XLOG_XACT_ABORT_PREPARED;
+	info = XLOG_XACT_ABORT;
 
 	/* First figure out and collect all the information needed */
 
 	xlrec.xact_time = abort_time;
-
-	if ((xactflags & XACT_FLAGS_ACQUIREDACCESSEXCLUSIVELOCK))
-		xl_xinfo.xinfo |= XACT_XINFO_HAS_AE_LOCKS;
 
 	if (nsubxacts > 0)
 	{
@@ -4658,15 +4288,6 @@ XactLogAbortRecord(TimestampTz abort_time,
 		xl_xinfo.xinfo |= XACT_XINFO_HAS_RELFILENODES;
 		xl_relfilenodes.nrels = nrels;
 		info |= XLR_SPECIAL_REL_UPDATE;
-	}
-
-	if (TransactionIdIsValid(twophase_xid))
-	{
-		xl_xinfo.xinfo |= XACT_XINFO_HAS_TWOPHASE;
-		xl_twophase.xid = twophase_xid;
-		Assert(twophase_gid != NULL);
-
-		xl_xinfo.xinfo |= XACT_XINFO_HAS_GID;
 	}
 
 	if (xl_xinfo.xinfo != 0)
@@ -4698,13 +4319,6 @@ XactLogAbortRecord(TimestampTz abort_time,
 						 MinSizeOfXactRelfilenodes);
 		XLogRegisterData((char *) rels,
 						 nrels * sizeof(RelFileNode));
-	}
-
-	if (xl_xinfo.xinfo & XACT_XINFO_HAS_TWOPHASE)
-	{
-		XLogRegisterData((char *) (&xl_twophase), sizeof(xl_xact_twophase));
-		if (xl_xinfo.xinfo & XACT_XINFO_HAS_GID)
-			XLogRegisterData(unconstify(char *, twophase_gid), strlen(twophase_gid) + 1);
 	}
 
 	return XLogInsert(RM_XACT_ID, info);
@@ -4838,20 +4452,6 @@ xact_redo(XLogReaderState *record)
 		xact_redo_commit(&parsed, XLogRecGetXid(record),
 						 record->EndRecPtr, XLogRecGetOrigin(record));
 	}
-	else if (info == XLOG_XACT_COMMIT_PREPARED)
-	{
-		xl_xact_commit *xlrec = (xl_xact_commit *) XLogRecGetData(record);
-		xl_xact_parsed_commit parsed;
-
-		ParseCommitRecord(XLogRecGetInfo(record), xlrec, &parsed);
-		xact_redo_commit(&parsed, parsed.twophase_xid,
-						 record->EndRecPtr, XLogRecGetOrigin(record));
-
-		/* Delete TwoPhaseState gxact entry and/or 2PC file. */
-		LWLockAcquire(TwoPhaseStateLock, LW_EXCLUSIVE);
-		PrepareRedoRemove(parsed.twophase_xid, false);
-		LWLockRelease(TwoPhaseStateLock);
-	}
 	else if (info == XLOG_XACT_ABORT)
 	{
 		xl_xact_abort *xlrec = (xl_xact_abort *) XLogRecGetData(record);
@@ -4860,32 +4460,6 @@ xact_redo(XLogReaderState *record)
 		ParseAbortRecord(XLogRecGetInfo(record), xlrec, &parsed);
 		xact_redo_abort(&parsed, XLogRecGetXid(record),
 						record->EndRecPtr, XLogRecGetOrigin(record));
-	}
-	else if (info == XLOG_XACT_ABORT_PREPARED)
-	{
-		xl_xact_abort *xlrec = (xl_xact_abort *) XLogRecGetData(record);
-		xl_xact_parsed_abort parsed;
-
-		ParseAbortRecord(XLogRecGetInfo(record), xlrec, &parsed);
-		xact_redo_abort(&parsed, parsed.twophase_xid,
-						record->EndRecPtr, XLogRecGetOrigin(record));
-
-		/* Delete TwoPhaseState gxact entry and/or 2PC file. */
-		LWLockAcquire(TwoPhaseStateLock, LW_EXCLUSIVE);
-		PrepareRedoRemove(parsed.twophase_xid, false);
-		LWLockRelease(TwoPhaseStateLock);
-	}
-	else if (info == XLOG_XACT_PREPARE)
-	{
-		/*
-		 * Store xid and start/end pointers of the WAL record in TwoPhaseState
-		 * gxact entry.
-		 */
-		LWLockAcquire(TwoPhaseStateLock, LW_EXCLUSIVE);
-		PrepareRedoAdd(XLogRecGetData(record),
-					   record->ReadRecPtr,
-					   record->EndRecPtr);
-		LWLockRelease(TwoPhaseStateLock);
 	}
 	else if (info == XLOG_XACT_INVALIDATIONS)
 	{

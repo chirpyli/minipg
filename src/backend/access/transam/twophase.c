@@ -655,146 +655,6 @@ RemoveGXact(GlobalTransaction gxact)
 }
 
 /*
- * Returns an array of all prepared transactions for the user-level
- * function pg_prepared_xact.
- *
- * The returned array and all its elements are copies of internal data
- * structures, to minimize the time we need to hold the TwoPhaseStateLock.
- *
- * WARNING -- we return even those transactions that are not fully prepared
- * yet.  The caller should filter them out if he doesn't want them.
- *
- * The returned array is palloc'd.
- */
-static int
-GetPreparedTransactionList(GlobalTransaction *gxacts)
-{
-	GlobalTransaction array;
-	int			num;
-	int			i;
-
-	LWLockAcquire(TwoPhaseStateLock, LW_SHARED);
-
-	if (TwoPhaseState->numPrepXacts == 0)
-	{
-		LWLockRelease(TwoPhaseStateLock);
-
-		*gxacts = NULL;
-		return 0;
-	}
-
-	num = TwoPhaseState->numPrepXacts;
-	array = (GlobalTransaction) palloc(sizeof(GlobalTransactionData) * num);
-	*gxacts = array;
-	for (i = 0; i < num; i++)
-		memcpy(array + i, TwoPhaseState->prepXacts[i],
-			   sizeof(GlobalTransactionData));
-
-	LWLockRelease(TwoPhaseStateLock);
-
-	return num;
-}
-
-
-/* Working status for pg_prepared_xact */
-typedef struct
-{
-	GlobalTransaction array;
-	int			ngxacts;
-	int			currIdx;
-} Working_State;
-
-/*
- * pg_prepared_xact
- *		Produce a view with one row per prepared transaction.
- *
- * This function is here so we don't have to export the
- * GlobalTransactionData struct definition.
- */
-Datum
-pg_prepared_xact(PG_FUNCTION_ARGS)
-{
-	FuncCallContext *funcctx;
-	Working_State *status;
-
-	if (SRF_IS_FIRSTCALL())
-	{
-		TupleDesc	tupdesc;
-		MemoryContext oldcontext;
-
-		/* create a function context for cross-call persistence */
-		funcctx = SRF_FIRSTCALL_INIT();
-
-		/*
-		 * Switch to memory context appropriate for multiple function calls
-		 */
-		oldcontext = MemoryContextSwitchTo(funcctx->multi_call_memory_ctx);
-
-		/* build tupdesc for result tuples */
-		/* this had better match pg_prepared_xacts view in system_views.sql */
-		tupdesc = CreateTemplateTupleDesc(5);
-		TupleDescInitEntry(tupdesc, (AttrNumber) 1, "transaction",
-						   XIDOID, -1, 0);
-		TupleDescInitEntry(tupdesc, (AttrNumber) 2, "gid",
-						   TEXTOID, -1, 0);
-		TupleDescInitEntry(tupdesc, (AttrNumber) 3, "prepared",
-						   TIMESTAMPTZOID, -1, 0);
-		TupleDescInitEntry(tupdesc, (AttrNumber) 4, "ownerid",
-						   OIDOID, -1, 0);
-		TupleDescInitEntry(tupdesc, (AttrNumber) 5, "dbid",
-						   OIDOID, -1, 0);
-
-		funcctx->tuple_desc = BlessTupleDesc(tupdesc);
-
-		/*
-		 * Collect all the 2PC status information that we will format and send
-		 * out as a result set.
-		 */
-		status = (Working_State *) palloc(sizeof(Working_State));
-		funcctx->user_fctx = (void *) status;
-
-		status->ngxacts = GetPreparedTransactionList(&status->array);
-		status->currIdx = 0;
-
-		MemoryContextSwitchTo(oldcontext);
-	}
-
-	funcctx = SRF_PERCALL_SETUP();
-	status = (Working_State *) funcctx->user_fctx;
-
-	while (status->array != NULL && status->currIdx < status->ngxacts)
-	{
-		GlobalTransaction gxact = &status->array[status->currIdx++];
-		PGPROC	   *proc = &ProcGlobal->allProcs[gxact->pgprocno];
-		Datum		values[5];
-		bool		nulls[5];
-		HeapTuple	tuple;
-		Datum		result;
-
-		if (!gxact->valid)
-			continue;
-
-		/*
-		 * Form tuple with appropriate data.
-		 */
-		MemSet(values, 0, sizeof(values));
-		MemSet(nulls, 0, sizeof(nulls));
-
-		values[0] = TransactionIdGetDatum(proc->xid);
-		values[1] = CStringGetTextDatum(gxact->gid);
-		values[2] = TimestampTzGetDatum(gxact->prepared_at);
-		values[3] = ObjectIdGetDatum(gxact->owner);
-		values[4] = ObjectIdGetDatum(proc->databaseId);
-
-		tuple = heap_form_tuple(funcctx->tuple_desc, values, nulls);
-		result = HeapTupleGetDatum(tuple);
-		SRF_RETURN_NEXT(funcctx, result);
-	}
-
-	SRF_RETURN_DONE(funcctx);
-}
-
-/*
  * TwoPhaseGetGXact
  *		Get the GlobalTransaction struct for a prepared transaction
  *		specified by XID
@@ -2234,17 +2094,11 @@ RecordTransactionCommitPrepared(TransactionId xid,
 	Assert(!MyProc->delayChkpt);
 	MyProc->delayChkpt = true;
 
-	/*
-	 * Emit the XLOG commit record. Note that we mark 2PC commits as
-	 * potentially having AccessExclusiveLocks since we don't know whether or
-	 * not they do.
-	 */
+	/* Emit the XLOG commit record. */
 	recptr = XactLogCommitRecord(committs,
 								 nchildren, children, nrels, rels,
 								 ninvalmsgs, invalmsgs,
-								 initfileinval,
-								 MyXactFlags | XACT_FLAGS_ACQUIREDACCESSEXCLUSIVELOCK,
-								 xid, gid);
+								 initfileinval);
 
 	/*
 	 * We don't currently try to sleep before flush here ... nor is there any
@@ -2299,16 +2153,10 @@ RecordTransactionAbortPrepared(TransactionId xid,
 
 	START_CRIT_SECTION();
 
-	/*
-	 * Emit the XLOG commit record. Note that we mark 2PC aborts as
-	 * potentially having AccessExclusiveLocks since we don't know whether or
-	 * not they do.
-	 */
+	/* Emit the XLOG abort record. */
 	recptr = XactLogAbortRecord(GetCurrentTimestamp(),
 								nchildren, children,
-								nrels, rels,
-								MyXactFlags | XACT_FLAGS_ACQUIREDACCESSEXCLUSIVELOCK,
-								xid, gid);
+								nrels, rels);
 
 	/* Always flush, since we're about to remove the 2PC state file */
 	XLogFlush(recptr);
