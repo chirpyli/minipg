@@ -287,8 +287,6 @@ main(int argc, char *argv[])
 		   ControlFile->wal_log_hints ? _("on") : _("off"));
 	printf(_("max_connections setting:              %d\n"),
 		   ControlFile->MaxConnections);
-	printf(_("max_prepared_xacts setting:           %d\n"),
-		   ControlFile->max_prepared_xacts);
 	printf(_("max_locks_per_xact setting:           %d\n"),
 		   ControlFile->max_locks_per_xact);
 	printf(_("Maximum data alignment:               %u\n"),

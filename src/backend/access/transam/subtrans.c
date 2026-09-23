@@ -242,8 +242,8 @@ ZeroSUBTRANSPage(int pageno)
  * This must be called ONCE during postmaster or standalone-backend startup,
  * after StartupXLOG has initialized ShmemVariableCache->nextXid.
  *
- * oldestActiveXID is the oldest XID of any prepared transaction, or nextXid
- * if there are none.
+ * oldestActiveXID is the current nextXid, i.e. there are no transactions
+ * older than it that could still need pg_subtrans entries.
  */
 void
 StartupSUBTRANS(TransactionId oldestActiveXID)

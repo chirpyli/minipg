@@ -564,13 +564,6 @@ extern BlockedProcsData *GetBlockerStatusData(int blocked_pid);
 extern xl_standby_lock *GetRunningTransactionLocks(int *nlocks);
 extern const char *GetLockmodeName(LOCKMETHODID lockmethodid, LOCKMODE mode);
 
-extern void lock_twophase_recover(TransactionId xid, uint16 info,
-								  void *recdata, uint32 len);
-extern void lock_twophase_postcommit(TransactionId xid, uint16 info,
-									 void *recdata, uint32 len);
-extern void lock_twophase_postabort(TransactionId xid, uint16 info,
-									void *recdata, uint32 len);
-
 extern DeadLockState DeadLockCheck(PGPROC *proc);
 extern void DeadLockReport(void) pg_attribute_noreturn();
 extern void RememberSimpleDeadLock(PGPROC *proc1,

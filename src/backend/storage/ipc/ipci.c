@@ -21,7 +21,6 @@
 #include "access/nbtree.h"
 #include "access/subtrans.h"
 #include "access/syncscan.h"
-#include "access/twophase.h"
 #include "miscadmin.h"
 #include "utils/backend_status.h"
 
@@ -88,7 +87,6 @@ CreateSharedMemoryAndSemaphores(void)
 		size = add_size(size, XLOGShmemSize());
 		size = add_size(size, CLOGShmemSize());
 		size = add_size(size, SUBTRANSShmemSize());
-		size = add_size(size, TwoPhaseShmemSize());
 		size = add_size(size, MultiXactShmemSize());
 		size = add_size(size, LWLockShmemSize());
 		size = add_size(size, ProcArrayShmemSize());
@@ -175,7 +173,6 @@ CreateSharedMemoryAndSemaphores(void)
 		InitProcGlobal();
 	CreateSharedProcArray();
 	CreateSharedBackendStatus();
-	TwoPhaseShmemInit();
 
 	/*
 	 * Set up shared-inval messaging

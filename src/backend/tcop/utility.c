@@ -17,7 +17,6 @@
 #include "postgres.h"
 
 #include "access/htup_details.h"
-#include "access/twophase.h"
 #include "access/xact.h"
 #include "access/xlog.h"
 #include "catalog/catalog.h"

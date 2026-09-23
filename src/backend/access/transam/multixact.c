@@ -71,8 +71,6 @@
 #include "access/multixact.h"
 #include "access/slru.h"
 #include "access/transam.h"
-#include "access/twophase.h"
-#include "access/twophase_rmgr.h"
 #include "access/xact.h"
 #include "access/xlog.h"
 #include "access/xloginsert.h"

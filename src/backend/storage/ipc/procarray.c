@@ -45,7 +45,6 @@
 #include "access/clog.h"
 #include "access/subtrans.h"
 #include "access/transam.h"
-#include "access/twophase.h"
 #include "access/xact.h"
 #include "access/xlog.h"
 #include "catalog/catalog.h"

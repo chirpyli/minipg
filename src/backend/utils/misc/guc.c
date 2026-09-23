@@ -31,7 +31,6 @@
 #include "access/rmgr.h"
 #include "access/tableam.h"
 #include "access/transam.h"
-#include "access/twophase.h"
 #include "access/xact.h"
 #include "access/xlog_internal.h"
 #include "catalog/namespace.h"
