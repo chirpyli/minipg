@@ -417,25 +417,17 @@ ProcArrayAdd(PGPROC *proc)
 
 /*
  * Remove the specified PGPROC from the shared array.
- *
- * When latestXid is a valid XID, we are removing a live 2PC gxact from the
- * array, and thus causing it to appear as "not running" anymore.  In this
- * case we must advance latestCompletedXid.  (This is essentially the same
- * as ProcArrayEndTransaction followed by removal of the PGPROC, but we take
- * the ProcArrayLock only once, and don't damage the content of the PGPROC;
- * twophase.c depends on the latter.)
  */
 void
-ProcArrayRemove(PGPROC *proc, TransactionId latestXid)
+ProcArrayRemove(PGPROC *proc)
 {
 	ProcArrayStruct *arrayP = procArray;
 	int			myoff;
 	int			movecount;
 
 #ifdef XIDCACHE_DEBUG
-	/* dump stats at backend shutdown, but not prepared-xact end */
-	if (proc->pid != 0)
-		DisplayXidCache();
+	/* dump stats at backend shutdown */
+	DisplayXidCache();
 #endif
 
 	/* See ProcGlobal comment explaining why both locks are held */
@@ -447,26 +439,7 @@ ProcArrayRemove(PGPROC *proc, TransactionId latestXid)
 	Assert(myoff >= 0 && myoff < arrayP->numProcs);
 	Assert(ProcGlobal->allProcs[arrayP->pgprocnos[myoff]].pgxactoff == myoff);
 
-	if (TransactionIdIsValid(latestXid))
-	{
-		Assert(TransactionIdIsValid(ProcGlobal->xids[myoff]));
-
-		/* Advance global latestCompletedXid while holding the lock */
-		MaintainLatestCompletedXid(latestXid);
-
-		/* Same with xactCompletionCount  */
-		ShmemVariableCache->xactCompletionCount++;
-
-		ProcGlobal->xids[myoff] = InvalidTransactionId;
-		ProcGlobal->subxidStates[myoff].overflowed = false;
-		ProcGlobal->subxidStates[myoff].count = 0;
-	}
-	else
-	{
-		/* Shouldn't be trying to remove a live transaction here */
-		Assert(!TransactionIdIsValid(ProcGlobal->xids[myoff]));
-	}
-
+	/* Shouldn't be trying to remove a live transaction here */
 	Assert(!TransactionIdIsValid(ProcGlobal->xids[myoff]));
 	Assert(ProcGlobal->subxidStates[myoff].count == 0);
 	Assert(ProcGlobal->subxidStates[myoff].overflowed == false);

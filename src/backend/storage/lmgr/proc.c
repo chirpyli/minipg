@@ -36,7 +36,6 @@
 #include <sys/time.h>
 
 #include "access/transam.h"
-#include "access/twophase.h"
 #include "access/xact.h"
 #include "miscadmin.h"
 #include "utils/wait_event.h"
@@ -74,7 +73,6 @@ static slock_t *ProcStructLock = NULL;
 /* Pointers to shared-memory structures */
 PROC_HDR   *ProcGlobal = NULL;
 static PGPROC *AuxiliaryProcs = NULL;
-PGPROC	   *PreparedXactProcs = NULL;
 
 /* If we are waiting for a lock, this points to the associated LOCALLOCK */
 static LOCALLOCK *lockAwaited = NULL;
@@ -249,11 +247,10 @@ InitProcGlobal(void)
 	}
 
 	/*
-	 * Save pointers to the blocks of PGPROC structures reserved for auxiliary
-	 * processes and prepared transactions.
+	 * Save pointer to the block of PGPROC structures reserved for auxiliary
+	 * processes.
 	 */
 	AuxiliaryProcs = &procs[MaxBackends];
-	PreparedXactProcs = &procs[MaxBackends + NUM_AUXILIARY_PROCS];
 
 	/* Create ProcStructLock spinlock, too */
 	ProcStructLock = (slock_t *) ShmemAlloc(sizeof(slock_t));
@@ -684,7 +681,7 @@ static void
 RemoveProcFromArray(int code, Datum arg)
 {
 	Assert(MyProc != NULL);
-	ProcArrayRemove(MyProc, InvalidTransactionId);
+	ProcArrayRemove(MyProc);
 }
 
 /*

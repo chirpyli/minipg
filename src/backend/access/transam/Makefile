@@ -20,8 +20,6 @@ OBJS = \
 	subtrans.o \
 	timeline.o \
 	transam.o \
-	twophase.o \
-	twophase_rmgr.o \
 	varsup.o \
 	xact.o \
 	xlog.o \

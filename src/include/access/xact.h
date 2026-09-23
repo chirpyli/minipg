@@ -23,14 +23,6 @@
 #include "storage/sinval.h"
 
 /*
- * Maximum size of Global Transaction ID (including '\0').
- *
- * Note that the max value of GIDSIZE must fit in the uint16 gidlen,
- * specified in TwoPhaseFileHeader.
- */
-#define GIDSIZE 200
-
-/*
  * Xact isolation levels
  */
 #define XACT_READ_UNCOMMITTED	0
@@ -119,7 +111,6 @@ extern int	MyXactFlags;
  * field. We use 3 for the opcode, and one about an optional flag variable.
  */
 #define XLOG_XACT_COMMIT			0x00
-#define XLOG_XACT_PREPARE			0x10
 #define XLOG_XACT_ABORT				0x20
 #define XLOG_XACT_ASSIGNMENT		0x50
 #define XLOG_XACT_INVALIDATIONS		0x60
@@ -229,25 +220,6 @@ typedef struct xl_xact_origin
 	XLogRecPtr	origin_lsn;
 	TimestampTz origin_timestamp;
 } xl_xact_origin;
-
-/* 2PC state file header; still used by twophase.c */
-typedef struct xl_xact_prepare
-{
-	uint32		magic;			/* format identifier */
-	uint32		total_len;		/* actual file length */
-	TransactionId xid;			/* original transaction XID */
-	Oid			database;		/* OID of database it was in */
-	TimestampTz prepared_at;	/* time of preparation */
-	Oid			owner;			/* user running the transaction */
-	int32		nsubxacts;		/* number of following subxact XIDs */
-	int32		ncommitrels;	/* number of delete-on-commit rels */
-	int32		nabortrels;		/* number of delete-on-abort rels */
-	int32		ninvalmsgs;		/* number of cache invalidation messages */
-	bool		initfileinval;	/* does relcache init file need invalidation? */
-	uint16		gidlen;			/* length of the GID - GID follows the header */
-	XLogRecPtr	origin_lsn;		/* lsn of this record at origin node */
-	TimestampTz origin_timestamp;	/* time of prepare at origin node */
-} xl_xact_prepare;
 
 typedef struct xl_xact_commit
 {

@@ -335,8 +335,6 @@ typedef struct PROC_HDR
 
 extern PGDLLIMPORT PROC_HDR *ProcGlobal;
 
-extern PGPROC *PreparedXactProcs;
-
 /* Accessor for PGPROC given a pgprocno. */
 #define GetPGProcByNumber(n) (&ProcGlobal->allProcs[(n)])
 
