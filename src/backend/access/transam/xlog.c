@@ -271,8 +271,6 @@ static char *primary_image_masked = NULL;
  * file was created.)  During a sequential scan we do not allow this value
  * to decrease.
  */
-RecoveryTargetTimeLineGoal recoveryTargetTimeLineGoal = RECOVERY_TARGET_TIMELINE_LATEST;
-TimeLineID	recoveryTargetTLIRequested = 0;
 TimeLineID	recoveryTargetTLI = 0;
 static List *expectedTLEs;
 static TimeLineID curFileTLI;
@@ -661,9 +659,6 @@ typedef struct XLogCtlData
 	 * only relevant for replication or archive recovery
 	 */
 	TimestampTz currentChunkStartTime;
-	/* Recovery pause state */
-	RecoveryPauseState recoveryPauseState;
-	ConditionVariable recoveryNotPausedCV;
 
 	/*
 	 * lastFpwDisableRecPtr points to the start of the last replayed
@@ -4722,7 +4717,6 @@ XLOGShmemInit(void)
 	SpinLockInit(&XLogCtl->info_lck);
 	SpinLockInit(&XLogCtl->ulsn_lck);
 	InitSharedLatch(&XLogCtl->recoveryWakeupLatch);
-	ConditionVariableInit(&XLogCtl->recoveryNotPausedCV);
 }
 
 /*
@@ -5383,7 +5377,6 @@ StartupXLOG(void)
 		XLogCtl->lastReplayedTLI = XLogCtl->replayEndTLI;
 		XLogCtl->recoveryLastXTime = 0;
 		XLogCtl->currentChunkStartTime = 0;
-		XLogCtl->recoveryPauseState = RECOVERY_NOT_PAUSED;
 		SpinLockRelease(&XLogCtl->info_lck);
 
 		/* Also ensure XLogReceiptTime has a sane value */

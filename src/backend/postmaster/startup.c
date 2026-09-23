@@ -51,12 +51,6 @@
 static volatile sig_atomic_t got_SIGHUP = false;
 static volatile sig_atomic_t shutdown_requested = false;
 
-/*
- * Flag set when executing a restore command, to tell SIGTERM signal handler
- * that it's safe to just proc_exit.
- */
-static volatile sig_atomic_t in_restore_command = false;
-
 /* Signal handlers */
 static void StartupProcSigHupHandler(SIGNAL_ARGS);
 
@@ -86,22 +80,7 @@ StartupProcShutdownHandler(SIGNAL_ARGS)
 {
 	int			save_errno = errno;
 
-	if (in_restore_command)
-	{
-		/*
-		 * If we are in a child process , we don't want to call any exit callbacks.
-		 * The parent will take care of that.
-		 */
-		if (MyProcPid == (int) getpid())
-			proc_exit(1);
-		else
-		{
-			write_stderr_signal_safe("StartupProcShutdownHandler() called in child process\n");
-			_exit(1);
-		}
-	}
-	else
-		shutdown_requested = true;
+	shutdown_requested = true;
 	WakeupRecovery();
 
 	errno = save_errno;
