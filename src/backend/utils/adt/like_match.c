@@ -3,9 +3,8 @@
  * like_match.c
  *	  LIKE pattern matching internal code.
  *
- * This file is included by like.c four times, to provide matching code for
- * (1) single-byte encodings, (2) UTF8, (3) other multi-byte encodings,
- * and (4) case insensitive matches in single-byte encodings.
+ * This file is included by like.c three times, to provide matching code for
+ * (1) single-byte encodings, (2) UTF8, and (3) other multi-byte encodings.
  * (UTF8 is a special case because we can use a much more efficient version
  * of NextChar than can be used for general multi-byte encodings.)
  *
@@ -13,8 +12,6 @@
  *
  * NextChar
  * MatchText - to name of function wanted
- * do_like_escape - name of function if wanted - needs CHAREQ and CopyAdvChar
- * MATCH_LOWER - define for case (4) to specify case folding for 1-byte chars
  *
  * Copyright (c) 1996-2021, PostgreSQL Global Development Group
  *
@@ -43,13 +40,8 @@
  *
  *	Keith Parks. <keith@mtcc.demon.co.uk>
  *
- *	SQL lets you specify the escape character by saying
- *	LIKE <pattern> ESCAPE <escape character>. We are a small operation
- *	so we force you to use '\'. - ay 7/95
- *
- *	Now we have the like_escape() function that converts patterns with
- *	any specified escape character (or none at all) to the internal
- *	default escape character, which is still '\'. - tgl 9/2000
+ *	The escape character is always '\'; the LIKE ... ESCAPE syntax has been
+ *	trimmed from this project.
  *
  * The code is rewritten to avoid requiring null-terminated strings,
  * which in turn allows us to leave out some memcpy() operations.
@@ -70,11 +62,7 @@
  *--------------------
  */
 
-#ifdef MATCH_LOWER
-#define GETCHAR(t) MATCH_LOWER(t)
-#else
 #define GETCHAR(t) (t)
-#endif
 
 static int
 MatchText(const char *t, int tlen, const char *p, int plen,
@@ -239,108 +227,6 @@ MatchText(const char *t, int tlen, const char *p, int plen,
 	return LIKE_ABORT;
 }								/* MatchText() */
 
-/*
- * like_escape() --- given a pattern and an ESCAPE string,
- * convert the pattern to use Postgres' standard backslash escape convention.
- */
-#ifdef do_like_escape
-
-static text *
-do_like_escape(text *pat, text *esc)
-{
-	text	   *result;
-	char	   *p,
-			   *e,
-			   *r;
-	int			plen,
-				elen;
-	bool		afterescape;
-
-	p = VARDATA_ANY(pat);
-	plen = VARSIZE_ANY_EXHDR(pat);
-	e = VARDATA_ANY(esc);
-	elen = VARSIZE_ANY_EXHDR(esc);
-
-	/*
-	 * Worst-case pattern growth is 2x --- unlikely, but it's hardly worth
-	 * trying to calculate the size more accurately than that.
-	 */
-	result = (text *) palloc(plen * 2 + VARHDRSZ);
-	r = VARDATA(result);
-
-	if (elen == 0)
-	{
-		/*
-		 * No escape character is wanted.  Double any backslashes in the
-		 * pattern to make them act like ordinary characters.
-		 */
-		while (plen > 0)
-		{
-			if (*p == '\\')
-				*r++ = '\\';
-			CopyAdvChar(r, p, plen);
-		}
-	}
-	else
-	{
-		/*
-		 * The specified escape must be only a single character.
-		 */
-		NextChar(e, elen);
-		if (elen != 0)
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_ESCAPE_SEQUENCE),
-					 errmsg("invalid escape string"),
-					 errhint("Escape string must be empty or one character.")));
-
-		e = VARDATA_ANY(esc);
-		elen = VARSIZE_ANY_EXHDR(esc);
-
-		/*
-		 * If specified escape is '\', just copy the pattern as-is.
-		 */
-		if (*e == '\\')
-		{
-			memcpy(result, pat, VARSIZE_ANY(pat));
-			return result;
-		}
-
-		/*
-		 * Otherwise, convert occurrences of the specified escape character to
-		 * '\', and double occurrences of '\' --- unless they immediately
-		 * follow an escape character!
-		 */
-		afterescape = false;
-		while (plen > 0)
-		{
-			if (CHAREQ(p, plen, e, elen) && !afterescape)
-			{
-				*r++ = '\\';
-				NextChar(p, plen);
-				afterescape = true;
-			}
-			else if (*p == '\\')
-			{
-				*r++ = '\\';
-				if (!afterescape)
-					*r++ = '\\';
-				NextChar(p, plen);
-				afterescape = false;
-			}
-			else
-			{
-				CopyAdvChar(r, p, plen);
-				afterescape = false;
-			}
-		}
-	}
-
-	SET_VARSIZE(result, r - ((char *) result));
-
-	return result;
-}
-#endif							/* do_like_escape */
-
 #ifdef CHAREQ
 #undef CHAREQ
 #endif
@@ -349,13 +235,4 @@ do_like_escape(text *pat, text *esc)
 #undef CopyAdvChar
 #undef MatchText
 
-#ifdef do_like_escape
-#undef do_like_escape
-#endif
-
 #undef GETCHAR
-
-#ifdef MATCH_LOWER
-#undef MATCH_LOWER
-
-#endif

@@ -320,8 +320,6 @@ select 'foo' like all (array['f%', '%o']); -- t
 select 'foo' like all (array['f%', '%b']); -- f
 select 'foo' not like any (array['%a', '%b']); -- t
 select 'foo' not like all (array['%a', '%o']); -- f
-select 'foo' ~~* any (array['%A', '%O']); -- t
-select 'foo' ~~* all (array['F%', '%O']); -- t
 
 --
 -- General array parser tests

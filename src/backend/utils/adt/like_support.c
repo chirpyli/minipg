@@ -59,7 +59,6 @@
 typedef enum
 {
 	Pattern_Type_Like,
-	Pattern_Type_Like_IC,
 	Pattern_Type_Prefix
 } Pattern_Type;
 
@@ -93,10 +92,7 @@ static Selectivity prefix_selectivity(PlannerInfo *root,
 									  Oid eqopr, Oid ltopr, Oid geopr,
 									  Oid collation,
 									  Const *prefixcon);
-static Selectivity like_selectivity(const char *patt, int pattlen,
-									bool case_insensitive);
-static int	pattern_char_isalpha(char c, bool is_multibyte,
-								 pg_locale_t locale, bool locale_is_c);
+static Selectivity like_selectivity(const char *patt, int pattlen);
 static Const *make_greater_string(const Const *str_const, FmgrInfo *ltproc,
 								  Oid collation);
 static Datum string_to_datum(const char *str, Oid datatype);
@@ -113,14 +109,6 @@ textlike_support(PG_FUNCTION_ARGS)
 	Node	   *rawreq = (Node *) PG_GETARG_POINTER(0);
 
 	PG_RETURN_POINTER(like_regex_support(rawreq, Pattern_Type_Like));
-}
-
-Datum
-texticlike_support(PG_FUNCTION_ARGS)
-{
-	Node	   *rawreq = (Node *) PG_GETARG_POINTER(0);
-
-	PG_RETURN_POINTER(like_regex_support(rawreq, Pattern_Type_Like_IC));
 }
 
 /*
@@ -761,31 +749,12 @@ prefixsel(PG_FUNCTION_ARGS)
 }
 
 /*
- *		iclikesel			- Selectivity of ILIKE pattern match.
- */
-Datum
-iclikesel(PG_FUNCTION_ARGS)
-{
-	PG_RETURN_FLOAT8(patternsel(fcinfo, Pattern_Type_Like_IC, false));
-}
-
-
-/*
  *		nlikesel		- Selectivity of LIKE pattern non-match.
  */
 Datum
 nlikesel(PG_FUNCTION_ARGS)
 {
 	PG_RETURN_FLOAT8(patternsel(fcinfo, Pattern_Type_Like, true));
-}
-
-/*
- *		icnlikesel		- Selectivity of ILIKE pattern non-match.
- */
-Datum
-icnlikesel(PG_FUNCTION_ARGS)
-{
-	PG_RETURN_FLOAT8(patternsel(fcinfo, Pattern_Type_Like_IC, true));
 }
 
 /*
@@ -818,16 +787,6 @@ prefixjoinsel(PG_FUNCTION_ARGS)
 }
 
 /*
- *		iclikejoinsel			- Join selectivity of ILIKE pattern match.
- */
-Datum
-iclikejoinsel(PG_FUNCTION_ARGS)
-{
-	PG_RETURN_FLOAT8(patternjoinsel(fcinfo, Pattern_Type_Like_IC, false));
-}
-
-
-/*
  *		nlikejoinsel		- Join selectivity of LIKE pattern non-match.
  */
 Datum
@@ -836,14 +795,6 @@ nlikejoinsel(PG_FUNCTION_ARGS)
 	PG_RETURN_FLOAT8(patternjoinsel(fcinfo, Pattern_Type_Like, true));
 }
 
-/*
- *		icnlikejoinsel		- Selectivity of ILIKE pattern non-match.
- */
-Datum
-icnlikejoinsel(PG_FUNCTION_ARGS)
-{
-	PG_RETURN_FLOAT8(patternjoinsel(fcinfo, Pattern_Type_Like_IC, true));
-}
 /*-------------------------------------------------------------------------
  *
  * Pattern analysis functions
@@ -873,7 +824,7 @@ icnlikejoinsel(PG_FUNCTION_ARGS)
  */
 
 static Pattern_Prefix_Status
-like_fixed_prefix(Const *patt_const, bool case_insensitive, Oid collation,
+like_fixed_prefix(Const *patt_const, Oid collation,
 				  Const **prefix_const, Selectivity *rest_selec)
 {
 	char	   *match;
@@ -882,39 +833,9 @@ like_fixed_prefix(Const *patt_const, bool case_insensitive, Oid collation,
 	Oid			typeid = patt_const->consttype;
 	int			pos,
 				match_pos;
-	bool		is_multibyte = (pg_database_encoding_max_length() > 1);
-	pg_locale_t locale = 0;
-	bool		locale_is_c = false;
 
 	/* the right-hand const is type text or bytea */
 	Assert(typeid == BYTEAOID || typeid == TEXTOID);
-
-	if (case_insensitive)
-	{
-		if (typeid == BYTEAOID)
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("case insensitive matching not supported on type bytea")));
-
-		/* If case-insensitive, we need locale info */
-		if (lc_ctype_is_c(collation))
-			locale_is_c = true;
-		else if (collation != DEFAULT_COLLATION_OID)
-		{
-			if (!OidIsValid(collation))
-			{
-				/*
-				 * This typically means that the parser could not resolve a
-				 * conflict of implicit collations, so report it that way.
-				 */
-				ereport(ERROR,
-						(errcode(ERRCODE_INDETERMINATE_COLLATION),
-						 errmsg("could not determine which collation to use for ILIKE"),
-						 errhint("Use the COLLATE clause to set the collation explicitly.")));
-			}
-			locale = pg_newlocale_from_collation(collation);
-		}
-	}
 
 	if (typeid != BYTEAOID)
 	{
@@ -948,11 +869,6 @@ like_fixed_prefix(Const *patt_const, bool case_insensitive, Oid collation,
 				break;
 		}
 
-		/* Stop if case-varying character (it's sort of a wildcard) */
-		if (case_insensitive &&
-			pattern_char_isalpha(patt[pos], is_multibyte, locale, locale_is_c))
-			break;
-
 		match[match_pos++] = patt[pos];
 	}
 
@@ -964,8 +880,7 @@ like_fixed_prefix(Const *patt_const, bool case_insensitive, Oid collation,
 		*prefix_const = string_to_bytea_const(match, match_pos);
 
 	if (rest_selec != NULL)
-		*rest_selec = like_selectivity(&patt[pos], pattlen - pos,
-									   case_insensitive);
+		*rest_selec = like_selectivity(&patt[pos], pattlen - pos);
 
 	pfree(patt);
 	pfree(match);
@@ -990,11 +905,7 @@ pattern_fixed_prefix(Const *patt, Pattern_Type ptype, Oid collation,
 	switch (ptype)
 	{
 		case Pattern_Type_Like:
-			result = like_fixed_prefix(patt, false, collation,
-									   prefix, rest_selec);
-			break;
-		case Pattern_Type_Like_IC:
-			result = like_fixed_prefix(patt, true, collation,
+			result = like_fixed_prefix(patt, collation,
 									   prefix, rest_selec);
 			break;
 		case Pattern_Type_Prefix:
@@ -1129,7 +1040,7 @@ prefix_selectivity(PlannerInfo *root, VariableStatData *vardata,
 #define PARTIAL_WILDCARD_SEL 2.0
 
 static Selectivity
-like_selectivity(const char *patt, int pattlen, bool case_insensitive)
+like_selectivity(const char *patt, int pattlen)
 {
 	Selectivity sel = 1.0;
 	int			pos;
@@ -1163,31 +1074,6 @@ like_selectivity(const char *patt, int pattlen, bool case_insensitive)
 	if (sel > 1.0)
 		sel = 1.0;
 	return sel;
-}
-
-
-/*
- * Check whether char is a letter (and, hence, subject to case-folding)
- *
- * In multibyte character sets, we can't use isalpha, and it does
- * not seem worth trying to convert to wchar_t to use iswalpha.
- * Instead, just assume any non-ASCII char is potentially case-varying, and
- * hard-wire knowledge of which ASCII chars are letters.
- */
-static int
-pattern_char_isalpha(char c, bool is_multibyte,
-					 pg_locale_t locale, bool locale_is_c)
-{
-	if (locale_is_c)
-		return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
-	else if (is_multibyte && IS_HIGHBIT_SET(c))
-		return true;
-#ifdef HAVE_LOCALE_T
-	else if (locale && locale->provider == COLLPROVIDER_LIBC)
-		return isalpha_l((unsigned char) c, locale->info.lt);
-#endif
-	else
-		return isalpha((unsigned char) c);
 }
 
 

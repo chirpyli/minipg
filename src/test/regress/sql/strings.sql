@@ -152,26 +152,6 @@ SELECT 'abc'::bytea NOT LIKE '_b_'::bytea AS "false";
 
 
 --
--- test ~~* (case-insensitive LIKE)
--- Be sure to form every test as an ILIKE/NOT ~~* pair.
---
-
-SELECT 'hawkeye' ~~* 'h%' AS "true";
-SELECT 'hawkeye' !~~* 'h%' AS "false";
-
-SELECT 'hawkeye' ~~* 'H%' AS "true";
-SELECT 'hawkeye' !~~* 'H%' AS "false";
-
-SELECT 'hawkeye' ~~* 'H%Eye' AS "true";
-SELECT 'hawkeye' !~~* 'H%Eye' AS "false";
-
-SELECT 'Hawkeye' ~~* 'h%' AS "true";
-SELECT 'Hawkeye' !~~* 'h%' AS "false";
-
-SELECT 'ABC'::name ~~* '_b_' AS "true";
-SELECT 'ABC'::name !~~* '_b_' AS "false";
-
---
 -- test %/_ combination cases, cf bugs #4821 and #5478
 --
 
