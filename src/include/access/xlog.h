@@ -77,25 +77,6 @@ extern HotStandbyState standbyState;
  * Recovery target type.
  * Only set during a Point in Time recovery, not when in standby mode.
  */
-typedef enum
-{
-	RECOVERY_TARGET_UNSET,
-	RECOVERY_TARGET_XID,
-	RECOVERY_TARGET_TIME,
-	RECOVERY_TARGET_NAME,
-	RECOVERY_TARGET_LSN,
-	RECOVERY_TARGET_IMMEDIATE
-} RecoveryTargetType;
-
-/*
- * Recovery target TimeLine goal
- */
-typedef enum
-{
-	RECOVERY_TARGET_TIMELINE_CONTROLFILE,
-	RECOVERY_TARGET_TIMELINE_LATEST,
-	RECOVERY_TARGET_TIMELINE_NUMERIC
-} RecoveryTargetTimeLineGoal;
 
 extern XLogRecPtr ProcLastRecPtr;
 extern XLogRecPtr XactLastRecEnd;
@@ -120,9 +101,6 @@ extern char *wal_consistency_checking_string;
 extern bool log_checkpoints;
 extern bool track_wal_io_timing;
 
-extern RecoveryTargetType recoveryTarget;
-extern RecoveryTargetTimeLineGoal recoveryTargetTimeLineGoal;
-extern TimeLineID recoveryTargetTLIRequested;
 extern TimeLineID recoveryTargetTLI;
 
 extern int	CheckPointSegments;
@@ -145,13 +123,6 @@ typedef enum RecoveryState
 	RECOVERY_STATE_DONE			/* currently in production */
 } RecoveryState;
 
-/* Recovery pause states */
-typedef enum RecoveryPauseState
-{
-	RECOVERY_NOT_PAUSED,		/* pause not requested */
-	RECOVERY_PAUSE_REQUESTED,	/* pause requested, but not yet paused */
-	RECOVERY_PAUSED				/* recovery is paused */
-} RecoveryPauseState;
 
 extern PGDLLIMPORT int wal_level;
 
@@ -255,8 +226,6 @@ extern void GetXLogReceiptTime(TimestampTz *rtime, bool *fromStream);
 extern XLogRecPtr GetXLogReplayRecPtr(TimeLineID *replayTLI);
 extern XLogRecPtr GetXLogInsertRecPtr(void);
 extern XLogRecPtr GetXLogWriteRecPtr(void);
-extern RecoveryPauseState GetRecoveryPauseState(void);
-extern void SetRecoveryPause(bool recoveryPause);
 extern TimestampTz GetLatestXTime(void);
 
 extern void UpdateControlFile(void);

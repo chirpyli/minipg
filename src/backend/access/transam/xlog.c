@@ -142,13 +142,6 @@ const struct config_enum_entry sync_method_options[] = {
 };
 
 
-const struct config_enum_entry recovery_target_action_options[] = {
-	{"pause", RECOVERY_TARGET_ACTION_PAUSE, false},
-	{"promote", RECOVERY_TARGET_ACTION_PROMOTE, false},
-	{"shutdown", RECOVERY_TARGET_ACTION_SHUTDOWN, false},
-	{NULL, 0, false}
-};
-
 /*
  * Statistics for current checkpoint are collected in this global struct.
  * Because only the checkpointer or a stand-alone backend can perform
