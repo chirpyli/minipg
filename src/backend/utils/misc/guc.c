@@ -1609,19 +1609,6 @@ static struct config_int ConfigureNamesInt[] =
 		NULL, NULL, NULL
 	},
 
-	/*
-	 * See also CheckRequiredParameterValues() if this parameter changes
-	 */
-	{
-		{"max_prepared_transactions", PGC_POSTMASTER, RESOURCES_MEM,
-			gettext_noop("Sets the maximum number of simultaneously prepared transactions."),
-			NULL
-		},
-		&max_prepared_xacts,
-		0, 0, MAX_BACKENDS,
-		NULL, NULL, NULL
-	},
-
 #ifdef LOCK_DEBUG
 	{
 		{"trace_lock_oidmin", PGC_SUSET, DEVELOPER_OPTIONS,

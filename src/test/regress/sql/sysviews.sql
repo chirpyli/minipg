@@ -21,9 +21,6 @@ select count(*) >= 0 as ok from pg_file_settings;
 -- There will surely be at least one active lock
 select count(*) > 0 as ok from pg_locks;
 
--- See also prepared_xacts.sql
-select count(*) >= 0 as ok from pg_prepared_xacts;
-
 -- This is to record the prevailing planner enable_foo settings during
 -- a regression test run.
 select name, setting from pg_settings where name like 'enable%';

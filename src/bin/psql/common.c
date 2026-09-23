@@ -1160,21 +1160,6 @@ command_no_begin(const char *query)
 		return true;
 	if (wordlen == 8 && pg_strncasecmp(query, "rollback", 8) == 0)
 		return true;
-	if (wordlen == 7 && pg_strncasecmp(query, "prepare", 7) == 0)
-	{
-		/* PREPARE TRANSACTION is a TC command, PREPARE foo is not */
-		query += wordlen;
-
-		query = skip_white_space(query);
-
-		wordlen = 0;
-		while (isalpha((unsigned char) query[wordlen]))
-			wordlen += PQmblenBounded(&query[wordlen], pset.encoding);
-
-		if (wordlen == 11 && pg_strncasecmp(query, "transaction", 11) == 0)
-			return true;
-		return false;
-	}
 
 	/*
 	 * Commands not allowed within transactions.  The statements checked for

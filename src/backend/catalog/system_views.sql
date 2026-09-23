@@ -115,12 +115,6 @@ CREATE VIEW pg_stats AS
 CREATE VIEW pg_locks AS
     SELECT L.* FROM (SELECT (pg_lock_status()).* ) AS L;
 
-CREATE VIEW pg_prepared_xacts AS
-    SELECT P.transaction, P.gid, P.prepared,
-           'postgres'::name AS owner, D.datname AS database
-    FROM (SELECT (pg_prepared_xact()).* ) AS P
-         LEFT JOIN pg_database D ON P.dbid = D.oid;
-
 CREATE VIEW pg_settings AS
     SELECT * FROM (SELECT (pg_show_all_settings()).* ) AS A;
 
