@@ -22,10 +22,7 @@ typedef uint8 TwoPhaseRmgrId;
  * Built-in resource managers
  */
 #define TWOPHASE_RM_END_ID			0
-#define TWOPHASE_RM_LOCK_ID			1
-#define TWOPHASE_RM_MULTIXACT_ID	2
-#define TWOPHASE_RM_PREDICATELOCK_ID	3
-#define TWOPHASE_RM_MAX_ID			TWOPHASE_RM_PREDICATELOCK_ID
+#define TWOPHASE_RM_MAX_ID			TWOPHASE_RM_END_ID
 
 extern const TwoPhaseCallback twophase_recover_callbacks[];
 extern const TwoPhaseCallback twophase_postcommit_callbacks[];

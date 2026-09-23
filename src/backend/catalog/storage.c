@@ -784,29 +784,6 @@ smgrGetPendingDeletes(bool forCommit, RelFileNode **ptr)
 }
 
 /*
- *	PostPrepare_smgr -- Clean up after a successful PREPARE
- *
- * What we have to do here is throw away the in-memory state about pending
- * relation deletes.  It's all been recorded in the 2PC state file and
- * it's no longer smgr's job to worry about it.
- */
-void
-PostPrepare_smgr(void)
-{
-	PendingRelDelete *pending;
-	PendingRelDelete *next;
-
-	for (pending = pendingDeletes; pending != NULL; pending = next)
-	{
-		next = pending->next;
-		pendingDeletes = next;
-		/* must explicitly free the list entry */
-		pfree(pending);
-	}
-}
-
-
-/*
  * AtSubCommit_smgr() --- Take care of subtransaction commit.
  *
  * Reassign all items in the pending-deletes list to the parent transaction.

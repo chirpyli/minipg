@@ -98,7 +98,7 @@ ProcGlobalShmemSize(void)
 {
 	Size		size = 0;
 	Size		TotalProcs =
-	add_size(MaxBackends, add_size(NUM_AUXILIARY_PROCS, max_prepared_xacts));
+	add_size(MaxBackends, NUM_AUXILIARY_PROCS);
 
 	/* ProcGlobal */
 	size = add_size(size, sizeof(PROC_HDR));
@@ -154,7 +154,7 @@ InitProcGlobal(void)
 	int			i,
 				j;
 	bool		found;
-	uint32		TotalProcs = MaxBackends + NUM_AUXILIARY_PROCS + max_prepared_xacts;
+	uint32		TotalProcs = MaxBackends + NUM_AUXILIARY_PROCS;
 
 	/* Create the ProcGlobal shared structure */
 	ProcGlobal = (PROC_HDR *)
@@ -176,15 +176,13 @@ InitProcGlobal(void)
 
 	/*
 	 * Create and initialize all the PGPROC structures we'll need.  There are
-	 * four separate consumers: (1) normal backends, (2) walsenders,
-	 * (3) auxiliary processes, and (4) prepared transactions.  Each PGPROC
-	 * structure is dedicated to exactly one of these purposes, and they do
-	 * not move between groups.
+	 * three separate consumers: (1) normal backends, (2) walsenders, and
+	 * (3) auxiliary processes.  Each PGPROC structure is dedicated to exactly
+	 * one of these purposes, and they do not move between groups.
 	 */
 	procs = (PGPROC *) ShmemAlloc(TotalProcs * sizeof(PGPROC));
 	MemSet(procs, 0, TotalProcs * sizeof(PGPROC));
 	ProcGlobal->allProcs = procs;
-	/* XXX allProcCount isn't really all of them; it excludes prepared xacts */
 	ProcGlobal->allProcCount = MaxBackends + NUM_AUXILIARY_PROCS;
 
 	/*
@@ -206,17 +204,10 @@ InitProcGlobal(void)
 	{
 		/* Common initialization for all PGPROCs, regardless of type. */
 
-		/*
-		 * Set up per-PGPROC semaphore, latch, and fpInfoLock.  Prepared xact
-		 * dummy PGPROCs don't need these though - they're never associated
-		 * with a real process
-		 */
-		if (i < MaxBackends + NUM_AUXILIARY_PROCS)
-		{
-			procs[i].sem = PGSemaphoreCreate();
-			InitSharedLatch(&(procs[i].procLatch));
-			LWLockInitialize(&(procs[i].fpInfoLock), LWTRANCHE_LOCK_FASTPATH);
-		}
+		/* Set up per-PGPROC semaphore, latch, and fpInfoLock. */
+		procs[i].sem = PGSemaphoreCreate();
+		InitSharedLatch(&(procs[i].procLatch));
+		LWLockInitialize(&(procs[i].fpInfoLock), LWTRANCHE_LOCK_FASTPATH);
 		procs[i].pgprocno = i;
 
 		/*
@@ -224,8 +215,7 @@ InitProcGlobal(void)
 		 * queued up on the appropriate free list.  Because there can only
 		 * ever be a small, fixed number of auxiliary processes, no free list
 		 * is used in that case; InitAuxiliaryProcess() instead uses a linear
-		 * search.  PGPROCs for prepared transactions are added to a free
-		 * list by TwoPhaseShmemInit().
+		 * search.
 		 */
 		if (i < MaxConnections)
 		{
@@ -908,9 +898,6 @@ AuxiliaryPidGetProc(int pid)
 {
 	PGPROC	   *result = NULL;
 	int			index;
-
-	if (pid == 0)				/* never match dummy PGPROCs */
-		return NULL;
 
 	for (index = 0; index < NUM_AUXILIARY_PROCS; index++)
 	{

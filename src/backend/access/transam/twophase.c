@@ -1436,8 +1436,6 @@ FinishPreparedTransaction(const char *gid, bool isCommit)
 	else
 		ProcessRecords(bufptr, xid, twophase_postabort_callbacks);
 
-	PredicateLockTwoPhaseFinish(xid, isCommit);
-
 	/*
 	 * Read this value while holding the two-phase lock, as the on-disk 2PC
 	 * file is physically removed after the lock is released.

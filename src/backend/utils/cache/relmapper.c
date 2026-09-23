@@ -504,25 +504,6 @@ AtEOXact_RelationMap(bool isCommit)
 }
 
 /*
- * AtPrepare_RelationMap
- *
- * Handle relation mapping at PREPARE.
- *
- * Currently, we don't support preparing any transaction that changes the map.
- */
-void
-AtPrepare_RelationMap(void)
-{
-	if (active_shared_updates.num_mappings != 0 ||
-		active_local_updates.num_mappings != 0 ||
-		pending_shared_updates.num_mappings != 0 ||
-		pending_local_updates.num_mappings != 0)
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot PREPARE a transaction that modified relation mapping")));
-}
-
-/*
  * CheckPointRelationMap
  *
  * This is called during a checkpoint.  It must ensure that any relation map

@@ -49,7 +49,6 @@ extern void RelationMapInvalidateAll(void);
 
 extern void AtCCI_RelationMap(void);
 extern void AtEOXact_RelationMap(bool isCommit);
-extern void AtPrepare_RelationMap(void);
 
 extern void CheckPointRelationMap(void);
 

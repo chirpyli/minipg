@@ -40,6 +40,5 @@ extern void smgrDoPendingSyncs(bool isCommit);
 extern int	smgrGetPendingDeletes(bool forCommit, RelFileNode **ptr);
 extern void AtSubCommit_smgr(void);
 extern void AtSubAbort_smgr(void);
-extern void PostPrepare_smgr(void);
 
 #endif							/* STORAGE_H */

@@ -826,24 +826,6 @@ PrepareInplaceInvalidationState(void)
 }
 
 /*
- * PostPrepare_Inval
- *		Clean up after successful PREPARE.
- *
- * Here, we want to act as though the transaction aborted, so that we will
- * undo any syscache changes it made, thereby bringing us into sync with the
- * outside world, which doesn't believe the transaction committed yet.
- *
- * If the prepared transaction is later aborted, there is nothing more to
- * do; if it commits, we will receive the consequent inval messages just
- * like everyone else.
- */
-void
-PostPrepare_Inval(void)
-{
-	AtEOXact_Inval(false);
-}
-
-/*
  * Collect invalidation messages into SharedInvalidMessagesArray array.
  */
 static void

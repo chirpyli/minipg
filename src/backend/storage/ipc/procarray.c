@@ -14,11 +14,6 @@
  * ProcGlobal->xids[]/MyProc->xid).  See notes in
  * src/backend/access/transam/README.
  *
- * The process arrays now also include structures representing prepared
- * transactions.  The xid and subxids fields of these are valid, as are the
- * myProcLocks lists.  They can be distinguished from regular backend PGPROCs
- * at need by checking for pid == 0.
- *
  * During hot standby, we also keep a list of XIDs representing transactions
  * that are known to be running on the primary (or more precisely, were running
  * as of the current point in the WAL stream).  This list is kept in the
@@ -294,7 +289,7 @@ ProcArrayShmemSize(void)
 	Size		size;
 
 	/* Size of the ProcArray structure itself */
-#define PROCARRAY_MAXPROCS	(MaxBackends + max_prepared_xacts)
+#define PROCARRAY_MAXPROCS	MaxBackends
 
 	size = offsetof(ProcArrayStruct, pgprocnos);
 	size = add_size(size, mul_size(sizeof(int), PROCARRAY_MAXPROCS));
@@ -763,70 +758,6 @@ ProcArrayGroupClearXid(PGPROC *proc, TransactionId latestXid)
 }
 
 /*
- * ProcArrayClearTransaction -- clear the transaction fields
- *
- * This is used after successfully preparing a 2-phase transaction.  We are
- * not actually reporting the transaction's XID as no longer running --- it
- * will still appear as running because the 2PC's gxact is in the ProcArray
- * too.  We just have to clear out our own PGPROC.
- */
-void
-ProcArrayClearTransaction(PGPROC *proc)
-{
-	int			pgxactoff;
-
-	/*
-	 * Currently we need to lock ProcArrayLock exclusively here, as we
-	 * increment xactCompletionCount below. We also need it at least in shared
-	 * mode for pgproc->pgxactoff to stay the same below.
-	 *
-	 * We could however, as this action does not actually change anyone's view
-	 * of the set of running XIDs (our entry is duplicate with the gxact that
-	 * has already been inserted into the ProcArray), lower the lock level to
-	 * shared if we were to make xactCompletionCount an atomic variable. But
-	 * that doesn't seem worth it currently, as a 2PC commit is heavyweight
-	 * enough for this not to be the bottleneck.  If it ever becomes a
-	 * bottleneck it may also be worth considering to combine this with the
-	 * subsequent ProcArrayRemove()
-	 */
-	LWLockAcquire(ProcArrayLock, LW_EXCLUSIVE);
-
-	pgxactoff = proc->pgxactoff;
-
-	ProcGlobal->xids[pgxactoff] = InvalidTransactionId;
-	proc->xid = InvalidTransactionId;
-
-	proc->lxid = InvalidLocalTransactionId;
-	proc->xmin = InvalidTransactionId;
-
-	Assert(!(proc->statusFlags & PROC_VACUUM_STATE_MASK));
-	Assert(!proc->delayChkpt);
-	Assert(!proc->delayChkptEnd);
-
-	/*
-	 * Need to increment completion count even though transaction hasn't
-	 * really committed yet. The reason for that is that GetSnapshotData()
-	 * omits the xid of the current transaction, thus without the increment we
-	 * otherwise could end up reusing the snapshot later. Which would be bad,
-	 * because it might not count the prepared transaction as running.
-	 */
-	ShmemVariableCache->xactCompletionCount++;
-
-	/* Clear the subtransaction-XID cache too */
-	Assert(ProcGlobal->subxidStates[pgxactoff].count == proc->subxidStatus.count &&
-		   ProcGlobal->subxidStates[pgxactoff].overflowed == proc->subxidStatus.overflowed);
-	if (proc->subxidStatus.count > 0 || proc->subxidStatus.overflowed)
-	{
-		ProcGlobal->subxidStates[pgxactoff].count = 0;
-		ProcGlobal->subxidStates[pgxactoff].overflowed = false;
-		proc->subxidStatus.count = 0;
-		proc->subxidStatus.overflowed = false;
-	}
-
-	LWLockRelease(ProcArrayLock);
-}
-
-/*
  * Update ShmemVariableCache->latestCompletedXid to point to latestXid if
  * currently older.
  */
@@ -1100,8 +1031,6 @@ TransactionIdIsActive(TransactionId xid)
 
 	for (i = 0; i < arrayP->numProcs; i++)
 	{
-		int			pgprocno = arrayP->pgprocnos[i];
-		PGPROC	   *proc = &allProcs[pgprocno];
 		TransactionId pxid;
 
 		/* Fetch xid just once - see GetNewTransactionId */
@@ -1109,9 +1038,6 @@ TransactionIdIsActive(TransactionId xid)
 
 		if (!TransactionIdIsValid(pxid))
 			continue;
-
-		if (proc->pid == 0)
-			continue;			/* ignore prepared transactions */
 
 		if (TransactionIdEquals(pxid, xid))
 		{
@@ -2009,8 +1935,7 @@ ProcArrayInstallRestoredXmin(TransactionId xmin, PGPROC *proc)
  * GetRunningTransactionData -- returns information about running transactions.
  *
  * Similar to GetSnapshotData but returns more information. We include
- * all PGPROCs with an assigned TransactionId, even VACUUM processes and
- * prepared transactions.
+ * all PGPROCs with an assigned TransactionId, even VACUUM processes.
  *
  * We acquire XidGenLock and ProcArrayLock, but the caller is responsible for
  * releasing them. Acquiring XidGenLock ensures that no new XIDs enter the proc
@@ -2023,11 +1948,6 @@ ProcArrayInstallRestoredXmin(TransactionId xmin, PGPROC *proc)
  *
  * This is never executed during recovery so there is no need to look at
  * KnownAssignedXids.
- *
- * Dummy PGPROCs from prepared transaction are included, meaning that this
- * may return entries with duplicated TransactionId values coming from
- * transaction finishing to prepare.  Nothing is done about duplicated
- * entries here to not hold on ProcArrayLock more than necessary.
  *
  * We don't worry about updating other counters, we want to keep this as
  * simple as possible and leave GetSnapshotData() as the primary code for
@@ -2426,9 +2346,6 @@ BackendPidGetProc(int pid)
 {
 	PGPROC	   *result;
 
-	if (pid == 0)				/* never match dummy PGPROCs */
-		return NULL;
-
 	LWLockAcquire(ProcArrayLock, LW_SHARED);
 
 	result = BackendPidGetProcWithLock(pid);
@@ -2451,9 +2368,6 @@ BackendPidGetProcWithLock(int pid)
 	ProcArrayStruct *arrayP = procArray;
 	int			index;
 
-	if (pid == 0)				/* never match dummy PGPROCs */
-		return NULL;
-
 	for (index = 0; index < arrayP->numProcs; index++)
 	{
 		PGPROC	   *proc = &allProcs[arrayP->pgprocnos[index]];
@@ -2471,7 +2385,7 @@ BackendPidGetProcWithLock(int pid)
 /*
  * BackendXidGetPid -- get a backend's pid given its XID
  *
- * Returns 0 if not found or it's a prepared transaction.  Note that
+ * Returns 0 if not found.  Note that
  * it is up to the caller to be sure that the question remains
  * meaningful for long enough for the answer to be used ...
  *
@@ -2667,10 +2581,6 @@ GetConflictingVirtualXIDs(TransactionId limitXmin, Oid dbOid)
 		int			pgprocno = arrayP->pgprocnos[index];
 		PGPROC	   *proc = &allProcs[pgprocno];
 
-		/* Exclude prepared transactions */
-		if (proc->pid == 0)
-			continue;
-
 		if (!OidIsValid(dbOid) ||
 			proc->databaseId == dbOid)
 		{
@@ -2753,8 +2663,6 @@ MinimumActiveBackends(int min)
 			continue;			/* do not count myself */
 		if (proc->xid == InvalidTransactionId)
 			continue;			/* do not count if no XID assigned */
-		if (proc->pid == 0)
-			continue;			/* do not count prepared xacts */
 		if (proc->waitLock != NULL)
 			continue;			/* do not count if blocked on a lock */
 		count++;
@@ -2782,8 +2690,6 @@ CountDBBackends(Oid databaseid)
 		int			pgprocno = arrayP->pgprocnos[index];
 		PGPROC	   *proc = &allProcs[pgprocno];
 
-		if (proc->pid == 0)
-			continue;			/* do not count prepared xacts */
 		if (!OidIsValid(databaseid) ||
 			proc->databaseId == databaseid)
 			count++;
@@ -2811,8 +2717,6 @@ CountDBConnections(Oid databaseid)
 		int			pgprocno = arrayP->pgprocnos[index];
 		PGPROC	   *proc = &allProcs[pgprocno];
 
-		if (proc->pid == 0)
-			continue;			/* do not count prepared xacts */
 		if (!OidIsValid(databaseid) ||
 			proc->databaseId == databaseid)
 			count++;
@@ -2841,8 +2745,6 @@ CountUserBackends(Oid roleid)
 		int			pgprocno = arrayP->pgprocnos[index];
 		PGPROC	   *proc = &allProcs[pgprocno];
 
-		if (proc->pid == 0)
-			continue;			/* do not count prepared xacts */
 		if (proc->roleId == roleid)
 			count++;
 	}
@@ -2862,8 +2764,7 @@ CountUserBackends(Oid roleid)
  * check whether the current backend uses the given DB, if it's important.
  *
  * Returns true if there are (still) other backends in the DB, false if not.
- * Also, *nbackends and *nprepared are set to the number of other backends
- * and prepared transactions in the DB, respectively.
+ * Also, *nbackends is set to the number of other backends in the DB.
  *
  * This function is used to interlock DROP DATABASE and related commands
  * against there being any active backends in the target DB --- dropping the
@@ -2875,7 +2776,7 @@ CountUserBackends(Oid roleid)
  * indefinitely.
  */
 bool
-CountOtherDBBackends(Oid databaseId, int *nbackends, int *nprepared)
+CountOtherDBBackends(Oid databaseId, int *nbackends)
 {
 	ProcArrayStruct *arrayP = procArray;
 
@@ -2889,7 +2790,7 @@ CountOtherDBBackends(Oid databaseId, int *nbackends, int *nprepared)
 
 		CHECK_FOR_INTERRUPTS();
 
-		*nbackends = *nprepared = 0;
+		*nbackends = 0;
 
 		LWLockAcquire(ProcArrayLock, LW_SHARED);
 
@@ -2905,10 +2806,7 @@ CountOtherDBBackends(Oid databaseId, int *nbackends, int *nprepared)
 
 			found = true;
 
-			if (proc->pid == 0)
-				(*nprepared)++;
-			else
-				(*nbackends)++;
+			(*nbackends)++;
 		}
 
 		LWLockRelease(ProcArrayLock);
@@ -2930,16 +2828,12 @@ CountOtherDBBackends(Oid databaseId, int *nbackends, int *nprepared)
  *
  * The current backend is always ignored; it is caller's responsibility to
  * check whether the current backend uses the given DB, if it's important.
- *
- * If the target database has a prepared transaction or permissions checks
- * fail for a connection, this fails without terminating anything.
  */
 void
 TerminateOtherDBBackends(Oid databaseId)
 {
 	ProcArrayStruct *arrayP = procArray;
 	List	   *pids = NIL;
-	int			nprepared = 0;
 	int			i;
 
 	LWLockAcquire(ProcArrayLock, LW_SHARED);
@@ -2954,23 +2848,10 @@ TerminateOtherDBBackends(Oid databaseId)
 		if (proc == MyProc)
 			continue;
 
-		if (proc->pid != 0)
-			pids = lappend_int(pids, proc->pid);
-		else
-			nprepared++;
+		pids = lappend_int(pids, proc->pid);
 	}
 
 	LWLockRelease(ProcArrayLock);
-
-	if (nprepared > 0)
-		ereport(ERROR,
-				(errcode(ERRCODE_OBJECT_IN_USE),
-				 errmsg("database \"%s\" is being used by prepared transactions",
-						get_database_name(databaseId)),
-				 errdetail_plural("There is %d prepared transaction using the database.",
-								  "There are %d prepared transactions using the database.",
-								  nprepared,
-								  nprepared)));
 
 	if (pids)
 	{

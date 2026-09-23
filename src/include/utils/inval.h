@@ -34,8 +34,6 @@ extern void ForgetInplace_Inval(void);
 
 extern void AtEOSubXact_Inval(bool isCommit);
 
-extern void PostPrepare_Inval(void);
-
 extern void CommandEndInvalidationMessages(void);
 
 extern void CacheInvalidateHeapTuple(Relation relation,

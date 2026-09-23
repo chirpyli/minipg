@@ -122,8 +122,6 @@ extern int	multixactoffsetssyncfiletag(const FileTag *ftag, char *path);
 extern int	multixactmemberssyncfiletag(const FileTag *ftag, char *path);
 
 extern void AtEOXact_MultiXact(void);
-extern void AtPrepare_MultiXact(void);
-extern void PostPrepare_MultiXact(TransactionId xid);
 
 extern Size MultiXactShmemSize(void);
 extern void MultiXactShmemInit(void);
@@ -147,13 +145,6 @@ extern void MultiXactAdvanceNextMXact(MultiXactId minMulti,
 									  MultiXactOffset minMultiOffset);
 extern void MultiXactAdvanceOldest(MultiXactId oldestMulti, Oid oldestMultiDB);
 extern int	MultiXactMemberFreezeThreshold(void);
-
-extern void multixact_twophase_recover(TransactionId xid, uint16 info,
-									   void *recdata, uint32 len);
-extern void multixact_twophase_postcommit(TransactionId xid, uint16 info,
-										  void *recdata, uint32 len);
-extern void multixact_twophase_postabort(TransactionId xid, uint16 info,
-										 void *recdata, uint32 len);
 
 extern void multixact_redo(XLogReaderState *record);
 extern void multixact_desc(StringInfo buf, XLogReaderState *record);

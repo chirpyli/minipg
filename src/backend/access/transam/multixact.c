@@ -238,9 +238,9 @@ typedef struct MultiXactStateData
 	 * immediately following the MultiXactStateData struct. Each is indexed by
 	 * BackendId.
 	 *
-	 * In both arrays, there's a slot for all normal backends (1..MaxBackends)
-	 * followed by a slot for max_prepared_xacts prepared transactions. Valid
-	 * BackendIds start from 1; element zero of each array is never used.
+	 * In both arrays, there's a slot for all normal backends
+	 * (1..MaxBackends). Valid BackendIds start from 1; element zero of each
+	 * array is never used.
 	 *
 	 * OldestMemberMXactId[k] is the oldest MultiXactId each backend's current
 	 * transaction(s) could possibly be a member of, or InvalidMultiXactId
@@ -285,7 +285,7 @@ typedef struct MultiXactStateData
  * Last element of OldestMemberMXactId and OldestVisibleMXactId arrays.
  * Valid elements are (1..MaxOldestSlot); element 0 is never used.
  */
-#define MaxOldestSlot	(MaxBackends + max_prepared_xacts)
+#define MaxOldestSlot	MaxBackends
 
 /* Pointers to the state data in shared memory */
 static MultiXactStateData *MultiXactState;
@@ -1813,120 +1813,6 @@ AtEOXact_MultiXact(void)
 	MXactContext = NULL;
 	dlist_init(&MXactCache);
 	MXactCacheMembers = 0;
-}
-
-/*
- * AtPrepare_MultiXact
- *		Save multixact state at 2PC transaction prepare
- *
- * In this phase, we only store our OldestMemberMXactId value in the two-phase
- * state file.
- */
-void
-AtPrepare_MultiXact(void)
-{
-	MultiXactId myOldestMember = OldestMemberMXactId[MyBackendId];
-
-	if (MultiXactIdIsValid(myOldestMember))
-		RegisterTwoPhaseRecord(TWOPHASE_RM_MULTIXACT_ID, 0,
-							   &myOldestMember, sizeof(MultiXactId));
-}
-
-/*
- * PostPrepare_MultiXact
- *		Clean up after successful PREPARE TRANSACTION
- */
-void
-PostPrepare_MultiXact(TransactionId xid)
-{
-	MultiXactId myOldestMember;
-
-	/*
-	 * Transfer our OldestMemberMXactId value to the slot reserved for the
-	 * prepared transaction.
-	 */
-	myOldestMember = OldestMemberMXactId[MyBackendId];
-	if (MultiXactIdIsValid(myOldestMember))
-	{
-		BackendId	dummyBackendId = TwoPhaseGetDummyBackendId(xid, false);
-
-		/*
-		 * Even though storing MultiXactId is atomic, acquire lock to make
-		 * sure others see both changes, not just the reset of the slot of the
-		 * current backend. Using a volatile pointer might suffice, but this
-		 * isn't a hot spot.
-		 */
-		LWLockAcquire(MultiXactGenLock, LW_EXCLUSIVE);
-
-		OldestMemberMXactId[dummyBackendId] = myOldestMember;
-		OldestMemberMXactId[MyBackendId] = InvalidMultiXactId;
-
-		LWLockRelease(MultiXactGenLock);
-	}
-
-	/*
-	 * We don't need to transfer OldestVisibleMXactId value, because the
-	 * transaction is not going to be looking at any more multixacts once it's
-	 * prepared.
-	 *
-	 * We assume that storing a MultiXactId is atomic and so we need not take
-	 * MultiXactGenLock to do this.
-	 */
-	OldestVisibleMXactId[MyBackendId] = InvalidMultiXactId;
-
-	/*
-	 * Discard the local MultiXactId cache like in AtEOXact_MultiXact.
-	 */
-	MXactContext = NULL;
-	dlist_init(&MXactCache);
-	MXactCacheMembers = 0;
-}
-
-/*
- * multixact_twophase_recover
- *		Recover the state of a prepared transaction at startup
- */
-void
-multixact_twophase_recover(TransactionId xid, uint16 info,
-						   void *recdata, uint32 len)
-{
-	BackendId	dummyBackendId = TwoPhaseGetDummyBackendId(xid, false);
-	MultiXactId oldestMember;
-
-	/*
-	 * Get the oldest member XID from the state file record, and set it in the
-	 * OldestMemberMXactId slot reserved for this prepared transaction.
-	 */
-	Assert(len == sizeof(MultiXactId));
-	oldestMember = *((MultiXactId *) recdata);
-
-	OldestMemberMXactId[dummyBackendId] = oldestMember;
-}
-
-/*
- * multixact_twophase_postcommit
- *		Similar to AtEOXact_MultiXact but for COMMIT PREPARED
- */
-void
-multixact_twophase_postcommit(TransactionId xid, uint16 info,
-							  void *recdata, uint32 len)
-{
-	BackendId	dummyBackendId = TwoPhaseGetDummyBackendId(xid, true);
-
-	Assert(len == sizeof(MultiXactId));
-
-	OldestMemberMXactId[dummyBackendId] = InvalidMultiXactId;
-}
-
-/*
- * multixact_twophase_postabort
- *		This is actually just the same as the COMMIT case.
- */
-void
-multixact_twophase_postabort(TransactionId xid, uint16 info,
-							 void *recdata, uint32 len)
-{
-	multixact_twophase_postcommit(xid, info, recdata, len);
 }
 
 /*

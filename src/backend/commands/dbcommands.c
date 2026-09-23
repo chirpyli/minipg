@@ -73,7 +73,7 @@ static bool get_db_info(const char *name, LOCKMODE lockmode,
 						Oid *dbTablespace, char **dbCollate, char **dbCtype);
 static void remove_dbtablespaces(Oid db_id);
 static bool check_db_file_conflict(Oid db_id);
-static int	errdetail_busy_db(int notherbackends, int npreparedxacts);
+static int	errdetail_busy_db(int notherbackends);
 
 
 /*
@@ -120,7 +120,6 @@ createdb(ParseState *pstate, const CreatedbStmt *stmt)
 	bool		dballowconnections = true;
 	int			dbconnlimit = DATCONNLIMIT_UNLIMITED;
 	int			notherbackends;
-	int			npreparedxacts;
 	createdb_failure_params fparms;
 
 	/* Extract options from the statement node tree */
@@ -407,12 +406,12 @@ createdb(ParseState *pstate, const CreatedbStmt *stmt)
 	 * potential waiting; we may as well throw an error first if we're gonna
 	 * throw one.
 	 */
-	if (CountOtherDBBackends(src_dboid, &notherbackends, &npreparedxacts))
+	if (CountOtherDBBackends(src_dboid, &notherbackends))
 		ereport(ERROR,
 				(errcode(ERRCODE_OBJECT_IN_USE),
 				 errmsg("source database \"%s\" is being accessed by other users",
 						dbtemplate),
-				 errdetail_busy_db(notherbackends, npreparedxacts)));
+				 errdetail_busy_db(notherbackends)));
 
 	/*
 	 * Select an OID for the new database, checking that it doesn't have a
@@ -677,7 +676,6 @@ dropdb(const char *dbname, bool missing_ok, bool force)
 	void	   *inplace_state;
 	Form_pg_database datform;
 	int			notherbackends;
-	int			npreparedxacts;
 
 	/*
 	 * Look up the target database's OID, and get exclusive lock on it. We
@@ -738,12 +736,12 @@ dropdb(const char *dbname, bool missing_ok, bool force)
 	 *
 	 * As in CREATE DATABASE, check this after other error conditions.
 	 */
-	if (CountOtherDBBackends(db_id, &notherbackends, &npreparedxacts))
+	if (CountOtherDBBackends(db_id, &notherbackends))
 		ereport(ERROR,
 				(errcode(ERRCODE_OBJECT_IN_USE),
 				 errmsg("database \"%s\" is being accessed by other users",
 						dbname),
-				 errdetail_busy_db(notherbackends, npreparedxacts)));
+				 errdetail_busy_db(notherbackends)));
 
 	/*
 	 * Except for the deletion of the catalog row, subsequent actions are not
@@ -1117,26 +1115,13 @@ check_db_file_conflict(Oid db_id)
  * Issue a suitable errdetail message for a busy database
  */
 static int
-errdetail_busy_db(int notherbackends, int npreparedxacts)
+errdetail_busy_db(int notherbackends)
 {
-	if (notherbackends > 0 && npreparedxacts > 0)
-
-		/*
-		 * We don't deal with singular versus plural here, since gettext
-		 * doesn't support multiple plurals in one string.
-		 */
-		errdetail("There are %d other session(s) and %d prepared transaction(s) using the database.",
-				  notherbackends, npreparedxacts);
-	else if (notherbackends > 0)
+	if (notherbackends > 0)
 		errdetail_plural("There is %d other session using the database.",
 						 "There are %d other sessions using the database.",
 						 notherbackends,
 						 notherbackends);
-	else
-		errdetail_plural("There is %d prepared transaction using the database.",
-						 "There are %d prepared transactions using the database.",
-						 npreparedxacts,
-						 npreparedxacts);
 	return 0;					/* just to keep ereport macro happy */
 }
 

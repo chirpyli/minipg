@@ -105,13 +105,6 @@ typedef enum
  * 该锁的 waitProcs 等待队列中。一个被回收的 PGPROC 会被链接到 ProcGlobal 的
  * freeProcs 空闲链表中。
  *
- * 注：twophase.c 还会为当前每个已准备事务（prepared transaction）建立一个
- * 虚拟的 PGPROC 结构体。这些 PGPROC 会出现在 ProcArray 数据结构中，以便已准备
- * 事务看起来仍在运行，并正确地显示为持有着锁。一个已准备事务的 PGPROC 可以
- * 通过其 pid == 0 这一特征在需要时被区分于真实的 PGPROC。已准备事务 PGPROC
- * 中的信号量（semaphore）和锁活动相关字段未被使用，但它的 myProcLocks[] 链表
- * 是有效的。
- *
  * 我们允许在没有锁的情况下访问该结构体的许多字段，例如 delayChkpt。
  * 但是请注意，写入那些被镜像的字段（见下文）需要至少以
  * 共享模式持有 ProcArrayLock 或 XidGenLock，以免 pgxactoff 被并发地修改。
@@ -151,7 +144,7 @@ struct PGPROC
 	LocalTransactionId lxid;	/* local id of top-level transaction currently
 								 * being executed by this proc, if running;
 								 * else InvalidLocalTransactionId */
-	int			pid;			/* Backend's process ID; 0 if prepared xact */
+	int			pid;			/* Backend's process ID */
 
 	int			pgxactoff;		/* offset into various ProcGlobal->arrays with
 								 * data mirrored from this PGPROC */
@@ -301,7 +294,7 @@ extern PGDLLIMPORT PGPROC *MyProc;
  */
 typedef struct PROC_HDR
 {
-	/* Array of PGPROC structures (not including dummies for prepared txns) */
+	/* Array of PGPROC structures */
 	PGPROC	   *allProcs;
 
 	/* Array mirroring PGPROC.xid for each PGPROC currently in the procarray */

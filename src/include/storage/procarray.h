@@ -25,7 +25,6 @@ extern void ProcArrayAdd(PGPROC *proc);
 extern void ProcArrayRemove(PGPROC *proc, TransactionId latestXid);
 
 extern void ProcArrayEndTransaction(PGPROC *proc, TransactionId latestXid);
-extern void ProcArrayClearTransaction(PGPROC *proc);
 
 /*
  * Data structure for GetRunningTransactionData(). Similar to Snapshots, but
@@ -93,8 +92,7 @@ extern bool MinimumActiveBackends(int min);
 extern int	CountDBBackends(Oid databaseid);
 extern int	CountDBConnections(Oid databaseid);
 extern int	CountUserBackends(Oid roleid);
-extern bool CountOtherDBBackends(Oid databaseId,
-								 int *nbackends, int *nprepared);
+extern bool CountOtherDBBackends(Oid databaseId, int *nbackends);
 extern void TerminateOtherDBBackends(Oid databaseId);
 
 extern void XidCacheRemoveRunningXids(TransactionId xid,
