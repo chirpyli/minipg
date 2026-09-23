@@ -140,8 +140,6 @@ extern TimeLineID recoveryTargetTLI;
 extern int	CheckPointSegments;
 
 /* option set locally in startup process only when signal files exist */
-extern bool StandbyModeRequested;
-extern bool StandbyMode;
 
 /* WAL levels */
 typedef enum WalLevel

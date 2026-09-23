@@ -240,19 +240,6 @@ static bool LocalPromoteIsTriggered = false;
  */
 static int	LocalXLogInsertAllowed = -1;
 
-/*
- * When ArchiveRecoveryRequested is set, archive recovery was requested,
- * ie. signal files were present. When InArchiveRecovery is set, we are
- * currently recovering using offline XLOG archives. These variables are only
- * valid in the startup process.
- *
- * When ArchiveRecoveryRequested is true, but InArchiveRecovery is false, we're
- * currently performing crash recovery using only XLOG files in pg_wal, but
- * will switch to using offline XLOG archives as soon as we reach the end of
- * WAL in pg_wal.
-*/
-bool		ArchiveRecoveryRequested = false;
-bool		InArchiveRecovery = false;
 
 
 /* Was the last xlog file restored from archive, or local? */
@@ -276,24 +263,11 @@ XLogRecPtr	recoveryTargetLSN;
 int			recovery_min_apply_delay = 0;
 
 /* options formerly taken from recovery.conf for XLOG streaming */
-bool		StandbyModeRequested = false;
 char	   *PrimaryConnInfo = NULL;
 char	   *PrimarySlotName = NULL;
 char	   *PromoteTriggerFile = NULL;
 bool		wal_receiver_create_temp_slot = false;
 
-/* are we currently in standby mode? */
-bool		StandbyMode = false;
-
-/*
- * if recoveryStopsBefore/After returns true, it saves information of the stop
- * point here
- */
-static TransactionId recoveryStopXid;
-static TimestampTz recoveryStopTime;
-static XLogRecPtr recoveryStopLSN;
-static char recoveryStopName[MAXFNAMELEN];
-static bool recoveryStopAfter;
 
 /*
  * During normal operation, the only timeline we care about is ThisTimeLineID.
@@ -4194,57 +4168,6 @@ ReadRecord(XLogReaderState *xlogreader, int emode,
 			 * we'd have no idea how far we'd have to replay to reach
 			 * consistency.  So err on the safe side and give up.
 			 */
-			if (!InArchiveRecovery && ArchiveRecoveryRequested &&
-				!fetching_ckpt)
-			{
-				ereport(DEBUG1,
-						(errmsg_internal("reached end of WAL in pg_wal, entering archive recovery")));
-				InArchiveRecovery = true;
-				if (StandbyModeRequested)
-					StandbyMode = true;
-
-				/* initialize minRecoveryPoint to this record */
-				LWLockAcquire(ControlFileLock, LW_EXCLUSIVE);
-				ControlFile->state = DB_IN_ARCHIVE_RECOVERY;
-				if (ControlFile->minRecoveryPoint < EndRecPtr)
-				{
-					ControlFile->minRecoveryPoint = EndRecPtr;
-					ControlFile->minRecoveryPointTLI = ThisTimeLineID;
-				}
-				/* update local copy */
-				minRecoveryPoint = ControlFile->minRecoveryPoint;
-				minRecoveryPointTLI = ControlFile->minRecoveryPointTLI;
-
-				/*
-				 * The startup process can update its local copy of
-				 * minRecoveryPoint from this point.
-				 */
-				updateMinRecoveryPoint = true;
-
-				UpdateControlFile();
-
-				/*
-				 * We update SharedRecoveryState while holding the lock on
-				 * ControlFileLock so both states are consistent in shared
-				 * memory.
-				 */
-				SpinLockAcquire(&XLogCtl->info_lck);
-				XLogCtl->SharedRecoveryState = RECOVERY_STATE_ARCHIVE;
-				SpinLockRelease(&XLogCtl->info_lck);
-
-				LWLockRelease(ControlFileLock);
-
-				CheckRecoveryConsistency();
-
-				/*
-				 * Before we retry, reset lastSourceFailed and currentSource
-				 * so that we will check the archive next.
-				 */
-				lastSourceFailed = false;
-				currentSource = XLOG_FROM_ANY;
-
-				continue;
-			}
 
 			/* Not in standby mode, give up. */
 			return NULL;
@@ -5463,16 +5386,8 @@ StartupXLOG(void)
 		 * startup process to think that there are still invalid page
 		 * references when checking for data consistency.
 		 */
-		if (InArchiveRecovery)
-		{
-			minRecoveryPoint = ControlFile->minRecoveryPoint;
-			minRecoveryPointTLI = ControlFile->minRecoveryPointTLI;
-		}
-		else
-		{
-			minRecoveryPoint = InvalidXLogRecPtr;
-			minRecoveryPointTLI = 0;
-		}
+		minRecoveryPoint = InvalidXLogRecPtr;
+		minRecoveryPointTLI = 0;
 
 		/*
 		 * Reset pgstat data, because it may be invalid after recovery.
@@ -5752,30 +5667,7 @@ StartupXLOG(void)
 
 		}
 
-		/*
-		 * This check is intentionally after the above log messages that
-		 * indicate how far recovery went.
-		 */
-		if (ArchiveRecoveryRequested &&
-			recoveryTarget != RECOVERY_TARGET_UNSET &&
-			!reachedRecoveryTarget)
-			ereport(FATAL,
-					(errmsg("recovery ended before configured recovery target was reached")));
 	}
-
-	/*
-	 * We don't need the latch anymore. It's not strictly necessary to disown
-	 * it, but let's do it for the sake of tidiness.
-	 */
-	if (ArchiveRecoveryRequested)
-		DisownLatch(&XLogCtl->recoveryWakeupLatch);
-
-	/*
-	 * We are now done reading the xlog from archive/stream. Turn off standby
-	 * mode so that subsequent steps fetch any required files from archive or
-	 * pg_wal.
-	 */
-	StandbyMode = false;
 
 	/*
 	 * Determine where to start writing WAL next.
@@ -5809,28 +5701,19 @@ StartupXLOG(void)
 		 !XLogRecPtrIsInvalid(ControlFile->backupStartPoint)))
 	{
 		/*
-		 * Ran off end of WAL before reaching end-of-backup WAL record, or
-		 * minRecoveryPoint. That's usually a bad sign, indicating that you
-		 * tried to recover from an online backup but never called
-		 * pg_stop_backup(), or you didn't archive all the WAL up to that
-		 * point. However, this also happens in crash recovery, if the system
-		 * crashes while an online backup is in progress. We must not treat
-		 * that as an error, or the database will refuse to start up.
+		 * Ran off end of WAL before reaching end-of-backup WAL record. This
+		 * usually happens in crash recovery, if the system crashes while an
+		 * online backup is in progress. We must not treat that as an error,
+		 * or the database will refuse to start up.
 		 */
-		if (ArchiveRecoveryRequested || ControlFile->backupEndRequired)
-		{
-			if (ControlFile->backupEndRequired)
-				ereport(FATAL,
-						(errmsg("WAL ends before end of online backup"),
-						 errhint("All WAL generated while online backup was taken must be available at recovery.")));
-			else if (!XLogRecPtrIsInvalid(ControlFile->backupStartPoint))
-				ereport(FATAL,
-						(errmsg("WAL ends before end of online backup"),
-						 errhint("Online backup started with pg_start_backup() must be ended with pg_stop_backup(), and all WAL up to that point must be available at recovery.")));
-			else
-				ereport(FATAL,
-						(errmsg("WAL ends before consistent recovery point")));
-		}
+		if (ControlFile->backupEndRequired)
+			ereport(FATAL,
+					(errmsg("WAL ends before end of online backup"),
+					 errhint("All WAL generated while online backup was taken must be available at recovery.")));
+		else if (!XLogRecPtrIsInvalid(ControlFile->backupStartPoint))
+			ereport(FATAL,
+					(errmsg("WAL ends before end of online backup"),
+					 errhint("Online backup started with pg_start_backup() must be ended with pg_stop_backup(), and all WAL up to that point must be available at recovery.")));
 	}
 
 	/*
@@ -5863,69 +5746,6 @@ StartupXLOG(void)
 	 * In a normal crash recovery, we can just extend the timeline we were in.
 	 */
 	PrevTimeLineID = ThisTimeLineID;
-	if (ArchiveRecoveryRequested)
-	{
-		char		reason[200];
-		char		recoveryPath[MAXPGPATH];
-
-		Assert(InArchiveRecovery);
-
-		ThisTimeLineID = findNewestTimeLine(recoveryTargetTLI) + 1;
-		ereport(LOG,
-				(errmsg("selected new timeline ID: %u", ThisTimeLineID)));
-
-		/*
-		 * Create a comment for the history file to explain why and where
-		 * timeline changed.
-		 */
-		if (recoveryTarget == RECOVERY_TARGET_XID)
-			snprintf(reason, sizeof(reason),
-					 "%s transaction %u",
-					 recoveryStopAfter ? "after" : "before",
-					 recoveryStopXid);
-		else if (recoveryTarget == RECOVERY_TARGET_TIME)
-			snprintf(reason, sizeof(reason),
-					 "%s %s\n",
-					 recoveryStopAfter ? "after" : "before",
-					 timestamptz_to_str(recoveryStopTime));
-		else if (recoveryTarget == RECOVERY_TARGET_LSN)
-			snprintf(reason, sizeof(reason),
-					 "%s LSN %X/%X\n",
-					 recoveryStopAfter ? "after" : "before",
-					 LSN_FORMAT_ARGS(recoveryStopLSN));
-		else if (recoveryTarget == RECOVERY_TARGET_NAME)
-			snprintf(reason, sizeof(reason),
-					 "at restore point \"%s\"",
-					 recoveryStopName);
-		else if (recoveryTarget == RECOVERY_TARGET_IMMEDIATE)
-			snprintf(reason, sizeof(reason), "reached consistency");
-		else
-			snprintf(reason, sizeof(reason), "no recovery target specified");
-
-		/*
-		 * Write the timeline history file, and have it archived. After this
-		 * point (or rather, as soon as the file is archived), the timeline
-		 * will appear as "taken" in the WAL archive and to any standby
-		 * servers.  If we crash before actually switching to the new
-		 * timeline, standby servers will nevertheless think that we switched
-		 * to the new timeline, and will try to connect to the new timeline.
-		 * To minimize the window for that, try to do as little as possible
-		 * between here and writing the end-of-recovery record.
-		 */
-		writeTimeLineHistory(ThisTimeLineID, recoveryTargetTLI,
-							 EndRecPtr, reason);
-
-		/*
-		 * Since there might be a partial WAL segment named RECOVERYXLOG, get
-		 * rid of it.
-		 */
-		snprintf(recoveryPath, MAXPGPATH, XLOGDIR "/RECOVERYXLOG");
-		unlink(recoveryPath);	/* ignore any error */
-
-		/* Get rid of any remaining recovered timeline-history file, too */
-		snprintf(recoveryPath, MAXPGPATH, XLOGDIR "/RECOVERYHISTORY");
-		unlink(recoveryPath);	/* ignore any error */
-	}
 
 	/* Save the selected TimeLineID in shared memory, too */
 	XLogCtl->ThisTimeLineID = ThisTimeLineID;
@@ -6155,57 +5975,6 @@ StartupXLOG(void)
 	LocalSetXLogInsertAllowed();
 	XLogReportParameters();
 
-	if (ArchiveRecoveryRequested)
-	{
-		/*
-		 * And finally, execute the recovery_end_command, if any.
-		 */
-		if (recoveryEndCommand && strcmp(recoveryEndCommand, "") != 0)
-			ExecuteRecoveryCommand(recoveryEndCommand,
-								   "recovery_end_command",
-								   true);
-
-		/*
-		 * We switched to a new timeline. Clean up segments on the old
-		 * timeline.
-		 *
-		 * If there are any higher-numbered segments on the old timeline,
-		 * remove them. They might contain valid WAL, but they might also be
-		 * pre-allocated files containing garbage. In any case, they are not
-		 * part of the new timeline's history so we don't need them.
-		 */
-		RemoveNonParentXlogFiles(EndOfLog, ThisTimeLineID);
-
-		/*
-		 * If the switch happened in the middle of a segment, what to do with
-		 * the last, partial segment on the old timeline? If we don't archive
-		 * it, and the server that created the WAL never archives it either
-		 * (e.g. because it was hit by a meteor), it will never make it to the
-		 * archive. That's OK from our point of view, because the new segment
-		 * that we created with the new TLI contains all the WAL from the old
-		 * timeline up to the switch point. But if you later try to do PITR to
-		 * the "missing" WAL on the old timeline, recovery won't find it in
-		 * the archive. It's physically present in the new file with new TLI,
-		 * but recovery won't look there when it's recovering to the older
-		 * timeline. On the other hand, if we archive the partial segment, and
-		 * the original server on that timeline is still running and archives
-		 * the completed version of the same segment later, it will fail. (We
-		 * used to do that in 9.4 and below, and it caused such problems).
-		 *
-		 * As a compromise, we rename the last segment with the .partial
-		 * suffix, and archive it. Archive recovery will never try to read
-		 * .partial segments, so they will normally go unused. But in the odd
-		 * PITR case, the administrator can copy them manually to the pg_wal
-		 * directory (removing the suffix). They can be useful in debugging,
-		 * too.
-		 *
-		 * If a .done or .ready file already exists for the old timeline,
-		 * however, we had already determined that the segment is complete, so
-		 * we can let it be archived normally. (In particular, if it was
-		 * restored from the archive to begin with, it's expected to have a
-		 * .done file).
-		 */
-	}
 
 	/*
 	 * All done with end-of-recovery actions.
@@ -6269,7 +6038,6 @@ CheckRecoveryConsistency(void)
 	if (XLogRecPtrIsInvalid(minRecoveryPoint))
 		return;
 
-	Assert(InArchiveRecovery);
 
 	/*
 	 * assume that we are called in the startup process, and hence don't need
@@ -8193,11 +7961,6 @@ xlog_redo(XLogReaderState *record)
 		 * local copies cannot be updated as long as crash recovery is
 		 * happening and we expect all the WAL to be replayed.
 		 */
-		if (InArchiveRecovery)
-		{
-			minRecoveryPoint = ControlFile->minRecoveryPoint;
-			minRecoveryPointTLI = ControlFile->minRecoveryPointTLI;
-		}
 		if (minRecoveryPoint != InvalidXLogRecPtr && minRecoveryPoint < lsn)
 		{
 			ControlFile->minRecoveryPoint = lsn;
@@ -9713,7 +9476,6 @@ XLogPageRead(XLogReaderState *xlogreader, XLogRecPtr targetPagePtr, int reqLen,
 
 	XLByteToSeg(targetPagePtr, readSegNo, wal_segment_size);
 
-retry:
 	/* See if we need to retrieve more data */
 	if (readFile < 0 ||
 		(readSource == XLOG_FROM_STREAM &&
@@ -9823,23 +9585,6 @@ retry:
 	 * page header here for the retry. Instead, ReadPageInternal() is
 	 * responsible for the validation.
 	 */
-	if (StandbyMode &&
-		(targetPagePtr % wal_segment_size) == 0 &&
-		!XLogReaderValidatePageHeader(xlogreader, targetPagePtr, readBuf))
-	{
-		/*
-		 * Emit this error right now then retry this page immediately. Use
-		 * errmsg_internal() because the message was already translated.
-		 */
-		if (xlogreader->errormsg_buf[0])
-			ereport(emode_for_corrupt_record(emode, EndRecPtr),
-					(errmsg_internal("%s", xlogreader->errormsg_buf)));
-
-		/* reset any error XLogReaderValidatePageHeader() might have set */
-		xlogreader->errormsg_buf[0] = '\0';
-		goto next_record_is_invalid;
-	}
-
 	return readLen;
 
 next_record_is_invalid:
@@ -9851,11 +9596,7 @@ next_record_is_invalid:
 	readLen = 0;
 	readSource = XLOG_FROM_ANY;
 
-	/* In standby-mode, keep trying */
-	if (StandbyMode)
-		goto retry;
-	else
-		return -1;
+	return -1;
 }
 
 /*
@@ -9917,13 +9658,7 @@ WaitForWALToBecomeAvailable(XLogRecPtr RecPtr, bool randAccess,
 	 * the end of recovery.
 	 *-------
 	 */
-	if (!InArchiveRecovery)
-		currentSource = XLOG_FROM_PG_WAL;
-	else if (currentSource == XLOG_FROM_ANY)
-	{
-		lastSourceFailed = false;
-		currentSource = XLOG_FROM_ARCHIVE;
-	}
+	currentSource = XLOG_FROM_PG_WAL;
 
 	for (;;)
 	{
@@ -9982,16 +9717,7 @@ WaitForWALToBecomeAvailable(XLogRecPtr RecPtr, bool randAccess,
 					elog(ERROR, "unexpected WAL source %d", currentSource);
 			}
 		}
-		else if (currentSource == XLOG_FROM_PG_WAL)
-		{
-			/*
-			 * We just successfully read a file in pg_wal. We prefer files in
-			 * the archive over ones in pg_wal, so try the next file again
-			 * from the archive first.
-			 */
-			if (InArchiveRecovery)
-				currentSource = XLOG_FROM_ARCHIVE;
-		}
+
 
 		if (currentSource != oldSource)
 			elog(DEBUG2, "switched WAL source from %s to %s after %s",
