@@ -1164,13 +1164,9 @@ preprocess_rowmarks(PlannerInfo *root)
 			continue;
 
 		newrc = makeNode(PlanRowMark);
-		newrc->rti = newrc->prti = i;
+		newrc->rti = i;
 		newrc->rowmarkId = ++(root->glob->lastRowMarkId);
-		newrc->markType = select_rowmark_type(rte, LCS_NONE);
-		newrc->allMarkTypes = (1 << newrc->markType);
-		newrc->strength = LCS_NONE;
-		newrc->waitPolicy = LockWaitBlock;	/* doesn't matter */
-		newrc->isParent = false;
+		newrc->markType = select_rowmark_type(rte);
 
 		prowmarks = lappend(prowmarks, newrc);
 	}
@@ -1182,21 +1178,16 @@ preprocess_rowmarks(PlannerInfo *root)
  * Select RowMarkType to use for a given table
  */
 RowMarkType
-select_rowmark_type(RangeTblEntry *rte, LockClauseStrength strength)
+select_rowmark_type(RangeTblEntry *rte)
 {
+	/*
+	 * We only need the ability to re-fetch the row: rows of a plain table can
+	 * be fetched by TID, anything else has to be copied.
+	 */
 	if (rte->rtekind != RTE_RELATION)
-	{
-		/* If it's not a table at all, use ROW_MARK_COPY */
 		return ROW_MARK_COPY;
-	}
 	else
-	{
-		/*
-		 * We don't need a tuple lock, only the ability to re-fetch the row.
-		 */
-		Assert(strength == LCS_NONE);
 		return ROW_MARK_REFERENCE;
-	}
 }
 
 
@@ -1836,12 +1827,11 @@ create_ordinary_grouping_paths(PlannerInfo *root, RelOptInfo *input_rel,
  * Moreover, in such a case the guarantees about evaluation order of
  * volatile functions still hold, since the rows are sorted already.
  *
- * This function has some things in common with make_group_input_target and
- * make_window_input_target, though the detailed rules for what to do are
- * different.  We never flatten/postpone any grouping or ordering columns;
- * those are needed before the sort.  If we do flatten a particular
- * expression, we leave Aggref and WindowFunc nodes alone, since those were
- * computed earlier.
+ * This function has some things in common with make_group_input_target,
+ * though the detailed rules for what to do are different.  We never
+ * flatten/postpone any grouping or ordering columns; those are needed before
+ * the sort.  If we do flatten a particular expression, we leave Aggref nodes
+ * alone, since those were computed earlier.
  *
  * 'final_target' is the query's final target list (in PathTarget form)
  * 'have_postponed_srfs' is an output argument, see below
@@ -1974,8 +1964,8 @@ make_sort_input_target(PlannerInfo *root,
 
 	/*
 	 * Construct the sort-input target, taking all non-postponable columns and
-	 * then adding Vars, PlaceHolderVars, Aggrefs, and WindowFuncs found in
-	 * the postponable ones.
+	 * then adding Vars, PlaceHolderVars, and Aggrefs found in the postponable
+	 * ones.
 	 */
 	input_target = create_empty_pathtarget();
 	postponable_cols = NIL;
@@ -1995,11 +1985,10 @@ make_sort_input_target(PlannerInfo *root,
 	}
 
 	/*
-	 * Pull out all the Vars, Aggrefs, and WindowFuncs mentioned in
-	 * postponable columns, and add them to the sort-input target if not
-	 * already present.  (Some might be there already.)  We mustn't
-	 * deconstruct Aggrefs or WindowFuncs here, since the projection node
-	 * would be unable to recompute them.
+	 * Pull out all the Vars and Aggrefs mentioned in postponable columns, and
+	 * add them to the sort-input target if not already present.  (Some might
+	 * be there already.)  We mustn't deconstruct Aggrefs here, since the
+	 * projection node would be unable to recompute them.
 	 */
 	postponable_vars = pull_var_clause((Node *) postponable_cols,
 									   PVC_INCLUDE_AGGREGATES |
@@ -2804,8 +2793,7 @@ make_group_input_target(PlannerInfo *root, PathTarget *final_target)
 	 * add them to the input target if not already present.  (A Var used
 	 * directly as a GROUP BY item will be present already.)  Note this
 	 * includes Vars used in resjunk items, so we are covering the needs of
-	 * ORDER BY and window specifications.  Vars used within Aggrefs and
-	 * WindowFuncs will be pulled out here, too.
+	 * ORDER BY.  Vars used within Aggrefs will be pulled out here, too.
 	 */
 	non_group_vars = pull_var_clause((Node *) non_group_cols,
 									 PVC_RECURSE_AGGREGATES |

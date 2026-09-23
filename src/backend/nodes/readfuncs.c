@@ -1610,13 +1610,8 @@ _readPlanRowMark(void)
 	READ_LOCALS(PlanRowMark);
 
 	READ_UINT_FIELD(rti);
-	READ_UINT_FIELD(prti);
 	READ_UINT_FIELD(rowmarkId);
 	READ_ENUM_FIELD(markType, RowMarkType);
-	READ_INT_FIELD(allMarkTypes);
-	READ_ENUM_FIELD(strength, LockClauseStrength);
-	READ_ENUM_FIELD(waitPolicy, LockWaitPolicy);
-	READ_BOOL_FIELD(isParent);
 
 	READ_DONE();
 }

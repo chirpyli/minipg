@@ -18,8 +18,6 @@
 
 extern bool contain_agg_clause(Node *clause);
 
-extern bool contain_window_function(Node *clause);
-
 extern double expression_returns_set_rows(PlannerInfo *root, Node *clause);
 
 extern bool contain_subplans(Node *clause);

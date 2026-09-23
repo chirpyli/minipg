@@ -688,92 +688,51 @@ typedef struct Hash
  * RowMarkType -
  *	  enums for types of row-marking operations
  *
- * The first four of these values represent different lock strengths that
- * we can take on tuples.  We support these on regular tables, as well as on
- * foreign tables whose FDWs report support for late locking.  For other foreign tables, any locking
- * that might be done for such requests must happen during the initial row
- * fetch; their FDWs provide no mechanism for going back to lock a row later.
- * This means that the semantics will be a bit different than for a local
- * table; in particular we are likely to lock more rows than would be locked
- * locally, since remote rows will be locked even if they then fail
- * locally-checked restriction or join quals.  However, the prospect of
- * doing a separate remote query to lock each selected row is usually pretty
- * unappealing, so early locking remains a credible design choice for FDWs.
+ * The FOR UPDATE/SHARE clauses have been trimmed, so the only row-marking
+ * operations that remain are the non-locking ones that EvalPlanQual needs in
+ * order to re-fetch the other relations of an UPDATE or DELETE.
  *
  * When doing UPDATE or DELETE, we have to uniquely identify all the source
  * rows, not only those from the target relations, so that we can perform
  * EvalPlanQual rechecking at need.  For plain tables we
  * can just fetch the TID, much as for a target relation; this case is
- * represented by ROW_MARK_REFERENCE.  Otherwise (for example for VALUES or
- * FUNCTION scans) we have to copy the whole row value.  ROW_MARK_COPY is
+ * represented by ROW_MARK_REFERENCE.  Otherwise (for example for subqueries
+ * in FROM) we have to copy the whole row value.  ROW_MARK_COPY is
  * pretty inefficient, since most of the time we'll never need the data; but
  * fortunately the overhead is usually not performance-critical in practice.
- * By default we use ROW_MARK_COPY for foreign tables, but if the FDW has
- * a concept of rowid it can request to use ROW_MARK_REFERENCE instead.
- * (Again, this probably doesn't make sense if a physical remote fetch is
- * needed, but for FDWs that map to local storage it might be credible.)
  */
 typedef enum RowMarkType
 {
-	ROW_MARK_EXCLUSIVE,			/* obtain exclusive tuple lock */
-	ROW_MARK_NOKEYEXCLUSIVE,	/* obtain no-key exclusive tuple lock */
-	ROW_MARK_SHARE,				/* obtain shared tuple lock */
-	ROW_MARK_KEYSHARE,			/* obtain keyshare tuple lock */
 	ROW_MARK_REFERENCE,			/* just fetch the TID, don't lock it */
 	ROW_MARK_COPY				/* physically copy the row value */
 } RowMarkType;
-
-#define RowMarkRequiresRowShareLock(marktype)  ((marktype) <= ROW_MARK_KEYSHARE)
 
 /*
  * PlanRowMark -
  *	   plan-time representation of row-marking requirements
  *
  * When doing UPDATE or DELETE, we create a separate PlanRowMark node for each
- * non-target relation in the query.  Relations that don't need locking are
- * marked ROW_MARK_REFERENCE (if regular tables or supported foreign tables)
- * or ROW_MARK_COPY (if not).
- *
- * Initially all PlanRowMarks have rti == prti and isParent == false.
- * When the planner discovers that a relation is the root of an inheritance
- * tree, it sets isParent true, and adds an additional PlanRowMark to the
- * list for each child relation (including the target rel itself in its role
- * as a child, if it is not a partitioned table).  Any non-leaf partitioned
- * child relations will also have entries with isParent = true.  The child
- * entries have rti == child rel's RT index and prti == top parent's RT index,
- * and can therefore be recognized as children by the fact that prti != rti.
- * The parent's allMarkTypes field gets the OR of (1<<markType) across all
- * its children (this definition allows children to use different markTypes).
+ * non-target relation in the query.  Relations whose rows can be re-fetched by
+ * TID are marked ROW_MARK_REFERENCE (regular tables); relations whose rows
+ * must be copied are marked ROW_MARK_COPY.
  *
  * The planner also adds resjunk output columns to the plan that carry
- * information sufficient to identify the locked or fetched rows.  When
- * markType != ROW_MARK_COPY, these columns are named
- *		tableoid%u			OID of table
+ * information sufficient to identify the fetched rows.  When
+ * markType != ROW_MARK_COPY, this column is named
  *		ctid%u				TID of row
- * The tableoid column is only present for an inheritance hierarchy.
  * When markType == ROW_MARK_COPY, there is instead a single column named
  *		wholerow%u			whole-row value of relation
- * (An inheritance hierarchy could have all three resjunk output columns,
- * if some children use a different markType than others.)
- * In all three cases, %u represents the rowmark ID number (rowmarkId).
- * This number is unique within a plan tree, except that child relation
- * entries copy their parent's rowmarkId.  (Assigning unique numbers
- * means we needn't renumber rowmarkIds when flattening subqueries, which
- * would require finding and renaming the resjunk columns as well.)
- * Note this means that all tables in an inheritance hierarchy share the
- * same resjunk column names.
+ * In either case, %u represents the rowmark ID number (rowmarkId).  This
+ * number is unique within a plan tree.  (Assigning unique numbers means we
+ * needn't renumber rowmarkIds when flattening subqueries, which would require
+ * finding and renaming the resjunk columns as well.)
  */
 typedef struct PlanRowMark
 {
 	NodeTag		type;
 	Index		rti;			/* range table index of markable relation */
-	Index		prti;			/* range table index of parent relation */
 	Index		rowmarkId;		/* unique identifier for resjunk columns */
 	RowMarkType markType;		/* see enum above */
-	int			allMarkTypes;	/* OR of (1<<markType) for all children */
-	LockClauseStrength strength;	/* lock strength, or LCS_NONE */
-	LockWaitPolicy waitPolicy;	/* NOWAIT and SKIP LOCKED options */
-	bool		isParent;		/* true if this is a "dummy" parent entry */
 } PlanRowMark;
 
 

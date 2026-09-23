@@ -1059,8 +1059,8 @@ pull_up_simple_subquery(PlannerInfo *root, Node *jtnode, RangeTblEntry *rte,
 	parse->hasSubLinks |= subquery->hasSubLinks;
 
 	/*
-	 * subquery won't be pulled up if it hasAggs, hasWindowFuncs, or
-	 * hasTargetSRFs, so no work needed on those flags
+	 * subquery won't be pulled up if it hasAggs or hasTargetSRFs, so no work
+	 * needed on those flags
 	 */
 
 	/*

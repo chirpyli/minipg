@@ -14,20 +14,6 @@
 #define LOCKOPTIONS_H
 
 /*
- * This enum represents the different strengths of row locking.  Only LCS_NONE
- * is used now that the FOR UPDATE/SHARE clauses have been trimmed, but the
- * remaining values are retained as part of the row-marking infrastructure.
- */
-typedef enum LockClauseStrength
-{
-	LCS_NONE,					/* no such clause - only used in PlanRowMark */
-	LCS_FORKEYSHARE,			/* FOR KEY SHARE */
-	LCS_FORSHARE,				/* FOR SHARE */
-	LCS_FORNOKEYUPDATE,			/* FOR NO KEY UPDATE */
-	LCS_FORUPDATE				/* FOR UPDATE */
-} LockClauseStrength;
-
-/*
  * This enum controls how to deal with rows being locked (i.e., it represents
  * the NOWAIT and SKIP LOCKED options).
  */

@@ -725,16 +725,14 @@ get_eclass_for_sort_expr(PlannerInfo *root,
 
 	/*
 	 * add_eq_member doesn't check for volatile functions, set-returning
-	 * functions, aggregates, or window functions, but such could appear in
-	 * sort expressions; so we have to check whether its const-marking was
-	 * correct.
+	 * functions, or aggregates, but such could appear in sort expressions; so
+	 * we have to check whether its const-marking was correct.
 	 */
 	if (newec->ec_has_const)
 	{
 		if (newec->ec_has_volatile ||
 			expression_returns_set((Node *) expr) ||
-			contain_agg_clause((Node *) expr) ||
-			contain_window_function((Node *) expr))
+			contain_agg_clause((Node *) expr))
 		{
 			newec->ec_has_const = false;
 			newem->em_is_const = false;
@@ -831,11 +829,10 @@ find_ec_member_matching_expr(EquivalenceClass *ec,
  *		expressions appearing in "exprs"; return NULL if no match.
  *
  * "exprs" can be either a list of bare expression trees, or a list of
- * TargetEntry nodes.  Typically it will contain Vars and possibly Aggrefs
- * and WindowFuncs; however, when considering an appendrel member the list
- * could contain arbitrary expressions.  We consider an EC member to be
- * computable if all the Vars, PlaceHolderVars, Aggrefs, and WindowFuncs
- * it needs are present in "exprs".
+ * TargetEntry nodes.  Typically it will contain Vars and possibly Aggrefs;
+ * however, when considering an appendrel member the list could contain
+ * arbitrary expressions.  We consider an EC member to be computable if all
+ * the Vars, PlaceHolderVars, and Aggrefs it needs are present in "exprs".
  *
  * There is some subtlety in that definition: for example, if an EC member is
  * Var_A + 1 while what is in "exprs" is Var_A + 2, it's still computable.

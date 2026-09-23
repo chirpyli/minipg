@@ -62,7 +62,7 @@
 
 /* decls for local routines only used within this module */
 static void InitPlan(QueryDesc *queryDesc, int eflags);
-static void CheckValidRowMarkRel(Relation rel, RowMarkType markType);
+static void CheckValidRowMarkRel(Relation rel);
 static void ExecPostprocessPlan(EState *estate);
 static void ExecEndPlan(PlanState *planstate, EState *estate);
 static void ExecutePlan(QueryDesc *queryDesc,
@@ -542,53 +542,28 @@ InitPlan(QueryDesc *queryDesc, int eflags)
 		foreach(l, plannedstmt->rowMarks)
 		{
 			PlanRowMark *rc = (PlanRowMark *) lfirst(l);
-			Oid			relid;
 			Relation	relation;
 			ExecRowMark *erm;
 
-			/* ignore "parent" rowmarks; they are irrelevant at runtime */
-			if (rc->isParent)
-				continue;
-
-			/* get relation's OID (will produce InvalidOid if subquery) */
-			relid = exec_rt_fetch(rc->rti, estate)->relid;
-
 			/* open relation, if we need to access it for this mark type */
-			switch (rc->markType)
+			if (rc->markType == ROW_MARK_COPY)
 			{
-				case ROW_MARK_EXCLUSIVE:
-				case ROW_MARK_NOKEYEXCLUSIVE:
-				case ROW_MARK_SHARE:
-				case ROW_MARK_KEYSHARE:
-				case ROW_MARK_REFERENCE:
-					relation = ExecGetRangeTableRelation(estate, rc->rti);
-					break;
-				case ROW_MARK_COPY:
-					/* no physical table access is required */
-					relation = NULL;
-					break;
-				default:
-					elog(ERROR, "unrecognized markType: %d", rc->markType);
-					relation = NULL;	/* keep compiler quiet */
-					break;
+				/* no physical table access is required */
+				relation = NULL;
 			}
+			else
+			{
+				relation = ExecGetRangeTableRelation(estate, rc->rti);
 
-			/* Check that relation is a legal target for marking */
-			if (relation)
-				CheckValidRowMarkRel(relation, rc->markType);
+				/* Check that relation is a legal target for marking */
+				CheckValidRowMarkRel(relation);
+			}
 
 			erm = (ExecRowMark *) palloc(sizeof(ExecRowMark));
 			erm->relation = relation;
-			erm->relid = relid;
 			erm->rti = rc->rti;
-			erm->prti = rc->prti;
 			erm->rowmarkId = rc->rowmarkId;
 			erm->markType = rc->markType;
-			erm->strength = rc->strength;
-			erm->waitPolicy = rc->waitPolicy;
-			erm->ermActive = false;
-			ItemPointerSetInvalid(&(erm->curCtid));
-			erm->ermExtra = NULL;
 
 			Assert(erm->rti > 0 && erm->rti <= estate->es_range_table_size &&
 				   estate->es_rowmarks[erm->rti - 1] == NULL);
@@ -753,7 +728,7 @@ CheckValidResultRel(ResultRelInfo *resultRelInfo, CmdType operation)
  * they don't cover all cases.
  */
 static void
-CheckValidRowMarkRel(Relation rel, RowMarkType markType)
+CheckValidRowMarkRel(Relation rel)
 {
 	switch (rel->rd_rel->relkind)
 	{
@@ -1074,10 +1049,10 @@ ExecUpdateLockMode(EState *estate, ResultRelInfo *relinfo)
 /*
  * ExecFindRowMark -- find the ExecRowMark struct for given rangetable index
  *
- * If no such struct, either return NULL or throw error depending on missing_ok
+ * Throws an error if no such struct exists.
  */
 ExecRowMark *
-ExecFindRowMark(EState *estate, Index rti, bool missing_ok)
+ExecFindRowMark(EState *estate, Index rti)
 {
 	if (rti > 0 && rti <= estate->es_range_table_size &&
 		estate->es_rowmarks != NULL)
@@ -1087,9 +1062,8 @@ ExecFindRowMark(EState *estate, Index rti, bool missing_ok)
 		if (erm)
 			return erm;
 	}
-	if (!missing_ok)
-		elog(ERROR, "failed to find ExecRowMark for rangetable index %u", rti);
-	return NULL;
+	elog(ERROR, "failed to find ExecRowMark for rangetable index %u", rti);
+	return NULL;				/* keep compiler quiet */
 }
 
 /*
@@ -1124,16 +1098,6 @@ ExecBuildAuxRowMark(ExecRowMark *erm, List *targetlist)
 		aerm->wholeAttNo = ExecFindJunkAttributeInTlist(targetlist,
 														resname);
 		if (!AttributeNumberIsValid(aerm->wholeAttNo))
-			elog(ERROR, "could not find junk %s column", resname);
-	}
-
-	/* if child rel, need tableoid */
-	if (erm->rti != erm->prti)
-	{
-		snprintf(resname, sizeof(resname), "tableoid%u", erm->rowmarkId);
-		aerm->toidAttNo = ExecFindJunkAttributeInTlist(targetlist,
-													   resname);
-		if (!AttributeNumberIsValid(aerm->toidAttNo))
 			elog(ERROR, "could not find junk %s column", resname);
 	}
 
@@ -1351,31 +1315,6 @@ EvalPlanQualFetchRowMark(EPQState *epqstate, Index rti, TupleTableSlot *slot)
 	Assert(epqstate->origslot != NULL);
 
 	erm = earm->rowmark;
-
-	if (RowMarkRequiresRowShareLock(erm->markType))
-		elog(ERROR, "EvalPlanQual doesn't support locking rowmarks");
-
-	/* if child rel, must check whether it produced this row */
-	if (erm->rti != erm->prti)
-	{
-		Oid			tableoid;
-
-		datum = ExecGetJunkAttribute(epqstate->origslot,
-									 earm->toidAttNo,
-									 &isNull);
-		/* non-locked rels could be on the inside of outer joins */
-		if (isNull)
-			return false;
-
-		tableoid = DatumGetObjectId(datum);
-
-		Assert(OidIsValid(erm->relid));
-		if (tableoid != erm->relid)
-		{
-			/* this child is inactive right now */
-			return false;
-		}
-	}
 
 	if (erm->markType == ROW_MARK_REFERENCE)
 	{

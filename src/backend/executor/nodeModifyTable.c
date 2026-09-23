@@ -1326,12 +1326,8 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
 		ExecRowMark *erm;
 		ExecAuxRowMark *aerm;
 
-		/* ignore "parent" rowmarks; they are irrelevant at runtime */
-		if (rc->isParent)
-			continue;
-
 		/* Find ExecRowMark and build ExecAuxRowMark */
-		erm = ExecFindRowMark(estate, rc->rti, false);
+		erm = ExecFindRowMark(estate, rc->rti);
 		aerm = ExecBuildAuxRowMark(erm, subplan->targetlist);
 		arowmarks = lappend(arowmarks, aerm);
 	}

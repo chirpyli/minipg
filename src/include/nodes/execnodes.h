@@ -500,18 +500,13 @@ typedef struct EState
 
 /*
  * ExecRowMark -
- *	   runtime representation of FOR [KEY] UPDATE/SHARE clauses
+ *	   runtime representation of row-marking requirements
  *
- * When doing UPDATE, DELETE, or SELECT FOR [KEY] UPDATE/SHARE, we will have an
- * ExecRowMark for each non-target relation in the query (except inheritance
- * parent RTEs, which can be ignored at runtime).  Virtual relations such as
- * subqueries-in-FROM will have an ExecRowMark with relation == NULL.  See
- * PlanRowMark for details about most of the fields.  In addition to fields
- * directly derived from PlanRowMark, we store an activity flag (to denote
- * inactive children of inheritance trees), curCtid, which is used by EPQ
- * rechecking, and ermExtra, which is available for use by the plan
- * node that sources the relation (e.g., for a foreign table the FDW can use
- * ermExtra to hold information).
+ * When doing UPDATE or DELETE, we will have an ExecRowMark for each non-target
+ * relation in the query, so that EvalPlanQual can re-fetch that relation's
+ * rows.  Virtual relations such as subqueries-in-FROM will have an ExecRowMark
+ * with relation == NULL.  See PlanRowMark for details about most of the
+ * fields.
  *
  * EState->es_rowmarks is an array of these structs, indexed by RT index,
  * with NULLs for irrelevant RT indexes.  es_rowmarks itself is NULL if
@@ -519,17 +514,10 @@ typedef struct EState
  */
 typedef struct ExecRowMark
 {
-	Relation	relation;		/* opened and suitably locked relation */
-	Oid			relid;			/* its OID (or InvalidOid, if subquery) */
+	Relation	relation;		/* opened relation, or NULL if none needed */
 	Index		rti;			/* its range table index */
-	Index		prti;			/* parent range table index, if child */
 	Index		rowmarkId;		/* unique identifier for resjunk columns */
 	RowMarkType markType;		/* see enum in nodes/plannodes.h */
-	LockClauseStrength strength;	/* lock strength, or LCS_NONE */
-	LockWaitPolicy waitPolicy;	/* NOWAIT and SKIP LOCKED */
-	bool		ermActive;		/* is this mark relevant for current tuple? */
-	ItemPointerData curCtid;	/* ctid of currently locked tuple, if any */
-	void	   *ermExtra;		/* available for use by relation source node */
 } ExecRowMark;
 
 /*
@@ -545,7 +533,6 @@ typedef struct ExecAuxRowMark
 {
 	ExecRowMark *rowmark;		/* related entry in es_rowmarks */
 	AttrNumber	ctidAttNo;		/* resno of ctid junk attribute, if any */
-	AttrNumber	toidAttNo;		/* resno of tableoid junk attribute, if any */
 	AttrNumber	wholeAttNo;		/* resno of whole-row junk attribute, if any */
 } ExecAuxRowMark;
 
@@ -1731,19 +1718,13 @@ typedef struct AggState
 	ExprContext *curaggcontext; /* currently active aggcontext */
 	AggStatePerAgg curperagg;	/* currently active aggregate, if any */
 	AggStatePerTrans curpertrans;	/* currently active trans state, if any */
-	bool		input_done;		/* indicates end of input */
 	bool		agg_done;		/* indicates completion of Agg scan */
-	int			projected_set;	/* The last projected grouping set */
-	Bitmapset  *grouped_cols;	/* grouped cols in current projection */
-	List	   *all_grouped_cols;	/* list of all grouped cols in DESC order */
 	Bitmapset  *colnos_needed;	/* all columns needed from the outer plan */
 	int			max_colno_needed;	/* highest colno needed from outer plan */
 	bool		all_cols_needed;	/* are all cols from outer plan needed? */
-	/* These fields are for grouping set phase data */
 	AggStatePerPhase phases;	/* array of all phases */
 	/* these fields are used in AGG_PLAIN and AGG_SORTED modes: */
-	AggStatePerGroup *pergroups;	/* grouping set indexed array of per-group
-									 * pointers */
+	AggStatePerGroup *pergroups;	/* array of per-group pointers */
 	HeapTuple	grp_firstTuple; /* copy of first tuple of current group */
 	/* these fields are used in AGG_HASHED mode: */
 	bool		table_filled;	/* hash table filled yet? */

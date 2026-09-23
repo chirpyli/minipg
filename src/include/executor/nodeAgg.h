@@ -240,15 +240,14 @@ typedef struct AggStatePerGroupData
 /*
  * AggStatePerPhaseData - per-phase state
  *
- * A phase specifies the plan node and grouping set information used while
- * processing the input in one pass.
+ * A phase specifies the plan node and strategy used while processing the
+ * input in one pass.  (Phases originally existed to support grouping sets;
+ * now there is at most one real phase per query, with phases[0] being a dummy
+ * entry in sorted/plain mode.)
  */
 typedef struct AggStatePerPhaseData
 {
 	AggStrategy aggstrategy;	/* strategy for this phase */
-	int			numsets;		/* number of grouping sets (or 0) */
-	int		   *gset_lengths;	/* lengths of grouping sets */
-	Bitmapset **grouped_cols;	/* column groupings for rollup */
 	ExprState **eqfunctions;	/* expression returning equality, indexed by
 								 * nr of cols to compare */
 	Agg		   *aggnode;		/* Agg node for phase data */

@@ -92,75 +92,29 @@
  *	  need some fallback logic to use this, since there's no Aggref node
  *	  for a window function.)
  *
- *	  Grouping sets:
+ *	  Grouping:
  *
- *	  A list of grouping sets which is structurally equivalent to a ROLLUP
- *	  clause (e.g. (a,b,c), (a,b), (a)) can be processed in a single pass over
- *	  ordered data.  We do this by keeping a separate set of transition values
- *	  for each grouping set being concurrently processed; for each input tuple
- *	  we update them all, and on group boundaries we reset those states
- *	  (starting at the front of the list) whose grouping values have changed
- *	  (the list of grouping sets is ordered from most specific to least
- *	  specific).
+ *	  We support three strategies: AGG_PLAIN (produce a single row with no
+ *	  grouping), AGG_SORTED (sorted input, grouping by the sort key) and
+ *	  AGG_HASHED (a hash table keyed on the grouping columns).  Grouping sets
+ *	  (ROLLUP/CUBE/GROUPING SETS) have been trimmed from this project, so each
+ *	  query has exactly one grouping set and therefore one set of transition
+ *	  values per group.
  *
- *	  Where more complex grouping sets are used, we break them down into
- *	  "phases", where each phase has a different sort order (except phase 0
- *	  which is reserved for hashing).  During each phase but the last, the
- *	  input tuples are additionally stored in a tuplesort which is keyed to the
- *	  next phase's sort order; during each phase but the first, the input
- *	  tuples are drawn from the previously sorted data.  (The sorting of the
- *	  data for the first phase is handled by the planner, as it might be
- *	  satisfied by underlying nodes.)
- *
- *	  We support AGG_HASHED with multiple hash tables and no sorting at all.
+ *	  There is at most one phase per query: phase 0 for AGG_HASHED, and phase 1
+ *	  for AGG_SORTED/AGG_PLAIN (phase 0 is allocated but unused in that case).
  *
  *	  From the perspective of aggregate transition and final functions, the
- *	  only issue regarding grouping sets is this: a single call site (flinfo)
- *	  of an aggregate function may be used for updating several different
- *	  transition values in turn. So the function must not cache in the flinfo
- *	  anything which logically belongs as part of the transition value (most
- *	  importantly, the memory context in which the transition value exists).
- *	  The support API functions (AggCheckCallContext, AggRegisterCallback) are
- *	  sensitive to the grouping set for which the aggregate function is
- *	  currently being called.
- *
- *	  Plan structure:
- *
- *	  What we get from the planner is actually one "real" Agg node which is
- *	  part of the plan tree proper, but which optionally has an additional list
- *	  of Agg nodes hung off the side via the "chain" field.  This is because an
- *	  Agg node happens to be a convenient representation of all the data we
- *	  need for grouping sets.
- *
- *	  For many purposes, we treat the "real" node as if it were just the first
- *	  node in the chain.  The chain must be ordered such that hashed entries
- *	  come before sorted/plain entries.  If the real node is marked AGG_HASHED
- *	  or AGG_SORTED, then all the chained nodes must be of the same type; if it
- *	  is AGG_PLAIN, there can be no chained nodes.
- *
- *	  We collect all hashed nodes into a single "phase", numbered 0, and create
- *	  a sorted phase (numbered 1..n) for each AGG_SORTED or AGG_PLAIN node.
- *	  Phase 0 is allocated even if there are no hashes, but remains unused in
- *	  that case.
- *
- *	  AGG_HASHED nodes actually refer to only a single grouping set each,
- *	  because for each hashed grouping we need a separate grpColIdx and
- *	  numGroups estimate.  AGG_SORTED nodes represent a "rollup", a list of
- *	  grouping sets that share a sort order.  Each AGG_SORTED node other than
- *	  the first one has an associated Sort node which describes the sort order
- *	  to be used; the first sorted node takes its input from the outer subtree,
- *	  which the planner has already arranged to provide ordered data.
+ *	  aggregate function must not cache in the flinfo anything which logically
+ *	  belongs as part of the transition value (most importantly, the memory
+ *	  context in which the transition value exists).  The support API functions
+ *	  (AggCheckCallContext, AggRegisterCallback) are sensitive to the context
+ *	  for which the aggregate function is currently being called.
  *
  *	  Memory and ExprContext usage:
  *
  *	  Because we're accumulating aggregate values across input rows, we need to
  *	  use more memory contexts than just simple input/output tuple contexts.
- *	  In fact, for a rollup, we need a separate context for each grouping set
- *	  so that we can reset the inner (finer-grained) aggregates on their group
- *	  boundaries while continuing to accumulate values for outer
- *	  (coarser-grained) groupings.  On top of this, we might be simultaneously
- *	  populating hashtables; however, we only need one context for all the
- *	  hashtables.
  *
  *	  So we create an ExprContext for transition values and use its per-tuple
  *	  memory context to store the aggregate transition values.  hashcontext
@@ -351,8 +305,7 @@ static void select_current_set(AggState *aggstate, bool is_hash);
 static void initialize_phase(AggState *aggstate, int newphase);
 static TupleTableSlot *fetch_input_tuple(AggState *aggstate);
 static void initialize_aggregates(AggState *aggstate,
-								  AggStatePerGroup *pergroups,
-								  int numReset);
+								  AggStatePerGroup pergroup);
 static void advance_transition_function(AggState *aggstate,
 										AggStatePerTrans pertrans,
 										AggStatePerGroup pergroupstate);
@@ -370,8 +323,6 @@ static void finalize_aggregate(AggState *aggstate,
 static inline void prepare_hash_slot(AggStatePerHash perhash,
 									 TupleTableSlot *inputslot,
 									 TupleTableSlot *hashslot);
-static void prepare_projection_slot(AggState *aggstate,
-									TupleTableSlot *slot);
 static void finalize_aggregates(AggState *aggstate,
 								AggStatePerAgg peragg,
 								AggStatePerGroup pergroup);
@@ -430,8 +381,8 @@ static void build_pertrans_for_aggref(AggStatePerTrans pertrans,
 
 
 /*
- * Select the current grouping set context; affects curaggcontext.
- * curaggcontext.
+ * Select the context in which aggregate transition values are allocated;
+ * affects curaggcontext.
  */
 static void
 select_current_set(AggState *aggstate, bool is_hash)
@@ -559,43 +510,27 @@ initialize_aggregate(AggState *aggstate, AggStatePerTrans pertrans,
 /*
  * Initialize all aggregate transition states for a new group of input values.
  *
- * If there are multiple grouping sets, we initialize only the first numReset
- * of them (the grouping sets are ordered so that the most specific one, which
- * is reset most often, is first). As a convenience, if numReset is 0, we
- * reinitialize all sets.
- *
- * NB: This cannot be used for hash aggregates, as for those the grouping set
- * number has to be specified from further up.
+ * NB: This cannot be used for hash aggregates, as for those the per-group
+ * state has to be specified from further up.
  *
  * When called, CurrentMemoryContext should be the per-query context.
  */
 static void
 initialize_aggregates(AggState *aggstate,
-					  AggStatePerGroup *pergroups,
-					  int numReset)
+					  AggStatePerGroup pergroup)
 {
 	int			transno;
-	int			numGroupingSets = Max(aggstate->phase->numsets, 1);
-	int			setno = 0;
 	int			numTrans = aggstate->numtrans;
 	AggStatePerTrans transstates = aggstate->pertrans;
 
-	if (numReset == 0)
-		numReset = numGroupingSets;
+	select_current_set(aggstate, false);
 
-	for (setno = 0; setno < numReset; setno++)
+	for (transno = 0; transno < numTrans; transno++)
 	{
-		AggStatePerGroup pergroup = pergroups[setno];
+		AggStatePerTrans pertrans = &transstates[transno];
+		AggStatePerGroup pergroupstate = &pergroup[transno];
 
-		select_current_set(aggstate, false);
-
-		for (transno = 0; transno < numTrans; transno++)
-		{
-			AggStatePerTrans pertrans = &transstates[transno];
-			AggStatePerGroup pergroupstate = &pergroup[transno];
-
-			initialize_aggregate(aggstate, pertrans, pergroupstate);
-		}
+		initialize_aggregate(aggstate, pertrans, pergroupstate);
 	}
 }
 
@@ -1060,71 +995,10 @@ prepare_hash_slot(AggStatePerHash perhash,
 }
 
 /*
- * Prepare to finalize and project based on the specified representative tuple
- * slot and grouping set.
- *
- * In the specified tuple slot, force to null all attributes that should be
- * read as null in the context of the current grouping set.  Also stash the
- * current group bitmap where GroupingExpr can get at it.
- *
- * This relies on three conditions:
- *
- * 1) Nothing is ever going to try and extract the whole tuple from this slot,
- * only reference it in evaluations, which will only access individual
- * attributes.
- *
- * 2) No system columns are going to need to be nulled. (If a system column is
- * referenced in a group clause, it is actually projected in the outer plan
- * tlist.)
- *
- * 3) Within a given phase, we never need to recover the value of an attribute
- * once it has been set to null.
- *
- * Poking into the slot this way is a bit ugly, but the consensus is that the
- * alternative was worse.
- */
-static void
-prepare_projection_slot(AggState *aggstate, TupleTableSlot *slot)
-{
-	if (aggstate->phase->grouped_cols)
-	{
-		Bitmapset  *grouped_cols = aggstate->phase->grouped_cols[0];
-
-		aggstate->grouped_cols = grouped_cols;
-
-		if (TTS_EMPTY(slot))
-		{
-			/*
-			 * Force all values to be NULL if working on an empty input tuple
-			 * (i.e. an empty grouping set for which no input rows were
-			 * supplied).
-			 */
-			ExecStoreAllNullTuple(slot);
-		}
-		else if (aggstate->all_grouped_cols)
-		{
-			ListCell   *lc;
-
-			/* all_grouped_cols is arranged in desc order */
-			slot_getsomeattrs(slot, linitial_int(aggstate->all_grouped_cols));
-
-			foreach(lc, aggstate->all_grouped_cols)
-			{
-				int			attnum = lfirst_int(lc);
-
-				if (!bms_is_member(attnum, grouped_cols))
-					slot->tts_isnull[attnum - 1] = true;
-			}
-		}
-	}
-}
-
-/*
  * Compute the final value of all aggregates for one group.
  *
- * This function handles only one grouping set at a time, which the caller must
- * have selected.  It's also the caller's responsibility to adjust the supplied
- * pergroup parameter to point to the current set's transvalues.
+ * The caller must have selected the (single) grouping set, and passes the
+ * per-group state to use for it.
  *
  * Results are stored in the output econtext aggvalues/aggnulls.
  */
@@ -1402,27 +1276,6 @@ find_hash_columns(AggState *aggstate)
 		int			i;
 
 		perhash->largestGrpColIdx = 0;
-
-		/*
-		 * If we're doing grouping sets, then some Vars might be referenced in
-		 * tlist/qual for the benefit of other grouping sets, but not needed
-		 * when hashing; i.e. prepare_projection_slot will null them out, so
-		 * there'd be no point storing them.  Use prepare_projection_slot's
-		 * logic to determine which.
-		 */
-		if (aggstate->phases[0].grouped_cols)
-		{
-			Bitmapset  *grouped_cols = aggstate->phases[0].grouped_cols[0];
-			ListCell   *lc;
-
-			foreach(lc, aggstate->all_grouped_cols)
-			{
-				int			attnum = lfirst_int(lc);
-
-				if (!bms_is_member(attnum, grouped_cols))
-					colnos = bms_del_member(colnos, attnum);
-			}
-		}
 
 		/*
 		 * Compute maximum number of input columns accounting for possible
@@ -1982,12 +1835,6 @@ agg_retrieve_direct(AggState *aggstate)
 	TupleTableSlot *outerslot;
 	TupleTableSlot *firstSlot;
 	TupleTableSlot *result;
-	bool		hasGroupingSets = aggstate->phase->numsets > 0;
-	int			numGroupingSets = Max(aggstate->phase->numsets, 1);
-	int			currentSet;
-	int			nextSetSize;
-	int			numReset;
-	int			i;
 
 	/*
 	 * get state info from node
@@ -2006,11 +1853,6 @@ agg_retrieve_direct(AggState *aggstate)
 	/*
 	 * We loop retrieving groups until we find one matching
 	 * aggstate->ss.ps.qual
-	 *
-	 * For grouping sets, we have the invariant that aggstate->projected_set
-	 * is either -1 (initial call) or the index (starting from 0) in
-	 * gset_lengths for the group we just completed (either by projecting a
-	 * row or by discarding it in the qual).
 	 */
 	while (!aggstate->agg_done)
 	{
@@ -2029,249 +1871,103 @@ agg_retrieve_direct(AggState *aggstate)
 		ReScanExprContext(econtext);
 
 		/*
-		 * Determine how many grouping sets need to be reset at this boundary.
+		 * If we don't already have the first tuple of the new group, fetch it
+		 * from the outer plan.
 		 */
-		if (aggstate->projected_set >= 0 &&
-			aggstate->projected_set < numGroupingSets)
-			numReset = aggstate->projected_set + 1;
-		else
-			numReset = numGroupingSets;
-
-		/*
-		 * numReset can change on a phase boundary, but that's OK; we want to
-		 * reset the contexts used in _this_ phase, and later, after possibly
-		 * changing phase, initialize the right number of aggregates for the
-		 * _new_ phase.
-		 */
-
-		for (i = 0; i < numReset; i++)
+		if (aggstate->grp_firstTuple == NULL)
 		{
-			ReScanExprContext(aggstate->ss.ps.ps_ExprContext);
-		}
-
-		/*
-		 * Check if input is complete and there are no more groups to project
-		 * in this phase; move to next phase or mark as done.
-		 */
-		if (aggstate->input_done == true &&
-			aggstate->projected_set >= (numGroupingSets - 1))
-		{
-			if (aggstate->current_phase < aggstate->numphases - 1)
+			outerslot = fetch_input_tuple(aggstate);
+			if (!TupIsNull(outerslot))
 			{
-				initialize_phase(aggstate, aggstate->current_phase + 1);
-				aggstate->input_done = false;
-				aggstate->projected_set = -1;
-				numGroupingSets = Max(aggstate->phase->numsets, 1);
-				node = aggstate->phase->aggnode;
-				numReset = numGroupingSets;
+				/*
+				 * Make a copy of the first input tuple; we will use this for
+				 * comparisons (in group mode) and for projection.
+				 */
+				aggstate->grp_firstTuple = ExecCopySlotHeapTuple(outerslot);
 			}
 			else
 			{
+				/* outer plan produced no tuples at all */
 				aggstate->agg_done = true;
-				break;
+				/* If we are grouping, we should produce no tuples too */
+				if (node->aggstrategy != AGG_PLAIN)
+					return NULL;
 			}
 		}
 
 		/*
-		 * Get the number of columns in the next grouping set after the last
-		 * projected one (if any). This is the number of columns to compare to
-		 * see if we reached the boundary of that set too.
+		 * Initialize working state for a new input tuple group.
 		 */
-		if (aggstate->projected_set >= 0 &&
-			aggstate->projected_set < (numGroupingSets - 1))
-			nextSetSize = aggstate->phase->gset_lengths[aggstate->projected_set + 1];
-		else
-			nextSetSize = 0;
+		initialize_aggregates(aggstate, pergroups[0]);
 
-		/*----------
-		 * If a subgroup for the current grouping set is present, project it.
-		 *
-		 * We have a new group if:
-		 *	- we're out of input but haven't projected all grouping sets
-		 *	  (checked above)
-		 * OR
-		 *	  - we already projected a row that wasn't from the last grouping
-		 *		set
-		 *	  AND
-		 *	  - the next grouping set has at least one grouping column (since
-		 *		empty grouping sets project only once input is exhausted)
-		 *	  AND
-		 *	  - the previous and pending rows differ on the grouping columns
-		 *		of the next grouping set
-		 *----------
-		 */
-		tmpcontext->ecxt_innertuple = econtext->ecxt_outertuple;
-		if (aggstate->input_done ||
-			(node->aggstrategy != AGG_PLAIN &&
-			 aggstate->projected_set != -1 &&
-			 aggstate->projected_set < (numGroupingSets - 1) &&
-			 nextSetSize > 0 &&
-			 !ExecQualAndReset(aggstate->phase->eqfunctions[nextSetSize - 1],
-							   tmpcontext)))
-		{
-			aggstate->projected_set += 1;
-
-			Assert(aggstate->projected_set < numGroupingSets);
-			Assert(nextSetSize > 0 || aggstate->input_done);
-		}
-		else
+		if (aggstate->grp_firstTuple != NULL)
 		{
 			/*
-			 * We no longer care what group we just projected, the next
-			 * projection will always be the first (or only) grouping set
-			 * (unless the input proves to be empty).
+			 * Store the copied first input tuple in the tuple table slot
+			 * reserved for it.  The tuple will be deleted when it is cleared
+			 * from the slot.
 			 */
-			aggstate->projected_set = 0;
+			ExecForceStoreHeapTuple(aggstate->grp_firstTuple,
+									firstSlot, true);
+			aggstate->grp_firstTuple = NULL;	/* don't keep two pointers */
+
+			/* set up for first advance_aggregates call */
+			tmpcontext->ecxt_outertuple = firstSlot;
 
 			/*
-			 * If we don't already have the first tuple of the new group,
-			 * fetch it from the outer plan.
+			 * Process each outer-plan tuple, and then fetch the next one,
+			 * until we exhaust the outer plan or cross a group boundary.
 			 */
-			if (aggstate->grp_firstTuple == NULL)
+			for (;;)
 			{
+				/* Advance the aggregates */
+				advance_aggregates(aggstate);
+
+				/* Reset per-input-tuple context after each tuple */
+				ResetExprContext(tmpcontext);
+
 				outerslot = fetch_input_tuple(aggstate);
-				if (!TupIsNull(outerslot))
+				if (TupIsNull(outerslot))
 				{
-					/*
-					 * Make a copy of the first input tuple; we will use this
-					 * for comparisons (in group mode) and for projection.
-					 */
-					aggstate->grp_firstTuple = ExecCopySlotHeapTuple(outerslot);
+					/* no more outer-plan tuples available */
+					aggstate->agg_done = true;
+					break;
 				}
-				else
+				/* set up for next advance_aggregates call */
+				tmpcontext->ecxt_outertuple = outerslot;
+
+				/*
+				 * If we are grouping, check whether we've crossed a group
+				 * boundary.
+				 */
+				if (node->aggstrategy != AGG_PLAIN)
 				{
-					/* outer plan produced no tuples at all */
-					if (hasGroupingSets)
+					tmpcontext->ecxt_innertuple = firstSlot;
+					if (!ExecQual(aggstate->phase->eqfunctions[node->numCols - 1],
+								  tmpcontext))
 					{
-						/*
-						 * If there was no input at all, we need to project
-						 * rows only if there are grouping sets of size 0.
-						 * Note that this implies that there can't be any
-						 * references to ungrouped Vars, which would otherwise
-						 * cause issues with the empty output slot.
-						 *
-						 * XXX: This is no longer true, we currently deal with
-						 * this in finalize_aggregates().
-						 */
-						aggstate->input_done = true;
-
-						while (aggstate->phase->gset_lengths[aggstate->projected_set] > 0)
-						{
-							aggstate->projected_set += 1;
-							if (aggstate->projected_set >= numGroupingSets)
-							{
-								/*
-								 * We can't set agg_done here because we might
-								 * have more phases to do, even though the
-								 * input is empty. So we need to restart the
-								 * whole outer loop.
-								 */
-								break;
-							}
-						}
-
-						if (aggstate->projected_set >= numGroupingSets)
-							continue;
-					}
-					else
-					{
-						aggstate->agg_done = true;
-						/* If we are grouping, we should produce no tuples too */
-						if (node->aggstrategy != AGG_PLAIN)
-							return NULL;
+						aggstate->grp_firstTuple = ExecCopySlotHeapTuple(outerslot);
+						break;
 					}
 				}
 			}
-
-			/*
-			 * Initialize working state for a new input tuple group.
-			 */
-			initialize_aggregates(aggstate, pergroups, numReset);
-
-			if (aggstate->grp_firstTuple != NULL)
-			{
-				/*
-				 * Store the copied first input tuple in the tuple table slot
-				 * reserved for it.  The tuple will be deleted when it is
-				 * cleared from the slot.
-				 */
-				ExecForceStoreHeapTuple(aggstate->grp_firstTuple,
-										firstSlot, true);
-				aggstate->grp_firstTuple = NULL;	/* don't keep two pointers */
-
-				/* set up for first advance_aggregates call */
-				tmpcontext->ecxt_outertuple = firstSlot;
-
-				/*
-				 * Process each outer-plan tuple, and then fetch the next one,
-				 * until we exhaust the outer plan or cross a group boundary.
-				 */
-				for (;;)
-				{
-					/* Advance the aggregates */
-					advance_aggregates(aggstate);
-
-					/* Reset per-input-tuple context after each tuple */
-					ResetExprContext(tmpcontext);
-
-					outerslot = fetch_input_tuple(aggstate);
-					if (TupIsNull(outerslot))
-					{
-						/* no more outer-plan tuples available */
-
-						if (hasGroupingSets)
-						{
-							aggstate->input_done = true;
-							break;
-						}
-						else
-						{
-							aggstate->agg_done = true;
-							break;
-						}
-					}
-					/* set up for next advance_aggregates call */
-					tmpcontext->ecxt_outertuple = outerslot;
-
-					/*
-					 * If we are grouping, check whether we've crossed a group
-					 * boundary.
-					 */
-					if (node->aggstrategy != AGG_PLAIN)
-					{
-						tmpcontext->ecxt_innertuple = firstSlot;
-						if (!ExecQual(aggstate->phase->eqfunctions[node->numCols - 1],
-									  tmpcontext))
-						{
-							aggstate->grp_firstTuple = ExecCopySlotHeapTuple(outerslot);
-							break;
-						}
-					}
-				}
-			}
-
-			/*
-			 * Use the representative input tuple for any references to
-			 * non-aggregated input columns in aggregate direct args, the node
-			 * qual, and the tlist.  (If we are not grouping, and there are no
-			 * input rows at all, we will come here with an empty firstSlot
-			 * ... but if not grouping, there can't be any references to
-			 * non-aggregated input columns, so no problem.)
-			 */
-			econtext->ecxt_outertuple = firstSlot;
 		}
 
-		Assert(aggstate->projected_set >= 0);
-
-		currentSet = aggstate->projected_set;
-
-		prepare_projection_slot(aggstate, econtext->ecxt_outertuple);
+		/*
+		 * Use the representative input tuple for any references to
+		 * non-aggregated input columns in aggregate direct args, the node
+		 * qual, and the tlist.  (If we are not grouping, and there are no
+		 * input rows at all, we will come here with an empty firstSlot
+		 * ... but if not grouping, there can't be any references to
+		 * non-aggregated input columns, so no problem.)
+		 */
+		econtext->ecxt_outertuple = firstSlot;
 
 		select_current_set(aggstate, false);
 
 		finalize_aggregates(aggstate,
 							peragg,
-							pergroups[currentSet]);
+							pergroups[0]);
 
 		/*
 		 * If there's no row to project right now, we must continue rather
@@ -2588,9 +2284,6 @@ agg_retrieve_hash_table_in_memory(AggState *aggstate)
 		 * non-aggregated input columns in the qual and tlist.
 		 */
 		econtext->ecxt_outertuple = firstSlot;
-
-		prepare_projection_slot(aggstate,
-								econtext->ecxt_outertuple);
 
 		finalize_aggregates(aggstate, peragg, pergroup);
 
@@ -2965,11 +2658,8 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 	int			phase;
 	int			phaseidx;
 	ListCell   *l;
-	Bitmapset  *all_grouped_cols = NULL;
 	int			numPhases;
 	int			numHashes;
-	int			i = 0;
-	int			j = 0;
 	bool		use_hashing = (node->aggstrategy == AGG_HASHED);
 
 	/* check for unsupported flags */
@@ -2987,12 +2677,10 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 	aggstate->numaggs = 0;
 	aggstate->numtrans = 0;
 	aggstate->aggstrategy = node->aggstrategy;
-	aggstate->projected_set = -1;
 	aggstate->peragg = NULL;
 	aggstate->pertrans = NULL;
 	aggstate->curperagg = NULL;
 	aggstate->curpertrans = NULL;
-	aggstate->input_done = false;
 	aggstate->agg_done = false;
 	aggstate->pergroups = NULL;
 	aggstate->grp_firstTuple = NULL;
@@ -3098,18 +2786,13 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 	numtrans = max_transno + 1;
 
 	/*
-	 * For each phase, prepare grouping set data and fmgr lookup data for
-	 * compare functions.  Accumulate all_grouped_cols in passing.
+	 * Prepare the phase data and, if grouping, the fmgr lookup data for the
+	 * compare functions used to detect group boundaries.
 	 */
 	aggstate->phases = palloc0(numPhases * sizeof(AggStatePerPhaseData));
 
 	if (numHashes)
-	{
 		aggstate->perhash = palloc0(sizeof(AggStatePerHashData));
-		aggstate->phases[0].numsets = 0;
-		aggstate->phases[0].gset_lengths = palloc(sizeof(int));
-		aggstate->phases[0].grouped_cols = palloc(sizeof(Bitmapset *));
-	}
 
 	phase = 0;
 	for (phaseidx = 0; phaseidx <= 0; ++phaseidx)
@@ -3120,10 +2803,8 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 		{
 			AggStatePerPhase phasedata = &aggstate->phases[0];
 			AggStatePerHash perhash;
-			Bitmapset  *cols = NULL;
 
 			Assert(phase == 0);
-			i = phasedata->numsets++;
 			perhash = aggstate->perhash;
 
 			/* phase 0 always points to the "real" Agg in the hash case */
@@ -3133,85 +2814,40 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 			/* but the actual Agg node representing this hash is saved here */
 			perhash->aggnode = aggnode;
 
-			phasedata->gset_lengths[i] = perhash->numCols = aggnode->numCols;
+			perhash->numCols = aggnode->numCols;
 
-			for (j = 0; j < aggnode->numCols; ++j)
-				cols = bms_add_member(cols, aggnode->grpColIdx[j]);
-
-			phasedata->grouped_cols[i] = cols;
-
-			all_grouped_cols = bms_add_members(all_grouped_cols, cols);
 			continue;
 		}
 		else
 		{
 			AggStatePerPhase phasedata = &aggstate->phases[++phase];
-			phasedata->numsets = 0;
-			phasedata->gset_lengths = NULL;
-			phasedata->grouped_cols = NULL;
 
 			/*
 			 * If we are grouping, precompute fmgr lookup data for inner loop.
 			 */
 			if (aggnode->aggstrategy == AGG_SORTED)
 			{
-				int			i = 0;
-
 				Assert(aggnode->numCols > 0);
 
 				/*
-				 * Build a separate function for each subset of columns that
-				 * need to be compared.
+				 * Build the function that compares all the grouping columns.
 				 */
 				phasedata->eqfunctions =
 					(ExprState **) palloc0(aggnode->numCols * sizeof(ExprState *));
 
-				/* for each grouping set */
-				for (i = 0; i < phasedata->numsets; i++)
-				{
-					int			length = phasedata->gset_lengths[i];
-
-					/* nothing to do for empty grouping set */
-					if (length == 0)
-						continue;
-
-					/* if we already had one of this length, it'll do */
-					if (phasedata->eqfunctions[length - 1] != NULL)
-						continue;
-
-					phasedata->eqfunctions[length - 1] =
-						execTuplesMatchPrepare(scanDesc,
-											   length,
-											   aggnode->grpColIdx,
-											   aggnode->grpOperators,
-											   aggnode->grpCollations,
-											   (PlanState *) aggstate);
-				}
-
-				/* and for all grouped columns, unless already computed */
-				if (phasedata->eqfunctions[aggnode->numCols - 1] == NULL)
-				{
-					phasedata->eqfunctions[aggnode->numCols - 1] =
-						execTuplesMatchPrepare(scanDesc,
-											   aggnode->numCols,
-											   aggnode->grpColIdx,
-											   aggnode->grpOperators,
-											   aggnode->grpCollations,
-											   (PlanState *) aggstate);
-				}
+				phasedata->eqfunctions[aggnode->numCols - 1] =
+					execTuplesMatchPrepare(scanDesc,
+										   aggnode->numCols,
+										   aggnode->grpColIdx,
+										   aggnode->grpOperators,
+										   aggnode->grpCollations,
+										   (PlanState *) aggstate);
 			}
 
 			phasedata->aggnode = aggnode;
 			phasedata->aggstrategy = aggnode->aggstrategy;
-			}
-			}
-
-	/*
-	 * Convert all_grouped_cols to a descending-order list.
-	 */
-	i = -1;
-	while ((i = bms_next_member(all_grouped_cols, i)) >= 0)
-		aggstate->all_grouped_cols = lcons_int(i, aggstate->all_grouped_cols);
+		}
+	}
 
 	/*
 	 * Set up aggregate-result storage in the output expr context, and also
@@ -3865,9 +3501,6 @@ ExecReScanAgg(AggState *node)
 
 		/* reset to phase 1 */
 		initialize_phase(node, 1);
-
-		node->input_done = false;
-		node->projected_set = -1;
 	}
 
 	if (outerPlan->chgParam == NULL)

@@ -93,8 +93,8 @@ static void ExecBuildAggTransCall(ExprState *state, AggState *aggstate,
  * executions of the expression are needed.  Typically the context will be
  * the same as the per-query context of the associated ExprContext.
  *
- * Any Aggref, WindowFunc, or SubPlan nodes found in the tree are added to
- * the lists of such nodes held by the parent PlanState.
+ * Any Aggref or SubPlan nodes found in the tree are added to the lists of
+ * such nodes held by the parent PlanState.
  *
  * Note: there is no ExecEndExpr function; we assume that any resource
  * cleanup needed will be handled by just releasing the memory context
@@ -2208,9 +2208,9 @@ expr_setup_walker(Node *node, ExprSetupInfo *info)
 	}
 
 	/*
-	 * Don't examine the arguments or filters of Aggrefs or WindowFuncs,
-	 * because those do not represent expressions to be evaluated within the
-	 * calling expression's econtext.
+	 * Don't examine the arguments or filters of Aggrefs, because those do not
+	 * represent expressions to be evaluated within the calling expression's
+	 * econtext.
 	 */
 	if (IsA(node, Aggref))
 		return false;

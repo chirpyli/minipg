@@ -414,13 +414,9 @@ ChangeVarNodes_walker(Node *node, ChangeVarNodes_context *context)
 	{
 		PlanRowMark *rowmark = (PlanRowMark *) node;
 
-		if (context->sublevels_up == 0)
-		{
-			if (rowmark->rti == context->rt_index)
-				rowmark->rti = context->new_index;
-			if (rowmark->prti == context->rt_index)
-				rowmark->prti = context->new_index;
-		}
+		if (context->sublevels_up == 0 &&
+			rowmark->rti == context->rt_index)
+			rowmark->rti = context->new_index;
 		return false;
 	}
 	if (IsA(node, AppendRelInfo))
@@ -861,7 +857,6 @@ AddInvertedQual(Query *parsetree, Node *qual)
  * Messy, isn't it?  We do not need to do similar pushups for hasAggs,
  * because it isn't possible for this transformation to insert a level-zero
  * aggregate reference into a subquery --- it could only insert outer aggs.
- * Likewise for hasWindowFuncs.
  *
  * Note: usually, we'd not expose the mutator function or context struct
  * for a function like this.  We do so because callbacks often find it

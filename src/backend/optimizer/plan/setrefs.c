@@ -225,7 +225,6 @@ set_plan_references(PlannerInfo *root, Plan *plan)
 
 		/* adjust indexes ... but *not* the rowmarkId */
 		newrc->rti += rtoffset;
-		newrc->prti += rtoffset;
 
 		glob->finalrowmarks = lappend(glob->finalrowmarks, newrc);
 	}
@@ -718,7 +717,6 @@ set_plan_refs(PlannerInfo *root, Plan *plan, int rtoffset)
 					PlanRowMark *rc = (PlanRowMark *) lfirst(l);
 
 					rc->rti += rtoffset;
-					rc->prti += rtoffset;
 				}
 
 				/*

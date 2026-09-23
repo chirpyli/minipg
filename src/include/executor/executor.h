@@ -157,7 +157,7 @@ extern void InitResultRelInfo(ResultRelInfo *resultRelInfo,
 							  Index resultRelationIndex,
 							  int instrument_options);
 extern LockTupleMode ExecUpdateLockMode(EState *estate, ResultRelInfo *relinfo);
-extern ExecRowMark *ExecFindRowMark(EState *estate, Index rti, bool missing_ok);
+extern ExecRowMark *ExecFindRowMark(EState *estate, Index rti);
 extern ExecAuxRowMark *ExecBuildAuxRowMark(ExecRowMark *erm, List *targetlist);
 extern TupleTableSlot *EvalPlanQual(EPQState *epqstate, Relation relation,
 									Index rti, TupleTableSlot *testslot);

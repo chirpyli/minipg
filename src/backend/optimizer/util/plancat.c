@@ -1047,8 +1047,8 @@ function_selectivity(PlannerInfo *root,
  * per-tuple components, since QualCost does.
  *
  * The funcid must always be supplied.  If it is being called as the
- * implementation of a specific parsetree node (FuncExpr, OpExpr,
- * WindowFunc, etc), pass that as "node", else pass NULL.
+ * implementation of a specific parsetree node (FuncExpr, OpExpr, etc), pass
+ * that as "node", else pass NULL.
  *
  * In some usages root might be NULL, too.
  */

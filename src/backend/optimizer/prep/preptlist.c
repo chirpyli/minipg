@@ -128,17 +128,12 @@ preprocess_targetlist(PlannerInfo *root)
 	/*
 	 * Add necessary junk columns for rowmarked rels.  These values are needed
 	 * to do EvalPlanQual rechecking.  See comments for PlanRowMark in
-	 * plannodes.h.  If you change this stanza, see also the appendrel
-	 * expansion path, which has to be able to add on junk columns equivalent
-	 * to these.
+	 * plannodes.h.
 	 *
 	 * (Someday it might be useful to fold these resjunk columns into the
 	 * row-identity-column management used for UPDATE/DELETE.  Today is not
 	 * that day, however.  One notable issue is that it seems important that
-	 * the whole-row Vars made here use the real table rowtype, not RECORD, so
-	 * that conversion to/from child relations' rowtypes will happen.  Also,
-	 * since these entries don't potentially bloat with more and more child
-	 * relations, there's not really much need for column sharing.)
+	 * the whole-row Vars made here use the real table rowtype, not RECORD.)
 	 */
 	foreach(lc, root->rowMarks)
 	{
@@ -147,11 +142,7 @@ preprocess_targetlist(PlannerInfo *root)
 		char		resname[32];
 		TargetEntry *tle;
 
-		/* child rels use the same junk attrs as their parents */
-		if (rc->rti != rc->prti)
-			continue;
-
-		if (rc->allMarkTypes & ~(1 << ROW_MARK_COPY))
+		if (rc->markType == ROW_MARK_REFERENCE)
 		{
 			/* Need to fetch TID */
 			var = makeVar(rc->rti,
@@ -167,30 +158,13 @@ preprocess_targetlist(PlannerInfo *root)
 								  true);
 			tlist = lappend(tlist, tle);
 		}
-		if (rc->allMarkTypes & (1 << ROW_MARK_COPY))
+		else
 		{
 			/* Need the whole row as a junk var */
 			var = makeWholeRowVar(rt_fetch(rc->rti, range_table),
 								  rc->rti,
 								  0);
 			snprintf(resname, sizeof(resname), "wholerow%u", rc->rowmarkId);
-			tle = makeTargetEntry((Expr *) var,
-								  list_length(tlist) + 1,
-								  pstrdup(resname),
-								  true);
-			tlist = lappend(tlist, tle);
-		}
-
-		/* If parent of inheritance tree, always fetch the tableoid too. */
-		if (rc->isParent)
-		{
-			var = makeVar(rc->rti,
-						  TableOidAttributeNumber,
-						  OIDOID,
-						  -1,
-						  InvalidOid,
-						  0);
-			snprintf(resname, sizeof(resname), "tableoid%u", rc->rowmarkId);
 			tle = makeTargetEntry((Expr *) var,
 								  list_length(tlist) + 1,
 								  pstrdup(resname),

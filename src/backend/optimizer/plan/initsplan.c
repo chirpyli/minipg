@@ -160,7 +160,7 @@ build_base_rel_tlists(PlannerInfo *root, List *final_tlist)
 
 	/*
 	 * If there's a HAVING clause, we'll need the Vars it uses, too.  Note
-	 * that HAVING can contain Aggrefs but not WindowFuncs.
+	 * that HAVING can contain Aggrefs.
 	 */
 	if (root->parse->havingQual)
 	{

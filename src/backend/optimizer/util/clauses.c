@@ -166,26 +166,6 @@ contain_agg_clause_walker(Node *node, void *context)
 }
 
 /*****************************************************************************
- *		Window-function clause manipulation
- *****************************************************************************/
-
-/*
- * contain_window_function
- *	  Recursively search for WindowFunc nodes within a clause.
- *
- * Since window functions don't have level fields, but are hard-wired to
- * be associated with the current query level, this is just the same as
- * No longer relevant: window functions have been removed from minipg.
- */
-bool
-contain_window_function(Node *clause)
-{
-	return false;
-}
-
-
-
-/*****************************************************************************
  *		Support for expressions returning sets
  *****************************************************************************/
 
@@ -1486,8 +1466,7 @@ is_strict_saop(ScalarArrayOpExpr *expr, bool falseOK)
  * not-constant expressions, namely aggregates (Aggrefs).  In current usage
  * this is only applied to WHERE clauses and so a check for Aggrefs would be
  * a waste of cycles; but be sure to also check contain_agg_clause() if you
- * want to know about pseudo-constness in other contexts.  The same goes
- * for window functions (WindowFuncs).
+ * want to know about pseudo-constness in other contexts.
  */
 bool
 is_pseudo_constant_clause(Node *clause)

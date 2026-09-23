@@ -804,13 +804,8 @@ _copyPlanRowMark(const PlanRowMark *from)
 	PlanRowMark *newnode = makeNode(PlanRowMark);
 
 	COPY_SCALAR_FIELD(rti);
-	COPY_SCALAR_FIELD(prti);
 	COPY_SCALAR_FIELD(rowmarkId);
 	COPY_SCALAR_FIELD(markType);
-	COPY_SCALAR_FIELD(allMarkTypes);
-	COPY_SCALAR_FIELD(strength);
-	COPY_SCALAR_FIELD(waitPolicy);
-	COPY_SCALAR_FIELD(isParent);
 
 	return newnode;
 }
