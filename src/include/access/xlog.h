@@ -110,7 +110,6 @@ extern int	max_wal_size_mb;
 extern int	wal_keep_size_mb;
 extern int	XLOGbuffers;
 extern int	wal_retrieve_retry_interval;
-extern bool EnableHotStandby;
 extern bool fullPageWrites;
 extern bool wal_log_hints;
 extern bool wal_compression;

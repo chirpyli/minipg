@@ -1539,18 +1539,6 @@ ProcessStartupPacket(Port *port, bool ssl_done)
 					(errcode(ERRCODE_CANNOT_CONNECT_NOW),
 					 errmsg("the database system is starting up")));
 			break;
-		case CAC_NOTCONSISTENT:
-			if (EnableHotStandby)
-				ereport(FATAL,
-						(errcode(ERRCODE_CANNOT_CONNECT_NOW),
-						 errmsg("the database system is not yet accepting connections"),
-						 errdetail("Consistent recovery state has not been yet reached.")));
-			else
-				ereport(FATAL,
-						(errcode(ERRCODE_CANNOT_CONNECT_NOW),
-						 errmsg("the database system is not accepting connections"),
-						 errdetail("Hot standby mode is disabled.")));
-			break;
 		case CAC_SHUTDOWN:
 			ereport(FATAL,
 					(errcode(ERRCODE_CANNOT_CONNECT_NOW),
