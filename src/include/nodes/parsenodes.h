@@ -1194,10 +1194,7 @@ typedef enum TransactionStmtKind
 	TRANS_STMT_ROLLBACK,
 	TRANS_STMT_SAVEPOINT,
 	TRANS_STMT_RELEASE,
-	TRANS_STMT_ROLLBACK_TO,
-	TRANS_STMT_PREPARE,
-	TRANS_STMT_COMMIT_PREPARED,
-	TRANS_STMT_ROLLBACK_PREPARED
+	TRANS_STMT_ROLLBACK_TO
 } TransactionStmtKind;
 
 typedef struct TransactionStmt
@@ -1206,7 +1203,6 @@ typedef struct TransactionStmt
 	TransactionStmtKind kind;	/* see above */
 	List	   *options;		/* for BEGIN/START commands */
 	char	   *savepoint_name; /* for savepoint commands */
-	char	   *gid;			/* for two-phase-commit related commands */
 } TransactionStmt;
 
 /* ----------------------

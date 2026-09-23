@@ -1027,7 +1027,6 @@ IsTransactionExitStmt(Node *parsetree)
 		TransactionStmt *stmt = (TransactionStmt *) parsetree;
 
 		if (stmt->kind == TRANS_STMT_COMMIT ||
-			stmt->kind == TRANS_STMT_PREPARE ||
 			stmt->kind == TRANS_STMT_ROLLBACK ||
 			stmt->kind == TRANS_STMT_ROLLBACK_TO)
 			return true;

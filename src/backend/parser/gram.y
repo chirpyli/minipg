@@ -399,7 +399,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 	ON ONLY OPERATOR OR
 	ORDER OUTER_P
 
-	PRECISION PREPARE PREPARED PRIMARY
+	PRECISION PRIMARY
 
 
 
@@ -1814,27 +1814,6 @@ TransactionStmt:
 					TransactionStmt *n = makeNode(TransactionStmt);
 					n->kind = TRANS_STMT_ROLLBACK_TO;
 					n->savepoint_name = $4;
-					$$ = (Node *)n;
-				}
-			| PREPARE TRANSACTION Sconst
-				{
-					TransactionStmt *n = makeNode(TransactionStmt);
-					n->kind = TRANS_STMT_PREPARE;
-					n->gid = $3;
-					$$ = (Node *)n;
-				}
-			| COMMIT PREPARED Sconst
-				{
-					TransactionStmt *n = makeNode(TransactionStmt);
-					n->kind = TRANS_STMT_COMMIT_PREPARED;
-					n->gid = $3;
-					$$ = (Node *)n;
-				}
-			| ROLLBACK PREPARED Sconst
-				{
-					TransactionStmt *n = makeNode(TransactionStmt);
-					n->kind = TRANS_STMT_ROLLBACK_PREPARED;
-					n->gid = $3;
 					$$ = (Node *)n;
 				}
 		;
@@ -4091,8 +4070,6 @@ unreserved_keyword:
 			| LOCAL
 			| NULLS_P
 			| OPERATOR
-			| PREPARE
-			| PREPARED
 			| READ
 			| RELEASE
 			| REPEATABLE
@@ -4322,8 +4299,6 @@ bare_label_keyword:
 			| OPERATOR
 			| OR
 			| OUTER_P
-			| PREPARE
-			| PREPARED
 			| PRIMARY
 			| READ
 			| REAL

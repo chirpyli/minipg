@@ -176,13 +176,9 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 				TransactionStmt *stmt = (TransactionStmt *) parsetree;
 
 				/*
-				 * PREPARE, COMMIT PREPARED, and ROLLBACK PREPARED all write
-				 * WAL, so they're not read-only in the strict sense; but the
-				 * first and third do not change pg_dump output, so they're OK
-				 * in a read-only transactions.
-				 *
-				 * We also consider COMMIT PREPARED to be OK in a read-only
-				 * transaction environment, by way of exception.
+				 * All remaining transaction control statements are strictly
+				 * read-only in the sense that they don't change database
+				 * state.
 				 */
 				switch (stmt->kind)
 				{
@@ -194,11 +190,6 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 					case TRANS_STMT_RELEASE:
 					case TRANS_STMT_ROLLBACK_TO:
 						return COMMAND_IS_STRICTLY_READ_ONLY;
-
-					case TRANS_STMT_PREPARE:
-					case TRANS_STMT_COMMIT_PREPARED:
-					case TRANS_STMT_ROLLBACK_PREPARED:
-						return COMMAND_OK_IN_READ_ONLY_TXN;
 				}
 				elog(ERROR, "unrecognized TransactionStmtKind: %d",
 					 (int) stmt->kind);
@@ -389,25 +380,6 @@ standard_ProcessUtility(PlannedStmt *pstmt,
 							if (qc)
 								SetQueryCompletion(qc, CMDTAG_ROLLBACK, 0);
 						}
-						break;
-
-					case TRANS_STMT_PREPARE:
-						if (!PrepareTransactionBlock(stmt->gid))
-						{
-							/* report unsuccessful commit in qc */
-							if (qc)
-								SetQueryCompletion(qc, CMDTAG_ROLLBACK, 0);
-						}
-						break;
-
-					case TRANS_STMT_COMMIT_PREPARED:
-						PreventInTransactionBlock(isTopLevel, "COMMIT PREPARED");
-						FinishPreparedTransaction(stmt->gid, true);
-						break;
-
-					case TRANS_STMT_ROLLBACK_PREPARED:
-						PreventInTransactionBlock(isTopLevel, "ROLLBACK PREPARED");
-						FinishPreparedTransaction(stmt->gid, false);
 						break;
 
 					case TRANS_STMT_ROLLBACK:
@@ -987,18 +959,6 @@ CreateCommandTag(Node *parsetree)
 
 					case TRANS_STMT_RELEASE:
 						tag = CMDTAG_RELEASE;
-						break;
-
-					case TRANS_STMT_PREPARE:
-						tag = CMDTAG_PREPARE_TRANSACTION;
-						break;
-
-					case TRANS_STMT_COMMIT_PREPARED:
-						tag = CMDTAG_COMMIT_PREPARED;
-						break;
-
-					case TRANS_STMT_ROLLBACK_PREPARED:
-						tag = CMDTAG_ROLLBACK_PREPARED;
 						break;
 
 					default:
