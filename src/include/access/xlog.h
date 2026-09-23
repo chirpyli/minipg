@@ -118,20 +118,8 @@ extern bool wal_recycle;
 extern bool *wal_consistency_checking;
 extern char *wal_consistency_checking_string;
 extern bool log_checkpoints;
-extern char *recoveryRestoreCommand;
-extern char *recoveryEndCommand;
-extern char *archiveCleanupCommand;
-extern bool recoveryTargetInclusive;
-extern int	recoveryTargetAction;
-extern int	recovery_min_apply_delay;
-extern char *PrimaryConnInfo;
-extern char *PrimarySlotName;
-extern bool wal_receiver_create_temp_slot;
 extern bool track_wal_io_timing;
 
-/* indirectly set via GUC system */
-extern TransactionId recoveryTargetXid;
-extern char *recovery_target_time_string;
 extern RecoveryTargetType recoveryTarget;
 extern RecoveryTargetTimeLineGoal recoveryTargetTimeLineGoal;
 extern TimeLineID recoveryTargetTLIRequested;

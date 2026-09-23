@@ -1431,16 +1431,6 @@ static struct config_int ConfigureNamesInt[] =
 		NULL, NULL, NULL
 	},
 
-	{
-		{"recovery_min_apply_delay", PGC_SIGHUP, REPLICATION_STANDBY,
-			gettext_noop("Sets the minimum delay for applying changes during recovery."),
-			NULL,
-			GUC_UNIT_MS
-		},
-		&recovery_min_apply_delay,
-		0, 0, INT_MAX,
-		NULL, NULL, NULL
-	},
 
 	{
 		{"max_connections", PGC_POSTMASTER, CONN_AUTH_SETTINGS,
@@ -2444,35 +2434,8 @@ static struct config_real ConfigureNamesReal[] =
 
 static struct config_string ConfigureNamesString[] =
 {
-	{
-		{"restore_command", PGC_SIGHUP, WAL_ARCHIVE_RECOVERY,
-			gettext_noop("Sets the shell command that will be called to retrieve an archived WAL file."),
-			NULL
-		},
-		&recoveryRestoreCommand,
-		"",
-		NULL, NULL, NULL
-	},
 
-	{
-		{"archive_cleanup_command", PGC_SIGHUP, WAL_ARCHIVE_RECOVERY,
-			gettext_noop("Sets the shell command that will be executed at every restart point."),
-			NULL
-		},
-		&archiveCleanupCommand,
-		"",
-		NULL, NULL, NULL
-	},
 
-	{
-		{"recovery_end_command", PGC_SIGHUP, WAL_ARCHIVE_RECOVERY,
-			gettext_noop("Sets the shell command that will be executed once at the end of recovery."),
-			NULL
-		},
-		&recoveryEndCommand,
-		"",
-		NULL, NULL, NULL
-	},
 
 
 	{

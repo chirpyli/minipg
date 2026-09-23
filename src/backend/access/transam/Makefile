@@ -25,7 +25,6 @@ OBJS = \
 	varsup.o \
 	xact.o \
 	xlog.o \
-	xlogarchive.o \
 	xlogfuncs.o \
 	xloginsert.o \
 	xlogreader.o \

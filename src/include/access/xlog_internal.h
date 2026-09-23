@@ -320,10 +320,5 @@ extern XLogRecPtr RequestXLogSwitch(bool mark_unimportant);
 
 extern void GetOldestRestartPoint(XLogRecPtr *oldrecptr, TimeLineID *oldtli);
 
-/*
- * Exported for the functions in timeline.c and xlogarchive.c.  Only valid
- * in the startup process.
- */
-extern char *recoveryRestoreCommand;
 
 #endif							/* XLOG_INTERNAL_H */

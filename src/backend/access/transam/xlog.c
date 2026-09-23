@@ -34,7 +34,6 @@
 #include "access/xact.h"
 #include "access/xlog_internal.h"
 #include "access/xlog.h"
-#include "access/xlogarchive.h"
 #include "access/xloginsert.h"
 #include "access/xlogreader.h"
 #include "access/xlogutils.h"
@@ -240,33 +239,10 @@ static bool LocalPromoteIsTriggered = false;
  */
 static int	LocalXLogInsertAllowed = -1;
 
-
-
-/* Was the last xlog file restored from archive, or local? */
-static bool restoredFromArchive = false;
-
 /* Buffers dedicated to consistency checks of size BLCKSZ */
 static char *replay_image_masked = NULL;
 static char *primary_image_masked = NULL;
 
-/* options formerly taken from recovery.conf for archive recovery */
-char	   *recoveryRestoreCommand = NULL;
-char	   *recoveryEndCommand = NULL;
-char	   *archiveCleanupCommand = NULL;
-RecoveryTargetType recoveryTarget = RECOVERY_TARGET_UNSET;
-bool		recoveryTargetInclusive = true;
-int			recoveryTargetAction = RECOVERY_TARGET_ACTION_PAUSE;
-TransactionId recoveryTargetXid;
-char	   *recovery_target_time_string;
-const char *recoveryTargetName;
-XLogRecPtr	recoveryTargetLSN;
-int			recovery_min_apply_delay = 0;
-
-/* options formerly taken from recovery.conf for XLOG streaming */
-char	   *PrimaryConnInfo = NULL;
-char	   *PrimarySlotName = NULL;
-char	   *PromoteTriggerFile = NULL;
-bool		wal_receiver_create_temp_slot = false;
 
 
 /*
@@ -3495,26 +3471,10 @@ XLogFileRead(XLogSegNo segno, int emode, TimeLineID tli,
 		case XLOG_FROM_PG_WAL:
 		case XLOG_FROM_STREAM:
 			XLogFilePath(path, tli, segno, wal_segment_size);
-			restoredFromArchive = false;
 			break;
 
 		default:
 			elog(ERROR, "invalid XLogFileRead source %d", source);
-	}
-
-	/*
-	 * If the segment was fetched from archival storage, replace the existing
-	 * xlog segment (if any) with the archival version.
-	 */
-	if (source == XLOG_FROM_ARCHIVE)
-	{
-		Assert(!XLogCtl->InstallXLogFileSegmentActive);
-		KeepFileRestoredFromArchive(path, xlogfname);
-
-		/*
-		 * Set path to point at the new file in pg_wal.
-		 */
-		snprintf(path, MAXPGPATH, XLOGDIR "/%s", xlogfname);
 	}
 
 	fd = BasicOpenFile(path, O_RDONLY | PG_BINARY);
@@ -4991,7 +4951,6 @@ StartupXLOG(void)
 	XLogCtlInsert *Insert;
 	CheckPoint	checkPoint;
 	bool		wasShutdown;
-	bool		reachedRecoveryTarget = false;
 	XLogRecPtr	RecPtr,
 				checkPointLoc,
 				EndOfLog;
@@ -5609,36 +5568,6 @@ StartupXLOG(void)
 			 * end of main redo apply loop
 			 */
 
-			if (reachedRecoveryTarget)
-			{
-				if (!reachedConsistency)
-					ereport(FATAL,
-							(errmsg("requested recovery stop point is before consistent recovery point")));
-
-				/*
-				 * This is the last point where we can restart recovery with a
-				 * new recovery target, if we shutdown and begin again. After
-				 * this, Resource Managers may choose to do permanent
-				 * corrective actions at end of recovery.
-				 */
-				switch (recoveryTargetAction)
-				{
-					case RECOVERY_TARGET_ACTION_SHUTDOWN:
-
-						/*
-						 * exit with special return code to request shutdown
-						 * of postmaster.  Log messages issued from
-						 * postmaster.
-						 */
-						proc_exit(3);
-
-					case RECOVERY_TARGET_ACTION_PAUSE:
-						/* drop into promote */
-
-					case RECOVERY_TARGET_ACTION_PROMOTE:
-						break;
-				}
-			}
 
 			/* Allow resource managers to do any required cleanup. */
 			for (rmid = 0; rmid <= RM_MAX_ID; rmid++)
@@ -7454,14 +7383,6 @@ CreateRestartPoint(int flags)
 					LSN_FORMAT_ARGS(lastCheckPoint.redo)),
 			 xtime ? errdetail("Last completed transaction was at log time %s.",
 							   timestamptz_to_str(xtime)) : 0));
-
-	/*
-	 * Finally, execute archive_cleanup_command, if any.
-	 */
-	if (archiveCleanupCommand && strcmp(archiveCleanupCommand, "") != 0)
-		ExecuteRecoveryCommand(archiveCleanupCommand,
-							   "archive_cleanup_command",
-							   false);
 
 	return true;
 }

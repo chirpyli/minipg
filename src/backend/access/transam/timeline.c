@@ -37,7 +37,6 @@
 #include "access/timeline.h"
 #include "access/xlog.h"
 #include "access/xlog_internal.h"
-#include "access/xlogarchive.h"
 #include "access/xlogdefs.h"
 #include "utils/wait_event.h"
 #include "storage/fd.h"
@@ -64,12 +63,10 @@ readTimeLineHistory(TimeLineID targetTLI)
 {
 	List	   *result;
 	char		path[MAXPGPATH];
-	char		histfname[MAXFNAMELEN];
 	FILE	   *fd;
 	TimeLineHistoryEntry *entry;
 	TimeLineID	lasttli = 0;
 	XLogRecPtr	prevend;
-	bool		fromArchive = false;
 
 	/* Timeline 1 does not have a history file, so no need to check */
 	if (targetTLI == 1)
@@ -185,12 +182,6 @@ readTimeLineHistory(TimeLineID targetTLI)
 
 	result = lcons(entry, result);
 
-	/*
-	 * If the history file was fetched from archive, save it in pg_wal for
-	 * future reference.
-	 */
-	if (fromArchive)
-		KeepFileRestoredFromArchive(path, histfname);
 
 	return result;
 }
@@ -226,190 +217,6 @@ existsTimeLineHistory(TimeLineID probeTLI)
 	}
 }
 
-/*
- * Find the newest existing timeline, assuming that startTLI exists.
- *
- * Note: while this is somewhat heuristic, it does positively guarantee
- * that (result + 1) is not a known timeline, and therefore it should
- * be safe to assign that ID to a new timeline.
- */
-TimeLineID
-findNewestTimeLine(TimeLineID startTLI)
-{
-	TimeLineID	newestTLI;
-	TimeLineID	probeTLI;
-
-	/*
-	 * The algorithm is just to probe for the existence of timeline history
-	 * files.  XXX is it useful to allow gaps in the sequence?
-	 */
-	newestTLI = startTLI;
-
-	for (probeTLI = startTLI + 1;; probeTLI++)
-	{
-		if (existsTimeLineHistory(probeTLI))
-		{
-			newestTLI = probeTLI;	/* probeTLI exists */
-		}
-		else
-		{
-			/* doesn't exist, assume we're done */
-			break;
-		}
-	}
-
-	return newestTLI;
-}
-
-/*
- * Create a new timeline history file.
- *
- *	newTLI: ID of the new timeline
- *	parentTLI: ID of its immediate parent
- *	switchpoint: WAL location where the system switched to the new timeline
- *	reason: human-readable explanation of why the timeline was switched
- *
- * Currently this is only used at the end recovery, and so there are no locking
- * considerations.  But we should be just as tense as XLogFileInit to avoid
- * emplacing a bogus file.
- */
-void
-writeTimeLineHistory(TimeLineID newTLI, TimeLineID parentTLI,
-					 XLogRecPtr switchpoint, char *reason)
-{
-	char		path[MAXPGPATH];
-	char		tmppath[MAXPGPATH];
-	char		buffer[BLCKSZ];
-	int			srcfd;
-	int			fd;
-	int			nbytes;
-
-	Assert(newTLI > parentTLI); /* else bad selection of newTLI */
-
-	/*
-	 * Write into a temp file name.
-	 */
-	snprintf(tmppath, MAXPGPATH, XLOGDIR "/xlogtemp.%d", (int) getpid());
-
-	unlink(tmppath);
-
-	/* do not use get_sync_bit() here --- want to fsync only at end of fill */
-	fd = OpenTransientFile(tmppath, O_RDWR | O_CREAT | O_EXCL);
-	if (fd < 0)
-		ereport(ERROR,
-				(errcode_for_file_access(),
-				 errmsg("could not create file \"%s\": %m", tmppath)));
-
-	/*
-	 * If a history file exists for the parent, copy it verbatim
-	 */
-	TLHistoryFilePath(path, parentTLI);
-
-	srcfd = OpenTransientFile(path, O_RDONLY);
-	if (srcfd < 0)
-	{
-		if (errno != ENOENT)
-			ereport(ERROR,
-					(errcode_for_file_access(),
-					 errmsg("could not open file \"%s\": %m", path)));
-		/* Not there, so assume parent has no parents */
-	}
-	else
-	{
-		for (;;)
-		{
-			errno = 0;
-			pgstat_report_wait_start(WAIT_EVENT_TIMELINE_HISTORY_READ);
-			nbytes = (int) read(srcfd, buffer, sizeof(buffer));
-			pgstat_report_wait_end();
-			if (nbytes < 0 || errno != 0)
-				ereport(ERROR,
-						(errcode_for_file_access(),
-						 errmsg("could not read file \"%s\": %m", path)));
-			if (nbytes == 0)
-				break;
-			errno = 0;
-			pgstat_report_wait_start(WAIT_EVENT_TIMELINE_HISTORY_WRITE);
-			if ((int) write(fd, buffer, nbytes) != nbytes)
-			{
-				int			save_errno = errno;
-
-				/*
-				 * If we fail to make the file, delete it to release disk
-				 * space
-				 */
-				unlink(tmppath);
-
-				/*
-				 * if write didn't set errno, assume problem is no disk space
-				 */
-				errno = save_errno ? save_errno : ENOSPC;
-
-				ereport(ERROR,
-						(errcode_for_file_access(),
-						 errmsg("could not write to file \"%s\": %m", tmppath)));
-			}
-			pgstat_report_wait_end();
-		}
-
-		if (CloseTransientFile(srcfd) != 0)
-			ereport(ERROR,
-					(errcode_for_file_access(),
-					 errmsg("could not close file \"%s\": %m", path)));
-	}
-
-	/*
-	 * Append one line with the details of this timeline split.
-	 *
-	 * If we did have a parent file, insert an extra newline just in case the
-	 * parent file failed to end with one.
-	 */
-	snprintf(buffer, sizeof(buffer),
-			 "%s%u\t%X/%X\t%s\n",
-			 (srcfd < 0) ? "" : "\n",
-			 parentTLI,
-			 LSN_FORMAT_ARGS(switchpoint),
-			 reason);
-
-	nbytes = strlen(buffer);
-	errno = 0;
-	pgstat_report_wait_start(WAIT_EVENT_TIMELINE_HISTORY_WRITE);
-	if ((int) write(fd, buffer, nbytes) != nbytes)
-	{
-		int			save_errno = errno;
-
-		/*
-		 * If we fail to make the file, delete it to release disk space
-		 */
-		unlink(tmppath);
-		/* if write didn't set errno, assume problem is no disk space */
-		errno = save_errno ? save_errno : ENOSPC;
-
-		ereport(ERROR,
-				(errcode_for_file_access(),
-				 errmsg("could not write to file \"%s\": %m", tmppath)));
-	}
-	pgstat_report_wait_end();
-
-	pgstat_report_wait_start(WAIT_EVENT_TIMELINE_HISTORY_SYNC);
-	if (pg_fsync(fd) != 0)
-		ereport(data_sync_elevel(ERROR),
-				(errcode_for_file_access(),
-				 errmsg("could not fsync file \"%s\": %m", tmppath)));
-	pgstat_report_wait_end();
-
-	if (CloseTransientFile(fd) != 0)
-		ereport(ERROR,
-				(errcode_for_file_access(),
-				 errmsg("could not close file \"%s\": %m", tmppath)));
-
-	/*
-	 * Now move the completed history file into place with its final name.
-	 */
-	TLHistoryFilePath(path, newTLI);
-	Assert(access(path, F_OK) != 0 && errno == ENOENT);
-	durable_rename(tmppath, path, ERROR);
-}
 
 /*
  * Returns true if 'expectedTLEs' contains a timeline with id 'tli'
