@@ -5095,21 +5095,15 @@ StartupXLOG(void)
 	CheckPoint	checkPoint;
 	bool		wasShutdown;
 	bool		reachedRecoveryTarget = false;
-	bool		haveBackupLabel = false;
-	bool		haveTblspcMap = false;
 	XLogRecPtr	RecPtr,
 				checkPointLoc,
 				EndOfLog;
 	TimeLineID	PrevTimeLineID;
 	XLogRecord *record;
 	TransactionId oldestActiveXID;
-	bool		backupEndRequired = false;
-	bool		backupFromStandby = false;
-	DBState		dbstate_at_startup;
 	XLogReaderState *xlogreader;
 	XLogPageReadPrivate private;
 	bool		promoted = false;
-	struct stat st;
 
 	/*
 	 * We should have an aux process resource owner to use, and we should not
@@ -5284,32 +5278,6 @@ StartupXLOG(void)
 	replay_image_masked = (char *) palloc(BLCKSZ);
 	primary_image_masked = (char *) palloc(BLCKSZ);
 
-		/*
-		 * If tablespace_map file is present without backup_label file, there
-		 * is no use of such file.  There is no harm in retaining it, but it
-		 * is better to get rid of the map file so that we don't have any
-		 * redundant file in data directory and it will avoid any sort of
-		 * confusion.  It seems prudent though to just rename the file out of
-		 * the way rather than delete it completely, also we ignore any error
-		 * that occurs in rename operation as even if map file is present
-		 * without backup_label file, it is harmless.
-		 */
-		if (stat(TABLESPACE_MAP, &st) == 0)
-		{
-			unlink(TABLESPACE_MAP_OLD);
-			if (durable_rename(TABLESPACE_MAP, TABLESPACE_MAP_OLD, DEBUG1) == 0)
-				ereport(LOG,
-						(errmsg("ignoring file \"%s\" because no file \"%s\" exists",
-								TABLESPACE_MAP, BACKUP_LABEL_FILE),
-						 errdetail("File \"%s\" was renamed to \"%s\".",
-								   TABLESPACE_MAP, TABLESPACE_MAP_OLD)));
-			else
-				ereport(LOG,
-						(errmsg("ignoring file \"%s\" because no file \"%s\" exists",
-								TABLESPACE_MAP, BACKUP_LABEL_FILE),
-						 errdetail("Could not rename file \"%s\" to \"%s\": %m.",
-								   TABLESPACE_MAP, TABLESPACE_MAP_OLD)));
-		}
 
 
 		/* Get the last valid checkpoint record. */
@@ -5531,75 +5499,17 @@ StartupXLOG(void)
 		 * pg_control with any minimum recovery stop point obtained from a
 		 * backup history file.
 		 */
-		dbstate_at_startup = ControlFile->state;
-		if (InArchiveRecovery)
-		{
-			ControlFile->state = DB_IN_ARCHIVE_RECOVERY;
+		ereport(LOG,
+				(errmsg("database system was not properly shut down; "
+						"automatic recovery in progress")));
+		ControlFile->state = DB_IN_CRASH_RECOVERY;
 
-			SpinLockAcquire(&XLogCtl->info_lck);
-			XLogCtl->SharedRecoveryState = RECOVERY_STATE_ARCHIVE;
-			SpinLockRelease(&XLogCtl->info_lck);
-		}
-		else
-		{
-			ereport(LOG,
-					(errmsg("database system was not properly shut down; "
-							"automatic recovery in progress")));
-			if (recoveryTargetTLI > ControlFile->checkPointCopy.ThisTimeLineID)
-				ereport(LOG,
-						(errmsg("crash recovery starts in timeline %u "
-								"and has target timeline %u",
-								ControlFile->checkPointCopy.ThisTimeLineID,
-								recoveryTargetTLI)));
-			ControlFile->state = DB_IN_CRASH_RECOVERY;
-
-			SpinLockAcquire(&XLogCtl->info_lck);
-			XLogCtl->SharedRecoveryState = RECOVERY_STATE_CRASH;
-			SpinLockRelease(&XLogCtl->info_lck);
-		}
+		SpinLockAcquire(&XLogCtl->info_lck);
+		XLogCtl->SharedRecoveryState = RECOVERY_STATE_CRASH;
+		SpinLockRelease(&XLogCtl->info_lck);
 		ControlFile->checkPoint = checkPointLoc;
 		ControlFile->checkPointCopy = checkPoint;
-		if (InArchiveRecovery)
-		{
-			/* initialize minRecoveryPoint if not set yet */
-			if (ControlFile->minRecoveryPoint < checkPoint.redo)
-			{
-				ControlFile->minRecoveryPoint = checkPoint.redo;
-				ControlFile->minRecoveryPointTLI = checkPoint.ThisTimeLineID;
-			}
-		}
 
-		/*
-		 * Set backupStartPoint if we're starting recovery from a base backup.
-		 *
-		 * Also set backupEndPoint and use minRecoveryPoint as the backup end
-		 * location if we're starting recovery from a base backup which was
-		 * taken from a standby. In this case, the database system status in
-		 * pg_control must indicate that the database was already in recovery.
-		 * Usually that will be DB_IN_ARCHIVE_RECOVERY but also can be
-		 * DB_SHUTDOWNED_IN_RECOVERY if recovery previously was interrupted
-		 * before reaching this point; e.g. because restore_command or
-		 * primary_conninfo were faulty.
-		 *
-		 * Any other state indicates that the backup somehow became corrupted
-		 * and we can't sensibly continue with recovery.
-		 */
-		if (haveBackupLabel)
-		{
-			ControlFile->backupStartPoint = checkPoint.redo;
-			ControlFile->backupEndRequired = backupEndRequired;
-
-			if (backupFromStandby)
-			{
-				if (dbstate_at_startup != DB_IN_ARCHIVE_RECOVERY &&
-					dbstate_at_startup != DB_SHUTDOWNED_IN_RECOVERY)
-					ereport(FATAL,
-							(errmsg("backup_label contains data inconsistent with control file"),
-							 errhint("This means that the backup is corrupted and you will "
-									 "have to use another backup for recovery.")));
-				ControlFile->backupEndPoint = ControlFile->minRecoveryPoint;
-			}
-		}
 		ControlFile->time = (pg_time_t) time(NULL);
 		/* No need to hold ControlFileLock yet, we aren't up far enough */
 		UpdateControlFile();
@@ -5629,32 +5539,6 @@ StartupXLOG(void)
 		 * Reset pgstat data, because it may be invalid after recovery.
 		 */
 
-		/*
-		 * If there was a backup label file, it's done its job and the info
-		 * has now been propagated into pg_control.  We must get rid of the
-		 * label file so that if we crash during recovery, we'll pick up at
-		 * the latest recovery restartpoint instead of going all the way back
-		 * to the backup start point.  It seems prudent though to just rename
-		 * the file out of the way rather than delete it completely.
-		 */
-		if (haveBackupLabel)
-		{
-			unlink(BACKUP_LABEL_OLD);
-			durable_rename(BACKUP_LABEL_FILE, BACKUP_LABEL_OLD, FATAL);
-		}
-
-		/*
-		 * If there was a tablespace_map file, it's done its job and the
-		 * symlinks have been created.  We must get rid of the map file so
-		 * that if we crash during recovery, we don't create symlinks again.
-		 * It seems prudent though to just rename the file out of the way
-		 * rather than delete it completely.
-		 */
-		if (haveTblspcMap)
-		{
-			unlink(TABLESPACE_MAP_OLD);
-			durable_rename(TABLESPACE_MAP, TABLESPACE_MAP_OLD, FATAL);
-		}
 
 		/* Check that the GUCs used to generate the WAL allow recovery */
 		CheckRequiredParameterValues();
