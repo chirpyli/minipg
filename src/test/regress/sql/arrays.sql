@@ -313,13 +313,6 @@ update arr_pk_tbl set f1[2147483647] = 42 where pk = 10;
 
 \set VERBOSITY default
 
--- test [not] (like|ilike) (any|all) (...)
-select 'foo' like any (array['%a', '%o']); -- t
-select 'foo' like any (array['%a', '%b']); -- f
-select 'foo' like all (array['f%', '%o']); -- t
-select 'foo' like all (array['f%', '%b']); -- f
-select 'foo' not like any (array['%a', '%b']); -- t
-select 'foo' not like all (array['%a', '%o']); -- f
 
 --
 -- General array parser tests

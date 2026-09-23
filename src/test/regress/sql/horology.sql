@@ -171,8 +171,8 @@ SELECT CAST(cast(date 'today' + time with time zone '03:30'
 
 SELECT t.d1 AS t, i.f1 AS i, t.d1 + i.f1 AS "add", t.d1 - i.f1 AS "subtract"
   FROM TIMESTAMP_TBL t, INTERVAL_TBL i
-  WHERE t.d1 BETWEEN '1990-01-01' AND '2001-01-01'
-    AND i.f1 BETWEEN '00:00' AND '23:00'
+  WHERE t.d1 >= '1990-01-01' AND t.d1 <= '2001-01-01'
+    AND i.f1 >= '00:00' AND i.f1 <= '23:00'
   ORDER BY 1,2;
 
 SELECT t.f1 AS t, i.f1 AS i, t.f1 + i.f1 AS "add", t.f1 - i.f1 AS "subtract"
@@ -185,8 +185,8 @@ CREATE TABLE TEMP_TIMESTAMP (f1 timestamp with time zone);
 
 INSERT INTO TEMP_TIMESTAMP (f1)
   SELECT d1 FROM TIMESTAMP_TBL
-  WHERE d1 BETWEEN '13-jun-1957' AND '1-jan-1997'
-   OR d1 BETWEEN '1-jan-1999' AND '1-jan-2010';
+  WHERE d1 >= '13-jun-1957' AND d1 <= '1-jan-1997'
+   OR d1 >= '1-jan-1999' AND d1 <= '1-jan-2010';
 
 SELECT f1 AS "timestamp"
   FROM TEMP_TIMESTAMP

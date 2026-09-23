@@ -23,7 +23,7 @@ select count(*) > 0 as ok from pg_locks;
 
 -- This is to record the prevailing planner enable_foo settings during
 -- a regression test run.
-select name, setting from pg_settings where name like 'enable%';
+select name, setting from pg_settings where left(name, 6) = 'enable';
 
 -- Test that the pg_timezone_names and pg_timezone_abbrevs views are
 -- more-or-less working.  We can't test their contents in any great detail

@@ -27,7 +27,7 @@ SELECT f1 FROM DATE_TBL;
 SELECT f1 FROM DATE_TBL WHERE f1 < '2000-01-01';
 
 SELECT f1 FROM DATE_TBL
-  WHERE f1 BETWEEN '2000-01-01' AND '2001-01-01';
+  WHERE f1 >= '2000-01-01' AND f1 <= '2001-01-01';
 
 --
 -- Check all the documented input formats

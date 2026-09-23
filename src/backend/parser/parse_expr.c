@@ -48,7 +48,6 @@ static Node *transformAExprOpAny(ParseState *pstate, A_Expr *a);
 static Node *transformAExprOpAll(ParseState *pstate, A_Expr *a);
 static Node *transformAExprNullIf(ParseState *pstate, A_Expr *a);
 static Node *transformAExprIn(ParseState *pstate, A_Expr *a);
-static Node *transformAExprBetween(ParseState *pstate, A_Expr *a);
 static Node *transformBoolExpr(ParseState *pstate, BoolExpr *a);
 static Node *transformFuncCall(ParseState *pstate, FuncCall *fn);
 static Node *transformCaseExpr(ParseState *pstate, CaseExpr *c);
@@ -152,14 +151,6 @@ transformExprRecurse(ParseState *pstate, Node *expr)
 						break;
 					case AEXPR_IN:
 						result = transformAExprIn(pstate, a);
-						break;
-					case AEXPR_LIKE:
-						/* we can transform this just like AEXPR_OP */
-						result = transformAExprOp(pstate, a);
-						break;
-					case AEXPR_BETWEEN:
-					case AEXPR_NOT_BETWEEN:
-						result = transformAExprBetween(pstate, a);
 						break;
 					default:
 						elog(ERROR, "unrecognized A_Expr kind: %d", a->kind);
@@ -1004,62 +995,6 @@ transformAExprIn(ParseState *pstate, A_Expr *a)
 	}
 
 	return result;
-}
-
-static Node *
-transformAExprBetween(ParseState *pstate, A_Expr *a)
-{
-	Node	   *aexpr;
-	Node	   *bexpr;
-	Node	   *cexpr;
-	Node	   *result;
-	List	   *args;
-
-	/* Deconstruct A_Expr into three subexprs */
-	aexpr = a->lexpr;
-	args = castNode(List, a->rexpr);
-	Assert(list_length(args) == 2);
-	bexpr = (Node *) linitial(args);
-	cexpr = (Node *) lsecond(args);
-
-	/*
-	 * Build the equivalent comparison expression.  Make copies of
-	 * multiply-referenced subexpressions for safety.  (XXX this is really
-	 * wrong since it results in multiple runtime evaluations of what may be
-	 * volatile expressions ...)
-	 *
-	 * Ideally we would not use hard-wired operators here but instead use
-	 * opclasses.  However, mixed data types and other issues make this
-	 * difficult:
-	 * http://archives.postgresql.org/pgsql-hackers/2008-08/msg01142.php
-	 */
-	switch (a->kind)
-	{
-		case AEXPR_BETWEEN:
-			args = list_make2(makeSimpleA_Expr(AEXPR_OP, ">=",
-											   aexpr, bexpr,
-											   a->location),
-							  makeSimpleA_Expr(AEXPR_OP, "<=",
-											   copyObject(aexpr), cexpr,
-											   a->location));
-			result = (Node *) makeBoolExpr(AND_EXPR, args, a->location);
-			break;
-		case AEXPR_NOT_BETWEEN:
-			args = list_make2(makeSimpleA_Expr(AEXPR_OP, "<",
-											   aexpr, bexpr,
-											   a->location),
-							  makeSimpleA_Expr(AEXPR_OP, ">",
-											   copyObject(aexpr), cexpr,
-											   a->location));
-			result = (Node *) makeBoolExpr(OR_EXPR, args, a->location);
-			break;
-		default:
-			elog(ERROR, "unrecognized A_Expr kind: %d", a->kind);
-			result = NULL;		/* keep compiler quiet */
-			break;
-	}
-
-	return transformExprRecurse(pstate, result);
 }
 
 static Node *

@@ -75,7 +75,7 @@ CREATE TABLE ramp (
 );
 INSERT INTO ramp
 	SELECT * FROM road
-	WHERE name LIKE '%Ramp';
+	WHERE right(name, 4) = 'Ramp';
 --
 -- for internal portal (cursor) tests
 --

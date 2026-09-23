@@ -9,7 +9,7 @@ VACUUM;
 \a\t
 SELECT relname, relhasindex
    FROM pg_class c LEFT JOIN pg_namespace n ON n.oid = relnamespace
-   WHERE relkind IN ('r', 'p') AND nspname NOT LIKE 'pg_temp_%'
+   WHERE relkind IN ('r', 'p') AND left(nspname, 8) <> 'pg_temp_'
    ORDER BY relname;
 aggtest|f
 array_index_op_test|f
@@ -87,7 +87,7 @@ varchar_tbl|f
 SELECT relname, nspname
  FROM pg_class c LEFT JOIN pg_namespace n ON n.oid = relnamespace JOIN pg_attribute a ON (attrelid = c.oid AND attname = 'oid')
  WHERE relkind = 'r' and c.oid < 16384
-     AND nspname LIKE 'pg_%'
+     AND left(nspname, 3) = 'pg_'
      AND NOT EXISTS (SELECT 1 FROM pg_index i WHERE indrelid = c.oid
                      AND indkey[0] = a.attnum AND indnatts = 1
                      AND indisunique AND indimmediate);

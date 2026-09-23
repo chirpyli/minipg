@@ -212,10 +212,7 @@ typedef enum A_Expr_Kind
 	AEXPR_OP_ANY,				/* scalar op ANY (array) */
 	AEXPR_OP_ALL,				/* scalar op ALL (array) */
 	AEXPR_NULLIF,				/* NULLIF - name must be "=" */
-	AEXPR_IN,					/* [NOT] IN - name must be "=" or "<>" */
-	AEXPR_LIKE,					/* [NOT] LIKE - name must be "~~" or "!~~" */
-	AEXPR_BETWEEN,				/* name must be "BETWEEN" */
-	AEXPR_NOT_BETWEEN			/* name must be "NOT BETWEEN" */
+	AEXPR_IN					/* [NOT] IN - name must be "=" or "<>" */
 } A_Expr_Kind;
 
 typedef struct A_Expr

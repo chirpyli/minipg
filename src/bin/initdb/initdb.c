@@ -1025,7 +1025,7 @@ setup_depend(FILE *cmdfd)
 		 */
 		"INSERT INTO pg_depend SELECT 0,0,0, tableoid,oid,0, 'p' "
 		" FROM pg_namespace "
-		"    WHERE nspname LIKE 'pg%';\n\n",
+		"    WHERE left(nspname, 2) = 'pg';\n\n",
 
 		"INSERT INTO pg_depend SELECT 0,0,0, tableoid,oid,0, 'p' "
 		" FROM pg_collation;\n\n",

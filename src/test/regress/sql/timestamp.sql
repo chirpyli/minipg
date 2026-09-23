@@ -146,7 +146,7 @@ SELECT d1 FROM TIMESTAMP_TBL
    WHERE d1 >= timestamp without time zone '1997-01-02';
 
 SELECT d1 - timestamp without time zone '1997-01-02' AS diff
-   FROM TIMESTAMP_TBL WHERE d1 BETWEEN '1902-01-01' AND '2038-01-01';
+   FROM TIMESTAMP_TBL WHERE d1 >= '1902-01-01' AND d1 <= '2038-01-01';
 
 SELECT date_trunc( 'week', timestamp '2004-02-29 15:44:17.71393' ) AS week_trunc;
 
@@ -260,11 +260,11 @@ select date_bin('15 minutes'::interval, timestamp '294276-12-30', timestamp '400
 select date_bin('200000000 days'::interval, '2024-02-01'::timestamp, '2024-01-01'::timestamp);
 select date_bin('365000 days'::interval, '4400-01-01 BC'::timestamp, '4000-01-01 BC'::timestamp);
 
--- Test casting within a BETWEEN qualifier
+-- Test casting within a range comparison qualifier
 SELECT d1 - timestamp without time zone '1997-01-02' AS diff
   FROM TIMESTAMP_TBL
-  WHERE d1 BETWEEN timestamp without time zone '1902-01-01'
-   AND timestamp without time zone '2038-01-01';
+  WHERE d1 >= timestamp without time zone '1902-01-01'
+   AND d1 <= timestamp without time zone '2038-01-01';
 
 -- DATE_PART (timestamp_part)
 SELECT d1 as "timestamp",

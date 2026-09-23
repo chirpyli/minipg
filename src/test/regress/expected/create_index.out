@@ -583,12 +583,12 @@ ANALYZE dupindexcols;
 ERROR:  relation "dupindexcols" does not exist
 EXPLAIN (COSTS OFF)
   SELECT count(*) FROM dupindexcols
-    WHERE f1 BETWEEN 'WA' AND 'ZZZ' and id < 1000 and f1 ~<~ 'YX';
+    WHERE f1 >= 'WA' AND f1 <= 'ZZZ' and id < 1000 and f1 ~<~ 'YX';
 ERROR:  relation "dupindexcols" does not exist
 LINE 2:   SELECT count(*) FROM dupindexcols
                                ^
 SELECT count(*) FROM dupindexcols
-  WHERE f1 BETWEEN 'WA' AND 'ZZZ' and id < 1000 and f1 ~<~ 'YX';
+  WHERE f1 >= 'WA' AND f1 <= 'ZZZ' and id < 1000 and f1 ~<~ 'YX';
 ERROR:  relation "dupindexcols" does not exist
 LINE 1: SELECT count(*) FROM dupindexcols
                              ^

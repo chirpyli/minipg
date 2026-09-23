@@ -282,7 +282,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 %type <node>	columnDef
 %type <defelt>	def_elem
 %type <node>	def_arg columnElem where_clause where_or_current_clause
-				a_expr b_expr c_expr AexprConst indirection_el
+				a_expr c_expr AexprConst indirection_el
 				columnref in_expr having_clause array_expr
 %type <list>	func_arg_list
 %type <node>	func_arg_expr
@@ -353,7 +353,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 %token <keyword> ABORT_P ADD_P
 	ALL ALTER ANALYZE AND ANY ARRAY AS ASC
 
-	BEGIN_P BETWEEN BIGINT
+	BEGIN_P BIGINT
 	BOOLEAN_P BY
 
 	CASCADE CASE CAST CHAR_P
@@ -390,7 +390,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 	KEY
 
 	LAST_P LATERAL_P
-	LEFT LEVEL LIKE LIMIT LOCAL
+	LEFT LEVEL LIMIT LOCAL
 
 	NONE
 	NOT NULL_P NULLIF
@@ -433,8 +433,8 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
  * list and so can never be entered directly.  The filter in parser.c
  * creates these tokens when required (based on looking one token ahead).
  *
- * NOT_LA exists so that productions such as NOT LIKE can be given the same
- * precedence as LIKE; otherwise they'd effectively have the same precedence
+ * NOT_LA exists so that productions such as NOT IN can be given the same
+ * precedence as IN_P; otherwise they'd effectively have the same precedence
  * as NOT, at least with respect to their left-hand subexpression.
  * NULLS_LA and WITH_LA are needed to make the grammar LALR(1).
  */
@@ -457,7 +457,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 %right		NOT
 %nonassoc	IS				/* IS sets precedence for IS NULL, etc */
 %nonassoc	'<' '>' '=' LESS_EQUALS GREATER_EQUALS NOT_EQUALS
-%nonassoc	BETWEEN IN_P LIKE NOT_LA
+%nonassoc	IN_P NOT_LA
 /*
  * To support target_el without AS, it used to be necessary to assign IDENT an
  * explicit precedence just less than Op.  While that's not really necessary
@@ -3119,17 +3119,8 @@ opt_timezone:
  * General expressions
  * This is the heart of the expression syntax.
  *
- * We have two expression types: a_expr is the unrestricted kind, and
- * b_expr is a subset that must be used in some places to avoid shift/reduce
- * conflicts.  For example, we can't do BETWEEN as "BETWEEN a_expr AND a_expr"
- * because that use of AND conflicts with AND as a boolean operator.  So,
- * b_expr is used in BETWEEN and we remove boolean keywords from b_expr.
- *
- * Note that '(' a_expr ')' is a b_expr, so an unrestricted expression can
- * always be used by surrounding it with parens.
- *
- * c_expr is all the productions that are common to a_expr and b_expr;
- * it's factored out just to eliminate redundant coding.
+ * c_expr is all the productions that are common to the various expression
+ * contexts; it's factored out just to eliminate redundant coding.
  *
  * Be careful of productions involving more than one terminal token.
  * By default, bison will assign such productions the precedence of their
@@ -3147,7 +3138,7 @@ a_expr:		c_expr									{ $$ = $1; }
 		 * below; and all those operators will have the same precedence.
 		 *
 		 * If you add more explicitly-known operators, be sure to add them
-		 * also to b_expr and to the MathOp list below.
+		 * also to the MathOp list below.
 		 */
 			| '+' a_expr					%prec UMINUS
 				{ $$ = (Node *) makeSimpleA_Expr(AEXPR_OP, "+", NULL, $2, @1); }
@@ -3192,16 +3183,6 @@ a_expr:		c_expr									{ $$ = $1; }
 			| NOT_LA a_expr						%prec NOT
 				{ $$ = makeNotExpr($2, @1); }
 
-			| a_expr LIKE a_expr
-				{
-					$$ = (Node *) makeSimpleA_Expr(AEXPR_LIKE, "~~",
-												   $1, $3, @2);
-				}
-			| a_expr NOT_LA LIKE a_expr							%prec NOT_LA
-				{
-					$$ = (Node *) makeSimpleA_Expr(AEXPR_LIKE, "!~~",
-												   $1, $4, @2);
-				}
 			/* NullTest clause
 			 * Define SQL-style Null test clause.
 			 * Allow two forms described in the standard:
@@ -3223,22 +3204,6 @@ a_expr:		c_expr									{ $$ = $1; }
 					n->nulltesttype = IS_NOT_NULL;
 					n->location = @2;
 					$$ = (Node *)n;
-				}
-			| a_expr BETWEEN b_expr AND a_expr		%prec BETWEEN
-				{
-					$$ = (Node *) makeSimpleA_Expr(AEXPR_BETWEEN,
-												   "BETWEEN",
-												   $1,
-												   (Node *) list_make2($3, $5),
-												   @2);
-				}
-			| a_expr NOT_LA BETWEEN b_expr AND a_expr %prec NOT_LA
-				{
-					$$ = (Node *) makeSimpleA_Expr(AEXPR_NOT_BETWEEN,
-												   "NOT BETWEEN",
-												   $1,
-												   (Node *) list_make2($4, $6),
-												   @2);
 				}
 			| a_expr IN_P in_expr
 				{
@@ -3300,59 +3265,12 @@ a_expr:		c_expr									{ $$ = $1; }
 		;
 
 /*
- * Restricted expressions
+ * Productions that can be used in the various expression contexts.
  *
- * b_expr is a subset of the complete expression syntax defined by a_expr.
- *
- * Presently, AND, NOT, IS, and IN are the a_expr keywords that would
- * cause trouble in the places where b_expr is used.  For simplicity, we
- * just eliminate all the boolean-keyword-operator productions from b_expr.
- */
-b_expr:		c_expr
-				{ $$ = $1; }
-			| b_expr TYPECAST Typename
-				{ $$ = makeTypeCast($1, $3, @2); }
-			| '+' b_expr					%prec UMINUS
-				{ $$ = (Node *) makeSimpleA_Expr(AEXPR_OP, "+", NULL, $2, @1); }
-			| '-' b_expr					%prec UMINUS
-				{ $$ = doNegate($2, @1); }
-			| b_expr '+' b_expr
-				{ $$ = (Node *) makeSimpleA_Expr(AEXPR_OP, "+", $1, $3, @2); }
-			| b_expr '-' b_expr
-				{ $$ = (Node *) makeSimpleA_Expr(AEXPR_OP, "-", $1, $3, @2); }
-			| b_expr '*' b_expr
-				{ $$ = (Node *) makeSimpleA_Expr(AEXPR_OP, "*", $1, $3, @2); }
-			| b_expr '/' b_expr
-				{ $$ = (Node *) makeSimpleA_Expr(AEXPR_OP, "/", $1, $3, @2); }
-			| b_expr '%' b_expr
-				{ $$ = (Node *) makeSimpleA_Expr(AEXPR_OP, "%", $1, $3, @2); }
-			| b_expr '^' b_expr
-				{ $$ = (Node *) makeSimpleA_Expr(AEXPR_OP, "^", $1, $3, @2); }
-			| b_expr '<' b_expr
-				{ $$ = (Node *) makeSimpleA_Expr(AEXPR_OP, "<", $1, $3, @2); }
-			| b_expr '>' b_expr
-				{ $$ = (Node *) makeSimpleA_Expr(AEXPR_OP, ">", $1, $3, @2); }
-			| b_expr '=' b_expr
-				{ $$ = (Node *) makeSimpleA_Expr(AEXPR_OP, "=", $1, $3, @2); }
-			| b_expr LESS_EQUALS b_expr
-				{ $$ = (Node *) makeSimpleA_Expr(AEXPR_OP, "<=", $1, $3, @2); }
-			| b_expr GREATER_EQUALS b_expr
-				{ $$ = (Node *) makeSimpleA_Expr(AEXPR_OP, ">=", $1, $3, @2); }
-			| b_expr NOT_EQUALS b_expr
-				{ $$ = (Node *) makeSimpleA_Expr(AEXPR_OP, "<>", $1, $3, @2); }
-			| b_expr qual_Op b_expr				%prec Op
-				{ $$ = (Node *) makeA_Expr(AEXPR_OP, $2, $1, $3, @2); }
-			| qual_Op b_expr					%prec Op
-				{ $$ = (Node *) makeA_Expr(AEXPR_OP, $1, NULL, $2, @1); }
-		;
-
-/*
- * Productions that can be used in both a_expr and b_expr.
- *
- * Note: productions that refer recursively to a_expr or b_expr mostly
- * cannot appear here.	However, it's OK to refer to a_exprs that occur
- * inside parentheses, such as function arguments; that cannot introduce
- * ambiguity to the b_expr syntax.
+ * Note: productions that refer recursively to a_expr mostly cannot appear
+ * here.  However, it's OK to refer to a_exprs that occur inside parentheses,
+ * such as function arguments; that cannot introduce ambiguity to the
+ * expression syntax.
  */
 c_expr:		columnref								{ $$ = $1; }
 			| AexprConst							{ $$ = $1; }
@@ -3597,10 +3515,6 @@ subquery_Op:
 					{ $$ = list_make1(makeString($1)); }
 			| OPERATOR '(' any_operator ')'
 					{ $$ = $3; }
-			| LIKE
-					{ $$ = list_make1(makeString("~~")); }
-			| NOT_LA LIKE
-					{ $$ = list_make1(makeString("!~~")); }
 			;
 
 expr_list:	a_expr
@@ -4114,8 +4028,7 @@ unreserved_keyword:
  * looks too much like a function call for an LR(1) parser.
  */
 col_name_keyword:
-			  BETWEEN
-			| BIGINT
+			  BIGINT
 			| BOOLEAN_P
 			| CHAR_P
 			| CHARACTER
@@ -4153,7 +4066,6 @@ type_func_name_keyword:
 			| IS
 			| JOIN
 			| LEFT
-			| LIKE
 			| OUTER_P
 			| RIGHT
 			| VERBOSE
@@ -4233,7 +4145,6 @@ bare_label_keyword:
 			| ANY
 			| ASC
 			| BEGIN_P
-			| BETWEEN
 			| BIGINT
 			| BOOLEAN_P
 			| BY
@@ -4288,7 +4199,6 @@ bare_label_keyword:
 			| LATERAL_P
 			| LEFT
 			| LEVEL
-			| LIKE
 			| LOCAL
 			| NONE
 			| NOT

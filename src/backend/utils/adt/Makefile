@@ -31,8 +31,6 @@ OBJS = \
 	format_type.o \
 	int.o \
 	int8.o \
-	like.o \
-	like_support.o \
 	lockfuncs.o \
 	mcxtfuncs.o \
 	misc.o \
@@ -44,6 +42,7 @@ OBJS = \
 	pg_locale.o \
 	pg_lsn.o \
 	pgstatfuncs.o \
+	prefix_support.o \
 	pseudotypes.o \
 	quote.o \
 	regproc.o \
@@ -59,8 +58,6 @@ OBJS = \
 
 clean distclean maintainer-clean:
 	rm -f lex.backup
-
-like.o: like.c like_match.c
 
 varlena.o: varlena.c levenshtein.c
 

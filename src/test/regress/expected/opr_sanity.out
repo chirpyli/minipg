@@ -126,10 +126,6 @@ WHERE p1.oid != p2.oid AND
     p1.prosrc = p2.prosrc AND
     p1.prolang = 12 AND p2.prolang = 12 AND
     p1.prokind != 'a' AND p2.prokind != 'a' AND
-    p1.prosrc NOT LIKE E'range\\_constructor_' AND
-    p2.prosrc NOT LIKE E'range\\_constructor_' AND
-    p1.prosrc NOT LIKE E'multirange\\_constructor_' AND
-    p2.prosrc NOT LIKE E'multirange\\_constructor_' AND
     (p1.prorettype < p2.prorettype)
 ORDER BY 1, 2;
          prorettype          |        prorettype        
@@ -144,10 +140,6 @@ WHERE p1.oid != p2.oid AND
     p1.prosrc = p2.prosrc AND
     p1.prolang = 12 AND p2.prolang = 12 AND
     p1.prokind != 'a' AND p2.prokind != 'a' AND
-    p1.prosrc NOT LIKE E'range\\_constructor_' AND
-    p2.prosrc NOT LIKE E'range\\_constructor_' AND
-    p1.prosrc NOT LIKE E'multirange\\_constructor_' AND
-    p2.prosrc NOT LIKE E'multirange\\_constructor_' AND
     (p1.proargtypes[0] < p2.proargtypes[0])
 ORDER BY 1, 2;
          proargtypes         |       proargtypes        
@@ -163,10 +155,6 @@ WHERE p1.oid != p2.oid AND
     p1.prosrc = p2.prosrc AND
     p1.prolang = 12 AND p2.prolang = 12 AND
     p1.prokind != 'a' AND p2.prokind != 'a' AND
-    p1.prosrc NOT LIKE E'range\\_constructor_' AND
-    p2.prosrc NOT LIKE E'range\\_constructor_' AND
-    p1.prosrc NOT LIKE E'multirange\\_constructor_' AND
-    p2.prosrc NOT LIKE E'multirange\\_constructor_' AND
     (p1.proargtypes[1] < p2.proargtypes[1])
 ORDER BY 1, 2;
          proargtypes         |       proargtypes        
@@ -889,13 +877,12 @@ WHERE o1.oprnegate = o2.oid AND o1.oprname <= o2.oprname
 ORDER BY 1, 2;
  op1  | op2  
 ------+------
- !~~  | ~~
  <    | >=
  <=   | >
  <>   | =
  ~<=~ | ~>~
  ~<~  | ~>=~
-(6 rows)
+(5 rows)
 
 -- A mergejoinable or hashjoinable operator must be binary, must return
 -- boolean, and must have a commutator (itself, unless it's a cross-type

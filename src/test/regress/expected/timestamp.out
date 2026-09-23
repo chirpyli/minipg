@@ -450,7 +450,7 @@ SELECT d1 FROM TIMESTAMP_TBL
 (50 rows)
 
 SELECT d1 - timestamp without time zone '1997-01-02' AS diff
-   FROM TIMESTAMP_TBL WHERE d1 BETWEEN '1902-01-01' AND '2038-01-01';
+   FROM TIMESTAMP_TBL WHERE d1 >= '1902-01-01' AND d1 <= '2038-01-01';
 ERROR:  operator does not exist: timestamp without time zone - timestamp without time zone
 LINE 1: SELECT d1 - timestamp without time zone '1997-01-02' AS diff
                   ^
@@ -601,11 +601,11 @@ select date_bin('365000 days'::interval, '4400-01-01 BC'::timestamp, '4000-01-01
 ERROR:  type "interval" does not exist
 LINE 1: select date_bin('365000 days'::interval, '4400-01-01 BC'::ti...
                                        ^
--- Test casting within a BETWEEN qualifier
+-- Test casting within a range comparison qualifier
 SELECT d1 - timestamp without time zone '1997-01-02' AS diff
   FROM TIMESTAMP_TBL
-  WHERE d1 BETWEEN timestamp without time zone '1902-01-01'
-   AND timestamp without time zone '2038-01-01';
+  WHERE d1 >= timestamp without time zone '1902-01-01'
+   AND d1 <= timestamp without time zone '2038-01-01';
 ERROR:  operator does not exist: timestamp without time zone - timestamp without time zone
 LINE 1: SELECT d1 - timestamp without time zone '1997-01-02' AS diff
                   ^

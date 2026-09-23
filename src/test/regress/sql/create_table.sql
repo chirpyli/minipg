@@ -186,8 +186,8 @@ CREATE TABLE unknowntab (
 );
 
 CREATE TABLE unlogged2 (a int primary key);			-- OK
-SELECT relname, relkind, relpersistence FROM pg_class WHERE relname LIKE 'unlogged%' ORDER BY relname;
-SELECT relname, relkind, relpersistence FROM pg_class WHERE relname LIKE 'unlogged%' ORDER BY relname;
+SELECT relname, relkind, relpersistence FROM pg_class WHERE left(relname, 8) = 'unlogged' ORDER BY relname;
+SELECT relname, relkind, relpersistence FROM pg_class WHERE left(relname, 8) = 'unlogged' ORDER BY relname;
 DROP TABLE unlogged2;
 
 -- temporary tables are ignored by pg_filenode_relation().

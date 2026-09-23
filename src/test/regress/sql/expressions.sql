@@ -20,22 +20,6 @@ SELECT length(current_timestamp::text) >= length(current_timestamp(0)::text);
 
 
 --
--- Tests for BETWEEN
---
-
-explain (costs off)
-select count(*) from date_tbl
-  where f1 between '1997-01-01' and '1998-01-01';
-select count(*) from date_tbl
-  where f1 between '1997-01-01' and '1998-01-01';
-
-explain (costs off)
-select count(*) from date_tbl
-  where f1 not between '1997-01-01' and '1998-01-01';
-select count(*) from date_tbl
-  where f1 not between '1997-01-01' and '1998-01-01';
-
---
 -- Test parsing of a no-op cast to a type with unspecified typmod
 --
 begin;

@@ -217,7 +217,7 @@ BEGIN;
 			SAVEPOINT three;
 				INSERT INTO savepoints VALUES (17);
 COMMIT;
-SELECT a FROM savepoints WHERE a BETWEEN 12 AND 17;
+SELECT a FROM savepoints WHERE a >= 12 AND a <= 17;
 
 BEGIN;
 	INSERT INTO savepoints VALUES (18);
@@ -230,7 +230,7 @@ BEGIN;
 	ROLLBACK TO SAVEPOINT one;
 		INSERT INTO savepoints VALUES (22);
 COMMIT;
-SELECT a FROM savepoints WHERE a BETWEEN 18 AND 22;
+SELECT a FROM savepoints WHERE a >= 18 AND a <= 22;
 
 DROP TABLE savepoints;
 

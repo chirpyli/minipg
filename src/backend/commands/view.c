@@ -315,10 +315,10 @@ UpdateRangeTableOfViewParse(Oid viewOid, Query *viewParse)
 	/*
 	 * Make a copy of the given parsetree.  It's not so much that we don't
 	 * want to scribble on our input, it's that the parser has a bad habit of
-	 * outputting multiple links to the same subtree for constructs like
-	 * BETWEEN, and we mustn't have OffsetVarNodes increment the varno of a
-	 * Var node twice.  copyObject will expand any multiply-referenced subtree
-	 * into multiple copies.
+	 * outputting multiple links to the same subtree for constructs like IN,
+	 * and we mustn't have OffsetVarNodes increment the varno of a Var node
+	 * twice.  copyObject will expand any multiply-referenced subtree into
+	 * multiple copies.
 	 */
 	viewParse = copyObject(viewParse);
 

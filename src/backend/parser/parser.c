@@ -171,12 +171,10 @@ base_yylex(YYSTYPE *lvalp, YYLTYPE *llocp, core_yyscan_t yyscanner)
 	switch (cur_token)
 	{
 		case NOT:
-			/* Replace NOT by NOT_LA if it's followed by BETWEEN, IN, etc */
+			/* Replace NOT by NOT_LA if it's followed by IN, etc */
 			switch (next_token)
 			{
-				case BETWEEN:
 				case IN_P:
-				case LIKE:
 					cur_token = NOT_LA;
 					break;
 			}

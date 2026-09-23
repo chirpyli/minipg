@@ -34,7 +34,7 @@ static bool describeOneTableDetails(const char *schemaname,
 static void add_tablespace_footer(printTableContent *const cont, char relkind,
 								  Oid tablespace, const bool newline);
 static bool validateSQLNamePattern(PQExpBuffer buf, const char *pattern,
-								   bool have_where, bool force_escape,
+								   bool have_where,
 								   const char *schemavar, const char *namevar,
 								   const char *altnamevar,
 								   const char *visibilityrule,
@@ -102,7 +102,7 @@ listAllDbs(const char *pattern, bool verbose)
 							 "  JOIN pg_catalog.pg_tablespace t on d.dattablespace = t.oid\n");
 
 	if (pattern)
-		if (!validateSQLNamePattern(&buf, pattern, false, false,
+		if (!validateSQLNamePattern(&buf, pattern, false,
 									NULL, "d.datname", NULL, NULL,
 									NULL, 1))
 			return false;
@@ -151,7 +151,7 @@ describeTableDetails(const char *pattern, bool verbose, bool showSystem)
 		appendPQExpBufferStr(&buf, "WHERE n.nspname <> 'pg_catalog'\n"
 							 "      AND n.nspname <> 'information_schema'\n");
 
-	if (!validateSQLNamePattern(&buf, pattern, !showSystem && !pattern, false,
+	if (!validateSQLNamePattern(&buf, pattern, !showSystem && !pattern,
 								"n.nspname", "c.relname", NULL,
 								"pg_catalog.pg_table_is_visible(c.oid)",
 								NULL, 3))
@@ -1166,10 +1166,10 @@ listTables(const char *tabtypes, const char *pattern, bool verbose, bool showSys
 
 	if (!showSystem && !pattern)
 		appendPQExpBufferStr(&buf, "      AND n.nspname <> 'pg_catalog'\n"
-							 "      AND n.nspname NOT LIKE 'pg_toast%'\n"
+							 "      AND left(n.nspname, 9) <> 'pg_toast'\n"
 							 "      AND n.nspname <> 'information_schema'\n");
 
-	if (!validateSQLNamePattern(&buf, pattern, true, false,
+	if (!validateSQLNamePattern(&buf, pattern, true,
 								"n.nspname", "c.relname", NULL,
 								"pg_catalog.pg_table_is_visible(c.oid)",
 								NULL, 3))
@@ -1222,7 +1222,7 @@ listTables(const char *tabtypes, const char *pattern, bool verbose, bool showSys
  */
 static bool
 validateSQLNamePattern(PQExpBuffer buf, const char *pattern, bool have_where,
-					   bool force_escape, const char *schemavar,
+					   const char *schemavar,
 					   const char *namevar, const char *altnamevar,
 					   const char *visibilityrule, bool *added_clause,
 					   int maxparts)
@@ -1232,7 +1232,7 @@ validateSQLNamePattern(PQExpBuffer buf, const char *pattern, bool have_where,
 	bool		added;
 
 	initPQExpBuffer(&dbbuf);
-	added = processSQLNamePattern(pset.db, buf, pattern, have_where, force_escape,
+	added = processSQLNamePattern(pset.db, buf, pattern, have_where,
 								  schemavar, namevar, altnamevar,
 								  visibilityrule, &dbbuf, &dotcnt);
 	if (added_clause != NULL)

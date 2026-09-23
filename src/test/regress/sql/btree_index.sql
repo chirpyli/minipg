@@ -51,47 +51,9 @@ SELECT b.*
    FROM bt_f8_heap b
    WHERE b.seqno = '4500'::float8;
 
---
--- Check correct optimization of LIKE (special index operator support)
--- for both indexscan and bitmapscan cases
---
-
-set enable_seqscan to false;
-set enable_indexscan to true;
-set enable_bitmapscan to false;
-explain (costs off)
-select proname from pg_proc where proname like E'RI\\_FKey%del' order by 1;
-select proname from pg_proc where proname like E'RI\\_FKey%del' order by 1;
-
-set enable_indexscan to false;
-set enable_bitmapscan to true;
-explain (costs off)
-select proname from pg_proc where proname like E'RI\\_FKey%del' order by 1;
-select proname from pg_proc where proname like E'RI\\_FKey%del' order by 1;
-
-reset enable_seqscan;
-reset enable_indexscan;
-reset enable_bitmapscan;
-
--- Also check LIKE optimization with binary-compatible cases
-
 CREATE TABLE btree_bpchar (f1 text);
 create index on btree_bpchar(f1 bpchar_ops);
 insert into btree_bpchar values ('foo'), ('fool'), ('bar'), ('quux');
--- doesn't match index:
-explain (costs off)
-select * from btree_bpchar where f1 like 'foo';
-select * from btree_bpchar where f1 like 'foo';
-explain (costs off)
-select * from btree_bpchar where f1 like 'foo%';
-select * from btree_bpchar where f1 like 'foo%';
--- these do match the index:
-explain (costs off)
-select * from btree_bpchar where f1::bpchar like 'foo';
-select * from btree_bpchar where f1::bpchar like 'foo';
-explain (costs off)
-select * from btree_bpchar where f1::bpchar like 'foo%';
-select * from btree_bpchar where f1::bpchar like 'foo%';
 
 -- get test coverage for "single value" deduplication strategy:
 insert into btree_bpchar select 'foo' from (SELECT generate_series(1,1500) AS g) AS _gs;

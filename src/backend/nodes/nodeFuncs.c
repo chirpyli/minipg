@@ -994,8 +994,8 @@ exprSetInputCollation(Node *expr, Oid inputcollation)
  * the operands of a FuncExpr node, when the function name can be expected
  * to be to the left of them?  There are a couple of reasons.  The grammar
  * sometimes builds expressions that aren't quite what the user wrote;
- * for instance x IS NOT BETWEEN ... becomes a NOT-expression whose keyword
- * pointer is to the right of its leftmost argument.  Also, nodes that were
+ * for instance NOT IN becomes a NOT-expression whose keyword pointer is to
+ * the right of its leftmost argument.  Also, nodes that were
  * inserted implicitly by parse analysis (such as FuncExprs for implicit
  * coercions) will have location -1, and so we can have odd combinations of
  * known and unknown locations in a tree.
@@ -1073,7 +1073,7 @@ exprLocation(const Node *expr)
 				/*
 				 * Same as above, to handle either NOT or AND/OR.  We can't
 				 * special-case NOT because of the way that it's used for
-				 * things like IS NOT BETWEEN.
+				 * things like NOT IN.
 				 */
 				loc = leftmostLoc(bexpr->location,
 								  exprLocation((Node *) bexpr->args));

@@ -56,7 +56,7 @@ WHERE (p1.typtype = 'c' AND p1.typrelid = 0) OR
 
 SELECT p1.oid, p1.typname
 FROM pg_type as p1
-WHERE p1.typtype not in ('p') AND p1.typname NOT LIKE E'\\_%'
+WHERE p1.typtype not in ('p') AND left(p1.typname, 1) <> '_'
     AND NOT EXISTS
     (SELECT 1 FROM pg_type as p2
      WHERE p2.typname = ('_' || p1.typname)::name AND

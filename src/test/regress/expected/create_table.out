@@ -158,14 +158,14 @@ CREATE TABLE unknowntab (
 );
 ERROR:  column "u" has pseudo-type unknown
 CREATE TABLE unlogged2 (a int primary key);			-- OK
-SELECT relname, relkind, relpersistence FROM pg_class WHERE relname LIKE 'unlogged%' ORDER BY relname;
+SELECT relname, relkind, relpersistence FROM pg_class WHERE left(relname, 8) = 'unlogged' ORDER BY relname;
     relname     | relkind | relpersistence 
 ----------------+---------+----------------
  unlogged2      | r       | p
  unlogged2_pkey | i       | p
 (2 rows)
 
-SELECT relname, relkind, relpersistence FROM pg_class WHERE relname LIKE 'unlogged%' ORDER BY relname;
+SELECT relname, relkind, relpersistence FROM pg_class WHERE left(relname, 8) = 'unlogged' ORDER BY relname;
     relname     | relkind | relpersistence 
 ----------------+---------+----------------
  unlogged2      | r       | p
