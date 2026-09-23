@@ -271,7 +271,6 @@ bool		recoveryTargetInclusive = true;
 int			recoveryTargetAction = RECOVERY_TARGET_ACTION_PAUSE;
 TransactionId recoveryTargetXid;
 char	   *recovery_target_time_string;
-static TimestampTz recoveryTargetTime;
 const char *recoveryTargetName;
 XLogRecPtr	recoveryTargetLSN;
 int			recovery_min_apply_delay = 0;
@@ -875,7 +874,6 @@ static bool holdingAllLocks = false;
 static MemoryContext walDebugCxt = NULL;
 #endif
 
-static void CheckRequiredParameterValues(void);
 static void XLogReportParameters(void);
 static void checkTimeLineSwitch(XLogRecPtr lsn, TimeLineID newTLI,
 								TimeLineID prevTLI);
@@ -5060,30 +5058,6 @@ GetXLogReceiptTime(TimestampTz *rtime, bool *fromStream)
 }
 
 
-/*
- * Check to see if required parameters are set high enough on this server
- * for various aspects of recovery operation.
- *
- * Note that all the parameters which this function tests need to be
- * listed in Administrator's Overview section in high-availability.sgml.
- * If you change them, don't forget to update the list.
- */
-static void
-CheckRequiredParameterValues(void)
-{
-	/*
-	 * For archive recovery, the WAL must be generated with at least 'replica'
-	 * wal_level.
-	 */
-	if (ArchiveRecoveryRequested && ControlFile->wal_level == WAL_LEVEL_MINIMAL)
-	{
-		ereport(FATAL,
-				(errmsg("WAL was generated with wal_level=minimal, cannot continue recovering"),
-				 errdetail("This happens if you temporarily set wal_level=minimal on the server."),
-				 errhint("Use a backup taken after setting wal_level to higher than minimal.")));
-	}
-
-}
 
 /*
  * This must be called ONCE during postmaster or standalone-backend startup
@@ -5217,41 +5191,11 @@ StartupXLOG(void)
 	else
 		recoveryTargetTLI = ControlFile->checkPointCopy.ThisTimeLineID;
 
-	if (ArchiveRecoveryRequested)
-	{
-		if (StandbyModeRequested)
-			ereport(LOG,
-					(errmsg("entering standby mode")));
-		else if (recoveryTarget == RECOVERY_TARGET_XID)
-			ereport(LOG,
-					(errmsg("starting point-in-time recovery to XID %u",
-							recoveryTargetXid)));
-		else if (recoveryTarget == RECOVERY_TARGET_TIME)
-			ereport(LOG,
-					(errmsg("starting point-in-time recovery to %s",
-							timestamptz_to_str(recoveryTargetTime))));
-		else if (recoveryTarget == RECOVERY_TARGET_NAME)
-			ereport(LOG,
-					(errmsg("starting point-in-time recovery to \"%s\"",
-							recoveryTargetName)));
-		else if (recoveryTarget == RECOVERY_TARGET_LSN)
-			ereport(LOG,
-					(errmsg("starting point-in-time recovery to WAL location (LSN) \"%X/%X\"",
-							LSN_FORMAT_ARGS(recoveryTargetLSN))));
-		else if (recoveryTarget == RECOVERY_TARGET_IMMEDIATE)
-			ereport(LOG,
-					(errmsg("starting point-in-time recovery to earliest consistent point")));
-		else
-			ereport(LOG,
-					(errmsg("starting archive recovery")));
-	}
 
 	/*
 	 * Take ownership of the wakeup latch if we're going to sleep during
 	 * recovery.
 	 */
-	if (ArchiveRecoveryRequested)
-		OwnLatch(&XLogCtl->recoveryWakeupLatch);
 
 	/* Set up XLOG reader facility */
 	MemSet(&private, 0, sizeof(XLogPageReadPrivate));
@@ -5476,11 +5420,6 @@ StartupXLOG(void)
 	}
 	else if (ControlFile->state != DB_SHUTDOWNED)
 		InRecovery = true;
-	else if (ArchiveRecoveryRequested)
-	{
-		/* force recovery due to presence of recovery signal file */
-		InRecovery = true;
-	}
 
 	/*
 	 * Start recovery assuming that the final record isn't lost.
@@ -5540,8 +5479,6 @@ StartupXLOG(void)
 		 */
 
 
-		/* Check that the GUCs used to generate the WAL allow recovery */
-		CheckRequiredParameterValues();
 
 		/*
 		 * Likewise, delete any saved transaction snapshot files that got left
@@ -8270,8 +8207,6 @@ xlog_redo(XLogReaderState *record)
 		UpdateControlFile();
 		LWLockRelease(ControlFileLock);
 
-		/* Check to see if any parameter change gives a problem on recovery */
-		CheckRequiredParameterValues();
 	}
 	else if (info == XLOG_FPW_CHANGE)
 	{
