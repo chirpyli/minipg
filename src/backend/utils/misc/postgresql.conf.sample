@@ -135,7 +135,7 @@
 					# (turning this off can cause
 					# unrecoverable data corruption)
 #synchronous_commit = on		# synchronization level;
-					# off, local, remote_write, remote_apply, or on
+					# off, local, or on
 #wal_sync_method = fsync		# the default is the first option
 					# supported by the operating system:
 					#   open_datasync

@@ -4174,12 +4174,6 @@ XactLogCommitRecord(TimestampTz commit_time,
 	if (forceSyncCommit)
 		xl_xinfo.xinfo |= XACT_COMPLETION_FORCE_SYNC_COMMIT;
 
-	/*
-	 * Check if the caller would like to ask standbys for immediate feedback
-	 * once this commit is applied.
-	 */
-	if (synchronous_commit >= SYNCHRONOUS_COMMIT_REMOTE_APPLY)
-		xl_xinfo.xinfo |= XACT_COMPLETION_APPLY_FEEDBACK;
 
 	/*
 	 * Relcache invalidations requires information about the current database.
@@ -4387,13 +4381,6 @@ xact_redo_commit(xl_xact_parsed_commit *parsed,
 	if (XactCompletionForceSyncCommit(parsed->xinfo))
 		XLogFlush(lsn);
 
-	/*
-	 * If asked by the primary (because someone is waiting for a synchronous
-	 * commit = remote_apply), we will need to ask walreceiver to send a reply
-	 * immediately.
-	 */
-	if (XactCompletionApplyFeedback(parsed->xinfo))
-		XLogRequestWalReceiverReply();
 }
 
 /*

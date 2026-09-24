@@ -9693,12 +9693,3 @@ SetWalWriterSleeping(bool sleeping)
 	SpinLockRelease(&XLogCtl->info_lck);
 }
 
-/*
- * Schedule a walreceiver wakeup in the main recovery loop.
- */
-void
-XLogRequestWalReceiverReply(void)
-{
-	/* Streaming replication has been removed; a reply from a walreceiver is
-	 * no longer meaningful, so this is intentionally a no-op. */
-}
