@@ -1050,19 +1050,6 @@ ExpandColumnRefStar(ParseState *pstate, ColumnRef *cref,
 			CRSERR_TOO_MANY
 		}			crserr = CRSERR_NO_RTE;
 
-		/*
-		 * Give the PreParseColumnRefHook, if any, first shot.  If it returns
-		 * non-null then we should use that expression.
-		 */
-		if (pstate->p_pre_columnref_hook != NULL)
-		{
-			Node	   *node;
-
-			node = pstate->p_pre_columnref_hook(pstate, cref);
-			if (node != NULL)
-				return ExpandRowReference(pstate, node, make_target_entry);
-		}
-
 		switch (numnames)
 		{
 			case 2:

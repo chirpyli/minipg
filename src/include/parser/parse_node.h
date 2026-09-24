@@ -60,12 +60,8 @@ typedef enum ParseExprKind
 /*
  * Function signatures for parser hooks
  */
-typedef Node *(*PreParseColumnRefHook) (ParseState *pstate, ColumnRef *cref);
 typedef Node *(*PostParseColumnRefHook) (ParseState *pstate, ColumnRef *cref, Node *var);
 typedef Node *(*ParseParamRefHook) (ParseState *pstate, ParamRef *pref);
-typedef Node *(*CoerceParamHook) (ParseState *pstate, Param *param,
-								  Oid targetTypeId, int32 targetTypeMod,
-								  int location);
 
 
 /*
@@ -121,7 +117,7 @@ typedef Node *(*CoerceParamHook) (ParseState *pstate, Param *param,
  * p_last_srf: the set-returning FuncExpr or OpExpr most recently found in
  * the query, or NULL if none.
  *
- * p_pre_columnref_hook, etc: optional parser hook functions for modifying the
+ * p_post_columnref_hook, etc: optional parser hook functions for modifying the
  * interpretation of ColumnRefs and ParamRefs.
  *
  * p_ref_hook_state: passthrough state for the parser hook functions.
@@ -157,10 +153,8 @@ struct ParseState
 	 * Optional hook functions for parser callbacks.  These are null unless
 	 * set up by the caller of make_parsestate.
 	 */
-	PreParseColumnRefHook p_pre_columnref_hook;
 	PostParseColumnRefHook p_post_columnref_hook;
 	ParseParamRefHook p_paramref_hook;
-	CoerceParamHook p_coerce_param_hook;
 	void	   *p_ref_hook_state;	/* common passthrough link for above */
 };
 

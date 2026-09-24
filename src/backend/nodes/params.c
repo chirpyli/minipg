@@ -70,7 +70,6 @@ static void
 paramlist_parser_setup(ParseState *pstate, void *arg)
 {
 	pstate->p_paramref_hook = paramlist_param_ref;
-	/* no need to use p_coerce_param_hook */
 	pstate->p_ref_hook_state = arg;
 }
 

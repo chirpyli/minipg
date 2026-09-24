@@ -415,17 +415,6 @@ transformColumnRef(ParseState *pstate, ColumnRef *cref)
 				 errmsg_internal("%s", err),
 				 parser_errposition(pstate, cref->location)));
 
-	/*
-	 * Give the PreParseColumnRefHook, if any, first shot.  If it returns
-	 * non-null then that's all, folks.
-	 */
-	if (pstate->p_pre_columnref_hook != NULL)
-	{
-		node = pstate->p_pre_columnref_hook(pstate, cref);
-		if (node != NULL)
-			return node;
-	}
-
 	/*----------
 	 * The allowed syntaxes are:
 	 *

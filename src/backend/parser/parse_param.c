@@ -51,7 +51,6 @@ parse_fixed_parameters(ParseState *pstate,
 	parstate->numParams = numParams;
 	pstate->p_ref_hook_state = (void *) parstate;
 	pstate->p_paramref_hook = fixed_paramref_hook;
-	/* no need to use p_coerce_param_hook */
 }
 
 

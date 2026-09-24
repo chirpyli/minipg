@@ -344,22 +344,6 @@ coerce_type(ParseState *pstate, Node *node,
 
 		return result;
 	}
-	if (IsA(node, Param) &&
-		pstate != NULL && pstate->p_coerce_param_hook != NULL)
-	{
-		/*
-		 * Allow the CoerceParamHook to decide what happens.  It can return a
-		 * transformed node (very possibly the same Param node), or return
-		 * NULL to indicate we should proceed with normal coercion.
-		 */
-		result = pstate->p_coerce_param_hook(pstate,
-											 (Param *) node,
-											 targetTypeId,
-											 targetTypeMod,
-											 location);
-		if (result)
-			return result;
-	}
 	if (IsA(node, CollateExpr))
 	{
 		/*
