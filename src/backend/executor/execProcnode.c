@@ -73,12 +73,10 @@
 #include "postgres.h"
 
 #include "executor/executor.h"
-#include "executor/nodeAgg.h"
 #include "executor/nodeBitmapAnd.h"
 #include "executor/nodeBitmapHeapscan.h"
 #include "executor/nodeBitmapIndexscan.h"
 #include "executor/nodeBitmapOr.h"
-#include "executor/nodeGroup.h"
 #include "executor/nodeHash.h"
 #include "executor/nodeHashjoin.h"
 #include "executor/nodeIncrementalSort.h"
@@ -260,16 +258,6 @@ ExecInitNode(Plan *node, EState *estate, int eflags)
 		case T_Memoize:
 			result = (PlanState *) ExecInitMemoize((Memoize *) node, estate,
 												   eflags);
-			break;
-
-		case T_Group:
-			result = (PlanState *) ExecInitGroup((Group *) node,
-												 estate, eflags);
-			break;
-
-		case T_Agg:
-			result = (PlanState *) ExecInitAgg((Agg *) node,
-											   estate, eflags);
 			break;
 
 		case T_Unique:
@@ -571,14 +559,6 @@ ExecEndNode(PlanState *node)
 
 		case T_MemoizeState:
 			ExecEndMemoize((MemoizeState *) node);
-			break;
-
-		case T_GroupState:
-			ExecEndGroup((GroupState *) node);
-			break;
-
-		case T_AggState:
-			ExecEndAgg((AggState *) node);
 			break;
 
 		case T_UniqueState:

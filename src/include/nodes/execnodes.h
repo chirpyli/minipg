@@ -219,19 +219,10 @@ typedef struct ExprContext
 	ParamExecData *ecxt_param_exec_vals;	/* for PARAM_EXEC params */
 	ParamListInfo ecxt_param_list_info; /* for other param types */
 
-	/*
-	 * Values to substitute for Aggref nodes in the expressions of an Agg
-	 * node.
-	 */
-#define FIELDNO_EXPRCONTEXT_AGGVALUES 8
-	Datum	   *ecxt_aggvalues; /* precomputed values for aggs */
-#define FIELDNO_EXPRCONTEXT_AGGNULLS 9
-	bool	   *ecxt_aggnulls;	/* null flags for aggs */
-
 	/* Value to substitute for CaseTestExpr nodes in expression */
-#define FIELDNO_EXPRCONTEXT_CASEDATUM 10
+#define FIELDNO_EXPRCONTEXT_CASEDATUM 8
 	Datum		caseValue_datum;
-#define FIELDNO_EXPRCONTEXT_CASENULL 11
+#define FIELDNO_EXPRCONTEXT_CASENULL 9
 	bool		caseValue_isNull;
 
 	/* Link to containing EState (NULL if a standalone ExprContext) */
@@ -1659,105 +1650,6 @@ typedef struct IncrementalSortState
 	TupleTableSlot *transfer_tuple;
 	bool		am_worker;		/* are we a worker? */
 } IncrementalSortState;
-
-/* ---------------------
- *	GroupState information
- * ---------------------
- */
-typedef struct GroupState
-{
-	ScanState	ss;				/* its first field is NodeTag */
-	ExprState  *eqfunction;		/* equality function */
-	bool		grp_done;		/* indicates completion of Group scan */
-} GroupState;
-
-/* ---------------------
- *	per-worker aggregate information
- * ---------------------
- */
-typedef struct AggregateInstrumentation
-{
-	Size		hash_mem_peak;	/* peak hash table memory usage */
-	uint64		hash_disk_used; /* kB of disk space used */
-	int			hash_batches_used;	/* batches used during entire execution */
-} AggregateInstrumentation;
-
-/* ---------------------
- *	AggState information
- *
- *	ss.ss_ScanTupleSlot refers to output of underlying plan.
- *
- *	Note: ss.ps.ps_ExprContext contains ecxt_aggvalues and
- *	ecxt_aggnulls arrays, which hold the computed agg values for the current
- *	input group during evaluation of an Agg node's output tuple(s).  We
- *	create a second ExprContext, tmpcontext, in which to evaluate input
- *	expressions and run the aggregate transition functions.
- * ---------------------
- */
-/* these structs are private in nodeAgg.c: */
-typedef struct AggStatePerAggData *AggStatePerAgg;
-typedef struct AggStatePerTransData *AggStatePerTrans;
-typedef struct AggStatePerGroupData *AggStatePerGroup;
-typedef struct AggStatePerPhaseData *AggStatePerPhase;
-typedef struct AggStatePerHashData *AggStatePerHash;
-
-typedef struct AggState
-{
-	ScanState	ss;				/* its first field is NodeTag */
-	List	   *aggs;			/* all Aggref nodes in targetlist & quals */
-	int			numaggs;		/* length of list (could be zero!) */
-	int			numtrans;		/* number of pertrans items */
-	AggStrategy aggstrategy;	/* strategy mode */
-	AggStatePerPhase phase;		/* pointer to current phase data */
-	int			numphases;		/* number of phases (including phase 0) */
-	int			current_phase;	/* current phase number */
-	AggStatePerAgg peragg;		/* per-Aggref information */
-	AggStatePerTrans pertrans;	/* per-Trans state information */
-	ExprContext *hashcontext;	/* econtexts for long-lived data (hashtable) */
-	ExprContext *tmpcontext;	/* econtext for input expressions */
-	ExprContext *curaggcontext; /* currently active aggcontext */
-	AggStatePerAgg curperagg;	/* currently active aggregate, if any */
-	AggStatePerTrans curpertrans;	/* currently active trans state, if any */
-	bool		agg_done;		/* indicates completion of Agg scan */
-	Bitmapset  *colnos_needed;	/* all columns needed from the outer plan */
-	int			max_colno_needed;	/* highest colno needed from outer plan */
-	bool		all_cols_needed;	/* are all cols from outer plan needed? */
-	AggStatePerPhase phases;	/* array of all phases */
-	/* these fields are used in AGG_PLAIN and AGG_SORTED modes: */
-	AggStatePerGroup *pergroups;	/* array of per-group pointers */
-	HeapTuple	grp_firstTuple; /* copy of first tuple of current group */
-	/* these fields are used in AGG_HASHED mode: */
-	bool		table_filled;	/* hash table filled yet? */
-	MemoryContext hash_metacxt; /* memory for hash table itself */
-	struct HashTapeInfo *hash_tapeinfo; /* metadata for spill tapes */
-	struct HashAggSpill *hash_spill;	/* spill info, exists only during
-										 * first pass */
-	TupleTableSlot *hash_spill_rslot;	/* for reading spill files */
-	TupleTableSlot *hash_spill_wslot;	/* for writing spill files */
-	List	   *hash_batches;	/* hash batches remaining to be processed */
-	bool		hash_ever_spilled;	/* ever spilled during this execution? */
-	bool		hash_spill_mode;	/* we hit a limit during the current batch
-									 * and we must not create new groups */
-	Size		hash_mem_limit; /* limit before spilling hash table */
-	uint64		hash_ngroups_limit; /* limit before spilling hash table */
-	int			hash_planned_partitions;	/* number of partitions planned
-											 * for first pass */
-	double		hashentrysize;	/* estimate revised during execution */
-	Size		hash_mem_peak;	/* peak hash table memory usage */
-	uint64		hash_ngroups_current;	/* number of groups currently in
-										 * memory in all hash tables */
-	uint64		hash_disk_used; /* kB of disk space used */
-	int			hash_batches_used;	/* batches used during entire execution */
-
-	AggStatePerHash perhash;	/* array of per-hashtable data */
-	AggStatePerGroup *hash_pergroup;	/* grouping set indexed array of
-										 * per-group pointers */
-
-	/* support for evaluation of agg input expressions: */
-	AggStatePerGroup *all_pergroups;	/* array of first ->pergroups, than
-										 * ->hash_pergroup */
-	ProjectionInfo *combinedproj;	/* projection machinery */
-} AggState;
 
 /* ----------------
  *	 UniqueState information

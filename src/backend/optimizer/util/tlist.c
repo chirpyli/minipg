@@ -385,82 +385,6 @@ get_sortgroupref_clause_noerr(Index sortref, List *clauses)
 }
 
 /*
- * extract_grouping_ops - make an array of the equality operator OIDs
- *		for a SortGroupClause list
- */
-Oid *
-extract_grouping_ops(List *groupClause)
-{
-	int			numCols = list_length(groupClause);
-	int			colno = 0;
-	Oid		   *groupOperators;
-	ListCell   *glitem;
-
-	groupOperators = (Oid *) palloc(sizeof(Oid) * numCols);
-
-	foreach(glitem, groupClause)
-	{
-		SortGroupClause *groupcl = (SortGroupClause *) lfirst(glitem);
-
-		groupOperators[colno] = groupcl->eqop;
-		Assert(OidIsValid(groupOperators[colno]));
-		colno++;
-	}
-
-	return groupOperators;
-}
-
-/*
- * extract_grouping_collations - make an array of the grouping column collations
- *		for a SortGroupClause list
- */
-Oid *
-extract_grouping_collations(List *groupClause, List *tlist)
-{
-	int			numCols = list_length(groupClause);
-	int			colno = 0;
-	Oid		   *grpCollations;
-	ListCell   *glitem;
-
-	grpCollations = (Oid *) palloc(sizeof(Oid) * numCols);
-
-	foreach(glitem, groupClause)
-	{
-		SortGroupClause *groupcl = (SortGroupClause *) lfirst(glitem);
-		TargetEntry *tle = get_sortgroupclause_tle(groupcl, tlist);
-
-		grpCollations[colno++] = exprCollation((Node *) tle->expr);
-	}
-
-	return grpCollations;
-}
-
-/*
- * extract_grouping_cols - make an array of the grouping column resnos
- *		for a SortGroupClause list
- */
-AttrNumber *
-extract_grouping_cols(List *groupClause, List *tlist)
-{
-	AttrNumber *grpColIdx;
-	int			numCols = list_length(groupClause);
-	int			colno = 0;
-	ListCell   *glitem;
-
-	grpColIdx = (AttrNumber *) palloc(sizeof(AttrNumber) * numCols);
-
-	foreach(glitem, groupClause)
-	{
-		SortGroupClause *groupcl = (SortGroupClause *) lfirst(glitem);
-		TargetEntry *tle = get_sortgroupclause_tle(groupcl, tlist);
-
-		grpColIdx[colno++] = tle->resno;
-	}
-
-	return grpColIdx;
-}
-
-/*
  * grouping_is_sortable - is it possible to implement grouping list by sorting?
  *
  * This is easy since the parser will have included a sortop if one exists.
@@ -475,26 +399,6 @@ grouping_is_sortable(List *groupClause)
 		SortGroupClause *groupcl = (SortGroupClause *) lfirst(glitem);
 
 		if (!OidIsValid(groupcl->sortop))
-			return false;
-	}
-	return true;
-}
-
-/*
- * grouping_is_hashable - is it possible to implement grouping list by hashing?
- *
- * We rely on the parser to have set the hashable flag correctly.
- */
-bool
-grouping_is_hashable(List *groupClause)
-{
-	ListCell   *glitem;
-
-	foreach(glitem, groupClause)
-	{
-		SortGroupClause *groupcl = (SortGroupClause *) lfirst(glitem);
-
-		if (!groupcl->hashable)
 			return false;
 	}
 	return true;
@@ -1033,8 +937,7 @@ split_pathtarget_walker(Node *node, split_pathtarget_context *context)
 	 * does, there will be an executor failure from a misplaced SRF).
 	 */
 	if (IsA(node, Var) ||
-		IsA(node, PlaceHolderVar) ||
-		IsA(node, Aggref))
+		IsA(node, PlaceHolderVar))
 	{
 		split_pathtarget_item *item = palloc(sizeof(split_pathtarget_item));
 

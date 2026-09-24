@@ -242,7 +242,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 				OptTableElementList TableElementList definition
 				opt_definition
 				opt_column_list columnList opt_name_list
-				sort_clause opt_sort_clause sortby_list index_params
+				sort_clause sortby_list index_params
 				opt_include opt_c_include index_including_params
 				name_list from_clause from_list opt_array_bounds
 				any_name any_name_list
@@ -258,8 +258,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 			vacuum_relation_list opt_vacuum_relation_list
 				drop_option_list
 
-%type <list>	group_clause group_by_list
-%type <node>	group_by_item
+
 
 
 %type <node>	join_qual
@@ -283,7 +282,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 %type <defelt>	def_elem
 %type <node>	def_arg columnElem where_clause where_or_current_clause
 				a_expr c_expr AexprConst indirection_el
-				columnref in_expr having_clause array_expr
+				columnref in_expr array_expr
 %type <list>	func_arg_list
 %type <node>	func_arg_expr
 %type <list>	array_expr_list
@@ -375,10 +374,6 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 
 	FALSE_P FIRST_P FLOAT_P
 	FORCE FROM FULL
-
-	GROUP_P
-
-	HAVING
 
 	IF_P IN_P INCLUDE
 	INDEX
@@ -2424,27 +2419,21 @@ select_clause:
 simple_select:
 			SELECT opt_all_clause opt_target_list
 			from_clause where_clause
-			group_clause having_clause
 				{
 					SelectStmt *n = makeNode(SelectStmt);
 					n->targetList = $3;
 					n->fromClause = $4;
 					n->whereClause = $5;
-					n->groupClause = $6;
-					n->havingClause = $7;
 					$$ = (Node *)n;
 				}
 			| SELECT distinct_clause target_list
 			from_clause where_clause
-			group_clause having_clause
 				{
 					SelectStmt *n = makeNode(SelectStmt);
 					n->distinctClause = $2;
 					n->targetList = $3;
 					n->fromClause = $4;
 					n->whereClause = $5;
-					n->groupClause = $6;
-					n->havingClause = $7;
 					$$ = (Node *)n;
 				}
 			| values_clause							{ $$ = $1; }
@@ -2469,11 +2458,6 @@ opt_all_clause:
 			| /*EMPTY*/
 		;
 
-opt_sort_clause:
-			sort_clause								{ $$ = $1; }
-			| /*EMPTY*/								{ $$ = NIL; }
-		;
-
 sort_clause:
 			ORDER BY sortby_list					{ $$ = $3; }
 		;
@@ -2495,43 +2479,6 @@ sortby:		a_expr opt_asc_desc opt_nulls_order
 
 
 
-
-/*
- * This syntax for group_clause tries to follow the spec quite closely.
- * However, the spec allows only column references, not expressions,
- * which introduces an ambiguity between implicit row constructors
- * (a,b) and lists of column references.
- *
- * We handle this by using the a_expr production for what the spec calls
- * <ordinary grouping set>, which in the spec represents either one column
- * reference or a parenthesized list of column references. Then, we check the
- * top node of the a_expr to see if it's an implicit RowExpr, and if so, just
- * grab and use the list, discarding the node. (this is done in parse analysis,
- * not here)
- *
- * (we abuse the row_format field of RowExpr to distinguish implicit and
- * explicit row constructors; it's debatable if anyone sanely wants to use them
- * in a group clause, but if they have a reason to, we make it possible.)
- *
- */
-group_clause:
-			GROUP_P BY group_by_list				{ $$ = $3; }
-			| /*EMPTY*/								{ $$ = NIL; }
-		;
-
-group_by_list:
-			group_by_item							{ $$ = list_make1($1); }
-			| group_by_list ',' group_by_item		{ $$ = lappend($1,$3); }
-		;
-
-group_by_item:
-			a_expr									{ $$ = $1; }
-		;
-
-having_clause:
-			HAVING a_expr							{ $$ = $2; }
-			| /*EMPTY*/								{ $$ = NULL; }
-		;
 
 /*
  * Note: the ROW keyword no longer exists in minipg, so there is no
@@ -3363,52 +3310,11 @@ func_application: func_name '(' ')'
 											   COERCE_EXPLICIT_CALL,
 											   @1);
 				}
-			| func_name '(' func_arg_list opt_sort_clause ')'
+			| func_name '(' func_arg_list ')'
 				{
-					FuncCall *n = makeFuncCall($1, $3,
+					$$ = (Node *) makeFuncCall($1, $3,
 											   COERCE_EXPLICIT_CALL,
 											   @1);
-					n->agg_order = $4;
-					$$ = (Node *)n;
-				}
-			| func_name '(' ALL func_arg_list opt_sort_clause ')'
-				{
-					FuncCall *n = makeFuncCall($1, $4,
-											   COERCE_EXPLICIT_CALL,
-											   @1);
-					n->agg_order = $5;
-					/* Ideally we'd mark the FuncCall node to indicate
-					 * "must be an aggregate", but there's no provision
-					 * for that in FuncCall at the moment.
-					 */
-					$$ = (Node *)n;
-				}
-			| func_name '(' DISTINCT func_arg_list opt_sort_clause ')'
-				{
-					FuncCall *n = makeFuncCall($1, $4,
-											   COERCE_EXPLICIT_CALL,
-											   @1);
-					n->agg_order = $5;
-					n->agg_distinct = true;
-					$$ = (Node *)n;
-				}
-			| func_name '(' '*' ')'
-				{
-					/*
-					 * We consider AGGREGATE(*) to invoke a parameterless
-					 * aggregate.  This does the right thing for COUNT(*),
-					 * and there are no other aggregates in SQL that accept
-					 * '*' as parameter.
-					 *
-					 * The FuncCall node is also marked agg_star = true,
-					 * so that later processing can detect what the argument
-					 * really was.
-					 */
-					FuncCall *n = makeFuncCall($1, NIL,
-											   COERCE_EXPLICIT_CALL,
-											   @1);
-					n->agg_star = true;
-					$$ = (Node *)n;
 				}
 		;
 
@@ -3826,17 +3732,16 @@ AexprConst: Iconst
 					t->location = @1;
 					$$ = makeStringConstCast($2, @2, t);
 				}
-			| func_name '(' func_arg_list opt_sort_clause ')' Sconst
+			| func_name '(' func_arg_list ')' Sconst
 				{
 					/* generic syntax with a type modifier */
 					TypeName *t = makeTypeNameFromNameList($1);
 					ListCell *lc;
 
 					/*
-					 * We must use func_arg_list and opt_sort_clause in the
-					 * production to avoid reduce/reduce conflicts, but we
-					 * don't actually wish to allow NamedArgExpr in this
-					 * context, nor ORDER BY.
+					 * We must use func_arg_list in the production to avoid
+					 * reduce/reduce conflicts, but we don't actually wish to
+					 * allow NamedArgExpr in this context.
 					 */
 					foreach(lc, $3)
 					{
@@ -3848,15 +3753,10 @@ AexprConst: Iconst
 									 errmsg("type modifier cannot have parameter name"),
 									 parser_errposition(arg->location)));
 					}
-					if ($4 != NIL)
-							ereport(ERROR,
-									(errcode(ERRCODE_SYNTAX_ERROR),
-									 errmsg("type modifier cannot have ORDER BY"),
-									 parser_errposition(@4)));
 
 					t->typmods = $3;
 					t->location = @1;
-					$$ = makeStringConstCast($6, @6, t);
+					$$ = makeStringConstCast($5, @5, t);
 				}
 			| ConstTypename Sconst
 				{
@@ -4100,8 +4000,6 @@ reserved_keyword:
 			| END_P
 			| FALSE_P
 			| FROM
-			| GROUP_P
-			| HAVING
 			| IN_P
 			| INTO
 			| LATERAL_P

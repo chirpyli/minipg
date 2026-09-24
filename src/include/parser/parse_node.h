@@ -42,12 +42,10 @@ typedef enum ParseExprKind
 	EXPR_KIND_JOIN_USING,		/* JOIN USING */
 	EXPR_KIND_FROM_SUBSELECT,	/* sub-SELECT in FROM clause */
 	EXPR_KIND_WHERE,			/* WHERE */
-	EXPR_KIND_HAVING,			/* HAVING */
 	EXPR_KIND_SELECT_TARGET,	/* SELECT target list item */
 	EXPR_KIND_INSERT_TARGET,	/* INSERT target list item */
 	EXPR_KIND_UPDATE_SOURCE,	/* UPDATE assignment source item */
 	EXPR_KIND_UPDATE_TARGET,	/* UPDATE assignment target item */
-	EXPR_KIND_GROUP_BY,			/* GROUP BY */
 	EXPR_KIND_ORDER_BY,			/* ORDER BY */
 	EXPR_KIND_VALUES,			/* VALUES */
 	EXPR_KIND_VALUES_SINGLE,	/* single-row VALUES (in INSERT only) */
@@ -111,7 +109,7 @@ typedef Node *(*ParseParamRefHook) (ParseState *pstate, ParamRef *pref);
  * p_resolve_unknowns: resolve unknown-type SELECT output columns as type TEXT
  * (this is true by default).
  *
- * p_hasAggs, etc: true if we've found any of the indicated
+ * p_hasTargetSRFs, etc: true if we've found any of the indicated
  * constructs in the query.
  *
  * p_last_srf: the set-returning FuncExpr or OpExpr most recently found in
@@ -142,7 +140,6 @@ struct ParseState
 								 * type text */
 
 	/* Flags telling about things found in the query: */
-	bool		p_hasAggs;
 	bool		p_hasTargetSRFs;
 	bool		p_hasSubLinks;
 

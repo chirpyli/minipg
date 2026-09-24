@@ -442,18 +442,6 @@ SELECT q2, abs(q2) FROM INT8_TBL;
  -4567890123456789 | 4567890123456789
 (5 rows)
 
-SELECT min(q1), min(q2) FROM INT8_TBL;
- min |        min        
------+-------------------
- 123 | -4567890123456789
-(1 row)
-
-SELECT max(q1), max(q2) FROM INT8_TBL;
-       max        |       max        
-------------------+------------------
- 4567890123456789 | 4567890123456789
-(1 row)
-
 -- check min/max values and overflow behavior
 select '-9223372036854775808'::int8;
          int8         

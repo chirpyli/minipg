@@ -40,7 +40,6 @@
  */
 #include "postgres.h"
 
-#include "catalog/pg_aggregate.h"
 #include "catalog/pg_collation.h"
 #include "nodes/makefuncs.h"
 #include "nodes/nodeFuncs.h"
@@ -81,8 +80,6 @@ static void merge_collation_state(Oid collation,
 								  Oid collation2,
 								  int location2,
 								  assign_collations_context *context);
-static void assign_aggregate_collations(Aggref *aggref,
-										assign_collations_context *loccontext);
 
 
 /*
@@ -325,8 +322,8 @@ assign_collations_walker(Node *node, assign_collations_context *context)
 			 * of leaving the comparison functions to fail at runtime, because
 			 * we can give a syntax error pointer to help locate the problem.
 			 * There are some cases where there might not be a failure, for
-			 * example if the planner chooses to use hash aggregation instead
-			 * of sorting for grouping; but it seems better to predictably
+			 * example if the planner chooses to use hashing instead of sorting
+			 * for DISTINCT; but it seems better to predictably
 			 * throw an error.  (Compare transformSetOperationTree, which will
 			 * throw error for indeterminate collation of set-op columns, even
 			 * though the planner might be able to implement the set-op
@@ -444,18 +441,7 @@ assign_collations_walker(Node *node, assign_collations_context *context)
 				 */
 				switch (nodeTag(node))
 				{
-					case T_Aggref:
-						{
-							/*
-							 * Aggref is messy enough that we give it its own
-							 * function, in fact three of them.
-							 */
-							Aggref	   *aggref = (Aggref *) node;
-
-							assign_aggregate_collations(aggref, &loccontext);
-							}
-							break;
-							case T_CaseExpr:
+					case T_CaseExpr:
 						{
 							/*
 							 * CaseExpr is a special case because we do not
@@ -679,42 +665,6 @@ merge_collation_state(Oid collation,
 				}
 				break;
 		}
-	}
-}
-
-/*
- * Aggref is a special case because expressions used only for ordering
- * shouldn't be taken to conflict with each other or with regular args,
- * indeed shouldn't affect the aggregate's result collation at all.
- * We handle this by applying assign_expr_collations() to them rather than
- * passing down our loccontext.
- *
- * Note that we recurse to each TargetEntry, not directly to its contained
- * expression, so that the case above for T_TargetEntry will complain if we
- * can't resolve a collation for an ORDER BY item (whether or not it is also
- * a normal aggregate arg).
- *
- * We need not recurse into the aggorder or aggdistinct lists, because those
- * contain only SortGroupClause nodes which we need not process.
- */
-static void
-assign_aggregate_collations(Aggref *aggref,
-							assign_collations_context *loccontext)
-{
-	ListCell   *lc;
-
-	/* Plain aggregates have no direct args */
-	Assert(aggref->aggdirectargs == NIL);
-
-	/* Process aggregated args, holding resjunk ones at arm's length */
-	foreach(lc, aggref->args)
-	{
-		TargetEntry *tle = lfirst_node(TargetEntry, lc);
-
-		if (tle->resjunk)
-			assign_expr_collations(loccontext->pstate, (Node *) tle);
-		else
-			(void) assign_collations_walker((Node *) tle, loccontext);
 	}
 }
 

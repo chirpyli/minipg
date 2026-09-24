@@ -20,7 +20,7 @@
 #include "postgres.h"
 
 #include "access/htup_details.h"
-#include "catalog/pg_aggregate.h"
+#include "catalog/pg_proc.h"
 #include "catalog/pg_class.h"
 #include "catalog/pg_operator.h"
 #include "catalog/pg_proc.h"
@@ -39,7 +39,6 @@
 #include "optimizer/plancat.h"
 #include "optimizer/planmain.h"
 #include "parser/analyze.h"
-#include "parser/parse_agg.h"
 #include "parser/parse_coerce.h"
 #include "parser/parse_func.h"
 #include "rewrite/rewriteHandler.h"
@@ -75,7 +74,7 @@ typedef struct
 	char	   *prosrc;
 } inline_error_callback_arg;
 
-static bool contain_agg_clause_walker(Node *node, void *context);
+
 static bool contain_subplans_walker(Node *node, void *context);
 static bool contain_mutable_functions_walker(Node *node, void *context);
 static bool contain_volatile_functions_walker(Node *node, void *context);
@@ -126,44 +125,6 @@ static Node *substitute_actual_parameters_mutator(Node *node,
 static void sql_inline_error_callback(void *arg);
 static bool pull_paramids_walker(Node *node, Bitmapset **context);
 
-
-/*****************************************************************************
- *		Aggregate-function clause manipulation
- *****************************************************************************/
-
-/*
- * contain_agg_clause
- *	  Recursively search for Aggref nodes within a clause.
- *
- *	  Returns true if any aggregate found.
- *
- * This does not descend into subqueries, and so should be used only after
- * reduction of sublinks to subplans, or in contexts where it's known there
- * are no subqueries.  There mustn't be outer-aggregate references either.
- *
- * (If you want something like this but able to deal with subqueries,
- * see rewriteManip.c's contain_aggs_of_level().)
- */
-bool
-contain_agg_clause(Node *clause)
-{
-	return contain_agg_clause_walker(clause, NULL);
-}
-
-static bool
-contain_agg_clause_walker(Node *node, void *context)
-{
-	if (node == NULL)
-		return false;
-	if (IsA(node, Aggref))
-	{
-		Assert(((Aggref *) node)->agglevelsup == 0);
-		return true;			/* abort the tree traversal and return true */
-	}
-
-	Assert(!IsA(node, SubLink));
-	return expression_tree_walker(node, contain_agg_clause_walker, context);
-}
 
 /*****************************************************************************
  *		Support for expressions returning sets
@@ -522,13 +483,7 @@ contain_nonstrict_functions_walker(Node *node, void *context)
 {
 	if (node == NULL)
 		return false;
-	if (IsA(node, Aggref))
-	{
-		/* an aggregate could return non-null with null input */
-		return true;
-	}
-
-	else if (IsA(node, SubscriptingRef))
+	if (IsA(node, SubscriptingRef))
 	{
 		SubscriptingRef *sbsref = (SubscriptingRef *) node;
 		const SubscriptRoutines *sbsroutines;
@@ -1461,12 +1416,6 @@ is_strict_saop(ScalarArrayOpExpr *expr, bool falseOK)
  *	  will be constant over any one scan of the current query, so it can be
  *	  used as, eg, an indexscan key.  (Actually, the condition for indexscan
  *	  keys is weaker than this; see is_pseudo_constant_for_index().)
- *
- * CAUTION: this function omits to test for one very important class of
- * not-constant expressions, namely aggregates (Aggrefs).  In current usage
- * this is only applied to WHERE clauses and so a check for Aggrefs would be
- * a waste of cycles; but be sure to also check contain_agg_clause() if you
- * want to know about pseudo-constness in other contexts.
  */
 bool
 is_pseudo_constant_clause(Node *clause)
@@ -3680,15 +3629,11 @@ inline_function(Oid funcid, Oid result_type, Oid result_collid,
 	 */
 	if (!IsA(querytree, Query) ||
 		querytree->commandType != CMD_SELECT ||
-		querytree->hasAggs ||
 		querytree->hasTargetSRFs ||
 		querytree->hasSubLinks ||
 		querytree->rtable ||
 		querytree->jointree->fromlist ||
 		querytree->jointree->quals ||
-		querytree->groupClause ||
-
-		querytree->havingQual ||
 		querytree->distinctClause ||
 		querytree->sortClause ||
 		list_length(querytree->targetList) != 1)

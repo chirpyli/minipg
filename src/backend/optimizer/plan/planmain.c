@@ -6,8 +6,8 @@
  * What's in a name, anyway?  The top-level entry point of the planner/
  * optimizer is over in planner.c, not here as you might think from the
  * file name.  But this is the main code for planning a basic join operation,
- * shorn of features like subselects, inheritance, aggregates, grouping,
- * and so on.  (Those are the things planner.c deals with.)
+ * shorn of features like subselects, inheritance, and so on.  (Those are
+ * the things planner.c deals with.)
  *
  * Portions Copyright (c) 1996-2021, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
@@ -38,7 +38,7 @@
  * Since query_planner does not handle the toplevel processing (grouping,
  * sorting, etc) it cannot select the best path by itself.  Instead, it
  * returns the RelOptInfo for the top level of joining, and the caller
- * (grouping_planner) can choose among the surviving paths for the rel.
+ * (upper_planner) can choose among the surviving paths for the rel.
  *
  * root describes the query to plan
  * qp_callback is a function to compute query_pathkeys once it's safe to do so
@@ -104,15 +104,12 @@ query_planner(PlannerInfo *root,
 				final_rel = build_simple_rel(root, varno, false);
 
 				/*
-				 * The only path for it is a trivial Result path.  We cheat a
-				 * bit here by using a GroupResultPath, because that way we
-				 * can just jam the quals into it without preprocessing them.
-				 * (But, if you hold your head at the right angle, a FROM-less
-				 * SELECT is a kind of degenerate-grouping case, so it's not
-				 * that much of a cheat.)
+				 * The only path for it is a trivial Result path.  We use a
+				 * ResultPath because that way we can just jam the quals into
+				 * it without preprocessing them.
 				 */
 				add_path(final_rel, (Path *)
-						 create_group_result_path(root, final_rel,
+						 create_result_path(root, final_rel,
 												  final_rel->reltarget,
 												  (List *) parse->jointree->quals));
 

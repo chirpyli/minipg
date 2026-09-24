@@ -39,11 +39,9 @@ SELECT DISTINCT p.age FROM person p ORDER BY age DESC;
 --
 
 EXPLAIN (VERBOSE, COSTS OFF)
-SELECT count(*) FROM
-  (SELECT DISTINCT two, four, two FROM tenk1) ss;
+SELECT DISTINCT two, four, two FROM tenk1 ORDER BY 1, 2;
 
-SELECT count(*) FROM
-  (SELECT DISTINCT two, four, two FROM tenk1) ss;
+SELECT DISTINCT two, four, two FROM tenk1 ORDER BY 1, 2;
 
 --
 -- Compare results between plans using sorting and plans using hash
@@ -54,7 +52,6 @@ SET work_mem='64kB';
 
 -- Produce results with sorting.
 
-SET enable_hashagg=FALSE;
 
 EXPLAIN (costs off)
 SELECT DISTINCT g%1000 FROM (SELECT generate_series(0,9999) AS g) AS _gs;
@@ -65,7 +62,6 @@ SELECT DISTINCT g%1000 FROM (SELECT generate_series(0,9999) AS g) AS _gs;
 CREATE TABLE distinct_group_2 AS
 SELECT DISTINCT (g%1000)::text FROM (SELECT generate_series(0,9999) AS g) AS _gs;
 
-SET enable_hashagg=TRUE;
 
 -- Produce results with hash aggregation.
 

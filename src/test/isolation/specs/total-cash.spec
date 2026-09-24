@@ -18,11 +18,11 @@ teardown
 session s1
 setup		{ BEGIN ISOLATION LEVEL SERIALIZABLE; }
 step wx1	{ UPDATE accounts SET balance = balance - 200 WHERE accountid = 'checking'; }
-step rxy1	{ SELECT SUM(balance) FROM accounts; }
+step rxy1	{ SELECT accountid, balance FROM accounts ORDER BY accountid; }
 step c1		{ COMMIT; }
 
 session s2
 setup		{ BEGIN ISOLATION LEVEL SERIALIZABLE; }
 step wy2	{ UPDATE accounts SET balance = balance - 200 WHERE accountid = 'savings'; }
-step rxy2	{ SELECT SUM(balance) FROM accounts; }
+step rxy2	{ SELECT accountid, balance FROM accounts ORDER BY accountid; }
 step c2		{ COMMIT; }

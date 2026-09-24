@@ -16,8 +16,6 @@
 
 #include "nodes/pathnodes.h"
 
-extern bool contain_agg_clause(Node *clause);
-
 extern double expression_returns_set_rows(PlannerInfo *root, Node *clause);
 
 extern bool contain_subplans(Node *clause);

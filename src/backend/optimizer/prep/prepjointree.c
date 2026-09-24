@@ -596,10 +596,10 @@ pull_up_sublinks_qual_recurse(PlannerInfo *root, Node *node,
 /*
  * pull_up_subqueries
  *		Look for subqueries in the rangetable that can be pulled up into
- *		the parent query.  If the subquery has no special features like
- *		grouping/aggregation then we can merge it into the parent's jointree.
- *		Also, subqueries that are simple UNION ALL structures can be
- *		converted into "append relations".
+ *		the parent query.  If the subquery has no special features that
+ *		prevent pullup, we can merge it into the parent's jointree.  Also,
+ *		subqueries that are simple UNION ALL structures can be converted
+ *		into "append relations".
  */
 void
 pull_up_subqueries(PlannerInfo *root)
@@ -1059,11 +1059,6 @@ pull_up_simple_subquery(PlannerInfo *root, Node *jtnode, RangeTblEntry *rte,
 	parse->hasSubLinks |= subquery->hasSubLinks;
 
 	/*
-	 * subquery won't be pulled up if it hasAggs or hasTargetSRFs, so no work
-	 * needed on those flags
-	 */
-
-	/*
 	 * Return the adjusted subquery jointree to replace the RangeTblRef entry
 	 * in parent's jointree; or, if the FromExpr is degenerate, just return
 	 * its single member.
@@ -1106,13 +1101,10 @@ is_simple_subquery(PlannerInfo *root, Query *subquery, RangeTblEntry *rte,
 	 */
 
 	/*
-	 * Can't pull up a subquery involving grouping, aggregation, SRFs,
-	 * sorting, limiting, or WITH.  (XXX WITH could possibly be allowed later)
+	 * Can't pull up a subquery involving SRFs, sorting, limiting, or WITH.
+	 * (XXX WITH could possibly be allowed later)
 	 */
-	if (subquery->hasAggs ||
-		subquery->hasTargetSRFs ||
-		subquery->groupClause ||
-		subquery->havingQual ||
+	if (subquery->hasTargetSRFs ||
 		subquery->sortClause ||
 		subquery->distinctClause)
 		return false;
@@ -1493,16 +1485,14 @@ perform_pullup_replace_vars(PlannerInfo *root,
 	 * Replace all of the top query's references to the subquery's outputs
 	 * with copies of the adjusted subtlist items, being careful not to
 	 * replace any of the jointree structure.  (This'd be a lot cleaner if we
-	 * could use query_tree_mutator.)  We have to use PHVs in the targetList
-	 * and havingQual, since those are certainly above any
-	 * outer join.  replace_vars_in_jointree tracks its location in the
-	 * jointree and uses PHVs or not appropriately.
+	 * could use query_tree_mutator.)  We have to use PHVs in the targetList,
+	 * since those are certainly above any outer join.  replace_vars_in_jointree
+	 * tracks its location in the jointree and uses PHVs or not appropriately.
 	 */
 	parse->targetList = (List *)
 		pullup_replace_vars((Node *) parse->targetList, rvcontext);
 	replace_vars_in_jointree((Node *) parse->jointree, rvcontext,
 							 lowest_nulling_outer_join);
-	parse->havingQual = pullup_replace_vars(parse->havingQual, rvcontext);
 
 	/*
 	 * Replace references in the translated_vars lists of appendrels.  When

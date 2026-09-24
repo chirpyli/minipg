@@ -72,11 +72,6 @@ static void ExecInitSubscriptingRef(ExprEvalStep *scratch,
 									ExprState *state,
 									Datum *resv, bool *resnull);
 static bool isAssignmentIndirectionExpr(Expr *expr);
-static void ExecBuildAggTransCall(ExprState *state, AggState *aggstate,
-								  ExprEvalStep *scratch,
-								  FunctionCallInfo fcinfo, AggStatePerTrans pertrans,
-								  int transno, bool ishash,
-								  bool nullcheck);
 
 
 /*
@@ -93,7 +88,7 @@ static void ExecBuildAggTransCall(ExprState *state, AggState *aggstate,
  * executions of the expression are needed.  Typically the context will be
  * the same as the per-query context of the associated ExprContext.
  *
- * Any Aggref or SubPlan nodes found in the tree are added to the lists of
+ * Any SubPlan nodes found in the tree are added to the lists of
  * such nodes held by the parent PlanState.
  *
  * Note: there is no ExecEndExpr function; we assume that any resource
@@ -105,7 +100,7 @@ static void ExecBuildAggTransCall(ExprState *state, AggState *aggstate,
  *	'parent' is the PlanState node that owns the expression.
  *
  * 'parent' may be NULL if we are preparing an expression that is not
- * associated with a plan tree.  (If so, it can't have aggs or subplans.)
+ * associated with a plan tree.  (If so, it can't have subplans.)
  * Such cases should usually come through ExecPrepareExpr, not directly here.
  *
  * Also, if 'node' is NULL, we just return NULL.  This is convenient for some
@@ -1005,31 +1000,6 @@ ExecInitExprRec(Expr *node, ExprState *state,
 				}
 				break;
 			}
-
-		case T_Aggref:
-			{
-				Aggref	   *aggref = (Aggref *) node;
-
-				scratch.opcode = EEOP_AGGREF;
-				scratch.d.aggref.aggno = aggref->aggno;
-
-				if (state->parent && IsA(state->parent, AggState))
-				{
-					AggState   *aggstate = (AggState *) state->parent;
-
-					aggstate->aggs = lappend(aggstate->aggs, aggref);
-				}
-				else
-				{
-					/* planner messed up */
-					elog(ERROR, "Aggref found in non-Agg plan node");
-				}
-
-				ExprEvalPushStep(state, &scratch);
-				break;
-			}
-
-
 
 		case T_SubscriptingRef:
 			{
@@ -2207,13 +2177,6 @@ expr_setup_walker(Node *node, ExprSetupInfo *info)
 		return false;
 	}
 
-	/*
-	 * Don't examine the arguments or filters of Aggrefs, because those do not
-	 * represent expressions to be evaluated within the calling expression's
-	 * econtext.
-	 */
-	if (IsA(node, Aggref))
-		return false;
 	return expression_tree_walker(node, expr_setup_walker,
 								  (void *) info);
 }
@@ -2627,308 +2590,6 @@ isAssignmentIndirectionExpr(Expr *expr)
 	return false;
 }
 
-/*
- * Build transition/combine function invocations for all aggregate transition
- * / combination function invocations in a grouping sets phase. This has to
- * invoke all sort based transitions in a phase (if doSort is true), all hash
- * based transitions (if doHash is true), or both (both true).
- *
- * The resulting expression will, for each set of transition values, first
- * check for filters, evaluate aggregate input, check that that input is not
- * NULL for a strict transition function, and then finally invoke the
- * transition for each of the concurrently computed grouping sets.
- *
- * If nullcheck is true, the generated code will check for a NULL pointer to
- * the array of AggStatePerGroup, and skip evaluation if so.
- */
-ExprState *
-ExecBuildAggTrans(AggState *aggstate, AggStatePerPhase phase,
-				  bool doSort, bool doHash, bool nullcheck)
-{
-	ExprState  *state = makeNode(ExprState);
-	PlanState  *parent = &aggstate->ss.ps;
-	ExprEvalStep scratch = {0};
-	ExprSetupInfo deform = {0, 0, 0};
-
-	state->expr = (Expr *) aggstate;
-	state->parent = parent;
-
-	scratch.resvalue = &state->resvalue;
-	scratch.resnull = &state->resnull;
-
-	/*
-	 * First figure out which slots, and how many columns from each, we're
-	 * going to need.
-	 */
-	for (int transno = 0; transno < aggstate->numtrans; transno++)
-	{
-		AggStatePerTrans pertrans = &aggstate->pertrans[transno];
-
-		expr_setup_walker((Node *) pertrans->aggref->aggdirectargs,
-						  &deform);
-		expr_setup_walker((Node *) pertrans->aggref->args,
-						  &deform);
-		expr_setup_walker((Node *) pertrans->aggref->aggorder,
-						  &deform);
-		expr_setup_walker((Node *) pertrans->aggref->aggdistinct,
-						  &deform);
-	}
-	ExecPushExprSetupSteps(state, &deform);
-
-	/*
-	 * Emit instructions for each transition value / grouping set combination.
-	 */
-	for (int transno = 0; transno < aggstate->numtrans; transno++)
-	{
-		AggStatePerTrans pertrans = &aggstate->pertrans[transno];
-		FunctionCallInfo trans_fcinfo = pertrans->transfn_fcinfo;
-		List	   *adjust_bailout = NIL;
-		NullableDatum *strictargs = NULL;
-		bool	   *strictnulls = NULL;
-		int			argno;
-		ListCell   *bail;
-
-		/*
-		 * Evaluate arguments to aggregate/combine function.
-		 */
-		argno = 0;
-		if (pertrans->numSortCols == 0)
-		{
-			ListCell   *arg;
-
-			/*
-			 * Normal transition function without ORDER BY / DISTINCT.
-			 */
-			strictargs = trans_fcinfo->args + 1;
-
-			foreach(arg, pertrans->aggref->args)
-			{
-				TargetEntry *source_tle = (TargetEntry *) lfirst(arg);
-
-				/*
-				 * Start from 1, since the 0th arg will be the transition
-				 * value
-				 */
-				ExecInitExprRec(source_tle->expr, state,
-								&trans_fcinfo->args[argno + 1].value,
-								&trans_fcinfo->args[argno + 1].isnull);
-				argno++;
-			}
-		}
-		else if (pertrans->numInputs == 1)
-		{
-			/*
-			 * DISTINCT and/or ORDER BY case, with a single column sorted on.
-			 */
-			TargetEntry *source_tle =
-			(TargetEntry *) linitial(pertrans->aggref->args);
-
-			Assert(list_length(pertrans->aggref->args) == 1);
-
-			ExecInitExprRec(source_tle->expr, state,
-							&state->resvalue,
-							&state->resnull);
-			strictnulls = &state->resnull;
-			argno++;
-		}
-		else
-		{
-			/*
-			 * DISTINCT and/or ORDER BY case, with multiple columns sorted on.
-			 */
-			Datum	   *values = pertrans->sortslot->tts_values;
-			bool	   *nulls = pertrans->sortslot->tts_isnull;
-			ListCell   *arg;
-
-			strictnulls = nulls;
-
-			foreach(arg, pertrans->aggref->args)
-			{
-				TargetEntry *source_tle = (TargetEntry *) lfirst(arg);
-
-				ExecInitExprRec(source_tle->expr, state,
-								&values[argno], &nulls[argno]);
-				argno++;
-			}
-		}
-		Assert(pertrans->numInputs == argno);
-
-		/*
-		 * For a strict transfn, nothing happens when there's a NULL input; we
-		 * just keep the prior transValue. This is true for both plain and
-		 * sorted/distinct aggregates.
-		 */
-		if (trans_fcinfo->flinfo->fn_strict && pertrans->numTransInputs > 0)
-		{
-			if (strictnulls)
-				scratch.opcode = EEOP_AGG_STRICT_INPUT_CHECK_NULLS;
-			else
-				scratch.opcode = EEOP_AGG_STRICT_INPUT_CHECK_ARGS;
-			scratch.d.agg_strict_input_check.nulls = strictnulls;
-			scratch.d.agg_strict_input_check.args = strictargs;
-			scratch.d.agg_strict_input_check.jumpnull = -1; /* adjust later */
-			scratch.d.agg_strict_input_check.nargs = pertrans->numTransInputs;
-			ExprEvalPushStep(state, &scratch);
-			adjust_bailout = lappend_int(adjust_bailout,
-										 state->steps_len - 1);
-		}
-
-		/*
-		 * Call transition function (once for each concurrently evaluated
-		 * grouping set). Do so for both sort and hash based computations, as
-		 * applicable.
-		 */
-		if (doSort)
-		{
-			ExecBuildAggTransCall(state, aggstate, &scratch, trans_fcinfo,
-								  pertrans, transno, false,
-								  nullcheck);
-								  }
-
-								  if (doHash)
-								  {
-								  ExecBuildAggTransCall(state, aggstate, &scratch, trans_fcinfo,
-								  				  pertrans, transno, true,
-								  				  nullcheck);
-								  }
-
-		/* adjust early bail out jump target(s) */
-		foreach(bail, adjust_bailout)
-		{
-			ExprEvalStep *as = &state->steps[lfirst_int(bail)];
-
-			if (as->opcode == EEOP_JUMP_IF_NOT_TRUE)
-			{
-				Assert(as->d.jump.jumpdone == -1);
-				as->d.jump.jumpdone = state->steps_len;
-			}
-			else if (as->opcode == EEOP_AGG_STRICT_INPUT_CHECK_ARGS ||
-					 as->opcode == EEOP_AGG_STRICT_INPUT_CHECK_NULLS)
-			{
-				Assert(as->d.agg_strict_input_check.jumpnull == -1);
-				as->d.agg_strict_input_check.jumpnull = state->steps_len;
-			}
-			else
-				Assert(false);
-		}
-	}
-
-	scratch.resvalue = NULL;
-	scratch.resnull = NULL;
-	scratch.opcode = EEOP_DONE;
-	ExprEvalPushStep(state, &scratch);
-
-	ExecReadyExpr(state);
-
-	return state;
-}
-
-/*
- * Build transition/combine function invocation for a single transition
- * value. This is separated from ExecBuildAggTrans() because there are
- * multiple callsites (hash and sort in some grouping set cases).
- */
-static void
-ExecBuildAggTransCall(ExprState *state, AggState *aggstate,
-					  ExprEvalStep *scratch,
-					  FunctionCallInfo fcinfo, AggStatePerTrans pertrans,
-					  int transno, bool ishash,
-					  bool nullcheck)
-{
-	ExprContext *aggcontext;
-	int			adjust_jumpnull = -1;
-
-	if (ishash)
-		aggcontext = aggstate->hashcontext;
-	else
-		aggcontext = aggstate->ss.ps.ps_ExprContext;
-
-	/* add check for NULL pointer? */
-	if (nullcheck)
-	{
-		scratch->opcode = EEOP_AGG_PLAIN_PERGROUP_NULLCHECK;
-		/* adjust later */
-		scratch->d.agg_plain_pergroup_nullcheck.jumpnull = -1;
-		ExprEvalPushStep(state, scratch);
-		adjust_jumpnull = state->steps_len - 1;
-	}
-
-	/*
-	 * Determine appropriate transition implementation.
-	 *
-	 * For non-ordered aggregates:
-	 *
-	 * If the initial value for the transition state doesn't exist in the
-	 * pg_aggregate table then we will let the first non-NULL value returned
-	 * from the outer procNode become the initial value. (This is useful for
-	 * aggregates like max() and min().) The noTransValue flag signals that we
-	 * need to do so. If true, generate a
-	 * EEOP_AGG_INIT_STRICT_PLAIN_TRANS{,_BYVAL} step. This step also needs to
-	 * do the work described next:
-	 *
-	 * If the function is strict, but does have an initial value, choose
-	 * EEOP_AGG_STRICT_PLAIN_TRANS{,_BYVAL}, which skips the transition
-	 * function if the transition value has become NULL (because a previous
-	 * transition function returned NULL). This step also needs to do the work
-	 * described next:
-	 *
-	 * Otherwise we call EEOP_AGG_PLAIN_TRANS{,_BYVAL}, which does not have to
-	 * perform either of the above checks.
-	 *
-	 * Having steps with overlapping responsibilities is not nice, but
-	 * aggregations are very performance sensitive, making this worthwhile.
-	 *
-	 * For ordered aggregates:
-	 *
-	 * Only need to choose between the faster path for a single ordered
-	 * column, and the one between multiple columns. Checking strictness etc
-	 * is done when finalizing the aggregate. See
-	 * process_ordered_aggregate_{single, multi} and
-	 * advance_transition_function.
-	 */
-	if (pertrans->numSortCols == 0)
-	{
-		if (pertrans->transtypeByVal)
-		{
-			if (fcinfo->flinfo->fn_strict &&
-				pertrans->initValueIsNull)
-				scratch->opcode = EEOP_AGG_PLAIN_TRANS_INIT_STRICT_BYVAL;
-			else if (fcinfo->flinfo->fn_strict)
-				scratch->opcode = EEOP_AGG_PLAIN_TRANS_STRICT_BYVAL;
-			else
-				scratch->opcode = EEOP_AGG_PLAIN_TRANS_BYVAL;
-		}
-		else
-		{
-			if (fcinfo->flinfo->fn_strict &&
-				pertrans->initValueIsNull)
-				scratch->opcode = EEOP_AGG_PLAIN_TRANS_INIT_STRICT_BYREF;
-			else if (fcinfo->flinfo->fn_strict)
-				scratch->opcode = EEOP_AGG_PLAIN_TRANS_STRICT_BYREF;
-			else
-				scratch->opcode = EEOP_AGG_PLAIN_TRANS_BYREF;
-		}
-	}
-	else if (pertrans->numInputs == 1)
-		scratch->opcode = EEOP_AGG_ORDERED_TRANS_DATUM;
-	else
-		scratch->opcode = EEOP_AGG_ORDERED_TRANS_TUPLE;
-
-	scratch->d.agg_trans.pertrans = pertrans;
-	scratch->d.agg_trans.transno = transno;
-	scratch->d.agg_trans.aggcontext = aggcontext;
-	ExprEvalPushStep(state, scratch);
-
-	/* fix up jumpnull */
-	if (adjust_jumpnull != -1)
-	{
-		ExprEvalStep *as = &state->steps[adjust_jumpnull];
-
-		Assert(as->opcode == EEOP_AGG_PLAIN_PERGROUP_NULLCHECK);
-		Assert(as->d.agg_plain_pergroup_nullcheck.jumpnull == -1);
-		as->d.agg_plain_pergroup_nullcheck.jumpnull = state->steps_len;
-	}
-}
 
 /*
  * Build equality expression that can be evaluated using ExecQual(), returning

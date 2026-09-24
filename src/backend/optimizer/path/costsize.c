@@ -74,7 +74,6 @@
 #include "access/amapi.h"
 #include "access/htup_details.h"
 #include "executor/executor.h"
-#include "executor/nodeAgg.h"
 #include "executor/nodeHash.h"
 #include "executor/nodeMemoize.h"
 #include "miscadmin.h"
@@ -129,7 +128,6 @@ bool		enable_bitmapscan = true;
 bool		enable_tidscan = true;
 bool		enable_sort = true;
 bool		enable_incremental_sort = true;
-bool		enable_hashagg = true;
 bool		enable_nestloop = true;
 bool		enable_material = true;
 bool		enable_memoize = true;
@@ -1670,257 +1668,6 @@ cost_memoize_rescan(PlannerInfo *root, MemoizePath *mpath,
 	*rescan_total_cost = total_cost;
 }
 
-/*
- * cost_agg
- *		Determines and returns the cost of performing an Agg plan node,
- *		including the cost of its input.
- *
- * aggcosts can be NULL when there are no actual aggregate functions (i.e.,
- * we are using a hashed Agg node just to do grouping).
- *
- * Note: when aggstrategy == AGG_SORTED, caller must ensure that input costs
- * are for appropriately-sorted input.
- */
-void
-cost_agg(Path *path, PlannerInfo *root,
-		 AggStrategy aggstrategy, const AggClauseCosts *aggcosts,
-		 int numGroupCols, double numGroups,
-		 List *quals,
-		 Cost input_startup_cost, Cost input_total_cost,
-		 double input_tuples, double input_width)
-{
-	double		output_tuples;
-	Cost		startup_cost;
-	Cost		total_cost;
-	AggClauseCosts dummy_aggcosts;
-
-	/* Use all-zero per-aggregate costs if NULL is passed */
-	if (aggcosts == NULL)
-	{
-		Assert(aggstrategy == AGG_HASHED);
-		MemSet(&dummy_aggcosts, 0, sizeof(AggClauseCosts));
-		aggcosts = &dummy_aggcosts;
-	}
-
-	/*
-	 * The transCost.per_tuple component of aggcosts should be charged once
-	 * per input tuple, corresponding to the costs of evaluating the aggregate
-	 * transfns and their input expressions. The finalCost.per_tuple component
-	 * is charged once per output tuple, corresponding to the costs of
-	 * evaluating the finalfns.  Startup costs are of course charged but once.
-	 *
-	 * If we are grouping, we charge an additional cpu_operator_cost per
-	 * grouping column per input tuple for grouping comparisons.
-	 *
-	 * We will produce a single output tuple if not grouping, and a tuple per
-	 * group otherwise.  We charge cpu_tuple_cost for each output tuple.
-	 *
-	 * Note: in this cost model, AGG_SORTED and AGG_HASHED have exactly the
-	 * same total CPU cost, but AGG_SORTED has lower startup cost.  If the
-	 * input path is already sorted appropriately, AGG_SORTED should be
-	 * preferred (since it has no risk of memory overflow).  This will happen
-	 * as long as the computed total costs are indeed exactly equal --- but if
-	 * there's roundoff error we might do the wrong thing.  So be sure that
-	 * the computations below form the same intermediate values in the same
-	 * order.
-	 */
-	if (aggstrategy == AGG_PLAIN)
-	{
-		startup_cost = input_total_cost;
-		startup_cost += aggcosts->transCost.startup;
-		startup_cost += aggcosts->transCost.per_tuple * input_tuples;
-		startup_cost += aggcosts->finalCost.startup;
-		startup_cost += aggcosts->finalCost.per_tuple;
-		/* we aren't grouping */
-		total_cost = startup_cost + cpu_tuple_cost;
-		output_tuples = 1;
-	}
-	else if (aggstrategy == AGG_SORTED)
-	{
-		/* Here we are able to deliver output on-the-fly */
-		startup_cost = input_startup_cost;
-		total_cost = input_total_cost;
-		/* calcs phrased this way to match HASHED case, see note above */
-		total_cost += aggcosts->transCost.startup;
-		total_cost += aggcosts->transCost.per_tuple * input_tuples;
-		total_cost += (cpu_operator_cost * numGroupCols) * input_tuples;
-		total_cost += aggcosts->finalCost.startup;
-		total_cost += aggcosts->finalCost.per_tuple * numGroups;
-		total_cost += cpu_tuple_cost * numGroups;
-		output_tuples = numGroups;
-	}
-	else
-	{
-		/* must be AGG_HASHED */
-		startup_cost = input_total_cost;
-		if (!enable_hashagg)
-			startup_cost += disable_cost;
-		startup_cost += aggcosts->transCost.startup;
-		startup_cost += aggcosts->transCost.per_tuple * input_tuples;
-		/* cost of computing hash value */
-		startup_cost += (cpu_operator_cost * numGroupCols) * input_tuples;
-		startup_cost += aggcosts->finalCost.startup;
-
-		total_cost = startup_cost;
-		total_cost += aggcosts->finalCost.per_tuple * numGroups;
-		/* cost of retrieving from hash table */
-		total_cost += cpu_tuple_cost * numGroups;
-		output_tuples = numGroups;
-	}
-
-	/*
-	 * Add the disk costs of hash aggregation that spills to disk.
-	 *
-	 * Groups that go into the hash table stay in memory until finalized, so
-	 * spilling and reprocessing tuples doesn't incur additional invocations
-	 * of transCost or finalCost. Furthermore, the computed hash value is
-	 * stored with the spilled tuples, so we don't incur extra invocations of
-	 * the hash function.
-	 *
-	 * Hash Agg begins returning tuples after the first batch is complete.
-	 * Accrue writes (spilled tuples) to startup_cost and to total_cost;
-	 * accrue reads only to total_cost.
-	 */
-	if (aggstrategy == AGG_HASHED)
-	{
-		double		pages;
-		double		pages_written = 0.0;
-		double		pages_read = 0.0;
-		double		spill_cost;
-		double		hashentrysize;
-		double		nbatches;
-		Size		mem_limit;
-		uint64		ngroups_limit;
-		int			num_partitions;
-		int			depth;
-
-		/*
-		 * Estimate number of batches based on the computed limits. If less
-		 * than or equal to one, all groups are expected to fit in memory;
-		 * otherwise we expect to spill.
-		 */
-		hashentrysize = hash_agg_entry_size(list_length(root->aggtransinfos),
-											input_width,
-											aggcosts->transitionSpace);
-		hash_agg_set_limits(hashentrysize, numGroups, 0, &mem_limit,
-							&ngroups_limit, &num_partitions);
-
-		nbatches = Max((numGroups * hashentrysize) / mem_limit,
-					   numGroups / ngroups_limit);
-
-		nbatches = Max(ceil(nbatches), 1.0);
-		num_partitions = Max(num_partitions, 2);
-
-		/*
-		 * The number of partitions can change at different levels of
-		 * recursion; but for the purposes of this calculation assume it stays
-		 * constant.
-		 */
-		depth = ceil(log(nbatches) / log(num_partitions));
-
-		/*
-		 * Estimate number of pages read and written. For each level of
-		 * recursion, a tuple must be written and then later read.
-		 */
-		pages = relation_byte_size(input_tuples, input_width) / BLCKSZ;
-		pages_written = pages_read = pages * depth;
-
-		/*
-		 * HashAgg has somewhat worse IO behavior than Sort on typical
-		 * hardware/OS combinations. Account for this with a generic penalty.
-		 */
-		pages_read *= 2.0;
-		pages_written *= 2.0;
-
-		startup_cost += pages_written * random_page_cost;
-		total_cost += pages_written * random_page_cost;
-		total_cost += pages_read * seq_page_cost;
-
-		/* account for CPU cost of spilling a tuple and reading it back */
-		spill_cost = depth * input_tuples * 2.0 * cpu_tuple_cost;
-		startup_cost += spill_cost;
-		total_cost += spill_cost;
-	}
-
-	/*
-	 * If there are quals (HAVING quals), account for their cost and
-	 * selectivity.
-	 */
-	if (quals)
-	{
-		QualCost	qual_cost;
-
-		cost_qual_eval(&qual_cost, quals, root);
-		startup_cost += qual_cost.startup;
-		total_cost += qual_cost.startup + output_tuples * qual_cost.per_tuple;
-
-		output_tuples = clamp_row_est(output_tuples *
-									  clauselist_selectivity(root,
-															 quals,
-															 0,
-															 JOIN_INNER,
-															 NULL));
-	}
-
-	path->rows = output_tuples;
-	path->startup_cost = startup_cost;
-	path->total_cost = total_cost;
-}
-
-
-/*
- * cost_group
- *		Determines and returns the cost of performing a Group plan node,
- *		including the cost of its input.
- *
- * Note: caller must ensure that input costs are for appropriately-sorted
- * input.
- */
-void
-cost_group(Path *path, PlannerInfo *root,
-		   int numGroupCols, double numGroups,
-		   List *quals,
-		   Cost input_startup_cost, Cost input_total_cost,
-		   double input_tuples)
-{
-	double		output_tuples;
-	Cost		startup_cost;
-	Cost		total_cost;
-
-	output_tuples = numGroups;
-	startup_cost = input_startup_cost;
-	total_cost = input_total_cost;
-
-	/*
-	 * Charge one cpu_operator_cost per comparison per input tuple. We assume
-	 * all columns get compared at most of the tuples.
-	 */
-	total_cost += cpu_operator_cost * input_tuples * numGroupCols;
-
-	/*
-	 * If there are quals (HAVING quals), account for their cost and
-	 * selectivity.
-	 */
-	if (quals)
-	{
-		QualCost	qual_cost;
-
-		cost_qual_eval(&qual_cost, quals, root);
-		startup_cost += qual_cost.startup;
-		total_cost += qual_cost.startup + output_tuples * qual_cost.per_tuple;
-
-		output_tuples = clamp_row_est(output_tuples *
-									  clauselist_selectivity(root,
-															 quals,
-															 0,
-															 JOIN_INNER,
-															 NULL));
-	}
-
-	path->rows = output_tuples;
-	path->startup_cost = startup_cost;
-	path->total_cost = total_cost;
-}
 
 /*
  * initial_cost_nestloop
@@ -3113,11 +2860,8 @@ cost_subplan(PlannerInfo *root, SubPlan *subplan, Plan *plan)
 	 * Therefore, we pass root as NULL here.  cost_qual_eval() is already
 	 * well-equipped to handle a NULL root.
 	 *
-	 * One exception is SubPlan nodes built for the initplans of MIN/MAX
-	 * aggregates from indexes (cf. SS_make_initplan_from_plan).  In this
-	 * case, having a NULL root is safe because testexpr will be NULL.
-	 * Besides, an initplan will by definition not consult anything from the
-	 * parent plan.
+	 * An initplan will by definition not consult anything from the parent
+	 * plan, so passing a NULL root is safe here.
 	 */
 	cost_qual_eval(&sp_cost,
 				   make_ands_implicit((Expr *) subplan->testexpr),
@@ -3477,19 +3221,6 @@ cost_qual_eval_walker(Node *node, cost_qual_eval_context *context)
 				estimate_array_length(arraynode) * 0.5;
 		}
 	}
-	else if (IsA(node, Aggref))
-	{
-		/*
-		 * Aggref nodes are (and should be) treated like Vars,
-		 * ie, zero execution cost in the current model, because they behave
-		 * essentially like Vars at execution.  We disregard the costs of
-		 * their input expressions for the same reason.  The actual execution
-		 * costs of the aggregate/window functions and their arguments have to
-		 * be factored into plan-node-specific costing of the Agg or WindowAgg
-		 * plan node.
-		 */
-		return false;			/* don't recurse into children */
-	}
 
 	else if (IsA(node, CoerceViaIO))
 	{
@@ -3684,7 +3415,6 @@ compute_semi_anti_join_factors(PlannerInfo *root,
 	norm_sjinfo.lhs_strict = false;
 	norm_sjinfo.delay_upper_joins = false;
 	norm_sjinfo.semi_can_btree = false;
-	norm_sjinfo.semi_can_hash = false;
 	norm_sjinfo.semi_operators = NIL;
 	norm_sjinfo.semi_rhs_exprs = NIL;
 
@@ -3848,7 +3578,6 @@ approx_tuple_count(PlannerInfo *root, JoinPath *path, List *quals)
 	sjinfo.lhs_strict = false;
 	sjinfo.delay_upper_joins = false;
 	sjinfo.semi_can_btree = false;
-	sjinfo.semi_can_hash = false;
 	sjinfo.semi_operators = NIL;
 	sjinfo.semi_rhs_exprs = NIL;
 

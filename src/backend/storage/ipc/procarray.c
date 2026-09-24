@@ -1381,13 +1381,11 @@ GetSnapshotDataInitOldSnapshot(Snapshot snapshot)
 }
 
 /*
- * Helper function for GetSnapshotData() that checks if the bulk of the
- * visibility information in the snapshot is still valid. If so, it updates
- * the fields that need to change and returns true. Otherwise it returns
- * false.
+ * GetSnapshotData() 的辅助函数，用于检查快照中的大部分可见性信息是否
+ * 仍然有效。如果有效，就更新需要变化的字段并返回 true；否则返回 false。
  *
- * This very likely can be evolved to not need ProcArrayLock held (at very
- * least in the case we already hold a snapshot), but that's for another day.
+ * 这个函数很可能可以演进为不需要持有 ProcArrayLock（至少在我们已经持有
+ * 快照的情况下如此），不过那是以后的事了。
  */
 static bool
 GetSnapshotDataReuse(Snapshot snapshot)
@@ -1440,36 +1438,36 @@ GetSnapshotDataReuse(Snapshot snapshot)
 }
 
 /*
- * GetSnapshotData -- returns information about running transactions.
+ * GetSnapshotData -- 返回正在运行的事务的信息。
  *
- * The returned snapshot includes xmin (lowest still-running xact ID),
- * xmax (highest completed xact ID + 1), and a list of running xact IDs
- * in the range xmin <= xid < xmax.  It is used as follows:
- *		All xact IDs < xmin are considered finished.
- *		All xact IDs >= xmax are considered still running.
- *		For an xact ID xmin <= xid < xmax, consult list to see whether
- *		it is considered running or not.
- * This ensures that the set of transactions seen as "running" by the
- * current xact will not change after it takes the snapshot.
+ * 返回的快照包含 xmin（仍然在运行的最低事务 ID）、xmax（已完成事务 ID 的
+ * 最大值 + 1），以及处于 xmin <= xid < xmax 范围内的运行中事务 ID 列表。
+ * 其使用方式如下：
+ *		XID < xmin 的所有事务 ID 都视为已结束。
+ *		XID >= xmax 的所有事务 ID 都视为仍在运行。
+ *		对于 xmin <= xid < xmax 的事务 ID，查询该列表来确定它是否被视为
+ *		正在运行。
+ * 这样可以保证当前事务所看到的"正在运行"的事务集合在该事务取得快照之后
+ * 不会发生变化。
  *
- * All running top-level XIDs are included in the snapshot, except for lazy
- * VACUUM processes.  We also try to include running subtransaction XIDs,
- * but since PGPROC has only a limited cache area for subxact XIDs, full
- * information may not be available.  If we find any overflowed subxid arrays,
- * we have to mark the snapshot's subxid data as overflowed, and extra work
- * *may* need to be done to determine what's running (see XidInMVCCSnapshot()).
+ * 快照中包含所有正在运行的顶层 XID，但惰性 VACUUM（lazy VACUUM）进程
+ * 除外。我们也尝试包含正在运行的子事务 XID，但由于 PGPROC 中用于缓存
+ * 子事务 XID 的区域有限，可能无法获得完整信息。如果我们发现任何溢出的
+ * 子事务 xid 数组，就必须把该快照的子事务 xid 数据标记为已溢出，此时
+ * *可能*需要做额外的工作来判断哪些事务正在运行（参见
+ * XidInMVCCSnapshot()）。
  *
- * We also update the following backend-global variables:
- *		TransactionXmin: the oldest xmin of any snapshot in use in the
- *			current transaction (this is the same as MyProc->xmin).
- *		RecentXmin: the xmin computed for the most recent snapshot.  XIDs
- *			older than this are known not running any more.
+ * 我们还会更新以下后端全局变量：
+ *		TransactionXmin：当前事务中正在使用的所有快照里最老的 xmin
+ *			（与 MyProc->xmin 相同）。
+ *		RecentXmin：为最近一个快照计算出的 xmin。比它更老的 XID 已知
+ *			不再处于运行状态。
  *
- * And try to advance the bounds of GlobalVis{Shared,Catalog,Data,Temp}Rels
- * for the benefit of the GlobalVisTest* family of functions.
+ * 并尝试推进 GlobalVis{Shared,Catalog,Data,Temp}Rels 的边界，以便为
+ * GlobalVisTest* 系列函数服务。
  *
- * Note: this function should probably not be called with an argument that's
- * not statically allocated (see xip allocation below).
+ * 注意：调用本函数时，传入的参数大概不应该是不静态分配的对象（参见下面
+ * 关于 xip 分配的说明）。
  */
 Snapshot
 GetSnapshotData(Snapshot snapshot)
@@ -1490,21 +1488,20 @@ GetSnapshotData(Snapshot snapshot)
 	Assert(snapshot != NULL);
 
 	/*
-	 * Allocating space for maxProcs xids is usually overkill; numProcs would
-	 * be sufficient.  But it seems better to do the malloc while not holding
-	 * the lock, so we can't look at numProcs.  Likewise, we allocate much
-	 * more subxip storage than is probably needed.
+	 * 按 maxProcs 个 xid 来分配空间通常是过量的；用 numProcs 就足够了。
+	 * 但看起来更好的做法是在不持有锁的情况下执行 malloc，这样就无法查看
+	 * numProcs。同样地，我们分配的 subxip 存储空间也比实际可能需要的多
+	 * 得多。
 	 *
-	 * This does open a possibility for avoiding repeated malloc/free: since
-	 * maxProcs does not change at runtime, we can simply reuse the previous
-	 * xip arrays if any.  (This relies on the fact that all callers pass
-	 * static SnapshotData structs.)
+	 * 这确实带来了避免反复 malloc/free 的可能：由于 maxProcs 在运行时
+	 * 不会变化，如果之前已分配过 xip 数组，我们直接复用即可。（这一点依赖
+	 * 于所有调用者都传入静态分配的 SnapshotData 结构体。）
 	 */
 	if (snapshot->xip == NULL)
 	{
 		/*
-		 * First call for this snapshot. Snapshot is same size whether or not
-		 * we are in recovery, see later comments.
+		 * 该快照的首次调用。无论是否处于恢复过程中，快照的大小都相同，
+		 * 参见后面的注释。
 		 */
 		snapshot->xip = (TransactionId *)
 			malloc(GetMaxSnapshotXidCount() * sizeof(TransactionId));
@@ -1522,8 +1519,8 @@ GetSnapshotData(Snapshot snapshot)
 	}
 
 	/*
-	 * It is sufficient to get shared lock on ProcArrayLock, even if we are
-	 * going to set MyProc->xmin.
+	 * 即使我们打算设置 MyProc->xmin，在 ProcArrayLock 上获取共享锁
+	 * 也足够了。
 	 */
 	LWLockAcquire(ProcArrayLock, LW_SHARED);
 
@@ -1541,15 +1538,15 @@ GetSnapshotData(Snapshot snapshot)
 	oldestxid = ShmemVariableCache->oldestXid;
 	curXactCompletionCount = ShmemVariableCache->xactCompletionCount;
 
-	/* xmax is always latestCompletedXid + 1 */
+	/* xmax 始终是 latestCompletedXid + 1 */
 	xmax = XidFromFullTransactionId(latest_completed);
 	TransactionIdAdvance(xmax);
 	Assert(TransactionIdIsNormal(xmax));
 
-	/* initialize xmin calculation with xmax */
+	/* 用 xmax 初始化 xmin 的计算 */
 	xmin = xmax;
 
-	/* take own xid into account, saves a check inside the loop */
+	/* 把本事务自己的 xid 也纳入考虑，可省去循环内的一次检查 */
 	if (TransactionIdIsNormal(myxid) && NormalTransactionIdPrecedes(myxid, xmin))
 		xmin = myxid;
 
@@ -1564,51 +1561,46 @@ GetSnapshotData(Snapshot snapshot)
 		uint8	   *allStatusFlags = ProcGlobal->statusFlags;
 
 		/*
-		 * First collect set of pgxactoff/xids that need to be included in the
-		 * snapshot.
+		 * 首先收集需要包含进快照的 pgxactoff/xid 集合。
 		 */
 		for (int pgxactoff = 0; pgxactoff < numProcs; pgxactoff++)
 		{
-			/* Fetch xid just once - see GetNewTransactionId */
+			/* 只获取一次 xid —— 参见 GetNewTransactionId */
 			TransactionId xid = UINT32_ACCESS_ONCE(other_xids[pgxactoff]);
 			uint8		statusFlags;
 
 			Assert(allProcs[arrayP->pgprocnos[pgxactoff]].pgxactoff == pgxactoff);
 
 			/*
-			 * If the transaction has no XID assigned, we can skip it; it
-			 * won't have sub-XIDs either.
+			 * 如果该事务还没有被分配 XID，可以跳过它；它也不会有子 XID。
 			 */
 			if (likely(xid == InvalidTransactionId))
 				continue;
 
 			/*
-			 * We don't include our own XIDs (if any) in the snapshot. It
-			 * needs to be includeded in the xmin computation, but we did so
-			 * outside the loop.
+			 * 我们不会把本事务自己的 XID（如果有）包含进快照。它需要参与
+			 * xmin 的计算，但我们在循环之外已经做过了。
 			 */
 			if (pgxactoff == mypgxactoff)
 				continue;
 
 			/*
-			 * The only way we are able to get here with a non-normal xid is
-			 * during bootstrap - with this backend using
-			 * BootstrapTransactionId. But the above test should filter that
-			 * out.
+			 * 唯一能带着非普通（non-normal）xid 走到这里的情况是在
+			 * bootstrap 期间——此后台进程使用 BootstrapTransactionId。
+			 * 不过上面的检查应该会把它过滤掉。
 			 */
 			Assert(TransactionIdIsNormal(xid));
 
 			/*
-			 * If the XID is >= xmax, we can skip it; such transactions will
-			 * be treated as running anyway (and any sub-XIDs will also be >=
-			 * xmax).
+			 * 如果 XID >= xmax，可以跳过它；这类事务无论如何都会被当作
+			 * 正在运行（其子 XID 也将 >= xmax）。
 			 */
 			if (!NormalTransactionIdPrecedes(xid, xmax))
 				continue;
 
 			/*
-			 * Skip over backends doing logical decoding which manages xmin
-			 * separately (check below) and ones running LAZY VACUUM.
+			 * 跳过那些单独管理 xmin 的逻辑解码后端（见下文的检查）以及
+			 * 正在执行惰性 VACUUM（LAZY VACUUM）的后端。
 			 */
 			statusFlags = allStatusFlags[pgxactoff];
 			if (statusFlags & (PROC_IN_LOGICAL_DECODING | PROC_IN_VACUUM))
@@ -1617,23 +1609,20 @@ GetSnapshotData(Snapshot snapshot)
 			if (NormalTransactionIdPrecedes(xid, xmin))
 				xmin = xid;
 
-			/* Add XID to snapshot. */
+			/* 把 XID 加入快照。 */
 			xip[count++] = xid;
 
 			/*
-			 * Save subtransaction XIDs if possible (if we've already
-			 * overflowed, there's no point).  Note that the subxact XIDs must
-			 * be later than their parent, so no need to check them against
-			 * xmin.  We could filter against xmax, but it seems better not to
-			 * do that much work while holding the ProcArrayLock.
+			 * 尽可能保存子事务 XID（如果已经溢出，就没有必要了）。注意
+			 * 子事务 XID 必定晚于其父事务，因此无需拿它们与 xmin 比较。
+			 * 我们本可以用 xmax 过滤，但在持有 ProcArrayLock 期间做那么多
+			 * 工作似乎并不划算。
 			 *
-			 * The other backend can add more subxids concurrently, but cannot
-			 * remove any.  Hence it's important to fetch nxids just once.
-			 * Should be safe to use memcpy, though.  (We needn't worry about
-			 * missing any xids added concurrently, because they must postdate
-			 * xmax.)
+			 * 其他后端可以并发地添加更多子事务 xid，但无法删除任何 xid。
+			 * 因此只获取一次 nxids 很重要。不过使用 memcpy 应该是安全的。
+			 * （不必担心漏掉并发添加的 xid，因为它们必定晚于 xmax。）
 			 *
-			 * Again, our own XIDs are not included in the snapshot.
+			 * 同样地，本事务自己的 XID 不会被包含进快照。
 			 */
 			if (!suboverflowed)
 			{
@@ -1649,7 +1638,7 @@ GetSnapshotData(Snapshot snapshot)
 						int			pgprocno = pgprocnos[pgxactoff];
 						PGPROC	   *proc = &allProcs[pgprocno];
 
-						pg_read_barrier();	/* pairs with GetNewTransactionId */
+						pg_read_barrier();	/* 与 GetNewTransactionId 配对 */
 
 						memcpy(snapshot->subxip + subcount,
 							   (void *) proc->subxids.xids,
@@ -1663,16 +1652,15 @@ GetSnapshotData(Snapshot snapshot)
 
 
 	/*
-	 * Fetch into local variable while ProcArrayLock is held - the
-	 * LWLockRelease below is a barrier, ensuring this happens inside the
-	 * lock.
+	 * 在持有 ProcArrayLock 期间读取到局部变量——下面的 LWLockRelease
+	 * 是一个屏障，确保这次读取发生在锁内。
 	 */
 	if (!TransactionIdIsValid(MyProc->xmin))
 		MyProc->xmin = TransactionXmin = xmin;
 
 	LWLockRelease(ProcArrayLock);
 
-	/* maintain state for GlobalVis* */
+	/* 维护 GlobalVis* 的状态 */
 	{
 		TransactionId def_vis_xid;
 		TransactionId def_vis_xid_data;
@@ -1681,31 +1669,29 @@ GetSnapshotData(Snapshot snapshot)
 		FullTransactionId oldestfxid;
 
 		/*
-		 * Converting oldestXid is only safe when xid horizon cannot advance,
-		 * i.e. holding locks. While we don't hold the lock anymore, all the
-		 * necessary data has been gathered with lock held.
+		 * 只有在 xid 水位线（horizon）无法推进时（即持有锁时）转换
+		 * oldestXid 才是安全的。虽然我们已不再持有锁，但所有必需的数据
+		 * 都是在持锁期间收集的。
 		 */
 		oldestfxid = FullXidRelativeTo(latest_completed, oldestxid);
 
 		def_vis_xid_data = xmin;
 
 		/*
-		 * Rows in non-shared, non-catalog tables possibly could be vacuumed
-		 * if older than this xid.
+		 * 非共享、非系统表（catalog）中的行，如果比这个 xid 更老，就有可能
+		 * 被 vacuum 回收。
 		 */
 		def_vis_xid = def_vis_xid_data;
 
 		/*
-		 * Check whether there's a replication slot requiring an older catalog
-		 * xmin.
+		 * 检查是否存在要求更老 catalog xmin 的复制槽（replication slot）。
 		 */
 		def_vis_fxid = FullXidRelativeTo(latest_completed, def_vis_xid);
 		def_vis_fxid_data = FullXidRelativeTo(latest_completed, def_vis_xid_data);
 
 		/*
-		 * Check if we can increase upper bound. As a previous
-		 * GlobalVisUpdate() might have computed more aggressive values, don't
-		 * overwrite them if so.
+		 * 检查我们是否能抬高上界。由于之前的 GlobalVisUpdate() 可能已经
+		 * 算出更激进的值，如果确实如此，就不要覆盖它们。
 		 */
 		GlobalVisSharedRels.definitely_needed =
 			FullTransactionIdNewer(def_vis_fxid,
@@ -1716,7 +1702,7 @@ GetSnapshotData(Snapshot snapshot)
 		GlobalVisDataRels.definitely_needed =
 			FullTransactionIdNewer(def_vis_fxid_data,
 								   GlobalVisDataRels.definitely_needed);
-		/* See temp_oldest_nonremovable computation in ComputeXidHorizons() */
+		/* 参见 ComputeXidHorizons() 中 temp_oldest_nonremovable 的计算 */
 		if (TransactionIdIsNormal(myxid))
 			GlobalVisTempRels.definitely_needed =
 				FullXidRelativeTo(latest_completed, myxid);
@@ -1727,12 +1713,11 @@ GetSnapshotData(Snapshot snapshot)
 		}
 
 		/*
-		 * Check if we know that we can initialize or increase the lower
-		 * bound. Currently the only cheap way to do so is to use
-		 * ShmemVariableCache->oldestXid as input.
+		 * 检查我们是否知道可以初始化或抬高下界。目前唯一代价低廉的做法
+		 * 是以 ShmemVariableCache->oldestXid 作为输入。
 		 *
-		 * We should definitely be able to do better. We could e.g. put a
-		 * global lower bound value into ShmemVariableCache.
+		 * 我们肯定还能做得更好。例如可以把一个全局下界值放进
+		 * ShmemVariableCache 中。
 		 */
 		GlobalVisSharedRels.maybe_needed =
 			FullTransactionIdNewer(GlobalVisSharedRels.maybe_needed,
@@ -1743,7 +1728,7 @@ GetSnapshotData(Snapshot snapshot)
 		GlobalVisDataRels.maybe_needed =
 			FullTransactionIdNewer(GlobalVisDataRels.maybe_needed,
 								   oldestfxid);
-		/* accurate value known */
+		/* 已知精确值 */
 		GlobalVisTempRels.maybe_needed = GlobalVisTempRels.definitely_needed;
 	}
 
@@ -1760,8 +1745,8 @@ GetSnapshotData(Snapshot snapshot)
 	snapshot->curcid = GetCurrentCommandId(false);
 
 	/*
-	 * This is a new snapshot, so set both refcounts are zero, and mark it as
-	 * not copied in persistent memory.
+	 * 这是一个新快照，因此把两个引用计数都置零，并把它标记为未拷贝到
+	 * 持久内存中。
 	 */
 	snapshot->active_count = 0;
 	snapshot->regd_count = 0;

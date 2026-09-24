@@ -62,10 +62,10 @@ extern TidRangePath *create_tidrangescan_path(PlannerInfo *root,
 											  Relids required_outer);
 extern AppendPath *create_dummy_append_path(PlannerInfo *root,
 											RelOptInfo *rel);
-extern GroupResultPath *create_group_result_path(PlannerInfo *root,
+extern ResultPath *create_result_path(PlannerInfo *root,
 												 RelOptInfo *rel,
 												 PathTarget *target,
-												 List *havingqual);
+												 List *quals);
 extern MaterialPath *create_material_path(RelOptInfo *rel, Path *subpath);
 extern MemoizePath *create_memoize_path(PlannerInfo *root,
 										RelOptInfo *rel,
@@ -148,26 +148,11 @@ extern IncrementalSortPath *create_incremental_sort_path(PlannerInfo *root,
 														 Path *subpath,
 														 List *pathkeys,
 														 int presorted_keys);
-extern GroupPath *create_group_path(PlannerInfo *root,
-									RelOptInfo *rel,
-									Path *subpath,
-									List *groupClause,
-									List *qual,
-									double numGroups);
 extern UpperUniquePath *create_upper_unique_path(PlannerInfo *root,
 												 RelOptInfo *rel,
 												 Path *subpath,
 												 int numCols,
 												 double numGroups);
-extern AggPath *create_agg_path(PlannerInfo *root,
-								RelOptInfo *rel,
-								Path *subpath,
-								PathTarget *target,
-								AggStrategy aggstrategy,
-								List *groupClause,
-								List *qual,
-								const AggClauseCosts *aggcosts,
-								double numGroups);
 extern ModifyTablePath *create_modifytable_path(PlannerInfo *root,
 												RelOptInfo *rel,
 												Path *subpath,

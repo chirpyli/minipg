@@ -177,30 +177,6 @@ _equalParam(const Param *a, const Param *b)
 	return true;
 }
 
-static bool
-_equalAggref(const Aggref *a, const Aggref *b)
-{
-	COMPARE_SCALAR_FIELD(aggfnoid);
-	COMPARE_SCALAR_FIELD(aggtype);
-	COMPARE_SCALAR_FIELD(aggcollid);
-	COMPARE_SCALAR_FIELD(inputcollid);
-	/* ignore aggtranstype since it might not be set yet */
-	COMPARE_NODE_FIELD(aggargtypes);
-	COMPARE_NODE_FIELD(aggdirectargs);
-	COMPARE_NODE_FIELD(args);
-	COMPARE_NODE_FIELD(aggorder);
-	COMPARE_NODE_FIELD(aggdistinct);
-	COMPARE_SCALAR_FIELD(aggstar);
-	COMPARE_SCALAR_FIELD(aggvariadic);
-	COMPARE_SCALAR_FIELD(aggkind);
-	COMPARE_SCALAR_FIELD(agglevelsup);
-	COMPARE_SCALAR_FIELD(aggno);
-	COMPARE_SCALAR_FIELD(aggtransno);
-	COMPARE_LOCATION_FIELD(location);
-
-	return true;
-}
-
 
 static bool
 _equalSubscriptingRef(const SubscriptingRef *a, const SubscriptingRef *b)
@@ -674,7 +650,6 @@ _equalSpecialJoinInfo(const SpecialJoinInfo *a, const SpecialJoinInfo *b)
 	COMPARE_SCALAR_FIELD(lhs_strict);
 	COMPARE_SCALAR_FIELD(delay_upper_joins);
 	COMPARE_SCALAR_FIELD(semi_can_btree);
-	COMPARE_SCALAR_FIELD(semi_can_hash);
 	COMPARE_NODE_FIELD(semi_operators);
 	COMPARE_NODE_FIELD(semi_rhs_exprs);
 
@@ -722,14 +697,11 @@ _equalQuery(const Query *a, const Query *b)
 	COMPARE_SCALAR_FIELD(canSetTag);
 	COMPARE_NODE_FIELD(utilityStmt);
 	COMPARE_SCALAR_FIELD(resultRelation);
-	COMPARE_SCALAR_FIELD(hasAggs);
 	COMPARE_SCALAR_FIELD(hasTargetSRFs);
 	COMPARE_SCALAR_FIELD(hasSubLinks);
 	COMPARE_NODE_FIELD(rtable);
 	COMPARE_NODE_FIELD(jointree);
 	COMPARE_NODE_FIELD(targetList);
-	COMPARE_NODE_FIELD(groupClause);
-	COMPARE_NODE_FIELD(havingQual);
 	COMPARE_NODE_FIELD(distinctClause);
 	COMPARE_NODE_FIELD(sortClause);
 	COMPARE_NODE_FIELD(constraintDeps);
@@ -787,8 +759,6 @@ _equalSelectStmt(const SelectStmt *a, const SelectStmt *b)
 	COMPARE_NODE_FIELD(targetList);
 	COMPARE_NODE_FIELD(fromClause);
 	COMPARE_NODE_FIELD(whereClause);
-	COMPARE_NODE_FIELD(groupClause);
-	COMPARE_NODE_FIELD(havingClause);
 	COMPARE_NODE_FIELD(valuesLists);
 	COMPARE_NODE_FIELD(sortClause);
 
@@ -1048,10 +1018,6 @@ _equalFuncCall(const FuncCall *a, const FuncCall *b)
 {
 	COMPARE_NODE_FIELD(funcname);
 	COMPARE_NODE_FIELD(args);
-	COMPARE_NODE_FIELD(agg_order);
-	COMPARE_SCALAR_FIELD(agg_within_group);
-	COMPARE_SCALAR_FIELD(agg_star);
-	COMPARE_SCALAR_FIELD(agg_distinct);
 	COMPARE_COERCIONFORM_FIELD(funcformat);
 	COMPARE_LOCATION_FIELD(location);
 
@@ -1392,9 +1358,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_Param:
 			retval = _equalParam(a, b);
-			break;
-		case T_Aggref:
-			retval = _equalAggref(a, b);
 			break;
 		case T_SubscriptingRef:
 			retval = _equalSubscriptingRef(a, b);

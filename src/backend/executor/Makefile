@@ -27,12 +27,10 @@ OBJS = \
 	execUtils.o \
 	functions.o \
 	instrument.o \
-	nodeAgg.o \
 	nodeBitmapAnd.o \
 	nodeBitmapHeapscan.o \
 	nodeBitmapIndexscan.o \
 	nodeBitmapOr.o \
-	nodeGroup.o \
 	nodeHash.o \
 	nodeHashjoin.o \
 	nodeIncrementalSort.o \

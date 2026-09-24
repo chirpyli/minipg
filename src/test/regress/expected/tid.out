@@ -1,19 +1,6 @@
 -- tests for functions related to TID handling
 CREATE TABLE tid_tab (a int);
--- min() and max() for TIDs
 INSERT INTO tid_tab VALUES (1), (2);
-SELECT min(ctid) FROM tid_tab;
-  min  
--------
- (0,1)
-(1 row)
-
-SELECT max(ctid) FROM tid_tab;
-  max  
--------
- (0,2)
-(1 row)
-
 TRUNCATE tid_tab;
 -- Tests for currtid2() with various relation kinds
 -- minipg: SEQUENCE 已裁剪，currtid2() 的序列分支无法测试，移除

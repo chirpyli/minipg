@@ -973,24 +973,24 @@ create_dummy_append_path(PlannerInfo *root, RelOptInfo *rel)
 }
 
 /*
- * create_group_result_path
+ * create_result_path
  *	  Creates a path representing a Result-and-nothing-else plan.
  *
- * This is only used for degenerate grouping cases, in which we know we
- * need to produce one result row, possibly filtered by a HAVING qual.
+ * This is used for a FROM-less SELECT, where the single RTE_RESULT relation
+ * supplies the quals.
  */
-GroupResultPath *
-create_group_result_path(PlannerInfo *root, RelOptInfo *rel,
-						 PathTarget *target, List *havingqual)
+ResultPath *
+create_result_path(PlannerInfo *root, RelOptInfo *rel,
+						 PathTarget *target, List *quals)
 {
-	GroupResultPath *pathnode = makeNode(GroupResultPath);
+	ResultPath *pathnode = makeNode(ResultPath);
 
 	pathnode->path.pathtype = T_Result;
 	pathnode->path.parent = rel;
 	pathnode->path.pathtarget = target;
 	pathnode->path.param_info = NULL;	/* there are no other rels... */
 	pathnode->path.pathkeys = NIL;
-	pathnode->quals = havingqual;
+	pathnode->quals = quals;
 
 	/*
 	 * We can't quite use cost_resultscan() because the quals we want to
@@ -1006,12 +1006,12 @@ create_group_result_path(PlannerInfo *root, RelOptInfo *rel,
 	 * Add cost of qual, if any --- but we ignore its selectivity, since our
 	 * rowcount estimate should be 1 no matter what the qual is.
 	 */
-	if (havingqual)
+	if (quals)
 	{
 		QualCost	qual_cost;
 
-		cost_qual_eval(&qual_cost, havingqual, root);
-		/* havingqual is evaluated once at startup */
+		cost_qual_eval(&qual_cost, quals, root);
+		/* quals are evaluated once at startup */
 		pathnode->path.startup_cost += qual_cost.startup + qual_cost.per_tuple;
 		pathnode->path.total_cost += qual_cost.startup + qual_cost.per_tuple;
 	}
@@ -1110,7 +1110,6 @@ create_unique_path(PlannerInfo *root, RelOptInfo *rel, Path *subpath,
 {
 	UniquePath *pathnode;
 	Path		sort_path;		/* dummy for result of cost_sort */
-	Path		agg_path;		/* dummy for result of cost_agg */
 	MemoryContext oldcontext;
 	int			numCols;
 
@@ -1126,7 +1125,7 @@ create_unique_path(PlannerInfo *root, RelOptInfo *rel, Path *subpath,
 		return (UniquePath *) rel->cheapest_unique_path;
 
 	/* If it's not possible to unique-ify, return NULL */
-	if (!(sjinfo->semi_can_btree || sjinfo->semi_can_hash))
+	if (!sjinfo->semi_can_btree)
 		return NULL;
 
 	/*
@@ -1236,82 +1235,26 @@ create_unique_path(PlannerInfo *root, RelOptInfo *rel, Path *subpath,
 											  NULL);
 	numCols = list_length(sjinfo->semi_rhs_exprs);
 
-	if (sjinfo->semi_can_btree)
-	{
-		/*
-		 * Estimate cost for sort+unique implementation
-		 */
-		cost_sort(&sort_path, root, NIL,
-				  subpath->total_cost,
-				  rel->rows,
-				  subpath->pathtarget->width,
-				  0.0,
-				  work_mem);
+	/*
+	 * Estimate cost for sort+unique implementation
+	 */
+	cost_sort(&sort_path, root, NIL,
+			  subpath->total_cost,
+			  rel->rows,
+			  subpath->pathtarget->width,
+			  0.0,
+			  work_mem);
 
-		/*
-		 * Charge one cpu_operator_cost per comparison per input tuple. We
-		 * assume all columns get compared at most of the tuples. (XXX
-		 * probably this is an overestimate.)  This should agree with
-		 * create_upper_unique_path.
-		 */
-		sort_path.total_cost += cpu_operator_cost * rel->rows * numCols;
-	}
+	/*
+	 * Charge one cpu_operator_cost per comparison per input tuple. We assume
+	 * all columns get compared at most of the tuples. (XXX probably this is
+	 * an overestimate.)  This should agree with create_upper_unique_path.
+	 */
+	sort_path.total_cost += cpu_operator_cost * rel->rows * numCols;
 
-	if (sjinfo->semi_can_hash)
-	{
-		/*
-		 * Estimate the overhead per hashtable entry at 64 bytes (same as in
-		 * planner.c).
-		 */
-		int			hashentrysize = subpath->pathtarget->width + 64;
-
-		if (hashentrysize * pathnode->path.rows > get_hash_memory_limit())
-		{
-			/*
-			 * We should not try to hash.  Hack the SpecialJoinInfo to
-			 * remember this, in case we come through here again.
-			 */
-			sjinfo->semi_can_hash = false;
-		}
-		else
-			cost_agg(&agg_path, root,
-					 AGG_HASHED, NULL,
-					 numCols, pathnode->path.rows,
-					 NIL,
-					 subpath->startup_cost,
-					 subpath->total_cost,
-					 rel->rows,
-					 subpath->pathtarget->width);
-	}
-
-	if (sjinfo->semi_can_btree && sjinfo->semi_can_hash)
-	{
-		if (agg_path.total_cost < sort_path.total_cost)
-			pathnode->umethod = UNIQUE_PATH_HASH;
-		else
-			pathnode->umethod = UNIQUE_PATH_SORT;
-	}
-	else if (sjinfo->semi_can_btree)
-		pathnode->umethod = UNIQUE_PATH_SORT;
-	else if (sjinfo->semi_can_hash)
-		pathnode->umethod = UNIQUE_PATH_HASH;
-	else
-	{
-		/* we can get here only if we abandoned hashing above */
-		MemoryContextSwitchTo(oldcontext);
-		return NULL;
-	}
-
-	if (pathnode->umethod == UNIQUE_PATH_HASH)
-	{
-		pathnode->path.startup_cost = agg_path.startup_cost;
-		pathnode->path.total_cost = agg_path.total_cost;
-	}
-	else
-	{
-		pathnode->path.startup_cost = sort_path.startup_cost;
-		pathnode->path.total_cost = sort_path.total_cost;
-	}
+	pathnode->umethod = UNIQUE_PATH_SORT;
+	pathnode->path.startup_cost = sort_path.startup_cost;
+	pathnode->path.total_cost = sort_path.total_cost;
 
 	rel->cheapest_unique_path = (Path *) pathnode;
 
@@ -1966,56 +1909,6 @@ create_sort_path(PlannerInfo *root,
 }
 
 /*
- * create_group_path
- *	  Creates a pathnode that represents performing grouping of presorted input
- *
- * 'rel' is the parent relation associated with the result
- * 'subpath' is the path representing the source of data
- * 'target' is the PathTarget to be computed
- * 'groupClause' is a list of SortGroupClause's representing the grouping
- * 'qual' is the HAVING quals if any
- * 'numGroups' is the estimated number of groups
- */
-GroupPath *
-create_group_path(PlannerInfo *root,
-				  RelOptInfo *rel,
-				  Path *subpath,
-				  List *groupClause,
-				  List *qual,
-				  double numGroups)
-{
-	GroupPath  *pathnode = makeNode(GroupPath);
-	PathTarget *target = rel->reltarget;
-
-	pathnode->path.pathtype = T_Group;
-	pathnode->path.parent = rel;
-	pathnode->path.pathtarget = target;
-	/* For now, assume we are above any joins, so no parameterization */
-	pathnode->path.param_info = NULL;
-	/* Group doesn't change sort ordering */
-	pathnode->path.pathkeys = subpath->pathkeys;
-
-	pathnode->subpath = subpath;
-
-	pathnode->groupClause = groupClause;
-	pathnode->qual = qual;
-
-	cost_group(&pathnode->path, root,
-			   list_length(groupClause),
-			   numGroups,
-			   qual,
-			   subpath->startup_cost, subpath->total_cost,
-			   subpath->rows);
-
-	/* add tlist eval cost for each output row */
-	pathnode->path.startup_cost += target->cost.startup;
-	pathnode->path.total_cost += target->cost.startup +
-		target->cost.per_tuple * pathnode->path.rows;
-
-	return pathnode;
-}
-
-/*
  * create_upper_unique_path
  *	  Creates a pathnode that represents performing an explicit Unique step
  *	  on presorted input.
@@ -2061,64 +1954,6 @@ create_upper_unique_path(PlannerInfo *root,
 	pathnode->path.total_cost = subpath->total_cost +
 		cpu_operator_cost * subpath->rows * numCols;
 	pathnode->path.rows = numGroups;
-
-	return pathnode;
-}
-
-/*
- * create_agg_path
- *	  Creates a pathnode that represents performing aggregation/grouping
- *
- * 'rel' is the parent relation associated with the result
- * 'subpath' is the path representing the source of data
- * 'target' is the PathTarget to be computed
- * 'aggstrategy' is the Agg node's basic implementation strategy
- * 'groupClause' is a list of SortGroupClause's representing the grouping
- * 'qual' is the HAVING quals if any
- * 'aggcosts' contains cost info about the aggregate functions to be computed
- * 'numGroups' is the estimated number of groups (1 if not grouping)
- */
-AggPath *
-create_agg_path(PlannerInfo *root,
-				RelOptInfo *rel,
-				Path *subpath,
-				PathTarget *target,
-				AggStrategy aggstrategy,
-				List *groupClause,
-				List *qual,
-				const AggClauseCosts *aggcosts,
-				double numGroups)
-{
-	AggPath    *pathnode = makeNode(AggPath);
-
-	pathnode->path.pathtype = T_Agg;
-	pathnode->path.parent = rel;
-	pathnode->path.pathtarget = target;
-	/* For now, assume we are above any joins, so no parameterization */
-	pathnode->path.param_info = NULL;
-	if (aggstrategy == AGG_SORTED)
-		pathnode->path.pathkeys = subpath->pathkeys;	/* preserves order */
-	else
-		pathnode->path.pathkeys = NIL;	/* output is unordered */
-	pathnode->subpath = subpath;
-
-	pathnode->aggstrategy = aggstrategy;
-	pathnode->numGroups = numGroups;
-	pathnode->transitionSpace = aggcosts ? aggcosts->transitionSpace : 0;
-	pathnode->groupClause = groupClause;
-	pathnode->qual = qual;
-
-	cost_agg(&pathnode->path, root,
-			 aggstrategy, aggcosts,
-			 list_length(groupClause), numGroups,
-			 qual,
-			 subpath->startup_cost, subpath->total_cost,
-			 subpath->rows, subpath->pathtarget->width);
-
-	/* add tlist eval cost for each output row */
-	pathnode->path.startup_cost += target->cost.startup;
-	pathnode->path.total_cost += target->cost.startup +
-		target->cost.per_tuple * pathnode->path.rows;
 
 	return pathnode;
 }

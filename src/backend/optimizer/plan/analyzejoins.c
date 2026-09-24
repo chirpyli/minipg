@@ -757,10 +757,7 @@ query_supports_distinctness(Query *query)
 		return false;
 
 	/* check for features we can prove distinctness with */
-	if (query->distinctClause != NIL ||
-		query->groupClause != NIL ||
-		query->hasAggs ||
-		query->havingQual)
+	if (query->distinctClause != NIL)
 		return true;
 
 	return false;
@@ -859,47 +856,11 @@ query_is_distinct_for_with_collations(Query *query, List *distinct_cols)
 
 	/*
 	 * Otherwise, a set-returning function in the query's targetlist can
-	 * result in returning duplicate rows, despite any grouping that might
-	 * occur before tlist evaluation.  (If all tlist SRFs are within GROUP BY
-	 * columns, it would be safe because they'd be expanded before grouping.
-	 * But it doesn't currently seem worth the effort to check for that.)
+	 * result in returning duplicate rows, despite any distinctness that might
+	 * occur before tlist evaluation.
 	 */
 	if (query->hasTargetSRFs)
 		return false;
-
-	/*
-	 * Similarly, GROUP BY without GROUPING SETS guarantees uniqueness if all
-	 * the grouped columns appear in colnos and operator semantics match.
-	 */
-	if (query->groupClause)
-	{
-		foreach(l, query->groupClause)
-		{
-			SortGroupClause *sgc = (SortGroupClause *) lfirst(l);
-			TargetEntry *tle = get_sortgroupclause_tle(sgc,
-													   query->targetList);
-
-			dcinfo = distinct_col_search(tle->resno, distinct_cols);
-			if (dcinfo == NULL ||
-				!equality_ops_are_compatible(dcinfo->opid, sgc->eqop) ||
-				!collations_agree_on_equality(dcinfo->collid,
-											  exprCollation((Node *) tle->expr)))
-				break;			/* exit early if no match */
-		}
-		if (l == NULL)			/* had matches for all? */
-			return true;
-	}
-
-	else
-	{
-		/*
-		 * If we have no GROUP BY, but do have aggregates or HAVING, then the
-		 * result is at most one row so it's surely unique, for any operators.
-		 */
-		if (query->hasAggs || query->havingQual)
-			return true;
-	}
-
 
 	/*
 	 * XXX Are there any other cases in which we can easily see the result

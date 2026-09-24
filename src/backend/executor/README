@@ -14,7 +14,7 @@ Refinements on this basic model include:
 
 * Choice of scan direction (forwards or backwards).  Caution: this is not
 currently well-supported.  It works for primitive scan nodes, but not very
-well for joins, aggregates, etc.
+well for joins, etc.
 
 * Rescan command to reset a node and make it generate its output sequence
 over again.
@@ -282,7 +282,7 @@ the plan state tree to find these sorts of resources.
 
 
 The executor can also be used to evaluate simple expressions without any Plan
-tree ("simple" meaning "no aggregates and no sub-selects", though such might
+tree ("simple" meaning "no sub-selects", though such might
 be hidden inside function calls).  This case has a flow of control like
 
 	CreateExecutorState

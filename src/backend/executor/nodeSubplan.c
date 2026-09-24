@@ -957,7 +957,7 @@ ExecInitSubPlan(SubPlan *subplan, PlanState *parent)
  * context is used to evaluate any parameters passed down to the subplan.
  * (Thus in principle, the shorter-lived the ExprContext the better, since
  * that data isn't needed after we return.  In practice, because initplan
- * parameters are never more complex than Vars, Aggrefs, etc, evaluating them
+ * parameters are never more complex than Vars, Params, etc, evaluating them
  * currently never leaks any memory anyway.)
  * ----------------------------------------------------------------
  */

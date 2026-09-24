@@ -252,7 +252,7 @@ sub ParseData
 
 			# Quick hack to detect when we have a full hash ref to
 			# parse. We can't just use a regex because of values in
-			# pg_aggregate and pg_proc like '{0,0}'.  This will need
+			# pg_proc like '{0,0}'.  This will need
 			# work if we ever need to allow unbalanced braces within
 			# a field value.
 			my $lcnt = tr/{//;

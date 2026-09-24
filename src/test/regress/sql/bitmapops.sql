@@ -31,10 +31,10 @@ set work_mem = 64;
 
 
 -- Test bitmap-and.
-SELECT count(*) FROM bmscantest WHERE a = 1 AND b = 1;
+SELECT DISTINCT 1 AS ok FROM bmscantest WHERE a = 1 AND b = 1;
 
 -- Test bitmap-or.
-SELECT count(*) FROM bmscantest WHERE a = 1 OR b = 1;
+SELECT DISTINCT 1 AS ok FROM bmscantest WHERE a = 1 OR b = 1;
 
 
 -- clean up

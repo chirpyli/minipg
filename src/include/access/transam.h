@@ -18,21 +18,20 @@
 
 
 /* ----------------
- *		Special transaction ID values
+ *		特殊事务 ID 取值
  *
- * BootstrapTransactionId is the XID for "bootstrap" operations, and
- * FrozenTransactionId is used for very old tuples.  Both should
- * always be considered valid.
+ * BootstrapTransactionId 是用于 "bootstrap" 操作的 XID，
+ * FrozenTransactionId 用于非常老的元组。两者都应始终被视为有效。
  *
- * FirstNormalTransactionId is the first "normal" transaction id.
- * Note: if you need to change it, you must change pg_class.h as well.
+ * FirstNormalTransactionId 是第一个"普通"（normal）事务 ID。
+ * 注意：如果需要修改它，必须同时修改 pg_class.h。
  * ----------------
  */
 #define InvalidTransactionId		((TransactionId) 0)
 #define BootstrapTransactionId		((TransactionId) 1)
 #define FrozenTransactionId			((TransactionId) 2)
 #define FirstNormalTransactionId	((TransactionId) 3)
-#define MaxTransactionId			((TransactionId) 0xFFFFFFFF)
+#define MaxTransactionId			((TransactionId) 0xFFFFFFFF)   // 采用32位事务ID
 
 /* ----------------
  *		transaction ID manipulation macros
@@ -58,9 +57,9 @@
 #define FullTransactionIdIsNormal(x)	FullTransactionIdFollowsOrEquals(x, FirstNormalFullTransactionId)
 
 /*
- * A 64 bit value that contains an epoch and a TransactionId.  This is
- * wrapped in a struct to prevent implicit conversion to/from TransactionId.
- * Not all values represent valid normal XIDs.
+ * 一个包含 epoch 和 TransactionId 的 64 位值。它被封装在结构体中，
+ * 以防止与 TransactionId 之间发生隐式转换。
+ * 并非所有取值都表示有效的普通 XID。
  */
 typedef struct FullTransactionId
 {
@@ -154,37 +153,32 @@ FullTransactionIdAdvance(FullTransactionId *dest)
 	(int32) ((id1) - (id2)) > 0)
 
 /* ----------
- *		Object ID (OID) zero is InvalidOid.
+ *		对象 ID（OID）取值为零时是 InvalidOid。
  *
- *		OIDs 1-9999 are reserved for manual assignment (see .dat files in
- *		src/include/catalog/).  Of these, 8000-9999 are reserved for
- *		development purposes (such as in-progress patches and forks);
- *		they should not appear in released versions.
+ *		OID 1-9999 预留给手工分配（参见 src/include/catalog/ 下的 .dat
+ *		文件）。其中 8000-9999 预留给开发用途（例如正在开发的补丁和
+ *		分支）；它们不应该出现在正式发布的版本中。
  *
- *		OIDs 10000-11999 are reserved for assignment by genbki.pl, for use
- *		when the .dat files in src/include/catalog/ do not specify an OID
- *		for a catalog entry that requires one.  Note that genbki.pl assigns
- *		these OIDs independently in each catalog, so they're not guaranteed
- *		to be globally unique.
+ *		OID 10000-11999 预留给 genbki.pl 分配，用于 src/include/catalog/
+ *		下的 .dat 文件没有为某个需要 OID 的系统表条目指定 OID 的情况。
+ *		注意 genbki.pl 是在每个系统表中独立分配这些 OID 的，因此不能
+ *		保证它们全局唯一。
  *
- *		OIDS 12000-16383 are reserved for assignment during initdb
- *		using the OID generator.  (We start the generator at 12000.)
+ *		OID 12000-16383 预留给 initdb 期间使用 OID 生成器进行分配。
+ *		（我们把生成器的起点设为 12000。）
  *
- *		OIDs beginning at 16384 are assigned from the OID generator
- *		during normal multiuser operation.  (We force the generator up to
- *		16384 as soon as we are in normal operation.)
+ *		从 16384 开始的 OID 在正常的多用户运行期间由 OID 生成器分配。
+ *		（一旦进入正常运行状态，我们就把生成器强制推进到 16384。）
  *
- * The choices of 8000, 10000 and 12000 are completely arbitrary, and can be
- * moved if we run low on OIDs in any category.  Changing the macros below,
- * and updating relevant documentation (see bki.sgml and RELEASE_CHANGES),
- * should be sufficient to do this.  Moving the 16384 boundary between
- * initdb-assigned OIDs and user-defined objects would be substantially
- * more painful, however, since some user-defined OIDs will appear in
- * on-disk data; such a change would probably break pg_upgrade.
+ * 8000、10000 和 12000 这几个分界值完全是任意选取的，如果在某个类别中
+ * OID 即将用尽，可以调整它们。为此只需修改下面的宏，并更新相关文档
+ * （参见 bki.sgml 和 RELEASE_CHANGES）即可。不过，移动 initdb 分配的
+ * OID 与用户自定义对象之间 16384 这个分界会麻烦得多，因为某些用户自定义
+ * OID 会出现在磁盘数据中；这样的改动很可能会导致 pg_upgrade 失败。
  *
- * NOTE: if the OID generator wraps around, we skip over OIDs 0-16383
- * and resume with 16384.  This minimizes the odds of OID conflict, by not
- * reassigning OIDs that might have been assigned during initdb.
+ * 注意：如果 OID 生成器发生回绕，我们会跳过 OID 0-16383，从 16384 继续
+ * 分配。这样可以避免重新分配那些可能在 initdb 期间已被分配的 OID，
+ * 从而把 OID 冲突的可能性降到最低。
  * ----------
  */
 #define FirstGenbkiObjectId		10000
@@ -192,14 +186,11 @@ FullTransactionIdAdvance(FullTransactionId *dest)
 #define FirstNormalObjectId		16384
 
 /*
- * VariableCache is a data structure in shared memory that is used to track
- * OID and XID assignment state.  For largely historical reasons, there is
- * just one struct with different fields that are protected by different
- * LWLocks.
+ * VariableCache 是共享内存中的一种数据结构，用于跟踪 OID 和 XID 的分配状态。
+ * 主要出于历史原因，这里只用了一个结构体，其不同字段由不同的 LWLock 保护。
  *
- * Note: xidWrapLimit and oldestXidDB are not "active" values, but are
- * used just to generate useful messages when xidWarnLimit or xidStopLimit
- * are exceeded.
+ * 注意：xidWrapLimit 和 oldestXidDB 并不是"活跃"的取值，它们只是用来在
+ * xidWarnLimit 或 xidStopLimit 被超过时生成有用的提示信息。
  */
 typedef struct VariableCacheData
 {

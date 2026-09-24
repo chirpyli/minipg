@@ -1,7 +1,7 @@
 --
 -- OPR_SANITY
 -- Sanity checks for common errors in making operator/procedure system tables:
--- pg_operator, pg_proc, pg_cast, pg_aggregate, pg_am,
+-- pg_operator, pg_proc, pg_cast, pg_am,
 -- pg_amop, pg_amproc, pg_opclass, pg_opfamily, pg_index.
 --
 -- Every test failure in this file should be closely inspected.
@@ -81,7 +81,6 @@ FROM pg_proc AS p1, pg_proc AS p2
 WHERE p1.oid < p2.oid AND
     p1.prosrc = p2.prosrc AND
     p1.prolang = 12 AND p2.prolang = 12 AND
-    (p1.prokind != 'a' OR p2.prokind != 'a') AND
     (p1.prolang != p2.prolang OR
      p1.prokind != p2.prokind OR
      p1.proleakproof != p2.proleakproof OR
@@ -107,7 +106,6 @@ FROM pg_proc AS p1, pg_proc AS p2
 WHERE p1.oid != p2.oid AND
     p1.prosrc = p2.prosrc AND
     p1.prolang = 12 AND p2.prolang = 12 AND
-    p1.prokind != 'a' AND p2.prokind != 'a' AND
     (p1.prorettype < p2.prorettype)
 ORDER BY 1, 2;
 
@@ -116,7 +114,6 @@ FROM pg_proc AS p1, pg_proc AS p2
 WHERE p1.oid != p2.oid AND
     p1.prosrc = p2.prosrc AND
     p1.prolang = 12 AND p2.prolang = 12 AND
-    p1.prokind != 'a' AND p2.prokind != 'a' AND
     (p1.proargtypes[0] < p2.proargtypes[0])
 ORDER BY 1, 2;
 
@@ -125,7 +122,6 @@ FROM pg_proc AS p1, pg_proc AS p2
 WHERE p1.oid != p2.oid AND
     p1.prosrc = p2.prosrc AND
     p1.prolang = 12 AND p2.prolang = 12 AND
-    p1.prokind != 'a' AND p2.prokind != 'a' AND
     (p1.proargtypes[1] < p2.proargtypes[1])
 ORDER BY 1, 2;
 
@@ -134,7 +130,6 @@ FROM pg_proc AS p1, pg_proc AS p2
 WHERE p1.oid != p2.oid AND
     p1.prosrc = p2.prosrc AND
     p1.prolang = 12 AND p2.prolang = 12 AND
-    p1.prokind != 'a' AND p2.prokind != 'a' AND
     (p1.proargtypes[2] < p2.proargtypes[2])
 ORDER BY 1, 2;
 
@@ -143,7 +138,6 @@ FROM pg_proc AS p1, pg_proc AS p2
 WHERE p1.oid != p2.oid AND
     p1.prosrc = p2.prosrc AND
     p1.prolang = 12 AND p2.prolang = 12 AND
-    p1.prokind != 'a' AND p2.prokind != 'a' AND
     (p1.proargtypes[3] < p2.proargtypes[3])
 ORDER BY 1, 2;
 
@@ -152,7 +146,6 @@ FROM pg_proc AS p1, pg_proc AS p2
 WHERE p1.oid != p2.oid AND
     p1.prosrc = p2.prosrc AND
     p1.prolang = 12 AND p2.prolang = 12 AND
-    p1.prokind != 'a' AND p2.prokind != 'a' AND
     (p1.proargtypes[4] < p2.proargtypes[4])
 ORDER BY 1, 2;
 
@@ -161,7 +154,6 @@ FROM pg_proc AS p1, pg_proc AS p2
 WHERE p1.oid != p2.oid AND
     p1.prosrc = p2.prosrc AND
     p1.prolang = 12 AND p2.prolang = 12 AND
-    p1.prokind != 'a' AND p2.prokind != 'a' AND
     (p1.proargtypes[5] < p2.proargtypes[5])
 ORDER BY 1, 2;
 
@@ -170,7 +162,6 @@ FROM pg_proc AS p1, pg_proc AS p2
 WHERE p1.oid != p2.oid AND
     p1.prosrc = p2.prosrc AND
     p1.prolang = 12 AND p2.prolang = 12 AND
-    p1.prokind != 'a' AND p2.prokind != 'a' AND
     (p1.proargtypes[6] < p2.proargtypes[6])
 ORDER BY 1, 2;
 
@@ -179,7 +170,6 @@ FROM pg_proc AS p1, pg_proc AS p2
 WHERE p1.oid != p2.oid AND
     p1.prosrc = p2.prosrc AND
     p1.prolang = 12 AND p2.prolang = 12 AND
-    p1.prokind != 'a' AND p2.prokind != 'a' AND
     (p1.proargtypes[7] < p2.proargtypes[7])
 ORDER BY 1, 2;
 
@@ -284,14 +274,7 @@ FROM pg_proc as p1
 WHERE proargmodes IS NOT NULL AND proargnames IS NOT NULL AND
     array_length(proargmodes,1) <> array_length(proargnames,1);
 
--- Check that proallargtypes matches proargtypes
-SELECT p1.oid, p1.proname, p1.proargtypes, p1.proallargtypes, p1.proargmodes
-FROM pg_proc as p1
-WHERE proallargtypes IS NOT NULL AND
-  (SELECT COALESCE(array_agg(u), '{}'::oid[]) FROM (SELECT unnest(proargtypes) AS u) AS _gsu) <>
-  (SELECT COALESCE(array_agg(proallargtypes[i]), '{}'::oid[])
-        FROM (SELECT generate_series(1, array_length(proallargtypes, 1)) AS i) AS g
-        WHERE proargmodes IS NULL OR proargmodes[i] IN ('i', 'b', 'v'));
+-- minipg: array_agg 已裁剪，proallargtypes/proargmodes 一致性检查移除
 
 -- Check for prosupport functions with the wrong signature
 SELECT p1.oid, p1.proname, p2.oid, p2.proname
@@ -643,156 +626,6 @@ WHERE pp.oid = ap.amproc AND po.oid = o.oprcode AND o.oid = ao.amopopr AND
     (pp.provolatile != po.provolatile OR
      pp.proleakproof != po.proleakproof)
 ORDER BY 1;
-
-
--- **************** pg_aggregate ****************
-
--- Look for illegal values in pg_aggregate fields.
-
-SELECT ctid, aggfnoid::oid
-FROM pg_aggregate as p1
-WHERE aggfnoid = 0 OR aggtransfn = 0 OR
-    aggkind NOT IN ('n', 'o', 'h') OR
-    aggfinalmodify NOT IN ('r', 's', 'w') OR
-    aggtranstype = 0 OR aggtransspace < 0;
-
--- Make sure the matching pg_proc entry is sensible, too.
-
-SELECT a.aggfnoid::oid, p.proname
-FROM pg_aggregate as a, pg_proc as p
-WHERE a.aggfnoid = p.oid AND
-    (p.prokind != 'a' OR p.proretset);
-
--- Make sure there are no prokind = PROKIND_AGGREGATE pg_proc entries without matches.
-
-SELECT oid, proname
-FROM pg_proc as p
-WHERE p.prokind = 'a' AND
-    NOT EXISTS (SELECT 1 FROM pg_aggregate a WHERE a.aggfnoid = p.oid);
-
--- If there is no finalfn then the output type must be the transtype.
-
-SELECT a.aggfnoid::oid, p.proname
-FROM pg_aggregate as a, pg_proc as p
-WHERE a.aggfnoid = p.oid AND
-    a.aggfinalfn = 0 AND p.prorettype != a.aggtranstype;
-
--- minipg: binary_coercible() 已裁剪，transfn / finalfn / combinefn 与
--- pg_proc 的二进制强制签名一致性检查整节移除
-
--- Check that no combine function for an INTERNAL transtype is strict.
-
-SELECT a.aggfnoid, p.proname
-FROM pg_aggregate as a, pg_proc as p
-WHERE a.aggcombinefn = p.oid AND
-    a.aggtranstype = 'internal'::regtype AND p.proisstrict;
-
--- serialize/deserialize functions should be specified only for aggregates
--- with transtype internal and a combine function, and we should have both
--- or neither of them.
-
-SELECT aggfnoid, aggtranstype, aggserialfn, aggdeserialfn
-FROM pg_aggregate
-WHERE (aggserialfn != 0 OR aggdeserialfn != 0)
-  AND (aggtranstype != 'internal'::regtype OR aggcombinefn = 0 OR
-       aggserialfn = 0 OR aggdeserialfn = 0);
-
--- Check that all serialization functions have signature
--- serialize(internal) returns bytea
--- Also insist that they be strict; it's wasteful to run them on NULLs.
-
-SELECT a.aggfnoid, p.proname
-FROM pg_aggregate as a, pg_proc as p
-WHERE a.aggserialfn = p.oid AND
-    (p.prorettype != 'bytea'::regtype OR p.pronargs != 1 OR
-     p.proargtypes[0] != 'internal'::regtype OR
-     NOT p.proisstrict);
-
--- Check that all deserialization functions have signature
--- deserialize(bytea, internal) returns internal
--- Also insist that they be strict; it's wasteful to run them on NULLs.
-
-SELECT a.aggfnoid, p.proname
-FROM pg_aggregate as a, pg_proc as p
-WHERE a.aggdeserialfn = p.oid AND
-    (p.prorettype != 'internal'::regtype OR p.pronargs != 2 OR
-     p.proargtypes[0] != 'bytea'::regtype OR
-     p.proargtypes[1] != 'internal'::regtype OR
-     NOT p.proisstrict);
-
--- Check that aggregates which have the same transition function also have
--- the same combine, serialization, and deserialization functions.
--- While that isn't strictly necessary, it's fishy if they don't.
-
-SELECT a.aggfnoid, a.aggcombinefn, a.aggserialfn, a.aggdeserialfn,
-       b.aggfnoid, b.aggcombinefn, b.aggserialfn, b.aggdeserialfn
-FROM
-    pg_aggregate a, pg_aggregate b
-WHERE
-    a.aggfnoid < b.aggfnoid AND a.aggtransfn = b.aggtransfn AND
-    (a.aggcombinefn != b.aggcombinefn OR a.aggserialfn != b.aggserialfn
-     OR a.aggdeserialfn != b.aggdeserialfn);
-
--- Cross-check aggsortop (if present) against pg_operator.
--- We expect to find entries for max and min.
-
-SELECT DISTINCT proname, oprname
-FROM pg_operator AS o, pg_aggregate AS a, pg_proc AS p
-WHERE a.aggfnoid = p.oid AND a.aggsortop = o.oid
-ORDER BY 1, 2;
-
--- Check datatypes match
-
-SELECT a.aggfnoid::oid, o.oid
-FROM pg_operator AS o, pg_aggregate AS a, pg_proc AS p
-WHERE a.aggfnoid = p.oid AND a.aggsortop = o.oid AND
-    (oprkind != 'b' OR oprresult != 'boolean'::regtype
-     OR oprleft != p.proargtypes[0] OR oprright != p.proargtypes[0]);
-
--- Check operator is a suitable btree opfamily member
-
-SELECT a.aggfnoid::oid, o.oid
-FROM pg_operator AS o, pg_aggregate AS a, pg_proc AS p
-WHERE a.aggfnoid = p.oid AND a.aggsortop = o.oid AND
-    NOT EXISTS(SELECT 1 FROM pg_amop
-               WHERE amopmethod = (SELECT oid FROM pg_am WHERE amname = 'btree')
-                     AND amopopr = o.oid
-                     AND amoplefttype = o.oprleft
-                     AND amoprighttype = o.oprright);
-
--- Check correspondence of btree strategies and names
-
-SELECT DISTINCT proname, oprname, amopstrategy
-FROM pg_operator AS o, pg_aggregate AS a, pg_proc AS p,
-     pg_amop as ao
-WHERE a.aggfnoid = p.oid AND a.aggsortop = o.oid AND
-    amopopr = o.oid AND
-    amopmethod = (SELECT oid FROM pg_am WHERE amname = 'btree')
-ORDER BY 1, 2;
-
--- Check that there are not aggregates with the same name and different
--- numbers of arguments.  While not technically wrong, we have a project policy
--- to avoid this because it opens the door for confusion in connection with
--- ORDER BY: novices frequently put the ORDER BY in the wrong place.
--- See the fate of the single-argument form of string_agg() for history.
--- (Note: we don't forbid users from creating such aggregates; the policy is
--- just to think twice before creating built-in aggregates like this.)
--- The only aggregates that should show up here are count(x) and count(*).
-
-SELECT p1.oid::regprocedure, p2.oid::regprocedure
-FROM pg_proc AS p1, pg_proc AS p2
-WHERE p1.oid < p2.oid AND p1.proname = p2.proname AND
-    p1.prokind = 'a' AND p2.prokind = 'a' AND
-    array_dims(p1.proargtypes) != array_dims(p2.proargtypes)
-ORDER BY 1;
-
--- For the same reason, we avoid creating built-in variadic aggregates, except
--- that variadic ordered-set aggregates are OK (since they have special syntax
--- that is not subject to the misplaced ORDER BY issue).
-
-SELECT p.oid, proname
-FROM pg_proc AS p JOIN pg_aggregate AS a ON a.aggfnoid = p.oid
-WHERE prokind = 'a' AND provariadic != 0 AND a.aggkind = 'n';
 
 
 -- **************** pg_opfamily ****************

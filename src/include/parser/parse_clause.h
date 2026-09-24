@@ -22,15 +22,12 @@ extern int	setTargetTable(ParseState *pstate, RangeVar *relation,
 
 extern Node *transformWhereClause(ParseState *pstate, Node *clause,
 								  ParseExprKind exprKind, const char *constructName);
-extern List *transformGroupClause(ParseState *pstate, List *grouplist,
-								  List **targetlist, List *sortClause,
-								  ParseExprKind exprKind, bool useSQL99);
 extern List *transformSortClause(ParseState *pstate, List *orderlist,
 								 List **targetlist, ParseExprKind exprKind,
 								 bool useSQL99);
 
 extern List *transformDistinctClause(ParseState *pstate,
-									 List **targetlist, List *sortClause, bool is_agg);
+									 List **targetlist, List *sortClause);
 
 extern List *addTargetToSortList(ParseState *pstate, TargetEntry *tle,
 								 List *sortlist, List *targetlist, SortBy *sortby);

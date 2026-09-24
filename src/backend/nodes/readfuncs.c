@@ -245,14 +245,11 @@ _readQuery(void)
 	READ_BOOL_FIELD(canSetTag);
 	READ_NODE_FIELD(utilityStmt);
 	READ_INT_FIELD(resultRelation);
-	READ_BOOL_FIELD(hasAggs);
 	READ_BOOL_FIELD(hasTargetSRFs);
 	READ_BOOL_FIELD(hasSubLinks);
 	READ_NODE_FIELD(rtable);
 	READ_NODE_FIELD(jointree);
 	READ_NODE_FIELD(targetList);
-	READ_NODE_FIELD(groupClause);
-	READ_NODE_FIELD(havingQual);
 	READ_NODE_FIELD(distinctClause);
 	READ_NODE_FIELD(sortClause);
 	READ_NODE_FIELD(constraintDeps);
@@ -376,35 +373,6 @@ _readParam(void)
 	READ_OID_FIELD(paramtype);
 	READ_INT_FIELD(paramtypmod);
 	READ_OID_FIELD(paramcollid);
-	READ_LOCATION_FIELD(location);
-
-	READ_DONE();
-}
-
-/*
- * _readAggref
- */
-static Aggref *
-_readAggref(void)
-{
-	READ_LOCALS(Aggref);
-
-	READ_OID_FIELD(aggfnoid);
-	READ_OID_FIELD(aggtype);
-	READ_OID_FIELD(aggcollid);
-	READ_OID_FIELD(inputcollid);
-	READ_OID_FIELD(aggtranstype);
-	READ_NODE_FIELD(aggargtypes);
-	READ_NODE_FIELD(aggdirectargs);
-	READ_NODE_FIELD(args);
-	READ_NODE_FIELD(aggorder);
-	READ_NODE_FIELD(aggdistinct);
-	READ_BOOL_FIELD(aggstar);
-	READ_BOOL_FIELD(aggvariadic);
-	READ_CHAR_FIELD(aggkind);
-	READ_UINT_FIELD(agglevelsup);
-	READ_INT_FIELD(aggno);
-	READ_INT_FIELD(aggtransno);
 	READ_LOCATION_FIELD(location);
 
 	READ_DONE();
@@ -1511,46 +1479,6 @@ _readIncrementalSort(void)
 }
 
 /*
- * _readGroup
- */
-static Group *
-_readGroup(void)
-{
-	READ_LOCALS(Group);
-
-	ReadCommonPlan(&local_node->plan);
-
-	READ_INT_FIELD(numCols);
-	READ_ATTRNUMBER_ARRAY(grpColIdx, local_node->numCols);
-	READ_OID_ARRAY(grpOperators, local_node->numCols);
-	READ_OID_ARRAY(grpCollations, local_node->numCols);
-
-	READ_DONE();
-}
-
-/*
- * _readAgg
- */
-static Agg *
-_readAgg(void)
-{
-	READ_LOCALS(Agg);
-
-	ReadCommonPlan(&local_node->plan);
-
-	READ_ENUM_FIELD(aggstrategy, AggStrategy);
-	READ_INT_FIELD(numCols);
-	READ_ATTRNUMBER_ARRAY(grpColIdx, local_node->numCols);
-	READ_OID_ARRAY(grpOperators, local_node->numCols);
-	READ_OID_ARRAY(grpCollations, local_node->numCols);
-	READ_LONG_FIELD(numGroups);
-	READ_UINT64_FIELD(transitionSpace);
-	READ_BITMAPSET_FIELD(aggParams);
-
-	READ_DONE();
-}
-
-/*
  * _readUnique
  */
 static Unique *
@@ -1694,8 +1622,6 @@ parseNodeString(void)
 		return_value = _readConst();
 	else if (MATCH("PARAM", 5))
 		return_value = _readParam();
-	else if (MATCH("AGGREF", 6))
-		return_value = _readAggref();
 	else if (MATCH("SUBSCRIPTINGREF", 15))
 		return_value = _readSubscriptingRef();
 	else if (MATCH("FUNCEXPR", 8))
@@ -1810,10 +1736,6 @@ parseNodeString(void)
 		return_value = _readSort();
 	else if (MATCH("INCREMENTALSORT", 15))
 		return_value = _readIncrementalSort();
-	else if (MATCH("GROUP", 5))
-		return_value = _readGroup();
-	else if (MATCH("AGG", 3))
-		return_value = _readAgg();
 	else if (MATCH("UNIQUE", 6))
 		return_value = _readUnique();
 	else if (MATCH("HASH", 4))

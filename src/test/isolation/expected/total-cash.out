@@ -2,50 +2,55 @@ Parsed test spec with 2 sessions
 
 starting permutation: wx1 rxy1 c1 wy2 rxy2 c2
 step wx1: UPDATE accounts SET balance = balance - 200 WHERE accountid = 'checking';
-step rxy1: SELECT SUM(balance) FROM accounts;
- sum
-----
-1000
-(1 row)
+step rxy1: SELECT accountid, balance FROM accounts ORDER BY accountid;
+accountid|balance
+---------+-------
+checking |    400
+savings  |    600
+(2 rows)
 
 step c1: COMMIT;
 step wy2: UPDATE accounts SET balance = balance - 200 WHERE accountid = 'savings';
-step rxy2: SELECT SUM(balance) FROM accounts;
-sum
----
-800
-(1 row)
+step rxy2: SELECT accountid, balance FROM accounts ORDER BY accountid;
+accountid|balance
+---------+-------
+checking |    400
+savings  |    400
+(2 rows)
 
 step c2: COMMIT;
 
 starting permutation: wx1 rxy1 wy2 c1 rxy2 c2
 step wx1: UPDATE accounts SET balance = balance - 200 WHERE accountid = 'checking';
-step rxy1: SELECT SUM(balance) FROM accounts;
- sum
-----
-1000
-(1 row)
+step rxy1: SELECT accountid, balance FROM accounts ORDER BY accountid;
+accountid|balance
+---------+-------
+checking |    400
+savings  |    600
+(2 rows)
 
 step wy2: UPDATE accounts SET balance = balance - 200 WHERE accountid = 'savings';
 step c1: COMMIT;
-step rxy2: SELECT SUM(balance) FROM accounts;
+step rxy2: SELECT accountid, balance FROM accounts ORDER BY accountid;
 ERROR:  could not serialize access due to read/write dependencies among transactions
 step c2: COMMIT;
 
 starting permutation: wx1 rxy1 wy2 rxy2 c1 c2
 step wx1: UPDATE accounts SET balance = balance - 200 WHERE accountid = 'checking';
-step rxy1: SELECT SUM(balance) FROM accounts;
- sum
-----
-1000
-(1 row)
+step rxy1: SELECT accountid, balance FROM accounts ORDER BY accountid;
+accountid|balance
+---------+-------
+checking |    400
+savings  |    600
+(2 rows)
 
 step wy2: UPDATE accounts SET balance = balance - 200 WHERE accountid = 'savings';
-step rxy2: SELECT SUM(balance) FROM accounts;
- sum
-----
-1000
-(1 row)
+step rxy2: SELECT accountid, balance FROM accounts ORDER BY accountid;
+accountid|balance
+---------+-------
+checking |    600
+savings  |    400
+(2 rows)
 
 step c1: COMMIT;
 step c2: COMMIT;
@@ -53,18 +58,20 @@ ERROR:  could not serialize access due to read/write dependencies among transact
 
 starting permutation: wx1 rxy1 wy2 rxy2 c2 c1
 step wx1: UPDATE accounts SET balance = balance - 200 WHERE accountid = 'checking';
-step rxy1: SELECT SUM(balance) FROM accounts;
- sum
-----
-1000
-(1 row)
+step rxy1: SELECT accountid, balance FROM accounts ORDER BY accountid;
+accountid|balance
+---------+-------
+checking |    400
+savings  |    600
+(2 rows)
 
 step wy2: UPDATE accounts SET balance = balance - 200 WHERE accountid = 'savings';
-step rxy2: SELECT SUM(balance) FROM accounts;
- sum
-----
-1000
-(1 row)
+step rxy2: SELECT accountid, balance FROM accounts ORDER BY accountid;
+accountid|balance
+---------+-------
+checking |    600
+savings  |    400
+(2 rows)
 
 step c2: COMMIT;
 step c1: COMMIT;
@@ -73,31 +80,34 @@ ERROR:  could not serialize access due to read/write dependencies among transact
 starting permutation: wx1 wy2 rxy1 c1 rxy2 c2
 step wx1: UPDATE accounts SET balance = balance - 200 WHERE accountid = 'checking';
 step wy2: UPDATE accounts SET balance = balance - 200 WHERE accountid = 'savings';
-step rxy1: SELECT SUM(balance) FROM accounts;
- sum
-----
-1000
-(1 row)
+step rxy1: SELECT accountid, balance FROM accounts ORDER BY accountid;
+accountid|balance
+---------+-------
+checking |    400
+savings  |    600
+(2 rows)
 
 step c1: COMMIT;
-step rxy2: SELECT SUM(balance) FROM accounts;
+step rxy2: SELECT accountid, balance FROM accounts ORDER BY accountid;
 ERROR:  could not serialize access due to read/write dependencies among transactions
 step c2: COMMIT;
 
 starting permutation: wx1 wy2 rxy1 rxy2 c1 c2
 step wx1: UPDATE accounts SET balance = balance - 200 WHERE accountid = 'checking';
 step wy2: UPDATE accounts SET balance = balance - 200 WHERE accountid = 'savings';
-step rxy1: SELECT SUM(balance) FROM accounts;
- sum
-----
-1000
-(1 row)
+step rxy1: SELECT accountid, balance FROM accounts ORDER BY accountid;
+accountid|balance
+---------+-------
+checking |    400
+savings  |    600
+(2 rows)
 
-step rxy2: SELECT SUM(balance) FROM accounts;
- sum
-----
-1000
-(1 row)
+step rxy2: SELECT accountid, balance FROM accounts ORDER BY accountid;
+accountid|balance
+---------+-------
+checking |    600
+savings  |    400
+(2 rows)
 
 step c1: COMMIT;
 step c2: COMMIT;
@@ -106,17 +116,19 @@ ERROR:  could not serialize access due to read/write dependencies among transact
 starting permutation: wx1 wy2 rxy1 rxy2 c2 c1
 step wx1: UPDATE accounts SET balance = balance - 200 WHERE accountid = 'checking';
 step wy2: UPDATE accounts SET balance = balance - 200 WHERE accountid = 'savings';
-step rxy1: SELECT SUM(balance) FROM accounts;
- sum
-----
-1000
-(1 row)
+step rxy1: SELECT accountid, balance FROM accounts ORDER BY accountid;
+accountid|balance
+---------+-------
+checking |    400
+savings  |    600
+(2 rows)
 
-step rxy2: SELECT SUM(balance) FROM accounts;
- sum
-----
-1000
-(1 row)
+step rxy2: SELECT accountid, balance FROM accounts ORDER BY accountid;
+accountid|balance
+---------+-------
+checking |    600
+savings  |    400
+(2 rows)
 
 step c2: COMMIT;
 step c1: COMMIT;
@@ -125,17 +137,19 @@ ERROR:  could not serialize access due to read/write dependencies among transact
 starting permutation: wx1 wy2 rxy2 rxy1 c1 c2
 step wx1: UPDATE accounts SET balance = balance - 200 WHERE accountid = 'checking';
 step wy2: UPDATE accounts SET balance = balance - 200 WHERE accountid = 'savings';
-step rxy2: SELECT SUM(balance) FROM accounts;
- sum
-----
-1000
-(1 row)
+step rxy2: SELECT accountid, balance FROM accounts ORDER BY accountid;
+accountid|balance
+---------+-------
+checking |    600
+savings  |    400
+(2 rows)
 
-step rxy1: SELECT SUM(balance) FROM accounts;
- sum
-----
-1000
-(1 row)
+step rxy1: SELECT accountid, balance FROM accounts ORDER BY accountid;
+accountid|balance
+---------+-------
+checking |    400
+savings  |    600
+(2 rows)
 
 step c1: COMMIT;
 step c2: COMMIT;
@@ -144,17 +158,19 @@ ERROR:  could not serialize access due to read/write dependencies among transact
 starting permutation: wx1 wy2 rxy2 rxy1 c2 c1
 step wx1: UPDATE accounts SET balance = balance - 200 WHERE accountid = 'checking';
 step wy2: UPDATE accounts SET balance = balance - 200 WHERE accountid = 'savings';
-step rxy2: SELECT SUM(balance) FROM accounts;
- sum
-----
-1000
-(1 row)
+step rxy2: SELECT accountid, balance FROM accounts ORDER BY accountid;
+accountid|balance
+---------+-------
+checking |    600
+savings  |    400
+(2 rows)
 
-step rxy1: SELECT SUM(balance) FROM accounts;
- sum
-----
-1000
-(1 row)
+step rxy1: SELECT accountid, balance FROM accounts ORDER BY accountid;
+accountid|balance
+---------+-------
+checking |    400
+savings  |    600
+(2 rows)
 
 step c2: COMMIT;
 step c1: COMMIT;
@@ -163,45 +179,49 @@ ERROR:  could not serialize access due to read/write dependencies among transact
 starting permutation: wx1 wy2 rxy2 c2 rxy1 c1
 step wx1: UPDATE accounts SET balance = balance - 200 WHERE accountid = 'checking';
 step wy2: UPDATE accounts SET balance = balance - 200 WHERE accountid = 'savings';
-step rxy2: SELECT SUM(balance) FROM accounts;
- sum
-----
-1000
-(1 row)
+step rxy2: SELECT accountid, balance FROM accounts ORDER BY accountid;
+accountid|balance
+---------+-------
+checking |    600
+savings  |    400
+(2 rows)
 
 step c2: COMMIT;
-step rxy1: SELECT SUM(balance) FROM accounts;
+step rxy1: SELECT accountid, balance FROM accounts ORDER BY accountid;
 ERROR:  could not serialize access due to read/write dependencies among transactions
 step c1: COMMIT;
 
 starting permutation: wy2 wx1 rxy1 c1 rxy2 c2
 step wy2: UPDATE accounts SET balance = balance - 200 WHERE accountid = 'savings';
 step wx1: UPDATE accounts SET balance = balance - 200 WHERE accountid = 'checking';
-step rxy1: SELECT SUM(balance) FROM accounts;
- sum
-----
-1000
-(1 row)
+step rxy1: SELECT accountid, balance FROM accounts ORDER BY accountid;
+accountid|balance
+---------+-------
+checking |    400
+savings  |    600
+(2 rows)
 
 step c1: COMMIT;
-step rxy2: SELECT SUM(balance) FROM accounts;
+step rxy2: SELECT accountid, balance FROM accounts ORDER BY accountid;
 ERROR:  could not serialize access due to read/write dependencies among transactions
 step c2: COMMIT;
 
 starting permutation: wy2 wx1 rxy1 rxy2 c1 c2
 step wy2: UPDATE accounts SET balance = balance - 200 WHERE accountid = 'savings';
 step wx1: UPDATE accounts SET balance = balance - 200 WHERE accountid = 'checking';
-step rxy1: SELECT SUM(balance) FROM accounts;
- sum
-----
-1000
-(1 row)
+step rxy1: SELECT accountid, balance FROM accounts ORDER BY accountid;
+accountid|balance
+---------+-------
+checking |    400
+savings  |    600
+(2 rows)
 
-step rxy2: SELECT SUM(balance) FROM accounts;
- sum
-----
-1000
-(1 row)
+step rxy2: SELECT accountid, balance FROM accounts ORDER BY accountid;
+accountid|balance
+---------+-------
+checking |    600
+savings  |    400
+(2 rows)
 
 step c1: COMMIT;
 step c2: COMMIT;
@@ -210,17 +230,19 @@ ERROR:  could not serialize access due to read/write dependencies among transact
 starting permutation: wy2 wx1 rxy1 rxy2 c2 c1
 step wy2: UPDATE accounts SET balance = balance - 200 WHERE accountid = 'savings';
 step wx1: UPDATE accounts SET balance = balance - 200 WHERE accountid = 'checking';
-step rxy1: SELECT SUM(balance) FROM accounts;
- sum
-----
-1000
-(1 row)
+step rxy1: SELECT accountid, balance FROM accounts ORDER BY accountid;
+accountid|balance
+---------+-------
+checking |    400
+savings  |    600
+(2 rows)
 
-step rxy2: SELECT SUM(balance) FROM accounts;
- sum
-----
-1000
-(1 row)
+step rxy2: SELECT accountid, balance FROM accounts ORDER BY accountid;
+accountid|balance
+---------+-------
+checking |    600
+savings  |    400
+(2 rows)
 
 step c2: COMMIT;
 step c1: COMMIT;
@@ -229,17 +251,19 @@ ERROR:  could not serialize access due to read/write dependencies among transact
 starting permutation: wy2 wx1 rxy2 rxy1 c1 c2
 step wy2: UPDATE accounts SET balance = balance - 200 WHERE accountid = 'savings';
 step wx1: UPDATE accounts SET balance = balance - 200 WHERE accountid = 'checking';
-step rxy2: SELECT SUM(balance) FROM accounts;
- sum
-----
-1000
-(1 row)
+step rxy2: SELECT accountid, balance FROM accounts ORDER BY accountid;
+accountid|balance
+---------+-------
+checking |    600
+savings  |    400
+(2 rows)
 
-step rxy1: SELECT SUM(balance) FROM accounts;
- sum
-----
-1000
-(1 row)
+step rxy1: SELECT accountid, balance FROM accounts ORDER BY accountid;
+accountid|balance
+---------+-------
+checking |    400
+savings  |    600
+(2 rows)
 
 step c1: COMMIT;
 step c2: COMMIT;
@@ -248,17 +272,19 @@ ERROR:  could not serialize access due to read/write dependencies among transact
 starting permutation: wy2 wx1 rxy2 rxy1 c2 c1
 step wy2: UPDATE accounts SET balance = balance - 200 WHERE accountid = 'savings';
 step wx1: UPDATE accounts SET balance = balance - 200 WHERE accountid = 'checking';
-step rxy2: SELECT SUM(balance) FROM accounts;
- sum
-----
-1000
-(1 row)
+step rxy2: SELECT accountid, balance FROM accounts ORDER BY accountid;
+accountid|balance
+---------+-------
+checking |    600
+savings  |    400
+(2 rows)
 
-step rxy1: SELECT SUM(balance) FROM accounts;
- sum
-----
-1000
-(1 row)
+step rxy1: SELECT accountid, balance FROM accounts ORDER BY accountid;
+accountid|balance
+---------+-------
+checking |    400
+savings  |    600
+(2 rows)
 
 step c2: COMMIT;
 step c1: COMMIT;
@@ -267,31 +293,34 @@ ERROR:  could not serialize access due to read/write dependencies among transact
 starting permutation: wy2 wx1 rxy2 c2 rxy1 c1
 step wy2: UPDATE accounts SET balance = balance - 200 WHERE accountid = 'savings';
 step wx1: UPDATE accounts SET balance = balance - 200 WHERE accountid = 'checking';
-step rxy2: SELECT SUM(balance) FROM accounts;
- sum
-----
-1000
-(1 row)
+step rxy2: SELECT accountid, balance FROM accounts ORDER BY accountid;
+accountid|balance
+---------+-------
+checking |    600
+savings  |    400
+(2 rows)
 
 step c2: COMMIT;
-step rxy1: SELECT SUM(balance) FROM accounts;
+step rxy1: SELECT accountid, balance FROM accounts ORDER BY accountid;
 ERROR:  could not serialize access due to read/write dependencies among transactions
 step c1: COMMIT;
 
 starting permutation: wy2 rxy2 wx1 rxy1 c1 c2
 step wy2: UPDATE accounts SET balance = balance - 200 WHERE accountid = 'savings';
-step rxy2: SELECT SUM(balance) FROM accounts;
- sum
-----
-1000
-(1 row)
+step rxy2: SELECT accountid, balance FROM accounts ORDER BY accountid;
+accountid|balance
+---------+-------
+checking |    600
+savings  |    400
+(2 rows)
 
 step wx1: UPDATE accounts SET balance = balance - 200 WHERE accountid = 'checking';
-step rxy1: SELECT SUM(balance) FROM accounts;
- sum
-----
-1000
-(1 row)
+step rxy1: SELECT accountid, balance FROM accounts ORDER BY accountid;
+accountid|balance
+---------+-------
+checking |    400
+savings  |    600
+(2 rows)
 
 step c1: COMMIT;
 step c2: COMMIT;
@@ -299,18 +328,20 @@ ERROR:  could not serialize access due to read/write dependencies among transact
 
 starting permutation: wy2 rxy2 wx1 rxy1 c2 c1
 step wy2: UPDATE accounts SET balance = balance - 200 WHERE accountid = 'savings';
-step rxy2: SELECT SUM(balance) FROM accounts;
- sum
-----
-1000
-(1 row)
+step rxy2: SELECT accountid, balance FROM accounts ORDER BY accountid;
+accountid|balance
+---------+-------
+checking |    600
+savings  |    400
+(2 rows)
 
 step wx1: UPDATE accounts SET balance = balance - 200 WHERE accountid = 'checking';
-step rxy1: SELECT SUM(balance) FROM accounts;
- sum
-----
-1000
-(1 row)
+step rxy1: SELECT accountid, balance FROM accounts ORDER BY accountid;
+accountid|balance
+---------+-------
+checking |    400
+savings  |    600
+(2 rows)
 
 step c2: COMMIT;
 step c1: COMMIT;
@@ -318,32 +349,35 @@ ERROR:  could not serialize access due to read/write dependencies among transact
 
 starting permutation: wy2 rxy2 wx1 c2 rxy1 c1
 step wy2: UPDATE accounts SET balance = balance - 200 WHERE accountid = 'savings';
-step rxy2: SELECT SUM(balance) FROM accounts;
- sum
-----
-1000
-(1 row)
+step rxy2: SELECT accountid, balance FROM accounts ORDER BY accountid;
+accountid|balance
+---------+-------
+checking |    600
+savings  |    400
+(2 rows)
 
 step wx1: UPDATE accounts SET balance = balance - 200 WHERE accountid = 'checking';
 step c2: COMMIT;
-step rxy1: SELECT SUM(balance) FROM accounts;
+step rxy1: SELECT accountid, balance FROM accounts ORDER BY accountid;
 ERROR:  could not serialize access due to read/write dependencies among transactions
 step c1: COMMIT;
 
 starting permutation: wy2 rxy2 c2 wx1 rxy1 c1
 step wy2: UPDATE accounts SET balance = balance - 200 WHERE accountid = 'savings';
-step rxy2: SELECT SUM(balance) FROM accounts;
- sum
-----
-1000
-(1 row)
+step rxy2: SELECT accountid, balance FROM accounts ORDER BY accountid;
+accountid|balance
+---------+-------
+checking |    600
+savings  |    400
+(2 rows)
 
 step c2: COMMIT;
 step wx1: UPDATE accounts SET balance = balance - 200 WHERE accountid = 'checking';
-step rxy1: SELECT SUM(balance) FROM accounts;
-sum
----
-800
-(1 row)
+step rxy1: SELECT accountid, balance FROM accounts ORDER BY accountid;
+accountid|balance
+---------+-------
+checking |    400
+savings  |    400
+(2 rows)
 
 step c1: COMMIT;

@@ -79,21 +79,6 @@ RemoveObjects(DropStmt *stmt)
 			continue;
 		}
 
-		/*
-		 * Although COMMENT ON FUNCTION, etc. are happy to operate on an
-		 * aggregate as on any other function, we have historically not allowed
-		 * this for DROP FUNCTION.
-		 */
-		if (stmt->removeType == OBJECT_FUNCTION)
-		{
-			if (get_func_prokind(address.objectId) == PROKIND_AGGREGATE)
-				ereport(ERROR,
-						(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-						 errmsg("\"%s\" is an aggregate function",
-								NameListToString(castNode(ObjectWithArgs, object)->objname)),
-						 errhint("Use DROP AGGREGATE to drop aggregate functions.")));
-		}
-
 		/* Release any relcache reference count, but keep lock until commit. */
 		if (relation)
 			table_close(relation, NoLock);

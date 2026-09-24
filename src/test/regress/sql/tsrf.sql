@@ -49,35 +49,11 @@ SELECT few.id, generate_series(1,3) g FROM few ORDER BY id, generate_series(1,3)
 -- it's weird to have ORDER BYs that increase the number of results
 SELECT few.id FROM few ORDER BY id, generate_series(1,3) DESC;
 
--- SRFs are computed after aggregation
-SET enable_hashagg TO 0; -- stable output order
-SELECT few.dataa, count(*), min(id), max(id), unnest('{1,1,3}'::int[]) FROM few WHERE few.id = 1 GROUP BY few.dataa;
--- unless referenced in GROUP BY clause
-SELECT few.dataa, count(*), min(id), max(id), unnest('{1,1,3}'::int[]) FROM few WHERE few.id = 1 GROUP BY few.dataa, unnest('{1,1,3}'::int[]);
-SELECT few.dataa, count(*), min(id), max(id), unnest('{1,1,3}'::int[]) FROM few WHERE few.id = 1 GROUP BY few.dataa, 5;
-RESET enable_hashagg;
-
--- check HAVING works when GROUP BY does [not] reference SRF output
-SELECT dataa, generate_series(1,1), count(*) FROM few GROUP BY 1 HAVING count(*) > 1;
-SELECT dataa, generate_series(1,1), count(*) FROM few GROUP BY 1, 2 HAVING count(*) > 1;
-
--- it's weird to have GROUP BYs that increase the number of results
-SELECT few.dataa, count(*) FROM few WHERE dataa = 'a' GROUP BY few.dataa ORDER BY 2;
-SELECT few.dataa, count(*) FROM few WHERE dataa = 'a' GROUP BY few.dataa, unnest('{1,1,3}'::int[]) ORDER BY 2;
+-- minipg: 聚合与 GROUP BY/HAVING 已裁剪，SRF 与聚合/GROUP BY 的交互用例移除
 
 -- SRFs are not allowed if they'd need to be conditionally executed
 SELECT q1, case when q1 > 0 then generate_series(1,3) else 0 end FROM int8_tbl;
 SELECT q1, coalesce(generate_series(1,3), 0) FROM int8_tbl;
-
--- SRFs are not allowed in aggregate arguments
-SELECT min(generate_series(1, 3)) FROM few;
-
--- ... unless they're within a sub-select
-SELECT sum((3 = ANY(SELECT generate_series(1,4)))::int);
-
--- sorting + grouping
-SELECT few.dataa, count(*), min(id), max(id), generate_series(1,3) FROM few GROUP BY few.dataa ORDER BY 5, 1;
-
 
 
 -- case with degenerate ORDER BY

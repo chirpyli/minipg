@@ -22,7 +22,6 @@
 #include "nodes/nodeFuncs.h"
 #include "optimizer/optimizer.h"
 #include "parser/analyze.h"
-#include "parser/parse_agg.h"
 #include "parser/parse_clause.h"
 #include "parser/parse_coerce.h"
 #include "parser/parse_collate.h"
@@ -386,12 +385,10 @@ transformColumnRef(ParseState *pstate, ColumnRef *cref)
 		case EXPR_KIND_JOIN_USING:
 		case EXPR_KIND_FROM_SUBSELECT:
 		case EXPR_KIND_WHERE:
-		case EXPR_KIND_HAVING:
 		case EXPR_KIND_SELECT_TARGET:
 		case EXPR_KIND_INSERT_TARGET:
 		case EXPR_KIND_UPDATE_SOURCE:
 		case EXPR_KIND_UPDATE_TARGET:
-		case EXPR_KIND_GROUP_BY:
 		case EXPR_KIND_ORDER_BY:
 		case EXPR_KIND_VALUES:
 		case EXPR_KIND_VALUES_SINGLE:
@@ -1036,26 +1033,6 @@ transformFuncCall(ParseState *pstate, FuncCall *fn)
 													(Node *) lfirst(args)));
 	}
 
-	/*
-	 * When WITHIN GROUP is used, we treat its ORDER BY expressions as
-	 * additional arguments to the function, for purposes of function lookup
-	 * and argument type coercion.  So, transform each such expression and add
-	 * them to the targs list.  We don't explicitly mark where each argument
-	 * came from, but ParseFuncOrColumn can tell what's what by reference to
-	 * list_length(fn->agg_order).
-	 */
-	if (fn->agg_within_group)
-	{
-		Assert(fn->agg_order != NIL);
-		foreach(args, fn->agg_order)
-		{
-			SortBy	   *arg = (SortBy *) lfirst(args);
-
-			targs = lappend(targs, transformExpr(pstate, arg->node,
-												 EXPR_KIND_ORDER_BY));
-		}
-	}
-
 	/* ... and hand off to ParseFuncOrColumn */
 	return ParseFuncOrColumn(pstate,
 							 fn->funcname,
@@ -1229,12 +1206,10 @@ transformSubLink(ParseState *pstate, SubLink *sublink)
 		case EXPR_KIND_JOIN_USING:
 		case EXPR_KIND_FROM_SUBSELECT:
 		case EXPR_KIND_WHERE:
-		case EXPR_KIND_HAVING:
 		case EXPR_KIND_SELECT_TARGET:
 		case EXPR_KIND_INSERT_TARGET:
 		case EXPR_KIND_UPDATE_SOURCE:
 		case EXPR_KIND_UPDATE_TARGET:
-		case EXPR_KIND_GROUP_BY:
 		case EXPR_KIND_ORDER_BY:
 		case EXPR_KIND_VALUES:
 		case EXPR_KIND_VALUES_SINGLE:
@@ -1763,8 +1738,6 @@ ParseExprKindName(ParseExprKind exprKind)
 			return "sub-SELECT in FROM";
 		case EXPR_KIND_WHERE:
 			return "WHERE";
-		case EXPR_KIND_HAVING:
-			return "HAVING";
 		case EXPR_KIND_SELECT_TARGET:
 			return "SELECT";
 		case EXPR_KIND_INSERT_TARGET:
@@ -1772,8 +1745,6 @@ ParseExprKindName(ParseExprKind exprKind)
 		case EXPR_KIND_UPDATE_SOURCE:
 		case EXPR_KIND_UPDATE_TARGET:
 			return "UPDATE";
-		case EXPR_KIND_GROUP_BY:
-			return "GROUP BY";
 		case EXPR_KIND_ORDER_BY:
 			return "ORDER BY";
 		case EXPR_KIND_VALUES:

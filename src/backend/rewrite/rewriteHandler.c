@@ -1512,24 +1512,14 @@ view_query_is_auto_updatable(Query *viewquery, bool check_cols)
 	if (viewquery->distinctClause != NIL)
 		return gettext_noop("Views containing DISTINCT are not automatically updatable.");
 
-	if (viewquery->groupClause != NIL)
-		return gettext_noop("Views containing GROUP BY are not automatically updatable.");
-
-	if (viewquery->havingQual != NULL)
-		return gettext_noop("Views containing HAVING are not automatically updatable.");
-
 	/*
 	 * We must not allow window functions or set returning functions in the
 	 * targetlist. Otherwise we might end up inserting them into the quals of
-	 * the main query. We must also check for aggregates in the targetlist in
-	 * case they appear without a GROUP BY.
+	 * the main query.
 	 *
 	 * These restrictions ensure that each row of the view corresponds to a
 	 * unique row in the underlying base relation.
 	 */
-	if (viewquery->hasAggs)
-		return gettext_noop("Views that return aggregate functions are not automatically updatable.");
-
 	if (viewquery->hasTargetSRFs)
 		return gettext_noop("Views that return set-returning functions are not automatically updatable.");
 

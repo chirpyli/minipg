@@ -25,7 +25,6 @@
 #include "access/relation.h"
 #include "access/sysattr.h"
 #include "access/table.h"
-#include "catalog/pg_aggregate.h"
 #include "catalog/pg_am.h"
 #include "catalog/pg_collation.h"
 #include "catalog/pg_constraint.h"
@@ -45,7 +44,6 @@
 #include "nodes/nodeFuncs.h"
 #include "nodes/pathnodes.h"
 #include "optimizer/optimizer.h"
-#include "parser/parse_agg.h"
 #include "parser/parse_func.h"
 #include "parser/parse_node.h"
 #include "parser/parse_oper.h"
@@ -108,8 +106,6 @@ typedef struct
 	int			wrapColumn;		/* max line length, or -1 for no limit */
 	int			indentLevel;	/* current indent level for pretty-print */
 	bool		varprefix;		/* true to print prefixes on Vars */
-	ParseExprKind special_exprkind; /* set only for exprkinds needing special
-									 * handling */
 	Bitmapset  *appendparents;	/* if not null, map child Vars of these relids
 								 * back to the parent rel */
 } deparse_context;
@@ -379,11 +375,10 @@ static void get_basic_select_query(Query *query, deparse_context *context,
 static void get_target_list(List *targetList, deparse_context *context,
 							TupleDesc resultDesc, bool colNamesVisible);
 static Node *get_rule_sortgroupclause(Index ref, List *tlist,
-									  bool force_colno,
 									  deparse_context *context);
 
 static void get_rule_orderby(List *orderList, List *targetList,
-							 bool force_colno, deparse_context *context);
+							 deparse_context *context);
 static char *get_variable(Var *var, int levelsup, bool istoplevel,
 						  deparse_context *context);
 static void get_special_variable(Node *node, deparse_context *context,
@@ -408,8 +403,6 @@ static bool looks_like_function(Node *node);
 static void get_oper_expr(OpExpr *expr, deparse_context *context);
 static void get_func_expr(FuncExpr *expr, deparse_context *context,
 						  bool showimplicit);
-static void get_agg_expr(Aggref *aggref, deparse_context *context,
-						 Aggref *original_aggref);
 static bool get_func_sql_syntax(FuncExpr *expr, deparse_context *context);
 static void get_coercion_expr(Node *arg, deparse_context *context,
 							  Oid resulttype, int32 resulttypmod,
@@ -436,8 +429,7 @@ static char *generate_relation_name(Oid relid, List *namespaces);
 static char *generate_qualified_relation_name(Oid relid);
 static char *generate_function_name(Oid funcid, int nargs,
 									List *argnames, Oid *argtypes,
-									bool has_variadic, bool *use_variadic_p,
-									ParseExprKind special_exprkind);
+									bool has_variadic, bool *use_variadic_p);
 static char *generate_operator_name(Oid operid, Oid arg1, Oid arg2);
 static text *string_to_text(char *str);
 
@@ -1367,7 +1359,6 @@ deparse_expression_pretty(Node *expr, List *dpcontext,
 	context.prettyFlags = prettyFlags;
 	context.wrapColumn = WRAP_COLUMN_DEFAULT;
 	context.indentLevel = startIndent;
-	context.special_exprkind = EXPR_KIND_NONE;
 	context.appendparents = NULL;
 
 	get_rule_expr(expr, &context, showimplicit);
@@ -2914,7 +2905,6 @@ get_query_def(Query *query, StringInfo buf, List *parentnamespace,
 	context.prettyFlags = prettyFlags;
 	context.wrapColumn = wrapColumn;
 	context.indentLevel = startIndent;
-	context.special_exprkind = EXPR_KIND_NONE;
 	context.appendparents = NULL;
 
 	set_deparse_for_query(&dpns, query, parentnamespace);
@@ -2999,13 +2989,10 @@ static void
 get_select_query_def(Query *query, deparse_context *context,
 					 TupleDesc resultDesc, bool colNamesVisible)
 {
-	bool		force_colno;
-
 	/*
 	 * Decompile the top-level query body.
 	 */
 	get_basic_select_query(query, context, resultDesc, colNamesVisible);
-	force_colno = false;
 
 	/* Add the ORDER BY clause if given */
 	if (query->sortClause != NIL)
@@ -3013,7 +3000,7 @@ get_select_query_def(Query *query, deparse_context *context,
 		appendContextKeyword(context, " ORDER BY ",
 							 -PRETTYINDENT_STD, PRETTYINDENT_STD, 1);
 		get_rule_orderby(query->sortClause, query->targetList,
-						 force_colno, context);
+						 context);
 	}
 
 
@@ -3099,8 +3086,6 @@ get_basic_select_query(Query *query, deparse_context *context,
 {
 	StringInfo	buf = context->buf;
 	RangeTblEntry *values_rte;
-	char	   *sep;
-	ListCell   *l;
 
 	if (PRETTY_INDENT(context))
 	{
@@ -3145,38 +3130,6 @@ get_basic_select_query(Query *query, deparse_context *context,
 		get_rule_expr(query->jointree->quals, context, false);
 	}
 
-	/* Add the GROUP BY clause if given */
-	if (query->groupClause != NULL)
-	{
-		ParseExprKind save_exprkind;
-
-		appendContextKeyword(context, " GROUP BY ",
-						 -PRETTYINDENT_STD, PRETTYINDENT_STD, 1);
-
-		save_exprkind = context->special_exprkind;
-		context->special_exprkind = EXPR_KIND_GROUP_BY;
-
-		sep = "";
-		foreach(l, query->groupClause)
-		{
-			SortGroupClause *grp = (SortGroupClause *) lfirst(l);
-
-			appendStringInfoString(buf, sep);
-			get_rule_sortgroupclause(grp->tleSortGroupRef, query->targetList,
-									 false, context);
-			sep = ", ";
-		}
-
-		context->special_exprkind = save_exprkind;
-	}
-
-	/* Add the HAVING clause if given */
-	if (query->havingQual != NULL)
-	{
-		appendContextKeyword(context, " HAVING ",
-							 -PRETTYINDENT_STD, PRETTYINDENT_STD, 0);
-		get_rule_expr(query->havingQual, context, false);
-	}
 }
 
 /* ----------
@@ -3330,10 +3283,9 @@ get_target_list(List *targetList, deparse_context *context,
  * Also returns the expression tree, so caller need not find it again.
  */
 static Node *
-get_rule_sortgroupclause(Index ref, List *tlist, bool force_colno,
+get_rule_sortgroupclause(Index ref, List *tlist,
 						 deparse_context *context)
 {
-	StringInfo	buf = context->buf;
 	TargetEntry *tle;
 	Node	   *expr;
 
@@ -3341,20 +3293,14 @@ get_rule_sortgroupclause(Index ref, List *tlist, bool force_colno,
 	expr = (Node *) tle->expr;
 
 	/*
-	 * Use column-number form if requested by caller.  Otherwise, if
-	 * expression is a constant, force it to be dumped with an explicit cast
-	 * as decoration --- this is because a simple integer constant is
+	 * If the expression is a constant, force it to be dumped with an explicit
+	 * cast as decoration --- this is because a simple integer constant is
 	 * ambiguous (and will be misinterpreted by findTargetlistEntry()) if we
 	 * dump it without any decoration.  If it's anything more complex than a
 	 * simple Var, then force extra parens around it, to ensure it can't be
 	 * misinterpreted as a cube() or rollup() construct.
 	 */
-	if (force_colno)
-	{
-		Assert(!tle->resjunk);
-		appendStringInfo(buf, "%d", tle->resno);
-	}
-	else if (expr && IsA(expr, Const))
+	if (expr && IsA(expr, Const))
 		get_const_expr((Const *) expr, context, 1);
 	else if (!expr || IsA(expr, Var))
 		get_rule_expr(expr, context, true);
@@ -3368,8 +3314,7 @@ get_rule_sortgroupclause(Index ref, List *tlist, bool force_colno,
 		 * itself. (We can't skip the parens.)
 		 */
 		bool		need_paren = (PRETTY_PAREN(context)
-								  || IsA(expr, FuncExpr)
-								  || IsA(expr, Aggref));
+								  || IsA(expr, FuncExpr));
 
 		if (need_paren)
 			appendStringInfoChar(context->buf, '(');
@@ -3388,7 +3333,7 @@ get_rule_sortgroupclause(Index ref, List *tlist, bool force_colno,
  */
 static void
 get_rule_orderby(List *orderList, List *targetList,
-				 bool force_colno, deparse_context *context)
+				 deparse_context *context)
 {
 	StringInfo	buf = context->buf;
 	const char *sep;
@@ -3404,7 +3349,7 @@ get_rule_orderby(List *orderList, List *targetList,
 
 		appendStringInfoString(buf, sep);
 		sortexpr = get_rule_sortgroupclause(srt->tleSortGroupRef, targetList,
-											force_colno, context);
+											context);
 		sortcoltype = exprType(sortexpr);
 		/* See whether operator is default < or > for datatype */
 		typentry = lookup_type_cache(sortcoltype,
@@ -4505,12 +4450,11 @@ get_parameter(Param *param, deparse_context *context)
 		context->varprefix = true;
 
 		/*
-		 * A Param's expansion is typically a Var or Aggref, or
-		 * upper-level Param, which wouldn't need extra parentheses.
-		 * Otherwise, insert parens to ensure the expression looks atomic.
+		 * A Param's expansion is typically a Var or upper-level Param, which
+		 * wouldn't need extra parentheses.  Otherwise, insert parens to
+		 * ensure the expression looks atomic.
 		 */
 		need_paren = !(IsA(expr, Var) ||
-					   IsA(expr, Aggref) ||
 					   IsA(expr, Param));
 		if (need_paren)
 			appendStringInfoChar(context->buf, '(');
@@ -4631,7 +4575,6 @@ isSimpleNode(Node *node, Node *parentNode, int prettyFlags)
 		case T_CoalesceExpr:
 		case T_SQLValueFunction:
 		case T_NullIfExpr:
-		case T_Aggref:
 		case T_FuncExpr:
 			/* function-like: name(..) or name[..] */
 			return true;
@@ -4740,7 +4683,6 @@ isSimpleNode(Node *node, Node *parentNode, int prettyFlags)
 				case T_RowExpr: /* other separators */
 				case T_CoalesceExpr:	/* own parentheses */
 				case T_NullIfExpr:	/* other separators */
-				case T_Aggref:	/* own parentheses */
 				case T_CaseExpr:	/* other separators */
 					return true;
 				default:
@@ -4788,7 +4730,6 @@ isSimpleNode(Node *node, Node *parentNode, int prettyFlags)
 				case T_RowExpr: /* other separators */
 				case T_CoalesceExpr:	/* own parentheses */
 				case T_NullIfExpr:	/* other separators */
-				case T_Aggref:	/* own parentheses */
 				case T_CaseExpr:	/* other separators */
 					return true;
 				default:
@@ -4948,9 +4889,7 @@ get_rule_expr(Node *node, deparse_context *context,
 			get_parameter((Param *) node, context);
 			break;
 
-		case T_Aggref:
-			get_agg_expr((Aggref *) node, context, (Aggref *) node);
-			break;
+
 
 
 
@@ -5822,8 +5761,7 @@ get_func_expr(FuncExpr *expr, deparse_context *context,
 					 generate_function_name(funcoid, nargs,
 											argnames, argtypes,
 											expr->funcvariadic,
-											&use_variadic,
-											context->special_exprkind));
+											&use_variadic));
 	nargs = 0;
 	foreach(l, expr->args)
 	{
@@ -5833,66 +5771,6 @@ get_func_expr(FuncExpr *expr, deparse_context *context,
 			appendStringInfoString(buf, "VARIADIC ");
 		get_rule_expr((Node *) lfirst(l), context, true);
 	}
-	appendStringInfoChar(buf, ')');
-}
-
-/*
- * get_agg_expr			- Parse back an Aggref node
- */
-static void
-get_agg_expr(Aggref *aggref, deparse_context *context,
-			 Aggref *original_aggref)
-{
-	StringInfo	buf = context->buf;
-	Oid			argtypes[FUNC_MAX_ARGS];
-	int			nargs;
-	bool		use_variadic;
-
-	/* Extract the argument types as seen by the parser */
-	nargs = get_aggregate_argtypes(aggref, argtypes);
-
-	/* Print the aggregate name, schema-qualified if needed */
-	appendStringInfo(buf, "%s(%s",
-					 generate_function_name(aggref->aggfnoid, nargs,
-											NIL, argtypes,
-											aggref->aggvariadic,
-											&use_variadic,
-											context->special_exprkind),
-					 (aggref->aggdistinct != NIL) ? "DISTINCT " : "");
-
-	{
-		/* aggstar can be set only in zero-argument aggregates */
-		if (aggref->aggstar)
-			appendStringInfoChar(buf, '*');
-		else
-		{
-			ListCell   *l;
-			int			i;
-
-			i = 0;
-			foreach(l, aggref->args)
-			{
-				TargetEntry *tle = (TargetEntry *) lfirst(l);
-				Node	   *arg = (Node *) tle->expr;
-
-				Assert(!IsA(arg, NamedArgExpr));
-				if (tle->resjunk)
-					continue;
-				if (i++ > 0)
-					appendStringInfoString(buf, ", ");
-				if (use_variadic && i == nargs)
-					appendStringInfoString(buf, "VARIADIC ");
-				get_rule_expr(arg, context, true);
-			}
-		}
-
-		if (aggref->aggorder != NIL)
-		{
-			appendStringInfoString(buf, " ORDER BY ");
-			get_rule_orderby(aggref->aggorder, aggref->args, false, context);
-		}
-	}
-
 	appendStringInfoChar(buf, ')');
 }
 
@@ -7047,7 +6925,7 @@ generate_qualified_relation_name(Oid relid)
  *		types.  (Those matter because of ambiguous-function resolution rules.)
  *
  * If we're dealing with a potentially variadic function (in practice, this
- * means a FuncExpr or Aggref, not some other way of calling a function), then
+ * means a FuncExpr, not some other way of calling a function), then
  * has_variadic must specify whether variadic arguments have been merged,
  * and *use_variadic_p will be set to indicate whether to print VARIADIC in
  * the output.  For non-FuncExpr cases, has_variadic should be false and
@@ -7057,8 +6935,7 @@ generate_qualified_relation_name(Oid relid)
  */
 static char *
 generate_function_name(Oid funcid, int nargs, List *argnames, Oid *argtypes,
-					   bool has_variadic, bool *use_variadic_p,
-					   ParseExprKind special_exprkind)
+					   bool has_variadic, bool *use_variadic_p)
 {
 	char	   *result;
 	HeapTuple	proctup;
@@ -7080,16 +6957,6 @@ generate_function_name(Oid funcid, int nargs, List *argnames, Oid *argtypes,
 		elog(ERROR, "cache lookup failed for function %u", funcid);
 	procform = (Form_pg_proc) GETSTRUCT(proctup);
 	proname = NameStr(procform->proname);
-
-	/*
-	 * Due to parser hacks to avoid needing to reserve CUBE, we need to force
-	 * qualification in some special cases.
-	 */
-	if (special_exprkind == EXPR_KIND_GROUP_BY)
-	{
-		if (strcmp(proname, "cube") == 0 || strcmp(proname, "rollup") == 0)
-			force_qualify = true;
-	}
 
 	/*
 	 * Determine whether VARIADIC should be printed.  We must do this first
@@ -7134,8 +7001,7 @@ generate_function_name(Oid funcid, int nargs, List *argnames, Oid *argtypes,
 		p_funcid = InvalidOid;
 	}
 
-	if ((p_result == FUNCDETAIL_NORMAL ||
-		 p_result == FUNCDETAIL_AGGREGATE) &&
+	if (p_result == FUNCDETAIL_NORMAL &&
 		p_funcid == funcid)
 		nspname = NULL;
 	else

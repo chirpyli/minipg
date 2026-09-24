@@ -85,9 +85,6 @@ SELECT ss.f1 AS "Correlated Field", ss.f3 AS "Second Field"
   WHERE f1 NOT IN (SELECT f1+1 FROM INT4_TBL
                    WHERE f1 != ss.f1 AND f1 < 2147483647);
 
-select q1, float8(count(*)) / (select count(*) from int8_tbl)
-from int8_tbl group by q1 order by q1;
-
 -- Unspecified-type literals in output columns should resolve as text
 
 SELECT *, pg_typeof(f1) FROM
@@ -107,16 +104,16 @@ select 1 = all (select (select 1));
 -- and subquery pullup.
 --
 
-select count(*) from
+select distinct 1 as one from
   (select 1 from tenk1 a
    where unique1 IN (select hundred from tenk1 b)) ss;
-select count(distinct ss.ten) from
+select distinct ss.ten from
   (select ten from tenk1 a
    where unique1 IN (select hundred from tenk1 b)) ss;
-select count(*) from
+select distinct 1 as one from
   (select 1 from tenk1 a
    where unique1 IN (select distinct hundred from tenk1 b)) ss;
-select count(distinct ss.ten) from
+select distinct ss.ten from
   (select ten from tenk1 a
    where unique1 IN (select distinct hundred from tenk1 b)) ss;
 
@@ -139,13 +136,9 @@ INSERT INTO bar VALUES (3, 1);
 SELECT * FROM foo WHERE id IN
     (SELECT id2 FROM (SELECT DISTINCT id1, id2 FROM bar) AS s);
 SELECT * FROM foo WHERE id IN
-    (SELECT id2 FROM (SELECT id1,id2 FROM bar GROUP BY id1,id2) AS s);
-SELECT * FROM foo WHERE id IN
     (SELECT id2 FROM (SELECT DISTINCT id1, id2 FROM bar) AS s);
 
 -- These cases do not
-SELECT * FROM foo WHERE id IN
-    (SELECT id2 FROM (SELECT id2 FROM bar GROUP BY id2) AS s);
 SELECT * FROM foo WHERE id IN
     (SELECT id2 FROM (SELECT DISTINCT id2 FROM bar) AS s);
 
@@ -214,23 +207,10 @@ SELECT * FROM orders_view;
 DROP TABLE orderstest cascade;
 
 select f1, ss1 as relabel from
-    (select *, (select sum(f1) from int4_tbl b where f1 >= a.f1) as ss1
+    (select *, (select b.f1 from int4_tbl b where b.f1 = a.f1) as ss1
      from int4_tbl a) ss;
 
---
--- Test cases involving PARAM_EXEC parameters and min/max index optimizations.
--- Per bug report from David Sanchez i Gregori.
---
-
-select * from (
-  select max(unique1) from tenk1 as a
-  where exists (select 1 from tenk1 as b where b.thousand = a.unique2)
-) ss;
-
-select * from (
-  select min(unique1) from tenk1 as a
-  where not exists (select 1 from tenk1 as b where b.unique2 = 10000)
-) ss;
+-- minipg: 聚合已裁剪，min/max 索引优化用例移除
 
 --
 -- Test that an IN implemented using a UniquePath does unique-ification
@@ -266,8 +246,10 @@ insert into tc values(1,1);
 insert into tc values(2,2);
 
 select
-  ( select min(tb.id) from tb
-    where tb.aval = (select ta.val from ta where ta.id = tc.aid) ) as min_tb_id
+  ( select tb.id from tb
+    where tb.aval = (select ta.val from ta where ta.id = tc.aid)
+      and not exists (select 1 from tb t2
+                      where t2.aval = tb.aval and t2.id < tb.id) ) as tb_id
 from tc;
 
 --
@@ -277,10 +259,9 @@ from tc;
 -- minipg: numeric 已裁剪，改用 int8
 CREATE TABLE t1 (f1 int8, f2 varchar(30));
 
-select * from
+select distinct f1, f2, fs from
   (select distinct f1, f2, (select f2 from t1 x where x.f1 = up.f1) as fs
-   from t1 up) ss
-group by f1,f2,fs;
+   from t1 up) ss;
 
 --
 -- Test case for bug #5514 (mishandling of whole-row Vars in subselects)
@@ -301,7 +282,7 @@ select (select (a.*)::text) from view_a a;
 -- any junk columns therein
 --
 
-select q from (select max(f1) from int4_tbl group by f1 order by f1) q;
+select q from (select f1 from int4_tbl order by f1) q;
 
 --
 -- Test case for sublinks pulled up into joinaliasvars lists in an
@@ -315,7 +296,7 @@ where exists (
   select 1
   from
     int4_tbl cross join
-    ( select f1, (select array_agg(q1) from int8_tbl) as arr
+    ( select f1, (select 0::bigint) as arr
       from text_tbl ) ss
   where road.name = ss.f1 );
 
@@ -389,16 +370,16 @@ select '1'::text in (select '1'::name from (SELECT generate_series(1,2) AS g) AS
 -- Test resolution of hashed vs non-hashed implementation of EXISTS subplan
 --
 explain (costs off)
-select count(*) from tenk1 t
+select distinct 1 as one from tenk1 t
 where (exists(select 1 from tenk1 k where k.unique1 = t.unique2) or ten < 0);
-select count(*) from tenk1 t
+select distinct 1 as one from tenk1 t
 where (exists(select 1 from tenk1 k where k.unique1 = t.unique2) or ten < 0);
 
 explain (costs off)
-select count(*) from tenk1 t
+select distinct 1 as one from tenk1 t
 where (exists(select 1 from tenk1 k where k.unique1 = t.unique2) or ten < 0)
   and thousand = 1;
-select count(*) from tenk1 t
+select distinct 1 as one from tenk1 t
 where (exists(select 1 from tenk1 k where k.unique1 = t.unique2) or ten < 0)
   and thousand = 1;
 
@@ -434,14 +415,14 @@ explain (verbose, costs off)
 -- sub-select from being pulled up, which would result in not hashing)
 --
 explain (verbose, costs off)
-select sum(ss.tst::int) from
+select distinct ss.tst from
   onek o cross join lateral (
   select i.ten in (select f1 from int4_tbl where f1 <= o.hundred) as tst,
          random() as r
   from onek i where i.unique1 = o.unique1 ) ss
 where o.ten = 0;
 
-select sum(ss.tst::int) from
+select distinct ss.tst from
   onek o cross join lateral (
   select i.ten in (select f1 from int4_tbl where f1 <= o.hundred) as tst,
          random() as r
@@ -504,9 +485,9 @@ select * from int4_tbl where
 --
 explain (verbose, costs off)
 select * from int4_tbl o where f1 in
-  (select generate_series(1,50) / 10 g from int4_tbl i group by f1);
+  (select distinct generate_series(1,50) / 10 g from int4_tbl i);
 select * from int4_tbl o where f1 in
-  (select generate_series(1,50) / 10 g from int4_tbl i group by f1);
+  (select distinct generate_series(1,50) / 10 g from int4_tbl i);
 
 --
 -- check for over-optimization of whole-row Var referencing an Append plan

@@ -92,8 +92,8 @@ DROP TABLE hash_index_table;
 SET maintenance_work_mem = '1MB';
 CREATE INDEX hash_tuplesort_idx ON tenk1 USING hash (stringu1 name_ops);
 EXPLAIN (COSTS OFF)
-SELECT count(*) FROM tenk1 WHERE stringu1 = 'TVAAAA';
-SELECT count(*) FROM tenk1 WHERE stringu1 = 'TVAAAA';
+SELECT ctid FROM tenk1 WHERE stringu1 = 'TVAAAA';
+SELECT ctid FROM tenk1 WHERE stringu1 = 'TVAAAA' ORDER BY ctid;
 DROP INDEX hash_tuplesort_idx;
 RESET maintenance_work_mem;
 
@@ -293,45 +293,45 @@ SET enable_seqscan = OFF;
 SET enable_indexscan = ON;
 SET enable_bitmapscan = ON;
 
-SELECT count(*) FROM onek_with_null WHERE unique1 IS NULL;
-SELECT count(*) FROM onek_with_null WHERE unique1 IS NULL AND unique2 IS NULL;
-SELECT count(*) FROM onek_with_null WHERE unique1 IS NOT NULL;
-SELECT count(*) FROM onek_with_null WHERE unique1 IS NULL AND unique2 IS NOT NULL;
-SELECT count(*) FROM onek_with_null WHERE unique1 IS NOT NULL AND unique1 > 500;
-SELECT count(*) FROM onek_with_null WHERE unique1 IS NULL AND unique1 > 500;
+SELECT DISTINCT 1 AS found FROM onek_with_null WHERE unique1 IS NULL;
+SELECT DISTINCT 1 AS found FROM onek_with_null WHERE unique1 IS NULL AND unique2 IS NULL;
+SELECT DISTINCT 1 AS found FROM onek_with_null WHERE unique1 IS NOT NULL;
+SELECT DISTINCT 1 AS found FROM onek_with_null WHERE unique1 IS NULL AND unique2 IS NOT NULL;
+SELECT DISTINCT 1 AS found FROM onek_with_null WHERE unique1 IS NOT NULL AND unique1 > 500;
+SELECT DISTINCT 1 AS found FROM onek_with_null WHERE unique1 IS NULL AND unique1 > 500;
 
 DROP INDEX onek_nulltest;
 
 CREATE UNIQUE INDEX onek_nulltest ON onek_with_null (unique2 desc,unique1);
 
-SELECT count(*) FROM onek_with_null WHERE unique1 IS NULL;
-SELECT count(*) FROM onek_with_null WHERE unique1 IS NULL AND unique2 IS NULL;
-SELECT count(*) FROM onek_with_null WHERE unique1 IS NOT NULL;
-SELECT count(*) FROM onek_with_null WHERE unique1 IS NULL AND unique2 IS NOT NULL;
-SELECT count(*) FROM onek_with_null WHERE unique1 IS NOT NULL AND unique1 > 500;
-SELECT count(*) FROM onek_with_null WHERE unique1 IS NULL AND unique1 > 500;
+SELECT DISTINCT 1 AS found FROM onek_with_null WHERE unique1 IS NULL;
+SELECT DISTINCT 1 AS found FROM onek_with_null WHERE unique1 IS NULL AND unique2 IS NULL;
+SELECT DISTINCT 1 AS found FROM onek_with_null WHERE unique1 IS NOT NULL;
+SELECT DISTINCT 1 AS found FROM onek_with_null WHERE unique1 IS NULL AND unique2 IS NOT NULL;
+SELECT DISTINCT 1 AS found FROM onek_with_null WHERE unique1 IS NOT NULL AND unique1 > 500;
+SELECT DISTINCT 1 AS found FROM onek_with_null WHERE unique1 IS NULL AND unique1 > 500;
 
 DROP INDEX onek_nulltest;
 
 CREATE UNIQUE INDEX onek_nulltest ON onek_with_null (unique2 desc nulls last,unique1);
 
-SELECT count(*) FROM onek_with_null WHERE unique1 IS NULL;
-SELECT count(*) FROM onek_with_null WHERE unique1 IS NULL AND unique2 IS NULL;
-SELECT count(*) FROM onek_with_null WHERE unique1 IS NOT NULL;
-SELECT count(*) FROM onek_with_null WHERE unique1 IS NULL AND unique2 IS NOT NULL;
-SELECT count(*) FROM onek_with_null WHERE unique1 IS NOT NULL AND unique1 > 500;
-SELECT count(*) FROM onek_with_null WHERE unique1 IS NULL AND unique1 > 500;
+SELECT DISTINCT 1 AS found FROM onek_with_null WHERE unique1 IS NULL;
+SELECT DISTINCT 1 AS found FROM onek_with_null WHERE unique1 IS NULL AND unique2 IS NULL;
+SELECT DISTINCT 1 AS found FROM onek_with_null WHERE unique1 IS NOT NULL;
+SELECT DISTINCT 1 AS found FROM onek_with_null WHERE unique1 IS NULL AND unique2 IS NOT NULL;
+SELECT DISTINCT 1 AS found FROM onek_with_null WHERE unique1 IS NOT NULL AND unique1 > 500;
+SELECT DISTINCT 1 AS found FROM onek_with_null WHERE unique1 IS NULL AND unique1 > 500;
 
 DROP INDEX onek_nulltest;
 
 CREATE UNIQUE INDEX onek_nulltest ON onek_with_null (unique2  nulls first,unique1);
 
-SELECT count(*) FROM onek_with_null WHERE unique1 IS NULL;
-SELECT count(*) FROM onek_with_null WHERE unique1 IS NULL AND unique2 IS NULL;
-SELECT count(*) FROM onek_with_null WHERE unique1 IS NOT NULL;
-SELECT count(*) FROM onek_with_null WHERE unique1 IS NULL AND unique2 IS NOT NULL;
-SELECT count(*) FROM onek_with_null WHERE unique1 IS NOT NULL AND unique1 > 500;
-SELECT count(*) FROM onek_with_null WHERE unique1 IS NULL AND unique1 > 500;
+SELECT DISTINCT 1 AS found FROM onek_with_null WHERE unique1 IS NULL;
+SELECT DISTINCT 1 AS found FROM onek_with_null WHERE unique1 IS NULL AND unique2 IS NULL;
+SELECT DISTINCT 1 AS found FROM onek_with_null WHERE unique1 IS NOT NULL;
+SELECT DISTINCT 1 AS found FROM onek_with_null WHERE unique1 IS NULL AND unique2 IS NOT NULL;
+SELECT DISTINCT 1 AS found FROM onek_with_null WHERE unique1 IS NOT NULL AND unique1 > 500;
+SELECT DISTINCT 1 AS found FROM onek_with_null WHERE unique1 IS NULL AND unique1 > 500;
 
 DROP INDEX onek_nulltest;
 
@@ -350,10 +350,10 @@ SELECT * FROM tenk1
   WHERE thousand = 42 AND (tenthous = 1 OR tenthous = 3 OR tenthous = 42);
 
 EXPLAIN (COSTS OFF)
-SELECT count(*) FROM tenk1
+SELECT ctid FROM tenk1
   WHERE hundred = 42 AND (thousand = 42 OR thousand = 99);
-SELECT count(*) FROM tenk1
-  WHERE hundred = 42 AND (thousand = 42 OR thousand = 99);
+SELECT ctid FROM tenk1
+  WHERE hundred = 42 AND (thousand = 42 OR thousand = 99) ORDER BY ctid;
 
 --
 -- Check behavior with duplicate index column contents
@@ -365,10 +365,10 @@ CREATE INDEX dupindexcols_i ON dupindexcols (f1, id, f1 text_pattern_ops);
 ANALYZE dupindexcols;
 
 EXPLAIN (COSTS OFF)
-  SELECT count(*) FROM dupindexcols
+  SELECT ctid FROM dupindexcols
     WHERE f1 >= 'WA' AND f1 <= 'ZZZ' and id < 1000 and f1 ~<~ 'YX';
-SELECT count(*) FROM dupindexcols
-  WHERE f1 >= 'WA' AND f1 <= 'ZZZ' and id < 1000 and f1 ~<~ 'YX';
+SELECT ctid FROM dupindexcols
+  WHERE f1 >= 'WA' AND f1 <= 'ZZZ' and id < 1000 and f1 ~<~ 'YX' ORDER BY ctid;
 
 --
 -- Check ordering of =ANY indexqual results (bug in 9.2.0)
@@ -517,11 +517,11 @@ CREATE UNIQUE INDEX concur_exprs_index_pred_2
   WHERE ('-H') >= (c2::TEXT);
 ALTER INDEX concur_exprs_index_expr ALTER COLUMN 1 SET STATISTICS 100;
 ANALYZE concur_exprs_tab;
-SELECT starelid::regclass, count(*) FROM pg_statistic WHERE starelid IN (
+SELECT DISTINCT starelid::regclass FROM pg_statistic WHERE starelid IN (
   'concur_exprs_index_expr'::regclass,
   'concur_exprs_index_pred'::regclass,
   'concur_exprs_index_pred_2'::regclass)
-  GROUP BY starelid ORDER BY starelid::regclass::text;
+  ORDER BY starelid::regclass;
 SELECT pg_get_indexdef('concur_exprs_index_expr'::regclass);
 SELECT pg_get_indexdef('concur_exprs_index_pred'::regclass);
 SELECT pg_get_indexdef('concur_exprs_index_pred_2'::regclass);
@@ -534,11 +534,11 @@ SELECT pg_get_indexdef('concur_exprs_index_expr'::regclass);
 SELECT pg_get_indexdef('concur_exprs_index_pred'::regclass);
 SELECT pg_get_indexdef('concur_exprs_index_pred_2'::regclass);
 -- Statistics should remain intact.
-SELECT starelid::regclass, count(*) FROM pg_statistic WHERE starelid IN (
+SELECT DISTINCT starelid::regclass FROM pg_statistic WHERE starelid IN (
   'concur_exprs_index_expr'::regclass,
   'concur_exprs_index_pred'::regclass,
   'concur_exprs_index_pred_2'::regclass)
-  GROUP BY starelid ORDER BY starelid::regclass::text;
+  ORDER BY starelid::regclass;
 -- attstattarget should remain intact
 SELECT attrelid::regclass, attnum, attstattarget
   FROM pg_attribute WHERE attrelid IN (

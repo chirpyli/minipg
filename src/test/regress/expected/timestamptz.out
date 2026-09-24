@@ -13,35 +13,37 @@ INSERT INTO TIMESTAMPTZ_TBL VALUES ('yesterday');
 INSERT INTO TIMESTAMPTZ_TBL VALUES ('tomorrow');
 INSERT INTO TIMESTAMPTZ_TBL VALUES ('tomorrow EST');
 INSERT INTO TIMESTAMPTZ_TBL VALUES ('tomorrow zulu');
-SELECT count(*) AS One FROM TIMESTAMPTZ_TBL WHERE d1 = timestamp with time zone 'today';
+SELECT true AS One FROM TIMESTAMPTZ_TBL WHERE d1 = timestamp with time zone 'today';
  one 
 -----
-   1
+ t
 (1 row)
 
-SELECT count(*) AS One FROM TIMESTAMPTZ_TBL WHERE d1 = timestamp with time zone 'tomorrow';
+SELECT true AS One FROM TIMESTAMPTZ_TBL WHERE d1 = timestamp with time zone 'tomorrow';
  one 
 -----
-   2
+ t
+ t
+(2 rows)
+
+SELECT true AS One FROM TIMESTAMPTZ_TBL WHERE d1 = timestamp with time zone 'yesterday';
+ one 
+-----
+ t
 (1 row)
 
-SELECT count(*) AS One FROM TIMESTAMPTZ_TBL WHERE d1 = timestamp with time zone 'yesterday';
+SELECT true AS One FROM TIMESTAMPTZ_TBL WHERE d1 = timestamp with time zone 'tomorrow EST';
  one 
 -----
-   1
+ t
 (1 row)
 
-SELECT count(*) AS One FROM TIMESTAMPTZ_TBL WHERE d1 = timestamp with time zone 'tomorrow EST';
+SELECT true AS One FROM TIMESTAMPTZ_TBL WHERE d1 = timestamp with time zone 'tomorrow zulu';
  one 
 -----
-   1
-(1 row)
-
-SELECT count(*) AS One FROM TIMESTAMPTZ_TBL WHERE d1 = timestamp with time zone 'tomorrow zulu';
- one 
------
-   2
-(1 row)
+ t
+ t
+(2 rows)
 
 COMMIT;
 DELETE FROM TIMESTAMPTZ_TBL;
@@ -51,17 +53,19 @@ DELETE FROM TIMESTAMPTZ_TBL;
 BEGIN;
 INSERT INTO TIMESTAMPTZ_TBL VALUES ('now');
 INSERT INTO TIMESTAMPTZ_TBL VALUES ('now');
-SELECT count(*) AS two FROM TIMESTAMPTZ_TBL WHERE d1 = timestamp(2) with time zone 'now';
+SELECT true AS two FROM TIMESTAMPTZ_TBL WHERE d1 = timestamp(2) with time zone 'now';
  two 
 -----
-   2
-(1 row)
+ t
+ t
+(2 rows)
 
-SELECT count(d1) AS two FROM TIMESTAMPTZ_TBL;
+SELECT true AS two FROM TIMESTAMPTZ_TBL;
  two 
 -----
-   2
-(1 row)
+ t
+ t
+(2 rows)
 
 COMMIT;
 TRUNCATE TIMESTAMPTZ_TBL;

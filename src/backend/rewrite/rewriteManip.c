@@ -25,148 +25,9 @@
 #include "utils/lsyscache.h"
 
 
-typedef struct
-{
-	int			sublevels_up;
-} contain_aggs_of_level_context;
-
-typedef struct
-{
-	int			agg_location;
-	int			sublevels_up;
-} locate_agg_of_level_context;
-
-static bool contain_aggs_of_level_walker(Node *node,
-										 contain_aggs_of_level_context *context);
-static bool locate_agg_of_level_walker(Node *node,
-									   locate_agg_of_level_context *context);
 static bool checkExprHasSubLink_walker(Node *node, void *context);
 static Relids offset_relid_set(Relids relids, int offset);
 static Relids adjust_relid_set(Relids relids, int oldrelid, int newrelid);
-
-
-/*
- * contain_aggs_of_level -
- *	Check if an expression contains an aggregate function call of a
- *	specified query level.
- *
- * The objective of this routine is to detect whether there are aggregates
- * belonging to the given query level.  Aggregates belonging to subqueries
- * or outer queries do NOT cause a true result.  We must recurse into
- * subqueries to detect outer-reference aggregates that logically belong to
- * the specified query level.
- */
-bool
-contain_aggs_of_level(Node *node, int levelsup)
-{
-	contain_aggs_of_level_context context;
-
-	context.sublevels_up = levelsup;
-
-	/*
-	 * Must be prepared to start with a Query or a bare expression tree; if
-	 * it's a Query, we don't want to increment sublevels_up.
-	 */
-	return query_or_expression_tree_walker(node,
-										   contain_aggs_of_level_walker,
-										   (void *) &context,
-										   0);
-}
-
-static bool
-contain_aggs_of_level_walker(Node *node,
-							 contain_aggs_of_level_context *context)
-{
-	if (node == NULL)
-		return false;
-	if (IsA(node, Aggref))
-	{
-		if (((Aggref *) node)->agglevelsup == context->sublevels_up)
-			return true;		/* abort the tree traversal and return true */
-		/* else fall through to examine argument */
-	}
-
-	if (IsA(node, Query))
-	{
-		/* Recurse into subselects */
-		bool		result;
-
-		context->sublevels_up++;
-		result = query_tree_walker((Query *) node,
-								   contain_aggs_of_level_walker,
-								   (void *) context, 0);
-		context->sublevels_up--;
-		return result;
-	}
-	return expression_tree_walker(node, contain_aggs_of_level_walker,
-								  (void *) context);
-}
-
-/*
- * locate_agg_of_level -
- *	  Find the parse location of any aggregate of the specified query level.
- *
- * Returns -1 if no such agg is in the querytree, or if they all have
- * unknown parse location.  (The former case is probably caller error,
- * but we don't bother to distinguish it from the latter case.)
- *
- * Note: it might seem appropriate to merge this functionality into
- * contain_aggs_of_level, but that would complicate that function's API.
- * Currently, the only uses of this function are for error reporting,
- * and so shaving cycles probably isn't very important.
- */
-int
-locate_agg_of_level(Node *node, int levelsup)
-{
-	locate_agg_of_level_context context;
-
-	context.agg_location = -1;	/* in case we find nothing */
-	context.sublevels_up = levelsup;
-
-	/*
-	 * Must be prepared to start with a Query or a bare expression tree; if
-	 * it's a Query, we don't want to increment sublevels_up.
-	 */
-	(void) query_or_expression_tree_walker(node,
-										   locate_agg_of_level_walker,
-										   (void *) &context,
-										   0);
-
-	return context.agg_location;
-}
-
-static bool
-locate_agg_of_level_walker(Node *node,
-						   locate_agg_of_level_context *context)
-{
-	if (node == NULL)
-		return false;
-	if (IsA(node, Aggref))
-	{
-		if (((Aggref *) node)->agglevelsup == context->sublevels_up &&
-			((Aggref *) node)->location >= 0)
-		{
-			context->agg_location = ((Aggref *) node)->location;
-			return true;		/* abort the tree traversal and return true */
-		}
-		/* else fall through to examine argument */
-	}
-
-	if (IsA(node, Query))
-	{
-		/* Recurse into subselects */
-		bool		result;
-
-		context->sublevels_up++;
-		result = query_tree_walker((Query *) node,
-								   locate_agg_of_level_walker,
-								   (void *) context, 0);
-		context->sublevels_up--;
-		return result;
-	}
-	return expression_tree_walker(node, locate_agg_of_level_walker,
-								  (void *) context);
-}
 
 
 /*
@@ -517,8 +378,6 @@ adjust_relid_set(Relids relids, int oldrelid, int newrelid)
  * that sublink are not affected, only outer references to vars that belong
  * to the expression's original query level or parents thereof.
  *
- * Likewise for other nodes containing levelsup fields, such as Aggref.
- *
  * NOTE: although this has the form of a walker, we cheat and modify the
  * Var nodes in-place.  The given expression tree should have been copied
  * earlier to ensure that no unwanted side-effects occur!
@@ -543,14 +402,6 @@ IncrementVarSublevelsUp_walker(Node *node,
 		if (var->varlevelsup >= context->min_sublevels_up)
 			var->varlevelsup += context->delta_sublevels_up;
 		return false;			/* done here */
-	}
-	if (IsA(node, Aggref))
-	{
-		Aggref	   *agg = (Aggref *) node;
-
-		if (agg->agglevelsup >= context->min_sublevels_up)
-			agg->agglevelsup += context->delta_sublevels_up;
-		/* fall through to recurse into argument */
 	}
 
 	if (IsA(node, PlaceHolderVar))
@@ -806,11 +657,6 @@ AddQual(Query *parsetree, Node *qual)
 											   copy);
 
 	/*
-	 * We had better not have stuck an aggregate into the WHERE clause.
-	 */
-	Assert(!contain_aggs_of_level(copy, 0));
-
-	/*
 	 * Make sure query is marked correctly if added qual has sublinks. Need
 	 * not search qual when query is already marked.
 	 */
@@ -854,9 +700,6 @@ AddInvertedQual(Query *parsetree, Node *qual)
  *
  * Note: the business with inserted_sublink is needed to update hasSubLinks
  * in subqueries when the replacement adds a subquery inside a subquery.
- * Messy, isn't it?  We do not need to do similar pushups for hasAggs,
- * because it isn't possible for this transformation to insert a level-zero
- * aggregate reference into a subquery --- it could only insert outer aggs.
  *
  * Note: usually, we'd not expose the mutator function or context struct
  * for a function like this.  We do so because callbacks often find it

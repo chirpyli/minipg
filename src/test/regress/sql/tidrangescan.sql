@@ -74,11 +74,11 @@ SELECT ctid FROM tidrangescan WHERE ctid >= (SELECT NULL::tid);
 -- rescans
 EXPLAIN (COSTS OFF)
 SELECT t.ctid,t2.c FROM tidrangescan t,
-LATERAL (SELECT count(*) c FROM tidrangescan t2 WHERE t2.ctid <= t.ctid) t2
+LATERAL (SELECT DISTINCT 1 AS c FROM tidrangescan t2 WHERE t2.ctid <= t.ctid) t2
 WHERE t.ctid < '(1,0)';
 
 SELECT t.ctid,t2.c FROM tidrangescan t,
-LATERAL (SELECT count(*) c FROM tidrangescan t2 WHERE t2.ctid <= t.ctid) t2
+LATERAL (SELECT DISTINCT 1 AS c FROM tidrangescan t2 WHERE t2.ctid <= t.ctid) t2
 WHERE t.ctid < '(1,0)';
 
 DROP TABLE tidrangescan;

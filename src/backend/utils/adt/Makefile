@@ -35,7 +35,6 @@ OBJS = \
 	mcxtfuncs.o \
 	misc.o \
 	name.o \
-	intagg.o \
 	numutils.o \
 	oid.o \
 	oracle_compat.o \

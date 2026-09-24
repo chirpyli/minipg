@@ -342,7 +342,6 @@ consider_new_or_clause(PlannerInfo *root, RelOptInfo *rel,
 		sjinfo.lhs_strict = false;
 		sjinfo.delay_upper_joins = false;
 		sjinfo.semi_can_btree = false;
-		sjinfo.semi_can_hash = false;
 		sjinfo.semi_operators = NIL;
 		sjinfo.semi_rhs_exprs = NIL;
 

@@ -15,12 +15,10 @@
 #include "access/amapi.h"
 #include "access/htup_details.h"
 #include "executor/execdebug.h"
-#include "executor/nodeAgg.h"
 #include "executor/nodeBitmapAnd.h"
 #include "executor/nodeBitmapHeapscan.h"
 #include "executor/nodeBitmapIndexscan.h"
 #include "executor/nodeBitmapOr.h"
-#include "executor/nodeGroup.h"
 #include "executor/nodeHash.h"
 #include "executor/nodeHashjoin.h"
 #include "executor/nodeIncrementalSort.h"
@@ -198,14 +196,6 @@ ExecReScan(PlanState *node)
 			ExecReScanIncrementalSort((IncrementalSortState *) node);
 			break;
 
-		case T_GroupState:
-			ExecReScanGroup((GroupState *) node);
-			break;
-
-		case T_AggState:
-			ExecReScanAgg((AggState *) node);
-			break;
-
 		case T_UniqueState:
 			ExecReScanUnique((UniqueState *) node);
 			break;
@@ -354,7 +344,7 @@ ExecSupportsMarkRestore(Path *pathnode)
 			 */
 			if (IsA(pathnode, ProjectionPath))
 				return ExecSupportsMarkRestore(((ProjectionPath *) pathnode)->subpath);
-			else if (IsA(pathnode, GroupResultPath))
+			else if (IsA(pathnode, ResultPath))
 				return false;	/* childless Result */
 			else
 			{

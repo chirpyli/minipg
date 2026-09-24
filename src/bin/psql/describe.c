@@ -271,8 +271,7 @@ describeOneTableDetails(const char *schemaname,
 						  "LEFT JOIN pg_catalog.pg_am am ON (c.relam = am.oid)\n"
 						  "WHERE c.oid = '%s';",
 						  (verbose ?
-						   "pg_catalog.array_to_string(c.reloptions || "
-						   "(select pg_catalog.array_agg('toast.' || x) from (select pg_catalog.unnest(tc.reloptions) as x) as _gs), ', ')\n"
+						   "pg_catalog.array_to_string(c.reloptions, ', ')\n"
 						   : "''"),
 						  oid);
 	}
@@ -287,8 +286,7 @@ describeOneTableDetails(const char *schemaname,
 						  "LEFT JOIN pg_catalog.pg_class tc ON (c.reltoastrelid = tc.oid)\n"
 						  "WHERE c.oid = '%s';",
 						  (verbose ?
-						   "pg_catalog.array_to_string(c.reloptions || "
-						   "(select pg_catalog.array_agg('toast.' || x) from (select pg_catalog.unnest(tc.reloptions) as x) as _gs), ', ')\n"
+						   "pg_catalog.array_to_string(c.reloptions, ', ')\n"
 						   : "''"),
 						  oid);
 	}
@@ -303,8 +301,7 @@ describeOneTableDetails(const char *schemaname,
 						  "LEFT JOIN pg_catalog.pg_class tc ON (c.reltoastrelid = tc.oid)\n"
 						  "WHERE c.oid = '%s';",
 						  (verbose ?
-						   "pg_catalog.array_to_string(c.reloptions || "
-						   "(select pg_catalog.array_agg('toast.' || x) from (select pg_catalog.unnest(tc.reloptions) as x) as _gs), ', ')\n"
+						   "pg_catalog.array_to_string(c.reloptions, ', ')\n"
 						   : "''"),
 						  oid);
 	}
@@ -319,8 +316,7 @@ describeOneTableDetails(const char *schemaname,
 						  "LEFT JOIN pg_catalog.pg_class tc ON (c.reltoastrelid = tc.oid)\n"
 						  "WHERE c.oid = '%s';",
 						  (verbose ?
-						   "pg_catalog.array_to_string(c.reloptions || "
-						   "(select pg_catalog.array_agg('toast.' || x) from (select pg_catalog.unnest(tc.reloptions) as x) as _gs), ', ')\n"
+						   "pg_catalog.array_to_string(c.reloptions, ', ')\n"
 						   : "''"),
 						  oid);
 	}
@@ -335,8 +331,7 @@ describeOneTableDetails(const char *schemaname,
 						  "LEFT JOIN pg_catalog.pg_class tc ON (c.reltoastrelid = tc.oid)\n"
 						  "WHERE c.oid = '%s';",
 						  (verbose ?
-						   "pg_catalog.array_to_string(c.reloptions || "
-						   "(select pg_catalog.array_agg('toast.' || x) from (select pg_catalog.unnest(tc.reloptions) as x) as _gs), ', ')\n"
+						   "pg_catalog.array_to_string(c.reloptions, ', ')\n"
 						   : "''"),
 						  oid);
 	}
@@ -350,8 +345,7 @@ describeOneTableDetails(const char *schemaname,
 						  "LEFT JOIN pg_catalog.pg_class tc ON (c.reltoastrelid = tc.oid)\n"
 						  "WHERE c.oid = '%s';",
 						  (verbose ?
-						   "pg_catalog.array_to_string(c.reloptions || "
-						   "(select pg_catalog.array_agg('toast.' || x) from (select pg_catalog.unnest(tc.reloptions) as x) as _gs), ', ')\n"
+						   "pg_catalog.array_to_string(c.reloptions, ', ')\n"
 						   : "''"),
 						  oid);
 	}
@@ -365,8 +359,7 @@ describeOneTableDetails(const char *schemaname,
 						  "LEFT JOIN pg_catalog.pg_class tc ON (c.reltoastrelid = tc.oid)\n"
 						  "WHERE c.oid = '%s';",
 						  (verbose ?
-						   "pg_catalog.array_to_string(c.reloptions || "
-						   "(select pg_catalog.array_agg('toast.' || x) from (select pg_catalog.unnest(tc.reloptions) as x) as _gs), ', ')\n"
+						   "pg_catalog.array_to_string(c.reloptions, ', ')\n"
 						   : "''"),
 						  oid);
 	}

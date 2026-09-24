@@ -761,11 +761,13 @@ select 33 = all ('{33,null,33}');
 (1 row)
 
 -- nulls later in the bitmap
-SELECT -1 != ALL((SELECT array_agg(NULLIF(g.i, 900)) FROM (SELECT generate_series(1,1000) AS i) AS g));
-ERROR:  operator does not exist: integer <> integer[]
-LINE 1: SELECT -1 != ALL((SELECT array_agg(NULLIF(g.i, 900)) FROM (S...
-                  ^
-HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
+-- minipg: array_agg 已裁剪，改用含较后位置 NULL 的等价字面量数组
+SELECT -1 != ALL('{1,2,3,4,5,6,7,8,9,null,11,12}'::int[]);
+ ?column? 
+----------
+ 
+(1 row)
+
 -- test indexes on arrays
 CREATE TABLE arr_tbl (f1 int[] unique);
 insert into arr_tbl values ('{1,2,3}');
@@ -910,44 +912,14 @@ INSERT INTO arraggtest (f1, f2, f3) VALUES
 ('{1,2,3,4}','{{grey,red},{blue,blue}}','{1.6, 0.0}');
 INSERT INTO arraggtest (f1, f2, f3) VALUES
 ('{1,2,3}','{{grey,red},{grey,blue}}','{1.6}');
-SELECT max(f1), min(f1), max(f2), min(f2), max(f3), min(f3) FROM arraggtest;
-    max    |   min   |           max            |           min            |   max   |  min  
------------+---------+--------------------------+--------------------------+---------+-------
- {1,2,3,4} | {1,2,3} | {{grey,red},{grey,blue}} | {{grey,red},{blue,blue}} | {1.6,0} | {1.6}
-(1 row)
-
 INSERT INTO arraggtest (f1, f2, f3) VALUES
 ('{3,3,2,4,5,6}','{{white,yellow},{pink,orange}}','{2.1,3.3,1.8,1.7,1.6}');
-SELECT max(f1), min(f1), max(f2), min(f2), max(f3), min(f3) FROM arraggtest;
-      max      |   min   |              max               |           min            |          max          |  min  
----------------+---------+--------------------------------+--------------------------+-----------------------+-------
- {3,3,2,4,5,6} | {1,2,3} | {{white,yellow},{pink,orange}} | {{grey,red},{blue,blue}} | {2.1,3.3,1.8,1.7,1.6} | {1.6}
-(1 row)
-
 INSERT INTO arraggtest (f1, f2, f3) VALUES
 ('{2}','{{black,red},{green,orange}}','{1.6,2.2,2.6,0.4}');
-SELECT max(f1), min(f1), max(f2), min(f2), max(f3), min(f3) FROM arraggtest;
-      max      |   min   |              max               |             min              |          max          |  min  
----------------+---------+--------------------------------+------------------------------+-----------------------+-------
- {3,3,2,4,5,6} | {1,2,3} | {{white,yellow},{pink,orange}} | {{black,red},{green,orange}} | {2.1,3.3,1.8,1.7,1.6} | {1.6}
-(1 row)
-
 INSERT INTO arraggtest (f1, f2, f3) VALUES
 ('{4,2,6,7,8,1}','{{red},{black},{purple},{blue},{blue}}',NULL);
-SELECT max(f1), min(f1), max(f2), min(f2), max(f3), min(f3) FROM arraggtest;
-      max      |   min   |              max               |             min              |          max          |  min  
----------------+---------+--------------------------------+------------------------------+-----------------------+-------
- {4,2,6,7,8,1} | {1,2,3} | {{white,yellow},{pink,orange}} | {{black,red},{green,orange}} | {2.1,3.3,1.8,1.7,1.6} | {1.6}
-(1 row)
-
 INSERT INTO arraggtest (f1, f2, f3) VALUES
 ('{}','{{pink,white,blue,red,grey,orange}}','{2.1,1.87,1.4,2.2}');
-SELECT max(f1), min(f1), max(f2), min(f2), max(f3), min(f3) FROM arraggtest;
-      max      | min |              max               |             min              |          max          |  min  
----------------+-----+--------------------------------+------------------------------+-----------------------+-------
- {4,2,6,7,8,1} | {}  | {{white,yellow},{pink,orange}} | {{black,red},{green,orange}} | {2.1,3.3,1.8,1.7,1.6} | {1.6}
-(1 row)
-
 -- minipg: CREATE FUNCTION 已裁剪，unnest1/unnest2 自定义展开函数用例移除；
 -- 内建 unnest() 已在下方覆盖同语义
 select array_fill(null::integer, array[3,3],array[2,2]);
@@ -1341,80 +1313,7 @@ select cardinality('{{{1,9},{5,6}},{{2,3},{3,4}}}'::int[]);
            8
 (1 row)
 
--- array_agg(anynonarray)
-select array_agg(unique1) from (select unique1 from tenk1 where unique1 < 15 order by unique1) ss;
-              array_agg               
---------------------------------------
- {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14}
-(1 row)
-
-select array_agg(ten) from (select ten from tenk1 where unique1 < 15 order by unique1) ss;
-            array_agg            
----------------------------------
- {0,1,2,3,4,5,6,7,8,9,0,1,2,3,4}
-(1 row)
-
-select array_agg(nullif(ten, 4)) from (select ten from tenk1 where unique1 < 15 order by unique1) ss;
-               array_agg               
----------------------------------------
- {0,1,2,3,NULL,5,6,7,8,9,0,1,2,3,NULL}
-(1 row)
-
-select array_agg(unique1) from tenk1 where unique1 < -15;
- array_agg 
------------
- 
-(1 row)
-
--- array_agg(anyarray)
-select array_agg(ar)
-  from (values ('{1,2}'::int[]), ('{3,4}'::int[])) v(ar);
-   array_agg   
----------------
- {{1,2},{3,4}}
-(1 row)
-
-select array_agg(distinct ar order by ar desc)
-  from (select array[i / 2] from (SELECT generate_series(1,10) AS i) AS a) b(ar);
-         array_agg         
----------------------------
- {{5},{4},{3},{2},{1},{0}}
-(1 row)
-
-select array_agg(ar)
-  from (select array_agg(array[i, i+1, i-1])
-        from (SELECT generate_series(1,2) AS i) AS a) b(ar);
-      array_agg      
----------------------
- {{{1,2,0},{2,3,1}}}
-(1 row)
-
-select array_agg(array[i+1.2, i+1.3, i+1.4]) from (SELECT generate_series(1,3) AS i) AS g;
-                  array_agg                  
----------------------------------------------
- {{2.2,2.3,2.4},{3.2,3.3,3.4},{4.2,4.3,4.4}}
-(1 row)
-
-select array_agg(array['Hello', i::text]) from (SELECT generate_series(9,11) AS i) AS g;
-             array_agg             
------------------------------------
- {{Hello,9},{Hello,10},{Hello,11}}
-(1 row)
-
-select array_agg(array[i, nullif(i, 3), i+1]) from (SELECT generate_series(1,4) AS i) AS g;
-              array_agg               
---------------------------------------
- {{1,1,2},{2,2,3},{3,NULL,4},{4,4,5}}
-(1 row)
-
--- errors
-select array_agg('{}'::int[]) from (SELECT generate_series(1,2) AS g) AS _gs;
-ERROR:  cannot accumulate empty arrays
-select array_agg(null::int[]) from (SELECT generate_series(1,2) AS g) AS _gs;
-ERROR:  cannot accumulate null arrays
-select array_agg(ar)
-  from (values ('{1,2}'::int[]), ('{3}'::int[])) v(ar);
-ERROR:  cannot accumulate arrays of different dimensionality
+-- minipg: array_agg 聚合已裁剪，array_agg(anynonarray/anyarray) 用例移除
 select unnest(array[1,2,3]);
  unnest 
 --------

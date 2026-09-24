@@ -109,7 +109,6 @@ typedef struct Query
 	int			resultRelation; /* rtable index of target relation for
 								 * INSERT/UPDATE/DELETE; 0 for SELECT */
 
-	bool		hasAggs;		/* has aggregates in tlist or havingQual */
 	bool		hasTargetSRFs;	/* has set-returning functions in tlist */
 	bool		hasSubLinks;	/* has subquery SubLink */
 
@@ -117,10 +116,6 @@ typedef struct Query
 	FromExpr   *jointree;		/* table join tree (FROM and WHERE clauses) */
 
 	List	   *targetList;		/* target list (of TargetEntry) */
-
-	List	   *groupClause;	/* a list of SortGroupClause's */
-
-	Node	   *havingQual;		/* qualifications applied to groups */
 
 	List	   *distinctClause; /* a list of SortGroupClause's */
 
@@ -247,15 +242,7 @@ typedef struct TypeCast
 } TypeCast;
 
 /*
- * FuncCall - a function or aggregate invocation
- *
- * agg_order (if not NIL) indicates we saw 'foo(... ORDER BY ...)', or if
- * agg_within_group is true, it was 'foo(...) WITHIN GROUP (ORDER BY ...)'.
- * agg_star indicates we saw a 'foo(*)' construct, while agg_distinct
- * indicates we saw 'foo(DISTINCT ...)'.  In any of these cases, the
- * construct *must* be an aggregate call.  Otherwise, it might be either an
- * aggregate or some other kind of function.  However, if FILTER or OVER is
- * present it had better be an aggregate or window function.
+ * FuncCall - a function invocation
  *
  * Normally, you'd initialize this via makeFuncCall() and then only change the
  * parts of the struct its defaults don't match afterwards, as needed.
@@ -265,10 +252,6 @@ typedef struct FuncCall
 	NodeTag		type;
 	List	   *funcname;		/* qualified name of function */
 	List	   *args;			/* the arguments (list of exprs) */
-	List	   *agg_order;		/* ORDER BY (list of SortBy) */
-	bool		agg_within_group;	/* ORDER BY appeared in WITHIN GROUP */
-	bool		agg_star;		/* argument was really '*' */
-	bool		agg_distinct;	/* arguments were labeled DISTINCT */
 	CoercionForm funcformat;	/* how to display this node */
 	int			location;		/* token location, or -1 if unknown */
 } FuncCall;
@@ -807,8 +790,6 @@ typedef struct SelectStmt
 	List	   *targetList;		/* the target list (of ResTarget) */
 	List	   *fromClause;		/* the FROM clause */
 	Node	   *whereClause;	/* WHERE qualification */
-	List	   *groupClause;	/* GROUP BY clauses */
-	Node	   *havingClause;	/* HAVING conditional-expression */
 
 	/*
 	 * In a "leaf" node representing a VALUES list, the above fields are all

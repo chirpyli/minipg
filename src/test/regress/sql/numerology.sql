@@ -65,29 +65,7 @@ INSERT INTO TEMP_GROUP
 
 SELECT DISTINCT f1 AS two FROM TEMP_GROUP ORDER BY 1;
 
-SELECT f1 AS two, max(f3) AS max_float, min(f3) as min_float
-  FROM TEMP_GROUP
-  GROUP BY f1
-  ORDER BY two, max_float, min_float;
-
--- GROUP BY a result column name is not legal per SQL92, but we accept it
--- anyway (if the name is not the name of any column exposed by FROM).
-SELECT f1 AS two, max(f3) AS max_float, min(f3) AS min_float
-  FROM TEMP_GROUP
-  GROUP BY two
-  ORDER BY two, max_float, min_float;
-
-SELECT f1 AS two, (max(f3) + 1) AS max_plus_1, (min(f3) - 1) AS min_minus_1
-  FROM TEMP_GROUP
-  GROUP BY f1
-  ORDER BY two, min_minus_1;
-
-SELECT f1 AS two,
-       max(f2) + min(f2) AS max_plus_min,
-       min(f3) - 1 AS min_minus_1
-  FROM TEMP_GROUP
-  GROUP BY f1
-  ORDER BY two, min_minus_1;
+-- minipg: 聚合与 GROUP BY 已裁剪，max/min 分组数值语义用例移除
 
 DROP TABLE TEMP_INT2;
 

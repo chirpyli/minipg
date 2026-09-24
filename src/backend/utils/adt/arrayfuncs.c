@@ -4767,8 +4767,8 @@ array_extract_slice(ArrayType *newarray,
  * It's possible to choose whether to create a separate memory context for the
  * array build state, or whether to allocate it directly within rcontext.
  *
- * When there are many concurrent small states (e.g. array_agg() using hash
- * aggregation of many small groups), using a separate memory context for each
+ * When there are many concurrent small states (e.g. building many small
+ * arrays at once), using a separate memory context for each
  * one may result in severe memory bloat. In such cases, use the same memory
  * context to initialize all such array build states, and pass
  * subcontext=false.
@@ -4851,7 +4851,7 @@ accumArrayResult(ArrayBuildState *astate,
 	 * it's varlena.  (You might think that detoasting is not needed here
 	 * because construct_md_array can detoast the array elements later.
 	 * However, we must not let construct_md_array modify the ArrayBuildState
-	 * because that would mean array_agg_finalfn damages its input, which is
+	 * because that would mean the caller damages its input, which is
 	 * verboten.  Also, this way frequently saves one copying step.)
 	 */
 	if (!disnull && !astate->typbyval)

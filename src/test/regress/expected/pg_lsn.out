@@ -26,13 +26,6 @@ INSERT INTO PG_LSN_TBL VALUES ('/ABCD');
 ERROR:  invalid input syntax for type pg_lsn: "/ABCD"
 LINE 1: INSERT INTO PG_LSN_TBL VALUES ('/ABCD');
                                        ^
--- Min/Max aggregation
-SELECT MIN(f1), MAX(f1) FROM PG_LSN_TBL;
- min |        max        
------+-------------------
- 0/0 | FFFFFFFF/FFFFFFFF
-(1 row)
-
 DROP TABLE PG_LSN_TBL;
 -- Operators
 SELECT '0/16AE7F8' = '0/16AE7F8'::pg_lsn;
@@ -130,12 +123,11 @@ SELECT DISTINCT (i || '/' || j)::pg_lsn f
        (SELECT generate_series(1, 5) AS k) AS _gsk
   WHERE i <= 10 AND j > 0 AND j <= 10
   ORDER BY f;
-                                   QUERY PLAN                                   
---------------------------------------------------------------------------------
- Sort
-   Sort Key: (((((_gsi.i)::text || '/'::text) || (_gsj.j)::text))::pg_lsn)
-   ->  HashAggregate
-         Group Key: ((((_gsi.i)::text || '/'::text) || (_gsj.j)::text))::pg_lsn
+                                   QUERY PLAN                                    
+---------------------------------------------------------------------------------
+ Unique
+   ->  Sort
+         Sort Key: (((((_gsi.i)::text || '/'::text) || (_gsj.j)::text))::pg_lsn)
          ->  Nested Loop
                ->  ProjectSet
                      ->  Result
@@ -149,7 +141,7 @@ SELECT DISTINCT (i || '/' || j)::pg_lsn f
                                  Filter: (_gsi.i <= 10)
                                  ->  ProjectSet
                                        ->  Result
-(17 rows)
+(16 rows)
 
 SELECT DISTINCT (i || '/' || j)::pg_lsn f
   FROM (SELECT generate_series(1, 10) AS i) AS _gsi,

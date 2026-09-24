@@ -90,8 +90,6 @@ SELECT q1 + 42::int2 AS "8plus2", q1 - 42::int2 AS "8minus2", q1 * 42::int2 AS "
 SELECT 246::int2 + q1 AS "2plus8", 246::int2 - q1 AS "2minus8", 246::int2 * q1 AS "2mul8", 246::int2 / q1 AS "2div8" FROM INT8_TBL;
 
 SELECT q2, abs(q2) FROM INT8_TBL;
-SELECT min(q1), min(q2) FROM INT8_TBL;
-SELECT max(q1), max(q2) FROM INT8_TBL;
 
 
 -- check min/max values and overflow behavior

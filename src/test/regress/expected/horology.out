@@ -969,10 +969,10 @@ SHOW DateStyle;
 (1 row)
 
 INSERT INTO TIMESTAMP_TBL VALUES('13/06/1957');
-SELECT count(*) as one FROM TIMESTAMP_TBL WHERE d1 = 'Jun 13 1957';
- one 
------
-   1
+SELECT d1 FROM TIMESTAMP_TBL WHERE d1 = 'Jun 13 1957';
+            d1            
+--------------------------
+ Thu 13 Jun 00:00:00 1957
 (1 row)
 
 SELECT d1 AS european_postgres FROM TIMESTAMP_TBL;

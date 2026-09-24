@@ -33,7 +33,6 @@
 #include "nodes/nodeFuncs.h"
 #include "optimizer/optimizer.h"
 #include "parser/analyze.h"
-#include "parser/parse_agg.h"
 #include "parser/parse_clause.h"
 #include "parser/parse_coerce.h"
 #include "parser/parse_collate.h"
@@ -332,13 +331,8 @@ transformDeleteStmt(ParseState *pstate, DeleteStmt *stmt)
 
 	qry->hasSubLinks = pstate->p_hasSubLinks;
 	qry->hasTargetSRFs = pstate->p_hasTargetSRFs;
-	qry->hasAggs = pstate->p_hasAggs;
 
 	assign_query_collations(pstate, qry);
-
-	/* this must be done after collations, for reliable comparison of exprs */
-	if (pstate->p_hasAggs)
-		parseCheckAggregates(pstate, qry);
 
 	return qry;
 }
@@ -824,28 +818,16 @@ transformSelectStmt(ParseState *pstate, SelectStmt *stmt)
 	qual = transformWhereClause(pstate, stmt->whereClause,
 								EXPR_KIND_WHERE, "WHERE");
 
-	/* initial processing of HAVING clause is much like WHERE clause */
-	qry->havingQual = transformWhereClause(pstate, stmt->havingClause,
-										   EXPR_KIND_HAVING, "HAVING");
-
 	/*
-	 * Transform sorting/grouping stuff.  Do ORDER BY first because both
-	 * transformGroupClause and transformDistinctClause need the results. Note
-	 * that these functions can also change the targetList, so it's passed to
-	 * them by reference.
+	 * Transform sorting stuff.  Do ORDER BY first because
+	 * transformDistinctClause needs the results. Note that these functions
+	 * can also change the targetList, so it's passed to them by reference.
 	 */
 	qry->sortClause = transformSortClause(pstate,
 										  stmt->sortClause,
 										  &qry->targetList,
 										  EXPR_KIND_ORDER_BY,
 										  false /* allow SQL92 rules */ );
-
-	qry->groupClause = transformGroupClause(pstate,
-											stmt->groupClause,
-											&qry->targetList,
-											qry->sortClause,
-											EXPR_KIND_GROUP_BY,
-											false /* allow SQL92 rules */ );
 
 	if (stmt->distinctClause == NIL)
 	{
@@ -856,8 +838,7 @@ transformSelectStmt(ParseState *pstate, SelectStmt *stmt)
 		/* We had SELECT DISTINCT */
 		qry->distinctClause = transformDistinctClause(pstate,
 													  &qry->targetList,
-													  qry->sortClause,
-													  false);
+													  qry->sortClause);
 	}
 
 	/* resolve any still-unresolved output columns as being type text */
@@ -869,13 +850,8 @@ transformSelectStmt(ParseState *pstate, SelectStmt *stmt)
 
 	qry->hasSubLinks = pstate->p_hasSubLinks;
 	qry->hasTargetSRFs = pstate->p_hasTargetSRFs;
-	qry->hasAggs = pstate->p_hasAggs;
 
 	assign_query_collations(pstate, qry);
-
-	/* this must be done after collations, for reliable comparison of exprs */
-	if (pstate->p_hasAggs || qry->groupClause || qry->havingQual)
-		parseCheckAggregates(pstate, qry);
 
 	return qry;
 }
@@ -910,8 +886,6 @@ transformValuesClause(ParseState *pstate, SelectStmt *stmt)
 	Assert(stmt->targetList == NIL);
 	Assert(stmt->fromClause == NIL);
 	Assert(stmt->whereClause == NULL);
-	Assert(stmt->groupClause == NIL);
-	Assert(stmt->havingClause == NULL);
 
 	/*
 	 * For each row of VALUES, transform the raw expressions.

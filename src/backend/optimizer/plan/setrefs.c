@@ -152,9 +152,6 @@ static Node *fix_upper_expr_mutator(Node *node,
  * 3. We adjust Vars in upper plan nodes to refer to the outputs of their
  * subplans.
  *
- * 4. Aggrefs in Agg plan nodes need to be adjusted in some cases involving
- * partial aggregation or minmax aggregate optimization.
- *
  * 6. We compute regproc OIDs for operators (ie, we look up the function
  * that implements each op).
  *
@@ -643,10 +640,6 @@ set_plan_refs(PlannerInfo *root, Plan *plan, int rtoffset)
 			 */
 			Assert(plan->qual == NIL);
 			break;
-		case T_Agg:
-		case T_Group:
-			set_upper_references(root, plan, rtoffset);
-			break;
 		case T_Result:
 			{
 				Result	   *splan = (Result *) plan;
@@ -1059,12 +1052,7 @@ static void
 fix_expr_common(PlannerInfo *root, Node *node)
 {
 	/* We assume callers won't call us on a NULL pointer */
-	if (IsA(node, Aggref))
-	{
-		record_plan_function_dependency(root,
-										((Aggref *) node)->aggfnoid);
-	}
-	else if (IsA(node, FuncExpr))
+	if (IsA(node, FuncExpr))
 	{
 		record_plan_function_dependency(root,
 										((FuncExpr *) node)->funcid);
@@ -1122,7 +1110,6 @@ fix_param_node(PlannerInfo *root, Param *p)
  *
  * This consists of incrementing all Vars' varnos by rtoffset,
  * expanding PlaceHolderVars,
- * replacing Aggref nodes that should be replaced by initplan output Params,
  * looking up operator opcode info for OpExpr and related nodes,
  * and adding OIDs from regclass Const nodes into root->glob->relationOids.
  *
@@ -1149,12 +1136,11 @@ fix_scan_expr(PlannerInfo *root, Node *node, int rtoffset)
 	{
 		/*
 		 * If rtoffset == 0, we don't need to change any Vars, and if there
-		 * are no placeholders anywhere
-		 * we won't need to remove them, and if there are no minmax Aggrefs we
-		 * won't need to replace them.  Then it's OK to just scribble on the
-		 * input node tree instead of copying (since the only change, filling
-		 * in any unset opfuncid fields, is harmless).  This saves just enough
-		 * cycles to be noticeable on trivial queries.
+		 * are no placeholders anywhere we won't need to remove them.  Then
+		 * it's OK to just scribble on the input node tree instead of copying
+		 * (since the only change, filling in any unset opfuncid fields, is
+		 * harmless).  This saves just enough cycles to be noticeable on
+		 * trivial queries.
 		 */
 		(void) fix_scan_expr_walker(node, &context);
 		return node;
@@ -1352,7 +1338,7 @@ set_join_references(PlannerInfo *root, Join *join, int rtoffset)
  *	  Also perform opcode lookup for these expressions, and
  *	  add regclass OIDs to root->glob->relationOids.
  *
- * This is used for single-input plan types like Agg, Group, Result.
+ * This is used for single-input plan types like Result, Sort, Unique.
  *
  * In most cases, we have to match up individual Vars in the tlist and
  * qual expressions with elements of the subplan's tlist (which was
@@ -1803,9 +1789,8 @@ fix_join_expr_mutator(Node *node, fix_join_expr_context *context)
 /*
  * fix_upper_expr
  *		Modifies an expression tree so that all Var nodes reference outputs
- *		of a subplan.  Also looks for Aggref nodes that should be replaced
- *		by initplan output Params.  Also performs opcode lookup, and adds
- *		regclass OIDs to root->glob->relationOids.
+ *		of a subplan.  Also performs opcode lookup, and adds regclass OIDs to
+ *		root->glob->relationOids.
  *
  * This is used to fix up target and qual expressions of non-join upper-level
  * plan nodes, as well as index-only scan nodes.

@@ -18,14 +18,10 @@
 #ifndef FMGR_H
 #define FMGR_H
 
-/* We don't want to include primnodes.h here, so make some stub references */
+/* We don't want to include primnodes.h here, so make a stub reference */
 typedef struct Node *fmNodePtr;
-typedef struct Aggref *fmAggrefPtr;
 
-/* Likewise, avoid including execnodes.h here */
-typedef void (*fmExprContextCallbackFunction) (Datum arg);
-
-/* Likewise, avoid including stringinfo.h here */
+/* We don't want to include stringinfo.h here, so make a stub reference */
 typedef struct StringInfoData *fmStringInfo;
 
 
@@ -691,25 +687,5 @@ extern bool get_fn_expr_arg_stable(FmgrInfo *flinfo, int argnum);
 extern bool get_call_expr_arg_stable(fmNodePtr expr, int argnum);
 extern bool get_fn_expr_variadic(FmgrInfo *flinfo);
 extern void set_fn_opclass_options(FmgrInfo *flinfo, bytea *options);
-
-/*
- * Support for aggregate functions
- *
- * These are actually in executor/nodeAgg.c, but we declare them here since
- * the whole point is for callers to not be overly friendly with nodeAgg.
- */
-
-/* AggCheckCallContext can return one of the following codes, or 0: */
-#define AGG_CONTEXT_AGGREGATE	1	/* regular aggregate */
-#define AGG_CONTEXT_WINDOW		2	/* window function */
-
-extern int	AggCheckCallContext(FunctionCallInfo fcinfo,
-								MemoryContext *aggcontext);
-extern fmAggrefPtr AggGetAggref(FunctionCallInfo fcinfo);
-extern MemoryContext AggGetTempMemoryContext(FunctionCallInfo fcinfo);
-extern bool AggStateIsShared(FunctionCallInfo fcinfo);
-extern void AggRegisterCallback(FunctionCallInfo fcinfo,
-								fmExprContextCallbackFunction func,
-								Datum arg);
 
 #endif							/* FMGR_H */

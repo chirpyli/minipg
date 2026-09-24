@@ -214,51 +214,6 @@ replace_outer_placeholdervar(PlannerInfo *root, PlaceHolderVar *phv)
 	return retval;
 }
 
-/*
- * Generate a Param node to replace the given Aggref
- * which is expected to have agglevelsup > 0 (ie, it is not local).
- * Record the need for the Aggref in the proper upper-level root->plan_params.
- */
-Param *
-replace_outer_agg(PlannerInfo *root, Aggref *agg)
-{
-	Param	   *retval;
-	PlannerParamItem *pitem;
-	Index		levelsup;
-
-	Assert(agg->agglevelsup > 0 && agg->agglevelsup < root->query_level);
-
-	/* Find the query level the Aggref belongs to */
-	for (levelsup = agg->agglevelsup; levelsup > 0; levelsup--)
-		root = root->parent_root;
-
-	/*
-	 * It does not seem worthwhile to try to de-duplicate references to outer
-	 * aggs.  Just make a new slot every time.
-	 */
-	agg = copyObject(agg);
-	IncrementVarSublevelsUp((Node *) agg, -((int) agg->agglevelsup), 0);
-	Assert(agg->agglevelsup == 0);
-
-	pitem = makeNode(PlannerParamItem);
-	pitem->item = (Node *) agg;
-	pitem->paramId = list_length(root->glob->paramExecTypes);
-	root->glob->paramExecTypes = lappend_oid(root->glob->paramExecTypes,
-											 agg->aggtype);
-
-	root->plan_params = lappend(root->plan_params, pitem);
-
-	retval = makeNode(Param);
-	retval->paramkind = PARAM_EXEC;
-	retval->paramid = pitem->paramId;
-	retval->paramtype = agg->aggtype;
-	retval->paramtypmod = -1;
-	retval->paramcollid = agg->aggcollid;
-	retval->location = agg->location;
-
-	return retval;
-}
-
 
 /*
  * Generate a Param node to replace the given Var,

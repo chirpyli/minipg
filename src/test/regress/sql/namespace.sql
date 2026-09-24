@@ -38,8 +38,8 @@ SHOW search_path;
 DROP SCHEMA test_ns_schema_2 CASCADE;
 
 -- verify that the objects were created
-SELECT COUNT(*) FROM pg_class WHERE relnamespace =
-    (SELECT oid FROM pg_namespace WHERE nspname = 'test_ns_schema_1');
+SELECT relname FROM pg_class WHERE relnamespace =
+    (SELECT oid FROM pg_namespace WHERE nspname = 'test_ns_schema_1') ORDER BY relname;
 
 -- minipg: DEFAULT VALUES 已裁剪，改为显式插入
 INSERT INTO test_ns_schema_1.abc (a, b) VALUES (1, 1);
@@ -50,8 +50,8 @@ SELECT * FROM test_ns_schema_1.abc;
 SELECT * FROM test_ns_schema_1.abc_view;
 
 -- minipg: ALTER SCHEMA ... RENAME 已裁剪，无法改名，直接对原 schema 断言
-SELECT COUNT(*) FROM pg_class WHERE relnamespace =
-    (SELECT oid FROM pg_namespace WHERE nspname = 'test_ns_schema_1');
+SELECT relname FROM pg_class WHERE relnamespace =
+    (SELECT oid FROM pg_namespace WHERE nspname = 'test_ns_schema_1') ORDER BY relname;
 
 -- test IF NOT EXISTS cases
 CREATE SCHEMA test_ns_schema_1; -- fail, already exists
@@ -65,5 +65,5 @@ CREATE SCHEMA IF NOT EXISTS test_ns_schema_1 -- fail, disallowed
 DROP SCHEMA test_ns_schema_1 CASCADE;
 
 -- verify that the objects were dropped
-SELECT COUNT(*) FROM pg_class WHERE relnamespace =
-    (SELECT oid FROM pg_namespace WHERE nspname = 'test_ns_schema_1');
+SELECT relname FROM pg_class WHERE relnamespace =
+    (SELECT oid FROM pg_namespace WHERE nspname = 'test_ns_schema_1') ORDER BY relname;

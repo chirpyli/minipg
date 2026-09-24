@@ -12,8 +12,7 @@ scan.l		break query into tokens
 scansup.c	handle escapes in input strings
 gram.y		parse the tokens and produce a "raw" parse tree
 analyze.c	top level of parse analysis for optimizable queries
-parse_agg.c	handle aggregates, like SUM(col1),  AVG(col2), ...
-parse_clause.c	handle clauses like WHERE, ORDER BY, GROUP BY, ...
+parse_clause.c	handle clauses like WHERE, ORDER BY, ...
 parse_coerce.c	handle coercing expressions to different data types
 parse_collate.c	assign collation information in completed expressions
 parse_cte.c	handle Common Table Expressions (WITH clauses)

@@ -119,7 +119,6 @@ DECLARE_UNIQUE_INDEX(pg_proc_proname_args_nsp_index, 2691, on pg_proc using btre
  * Symbolic values for prokind column
  */
 #define PROKIND_FUNCTION 'f'
-#define PROKIND_AGGREGATE 'a'
 #define PROKIND_WINDOW 'w'
 #define PROKIND_PROCEDURE 'p'
 

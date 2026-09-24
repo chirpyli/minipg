@@ -23,7 +23,7 @@
 #include "storage/sinval.h"
 
 /*
- * Xact isolation levels
+ * 事务隔离级别
  */
 #define XACT_READ_UNCOMMITTED	0
 #define XACT_READ_COMMITTED		1
@@ -34,11 +34,11 @@ extern int	DefaultXactIsoLevel;
 extern PGDLLIMPORT int XactIsoLevel;
 
 /*
- * We implement three isolation levels internally.
- * The two stronger ones use one snapshot per database transaction;
- * the others use one snapshot per statement.
- * Serializable uses predicate locks in addition to snapshots.
- * These macros should be used to check which isolation level is selected.
+ * 我们在内部实现三种隔离级别。
+ * 其中较强的两种每个数据库事务使用一个快照；
+ * 其余的则为每条语句使用一个快照。
+ * 可串行化（Serializable）除了快照之外还使用谓词锁（predicate lock）。
+ * 应当使用这些宏来检查当前选择的是哪种隔离级别。
  */
 #define IsolationUsesXactSnapshot() (XactIsoLevel >= XACT_REPEATABLE_READ)
 #define IsolationIsSerializable() (XactIsoLevel == XACT_SERIALIZABLE)
@@ -75,11 +75,9 @@ extern PGDLLIMPORT TransactionId CheckXidAlive;
 extern PGDLLIMPORT bool bsysscan;
 
 /*
- * Miscellaneous flag bits to record events which occur on the top level
- * transaction. These flags are only persisted in MyXactFlags and are intended
- * so we remember to do certain things later in the transaction. This is
- * globally accessible, so can be set from anywhere in the code which requires
- * recording flags.
+ * 用来记录顶层事务上发生的事件的一些杂项标志位。这些标志只保存在
+ * MyXactFlags 中，其用途是让我们记得在事务稍后的阶段做某些事情。
+ * 它是全局可访问的，因此代码中任何需要记录标志的地方都可以设置它。
  */
 extern int	MyXactFlags;
 
@@ -155,28 +153,25 @@ typedef struct xl_xact_assignment
 #define MinSizeOfXactAssignment offsetof(xl_xact_assignment, xsub)
 
 /*
- * Commit and abort records can contain a lot of information. But a large
- * portion of the records won't need all possible pieces of information. So we
- * only include what's needed.
+ * 提交和回滚记录可能包含大量信息。但其中很大一部分记录并不需要所有可能的
+ * 信息，因此我们只包含真正需要的内容。
  *
- * A minimal commit/abort record only consists of a xl_xact_commit/abort
- * struct. The presence of additional information is indicated by bits set in
- * 'xl_xact_xinfo->xinfo'. The presence of the xinfo field itself is signaled
- * by a set XLOG_XACT_HAS_INFO bit in the xl_info field.
+ * 一条最小的提交/回滚记录只包含一个 xl_xact_commit/abort 结构体。是否
+ * 存在附加信息由 'xl_xact_xinfo->xinfo' 中置位的比特来指示。xinfo 字段
+ * 本身是否存在，则由 xl_info 字段中置位的 XLOG_XACT_HAS_INFO 比特来表明。
  *
- * NB: All the individual data chunks should be sized to multiples of
- * sizeof(int) and only require int32 alignment. If they require bigger
- * alignment, they need to be copied upon reading.
+ * 注意（NB）：各个独立的数据块的大小应当是 sizeof(int) 的整数倍，并且只
+ * 要求 int32 对齐。如果它们要求更大的对齐，则在读取时需要被拷贝出来。
  */
 
-/* sub-records for commit/abort */
+/* 提交/回滚的子记录 */
 
 typedef struct xl_xact_xinfo
 {
 	/*
-	 * Even though we right now only require 1 byte of space in xinfo we use
-	 * four so following records don't have to care about alignment. Commit
-	 * records can be large, so copying large portions isn't attractive.
+	 * 尽管我们目前只需要 xinfo 中 1 字节的空间，但仍使用 4 字节，这样后续
+	 * 的记录就不必关心对齐问题。提交记录可能很大，因此拷贝其中的大部分内容
+	 * 并不划算。
 	 */
 	uint32		xinfo;
 } xl_xact_xinfo;

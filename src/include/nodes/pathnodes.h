@@ -46,28 +46,11 @@ typedef struct QualCost
 } QualCost;
 
 /*
- * Costing aggregate function execution requires these statistics about
- * the aggregates to be executed by a given Agg node.  Note that the costs
- * include the execution costs of the aggregates' argument expressions as
- * well as the aggregate functions themselves.  Also, the fields must be
- * defined so that initializing the struct to zeroes with memset is correct.
- */
-typedef struct AggClauseCosts
-{
-	QualCost	transCost;		/* total per-input-row execution costs */
-	QualCost	finalCost;		/* total per-aggregated-row costs */
-	Size		transitionSpace;	/* space for pass-by-ref transition data */
-} AggClauseCosts;
-
-/*
  * This enum identifies the different types of "upper" (post-scan/join)
  * relations that we might deal with during planning.
  */
 typedef enum UpperRelationKind
 {
-	UPPERREL_PARTIAL_GROUP_AGG, /* result of partial grouping/aggregation, if
-								 * any */
-	UPPERREL_GROUP_AGG,			/* result of grouping/aggregation, if any */
 	UPPERREL_DISTINCT,			/* result of "SELECT DISTINCT", if any */
 	UPPERREL_ORDERED,			/* result of ORDER BY, if any */
 	UPPERREL_FINAL				/* result of any remaining top-level actions */
@@ -269,7 +252,6 @@ struct PlannerInfo
 
 	List	   *query_pathkeys; /* desired pathkeys for query_planner() */
 
-	List	   *group_pathkeys; /* groupClause pathkeys, if any */
 	List	   *distinct_pathkeys;	/* distinctClause pathkeys, if any */
 	List	   *sort_pathkeys;	/* sortClause pathkeys, if any */
 
@@ -278,7 +260,7 @@ struct PlannerInfo
 	/* Use fetch_upper_rel() to get any particular upper rel */
 	List	   *upper_rels[UPPERREL_FINAL + 1]; /* upper-rel RelOptInfos */
 
-	/* Result tlists chosen by grouping_planner for upper-stage processing */
+	/* Result tlists chosen by upper_planner for upper-stage processing */
 	struct PathTarget *upper_targets[UPPERREL_FINAL + 1];
 
 	/*
@@ -314,17 +296,9 @@ struct PlannerInfo
 
 	bool		hasJoinRTEs;	/* true if any RTEs are RTE_JOIN kind */
 	bool		hasLateralRTEs; /* true if any RTEs are marked LATERAL */
-	bool		hasHavingQual;	/* true if havingQual was non-null */
 	bool		hasPseudoConstantQuals; /* true if any RestrictInfo has
-										 * pseudoconstant = true */
+									 * pseudoconstant = true */
 	bool		hasRecursion;	/* true if planning a recursive WITH item */
-
-	/*
-	 * Information about aggregates. Filled by preprocess_aggrefs().
-	 */
-	List	   *agginfos;		/* AggInfo structs */
-	List	   *aggtransinfos;	/* AggTransInfo structs */
-	int			numOrderedAggs; /* number w/ DISTINCT/ORDER BY/WITHIN GROUP */
 
 	/* These fields are used only when hasRecursion is true: */
 	int			wt_param_id;	/* PARAM_EXEC ID for the work table */
@@ -1163,17 +1137,17 @@ typedef struct AppendPath
 extern bool is_dummy_rel(RelOptInfo *rel);
 
 /*
- * GroupResultPath represents use of a Result plan node to compute the
- * output of a degenerate GROUP BY case, wherein we know we should produce
- * exactly one row, which might then be filtered by a HAVING qual.
+ * ResultPath represents use of a Result plan node to compute a one-row
+ * output, as needed for a FROM-less SELECT on an RTE_RESULT relation,
+ * possibly filtered by a qual.
  *
  * Note that quals is a list of bare clauses, not RestrictInfos.
  */
-typedef struct GroupResultPath
+typedef struct ResultPath
 {
 	Path		path;
 	List	   *quals;
-} GroupResultPath;
+} ResultPath;
 
 /*
  * MaterialPath represents use of a Material plan node, i.e., caching of
@@ -1212,10 +1186,10 @@ typedef struct MemoizePath
  * UniquePath represents elimination of distinct rows from the output of
  * its subpath.
  *
- * This can represent significantly different plans: either hash-based or
- * sort-based implementation, or a no-op if the input path can be proven
- * distinct already.  The decision is sufficiently localized that it's not
- * worth having separate Path node types.  (Note: in the no-op case, we could
+ * This can represent significantly different plans: either sort-based
+ * implementation, or a no-op if the input path can be proven distinct
+ * already.  The decision is sufficiently localized that it's not worth
+ * having separate Path node types.  (Note: in the no-op case, we could
  * eliminate the UniquePath node entirely and just return the subpath; but
  * it's convenient to have a UniquePath in the path tree to signal upper-level
  * routines that the input is known distinct.)
@@ -1223,7 +1197,6 @@ typedef struct MemoizePath
 typedef enum
 {
 	UNIQUE_PATH_NOOP,			/* input is known unique already */
-	UNIQUE_PATH_HASH,			/* use hashing */
 	UNIQUE_PATH_SORT			/* use sorting */
 } UniquePathMethod;
 
@@ -1388,22 +1361,6 @@ typedef struct IncrementalSortPath
 } IncrementalSortPath;
 
 /*
- * GroupPath represents grouping (of presorted input)
- *
- * groupClause represents the columns to be grouped on; the input path
- * must be at least that well sorted.
- *
- * We can also apply a qual to the grouped rows (equivalent of HAVING)
- */
-typedef struct GroupPath
-{
-	Path		path;
-	Path	   *subpath;		/* path representing input source */
-	List	   *groupClause;	/* a list of SortGroupClause's */
-	List	   *qual;			/* quals (HAVING quals), if any */
-} GroupPath;
-
-/*
  * UpperUniquePath represents adjacent-duplicate removal (in presorted input)
  *
  * The columns to be compared are the first numkeys columns of the path's
@@ -1415,24 +1372,6 @@ typedef struct UpperUniquePath
 	Path	   *subpath;		/* path representing input source */
 	int			numkeys;		/* number of pathkey columns to compare */
 } UpperUniquePath;
-
-/*
- * AggPath represents generic computation of aggregate functions
- *
- * This may involve plain grouping (but not grouping sets), using either
- * sorted or hashed grouping; for the AGG_SORTED case, the input must be
- * appropriately presorted.
- */
-typedef struct AggPath
-{
-	Path		path;
-	Path	   *subpath;		/* path representing input source */
-	AggStrategy aggstrategy;	/* basic strategy, see nodes.h */
-	double		numGroups;		/* estimated number of groups in input */
-	uint64		transitionSpace;	/* for pass-by-ref transition data */
-	List	   *groupClause;	/* a list of SortGroupClause's */
-	List	   *qual;			/* quals (HAVING quals), if any */
-} AggPath;
 
 /*
  * ModifyTablePath represents performing INSERT/UPDATE/DELETE modifications
@@ -1768,12 +1707,12 @@ typedef struct PlaceHolderVar
  * pushed-down clause.  (We don't track this for FULL JOINs, either.)
  *
  * For a semijoin, we also extract the join operators and their RHS arguments
- * and set semi_operators, semi_rhs_exprs, semi_can_btree, and semi_can_hash.
+ * and set semi_operators, semi_rhs_exprs, and semi_can_btree.
  * This is done in support of possibly unique-ifying the RHS, so we don't
- * bother unless at least one of semi_can_btree and semi_can_hash can be set
- * true.  (You might expect that this information would be computed during
- * join planning; but it's helpful to have it available during planning of
- * parameterized table scans, so we store it in the SpecialJoinInfo structs.)
+ * bother unless semi_can_btree can be set true.  (You might expect that this
+ * information would be computed during join planning; but it's helpful to
+ * have it available during planning of parameterized table scans, so we store
+ * it in the SpecialJoinInfo structs.)
  *
  * jointype is never JOIN_RIGHT; a RIGHT JOIN is handled by switching
  * the inputs to make it a LEFT JOIN.  So the allowed values of jointype
@@ -1805,7 +1744,6 @@ struct SpecialJoinInfo
 	bool		delay_upper_joins;	/* can't commute with upper RHS */
 	/* Remaining fields are set only for JOIN_SEMI jointype: */
 	bool		semi_can_btree; /* true if semi_operators are all btree */
-	bool		semi_can_hash;	/* true if semi_operators are all hash */
 	List	   *semi_operators; /* OIDs of equality join operators */
 	List	   *semi_rhs_exprs; /* righthand-side expressions of these ops */
 };
@@ -1990,13 +1928,8 @@ typedef struct PlaceHolderInfo
  * will have phlevelsup = 0, and the contained expression is adjusted
  * to match in level.
  *
- * An Aggref (with an expression tree representing its argument): the slot
- * represents an aggregate expression that is an outer reference for some
- * subquery.  The Aggref itself has agglevelsup = 0, and its argument tree
- * is adjusted to match in level.
- *
  * Note: we detect duplicate Var and PlaceHolderVar parameters and coalesce
- * them into one slot, but we do not bother to do that for Aggrefs.
+ * them into one slot.
  * The scope of duplicate-elimination only extends across the set of
  * parameters passed from one query level into a single subquery, or for
  * nestloop parameters across the set of nestloop parameters used in a single
@@ -2014,7 +1947,7 @@ typedef struct PlannerParamItem
 {
 	NodeTag		type;
 
-	Node	   *item;			/* the Var, PlaceHolderVar, or Aggref */
+	Node	   *item;			/* the Var or PlaceHolderVar */
 	int			paramId;		/* its assigned PARAM_EXEC slot number */
 } PlannerParamItem;
 
@@ -2064,50 +1997,6 @@ typedef struct JoinPathExtraData
 } JoinPathExtraData;
 
 /*
- * Various flags indicating what kinds of grouping are possible.
- *
- * GROUPING_CAN_USE_SORT should be set if it's possible to perform
- * sort-based implementations of grouping.  When grouping sets are in use,
- * this will be true if sorting is potentially usable for any of the grouping
- * sets, even if it's not usable for all of them.
- *
- * GROUPING_CAN_USE_HASH should be set if it's possible to perform
- * hash-based implementations of grouping.
- *
- * GROUPING_CAN_PARTIAL_AGG should be set if the aggregation is of a type
- * for which we support partial aggregation (not, for example, grouping sets).
- * It says nothing about parallel-safety or the availability of suitable paths.
- */
-#define GROUPING_CAN_USE_SORT       0x0001
-#define GROUPING_CAN_USE_HASH       0x0002
-#define GROUPING_CAN_PARTIAL_AGG	0x0004
-
-/*
- * Struct for extra information passed to subroutines of create_grouping_paths
- *
- * flags indicating what kinds of grouping are possible.
- * partial_costs_set is true if the agg_partial_costs and agg_final_costs
- * 		have been initialized.
- * agg_partial_costs gives partial aggregation costs.
- * agg_final_costs gives finalization costs.
- * havingQual gives list of quals to be applied after aggregation.
- * targetList gives list of columns to be projected.
- */
-typedef struct
-{
-	/* Data which remains constant once set. */
-	int			flags;
-	bool		partial_costs_set;
-	AggClauseCosts agg_partial_costs;
-	AggClauseCosts agg_final_costs;
-
-	/* Data which may differ across partitions. */
-	Node	   *havingQual;
-	List	   *targetList;
-} GroupPathExtraData;
-
-
-/*
  * For speed reasons, cost estimation for join paths is performed in two
  * phases: the first phase tries to quickly derive a lower bound for the
  * join cost, and then we check if that's sufficient to reject the path.
@@ -2143,62 +2032,5 @@ typedef struct JoinCostWorkspace
 	int			numbatches;
 	double		inner_rows_total;
 } JoinCostWorkspace;
-
-/*
- * AggInfo holds information about an aggregate that needs to be computed.
- * Multiple Aggrefs in a query can refer to the same AggInfo by having the
- * same 'aggno' value, so that the aggregate is computed only once.
- */
-typedef struct AggInfo
-{
-	/*
-	 * Link to an Aggref expr this state value is for.
-	 *
-	 * There can be multiple identical Aggref's sharing the same per-agg. This
-	 * points to the first one of them.
-	 */
-	Aggref	   *representative_aggref;
-
-	int			transno;
-
-	/*
-	 * "shareable" is false if this agg cannot share state values with other
-	 * aggregates because the final function is read-write.
-	 */
-	bool		shareable;
-
-	/* Oid of the final function or InvalidOid */
-	Oid			finalfn_oid;
-
-} AggInfo;
-
-/*
- * AggTransInfo holds information about transition state that is used by one
- * or more aggregates in the query.  Multiple aggregates can share the same
- * transition state, if they have the same inputs and the same transition
- * function.  Aggrefs that share the same transition info have the same
- * 'aggtransno' value.
- */
-typedef struct AggTransInfo
-{
-	List	   *args;
-
-	/* Oid of the state transition function */
-	Oid			transfn_oid;
-
-	/* Oid of state value's datatype */
-	Oid			aggtranstype;
-	int32		aggtranstypmod;
-	int			transtypeLen;
-	bool		transtypeByVal;
-	int32		aggtransspace;
-
-	/*
-	 * initial value from pg_aggregate entry
-	 */
-	Datum		initValue;
-	bool		initValueIsNull;
-
-} AggTransInfo;
 
 #endif							/* PATHNODES_H */

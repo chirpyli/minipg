@@ -108,9 +108,10 @@ INSERT INTO dedup_unique_test_table
 SELECT 1 FROM (SELECT generate_series(1, 1350) AS g) AS _gs;
 ERROR:  duplicate key value violates unique constraint "dedup_unique"
 DETAIL:  Key (a)=(1) already exists.
-DELETE FROM dedup_unique_test_table WHERE ctid NOT IN (
-    SELECT min(ctid) FROM dedup_unique_test_table
-);
+DELETE FROM dedup_unique_test_table
+WHERE ctid NOT IN (SELECT a.ctid FROM dedup_unique_test_table a
+                   WHERE NOT EXISTS (SELECT 1 FROM dedup_unique_test_table b
+                                     WHERE b.ctid < a.ctid));
 -- Exercise the LP_DEAD-bit-set tuple deletion code with a posting list tuple.
 -- The implementation prefers deleting existing items to merging any duplicate
 -- tuples into a posting list, so we need an explicit test to make sure we get

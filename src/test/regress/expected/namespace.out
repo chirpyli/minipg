@@ -55,12 +55,15 @@ SHOW search_path;
 DROP SCHEMA test_ns_schema_2 CASCADE;
 NOTICE:  drop cascades to view test_ns_schema_2.abc_view
 -- verify that the objects were created
-SELECT COUNT(*) FROM pg_class WHERE relnamespace =
-    (SELECT oid FROM pg_namespace WHERE nspname = 'test_ns_schema_1');
- count 
--------
-     4
-(1 row)
+SELECT relname FROM pg_class WHERE relnamespace =
+    (SELECT oid FROM pg_namespace WHERE nspname = 'test_ns_schema_1') ORDER BY relname;
+  relname  
+-----------
+ abc
+ abc_a_idx
+ abc_b_key
+ abc_view
+(4 rows)
 
 -- minipg: DEFAULT VALUES 已裁剪，改为显式插入
 INSERT INTO test_ns_schema_1.abc (a, b) VALUES (1, 1);
@@ -83,12 +86,15 @@ SELECT * FROM test_ns_schema_1.abc_view;
 (3 rows)
 
 -- minipg: ALTER SCHEMA ... RENAME 已裁剪，无法改名，直接对原 schema 断言
-SELECT COUNT(*) FROM pg_class WHERE relnamespace =
-    (SELECT oid FROM pg_namespace WHERE nspname = 'test_ns_schema_1');
- count 
--------
-     4
-(1 row)
+SELECT relname FROM pg_class WHERE relnamespace =
+    (SELECT oid FROM pg_namespace WHERE nspname = 'test_ns_schema_1') ORDER BY relname;
+  relname  
+-----------
+ abc
+ abc_a_idx
+ abc_b_key
+ abc_view
+(4 rows)
 
 -- test IF NOT EXISTS cases
 CREATE SCHEMA test_ns_schema_1; -- fail, already exists
@@ -108,10 +114,9 @@ NOTICE:  drop cascades to 2 other objects
 DETAIL:  drop cascades to table abc
 drop cascades to view abc_view
 -- verify that the objects were dropped
-SELECT COUNT(*) FROM pg_class WHERE relnamespace =
-    (SELECT oid FROM pg_namespace WHERE nspname = 'test_ns_schema_1');
- count 
--------
-     0
-(1 row)
+SELECT relname FROM pg_class WHERE relnamespace =
+    (SELECT oid FROM pg_namespace WHERE nspname = 'test_ns_schema_1') ORDER BY relname;
+ relname 
+---------
+(0 rows)
 

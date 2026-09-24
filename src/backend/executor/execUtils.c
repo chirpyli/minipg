@@ -238,9 +238,6 @@ CreateExprContextInternal(EState *estate, Size minContextSize,
 	econtext->ecxt_param_exec_vals = estate->es_param_exec_vals;
 	econtext->ecxt_param_list_info = estate->es_param_list_info;
 
-	econtext->ecxt_aggvalues = NULL;
-	econtext->ecxt_aggnulls = NULL;
-
 	econtext->caseValue_datum = (Datum) 0;
 	econtext->caseValue_isNull = true;
 
@@ -349,9 +346,6 @@ CreateStandaloneExprContext(void)
 
 	econtext->ecxt_param_exec_vals = NULL;
 	econtext->ecxt_param_list_info = NULL;
-
-	econtext->ecxt_aggvalues = NULL;
-	econtext->ecxt_aggnulls = NULL;
 
 	econtext->caseValue_datum = (Datum) 0;
 	econtext->caseValue_isNull = true;

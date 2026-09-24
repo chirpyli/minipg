@@ -274,7 +274,7 @@ Pulling Up Subqueries
 As we described above, a subquery appearing in the range table is planned
 independently and treated as a "black box" during planning of the outer
 query.  This is necessary when the subquery uses features such as
-aggregates, GROUP, or DISTINCT.  But if the subquery is just a simple
+DISTINCT.  But if the subquery is just a simple
 scan or join, treating the subquery as a black box may produce a poor plan
 compared to considering it as part of the entire plan search space.
 Therefore, at the start of the planning process the planner looks for
@@ -310,10 +310,9 @@ set up for recursive handling of subqueries
  simplify constant expressions
  process sublinks
  convert Vars of outer query levels into Params
---grouping_planner()
+--upper_planner()
   preprocess target list for non-SELECT queries
-  handle UNION/INTERSECT/EXCEPT, GROUP BY, HAVING, aggregates,
-	ORDER BY, DISTINCT, LIMIT
+  handle UNION/INTERSECT/EXCEPT, ORDER BY, DISTINCT, LIMIT
 ---query_planner()
    make list of base relations used in query
    split up the qual into restrictions (a=1) and joins (b=c)
@@ -334,8 +333,7 @@ set up for recursive handling of subqueries
       each newly constructed joinrel, then apply set_cheapest() to extract
       the cheapest path for it.
       Loop back if this wasn't the top join level.
-  Back at grouping_planner:
-  do grouping (GROUP BY) and aggregation
+  Back at upper_planner:
   do window functions
   make unique (DISTINCT)
   do sorting (ORDER BY)
@@ -361,41 +359,25 @@ RelOptInfo      - a relation or joined relations
 
  Path           - every way to generate a RelOptInfo(sequential,index,joins)
   A plain Path node can represent several simple plans, per its pathtype:
-    T_SeqScan   - sequential scan
-    T_SampleScan - tablesample scan
-    T_TableFuncScan - table function scan
-    T_ValuesScan - VALUES scan
-    T_CteScan   - CTE (WITH) scan
-    T_NamedTuplestoreScan - ENR scan
-    T_WorkTableScan - scan worktable of a recursive CTE
     T_Result    - childless Result plan node (used for FROM-less SELECT)
+    T_SeqScan   - sequential scan
+    T_ValuesScan - VALUES scan
   IndexPath     - index scan
   BitmapHeapPath - top of a bitmapped index scan
   TidPath       - scan by CTID
   TidRangePath  - scan a contiguous range of CTIDs
   SubqueryScanPath - scan a subquery-in-FROM
-  ForeignPath   - scan a foreign table, foreign join or foreign upper-relation
   AppendPath    - append multiple subpaths together
-  MergeAppendPath - merge multiple subpaths, preserving their common sort order
-  GroupResultPath - childless Result plan node (used for degenerate grouping)
+  ResultPath    - childless Result plan node, possibly with a qual
   MaterialPath  - a Material plan node
   MemoizePath   - a Memoize plan node for caching tuples from sub-paths
-  UniquePath    - remove duplicate rows (either by hashing or sorting)
-  GatherPath    - collect the results of parallel workers
-  GatherMergePath - collect parallel results, preserving their common sort order
+  UniquePath    - remove duplicate rows
   ProjectionPath - a Result plan node with child (used for projection)
   ProjectSetPath - a ProjectSet plan node applied to some sub-path
   SortPath      - a Sort plan node applied to some sub-path
   IncrementalSortPath - an IncrementalSort plan node applied to some sub-path
-  GroupPath     - a Group plan node applied to some sub-path
   UpperUniquePath - a Unique plan node applied to some sub-path
-  AggPath       - an Agg plan node applied to some sub-path
-  MinMaxAggPath - a Result plan node with subplans performing MIN/MAX
-  WindowAggPath - a WindowAgg plan node applied to some sub-path
-  SetOpPath     - a SetOp plan node applied to some sub-path
-  RecursiveUnionPath - a RecursiveUnion plan node applied to two sub-paths
   ModifyTablePath - a ModifyTable plan node applied to some sub-path(s)
-  LimitPath     - a Limit plan node applied to some sub-path
   NestPath      - nested-loop joins
   MergePath     - merge joins
   HashPath      - hash joins
@@ -415,7 +397,7 @@ generated during the optimization process are marked with their sort order
 
 It is also possible to avoid an explicit sort step to implement a user's
 ORDER BY clause if the final path has the right ordering already, so the
-sort ordering is of interest even at the top level.  grouping_planner() will
+sort ordering is of interest even at the top level.  upper_planner() will
 look for the cheapest path with a sort order matching the desired order,
 then compare its cost to the cost of using the cheapest-overall path and
 doing an explicit sort on that.
@@ -519,11 +501,10 @@ expressions.
 Another way that we may form a single-item EquivalenceClass is in creation
 of a PathKey to represent a desired sort order (see below).  This is a bit
 different from the above cases because such an EquivalenceClass might
-contain an aggregate function or volatile expression.  (A clause containing
-a volatile function will never be considered mergejoinable, even if its top
-operator is mergejoinable, so there is no way for a volatile expression to
-get into EquivalenceClasses otherwise.  Aggregates are disallowed in WHERE
-altogether, so will never be found in a mergejoinable clause.)  This is just
+contain a volatile expression.  (A clause containing a volatile function
+will never be considered mergejoinable, even if its top operator is
+mergejoinable, so there is no way for a volatile expression to get into
+EquivalenceClasses otherwise.)  This is just
 a convenience to maintain a uniform PathKey representation: such an
 EquivalenceClass will never be merged with any other.  Note in particular
 that a single-item EquivalenceClass {a.x} is *not* meant to imply an
@@ -994,7 +975,7 @@ Post scan/join planning
 
 So far we have discussed only scan/join planning, that is, implementation
 of the FROM and WHERE clauses of a SQL query.  But the planner must also
-determine how to deal with GROUP BY, aggregation, and other higher-level
+determine how to deal with DISTINCT, ORDER BY, and other higher-level
 features of queries; and in many cases there are multiple ways to do these
 steps and thus opportunities for optimization choices.  These steps, like
 scan/join planning, are handled by constructing Paths representing the
@@ -1006,8 +987,6 @@ RelOptInfos are mostly dummy, but their pathlist lists hold all the Paths
 considered useful for each step.  Currently, we may create these types of
 additional RelOptInfos during upper-level planning:
 
-UPPERREL_PARTIAL_GROUP_AGG	result of partial grouping/aggregation, if any
-UPPERREL_GROUP_AGG	result of grouping/aggregation, if any
 UPPERREL_DISTINCT	result of "SELECT DISTINCT", if any
 UPPERREL_ORDERED	result of ORDER BY, if any
 UPPERREL_FINAL		result of any remaining top-level actions

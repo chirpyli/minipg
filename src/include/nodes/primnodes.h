@@ -206,64 +206,6 @@ typedef struct Param
 } Param;
 
 /*
- * Aggref
- *
- * The aggregate's args list is a targetlist, ie, a list of TargetEntry nodes.
- *
- * For a normal (non-ordered-set) aggregate, the non-resjunk TargetEntries
- * represent the aggregate's regular arguments (if any) and resjunk TLEs can
- * be added at the end to represent ORDER BY expressions that are not also
- * arguments.  As in a top-level Query, the TLEs can be marked with
- * ressortgroupref indexes to let them be referenced by SortGroupClause
- * entries in the aggorder and/or aggdistinct lists.  This represents ORDER BY
- * and DISTINCT operations to be applied to the aggregate input rows before
- * they are passed to the transition function.  The grammar only allows a
- * simple "DISTINCT" specifier for the arguments, but we use the full
- * query-level representation to allow more code sharing.
- *
- * For an ordered-set aggregate, the args list represents the WITHIN GROUP
- * (aggregated) arguments, all of which will be listed in the aggorder list.
- * DISTINCT is not supported in this case, so aggdistinct will be NIL.
- * The direct arguments appear in aggdirectargs (as a list of plain
- * expressions, not TargetEntry nodes).
- *
- * aggtranstype is the data type of the state transition values for this
- * aggregate (resolved to an actual type, if agg's transtype is polymorphic).
- * This is determined during planning and is InvalidOid before that.
- *
- * aggargtypes is an OID list of the data types of the direct and regular
- * arguments.
- *
- * aggno and aggtransno are -1 in the parse stage, and are set in planning.
- * Aggregates with the same 'aggno' represent the same aggregate expression,
- * and can share the result.  Aggregates with same 'transno' but different
- * 'aggno' can share the same transition state, only the final function needs
- * to be called separately.
- */
-typedef struct Aggref
-{
-	Expr		xpr;
-	Oid			aggfnoid;		/* pg_proc Oid of the aggregate */
-	Oid			aggtype;		/* type Oid of result of the aggregate */
-	Oid			aggcollid;		/* OID of collation of result */
-	Oid			inputcollid;	/* OID of collation that function should use */
-	Oid			aggtranstype;	/* type Oid of aggregate's transition value */
-	List	   *aggargtypes;	/* type Oids of direct and aggregated args */
-	List	   *aggdirectargs;	/* direct arguments, if an ordered-set agg */
-	List	   *args;			/* aggregated arguments and sort expressions */
-	List	   *aggorder;		/* ORDER BY (list of SortGroupClause) */
-	List	   *aggdistinct;	/* DISTINCT (list of SortGroupClause) */
-	bool		aggstar;		/* true if argument list was really '*' */
-	bool		aggvariadic;	/* true if variadic arguments have been
-								 * combined into an array last argument */
-	char		aggkind;		/* aggregate kind (see pg_aggregate.h) */
-	Index		agglevelsup;	/* > 0 if agg belongs to outer query */
-	int			aggno;			/* unique ID within the Agg node */
-	int			aggtransno;		/* unique ID of transition state in the Agg */
-	int			location;		/* token location, or -1 if unknown */
-} Aggref;
-
-/*
  * SubscriptingRef: describes a subscripting operation over a container
  * (array, etc).
  *

@@ -845,14 +845,13 @@ exec_simple_query(const char *query_string)
 										0, NULL);
 
 		/*
-		 * Done with the snapshot used for parsing/planning.
+		 * 用于解析/计划的快照到此为止。
 		 *
-		 * While it looks promising to reuse the same snapshot for query
-		 * execution (at least for simple protocol), unfortunately it causes
-		 * execution to use a snapshot that has been acquired before locking
-		 * any of the tables mentioned in the query.  This creates user-
-		 * visible anomalies, so refrain.  Refer to
-		 * https://postgr.es/m/flat/5075D8DF.6050500@fuzzy.cz for details.
+		 * 虽然把同一个快照复用给查询执行看起来很有吸引力（至少在简单协议
+		 * 下如此），但不幸的是，这会导致执行阶段使用的快照是在锁定查询中
+		 * 涉及的任何表之前就已获取的。这会产生用户可见的异常，因此不要
+		 * 这么做。详情参见
+		 * https://postgr.es/m/flat/5075D8DF.6050500@fuzzy.cz。
 		 */
 		if (snapshot_set)
 			PopActiveSnapshot();

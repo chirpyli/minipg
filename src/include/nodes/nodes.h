@@ -66,8 +66,6 @@ typedef enum NodeTag
 	T_Memoize,
 	T_Sort,
 	T_IncrementalSort,
-	T_Group,
-	T_Agg,
 	T_Unique,
 	T_Hash,
 	/* these aren't subclasses of Plan: */
@@ -104,8 +102,6 @@ typedef enum NodeTag
 	T_MemoizeState,
 	T_SortState,
 	T_IncrementalSortState,
-	T_GroupState,
-	T_AggState,
 	T_UniqueState,
 	T_HashState,
 
@@ -118,7 +114,6 @@ typedef enum NodeTag
 	T_Var,
 	T_Const,
 	T_Param,
-	T_Aggref,
 	T_SubscriptingRef,
 	T_FuncExpr,
 	T_NamedArgExpr,
@@ -182,7 +177,7 @@ typedef enum NodeTag
 	T_MergePath,
 	T_HashPath,
 	T_AppendPath,
-	T_GroupResultPath,
+	T_ResultPath,
 	T_MaterialPath,
 	T_MemoizePath,
 	T_UniquePath,
@@ -190,9 +185,7 @@ typedef enum NodeTag
 	T_ProjectSetPath,
 	T_SortPath,
 	T_IncrementalSortPath,
-	T_GroupPath,
 	T_UpperUniquePath,
-	T_AggPath,
 	T_ModifyTablePath,
 	/* these aren't subclasses of Path: */
 	T_EquivalenceClass,
@@ -531,19 +524,5 @@ typedef enum JoinType
 	   (1 << JOIN_FULL) | \
 	   (1 << JOIN_RIGHT) | \
 	   (1 << JOIN_ANTI))) != 0)
-
-/*
- * AggStrategy -
- *	  overall execution strategies for Agg plan nodes
- *
- * This is needed in both pathnodes.h and plannodes.h, so put it here...
- */
-typedef enum AggStrategy
-{
-	AGG_PLAIN,					/* simple agg across all input rows */
-	AGG_SORTED,					/* grouped agg, input must be sorted */
-	AGG_HASHED					/* grouped agg, use internal hashtable */
-} AggStrategy;
-
 
 #endif							/* NODES_H */

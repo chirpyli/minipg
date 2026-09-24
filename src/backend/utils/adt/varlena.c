@@ -157,7 +157,6 @@ static void split_text_accum_result(SplitTextOutputData *tstate,
 									Oid collation);
 static text *array_to_text_internal(FunctionCallInfo fcinfo, ArrayType *v,
 									const char *fldsep, const char *null_string);
-static StringInfo makeStringAggState(FunctionCallInfo fcinfo);
 static bool text_format_parse_digits(const char **ptr, const char *end_ptr,
 									 int *value);
 static const char *text_format_parse_format(const char *start_ptr,
@@ -493,61 +492,6 @@ byteasend(PG_FUNCTION_ARGS)
 	bytea	   *vlena = PG_GETARG_BYTEA_P_COPY(0);
 
 	PG_RETURN_BYTEA_P(vlena);
-}
-
-Datum
-bytea_string_agg_transfn(PG_FUNCTION_ARGS)
-{
-	StringInfo	state;
-
-	state = PG_ARGISNULL(0) ? NULL : (StringInfo) PG_GETARG_POINTER(0);
-
-	/* Append the value unless null. */
-	if (!PG_ARGISNULL(1))
-	{
-		bytea	   *value = PG_GETARG_BYTEA_PP(1);
-
-		/* On the first time through, we ignore the delimiter. */
-		if (state == NULL)
-			state = makeStringAggState(fcinfo);
-		else if (!PG_ARGISNULL(2))
-		{
-			bytea	   *delim = PG_GETARG_BYTEA_PP(2);
-
-			appendBinaryStringInfo(state, VARDATA_ANY(delim), VARSIZE_ANY_EXHDR(delim));
-		}
-
-		appendBinaryStringInfo(state, VARDATA_ANY(value), VARSIZE_ANY_EXHDR(value));
-	}
-
-	/*
-	 * The transition type for string_agg() is declared to be "internal",
-	 * which is a pass-by-value type the same size as a pointer.
-	 */
-	PG_RETURN_POINTER(state);
-}
-
-Datum
-bytea_string_agg_finalfn(PG_FUNCTION_ARGS)
-{
-	StringInfo	state;
-
-	/* cannot be called directly because of internal-type argument */
-	Assert(AggCheckCallContext(fcinfo, NULL));
-
-	state = PG_ARGISNULL(0) ? NULL : (StringInfo) PG_GETARG_POINTER(0);
-
-	if (state != NULL)
-	{
-		bytea	   *result;
-
-		result = (bytea *) palloc(state->len + VARHDRSZ);
-		SET_VARSIZE(result, state->len + VARHDRSZ);
-		memcpy(VARDATA(result), state->data, state->len);
-		PG_RETURN_BYTEA_P(result);
-	}
-	else
-		PG_RETURN_NULL();
 }
 
 /*
@@ -4691,83 +4635,6 @@ pg_column_size(PG_FUNCTION_ARGS)
 	}
 
 	PG_RETURN_INT32(result);
-}
-
-/*
- * string_agg - Concatenates values and returns string.
- *
- * Syntax: string_agg(value text, delimiter text) RETURNS text
- *
- * Note: Any NULL values are ignored. The first-call delimiter isn't
- * actually used at all, and on subsequent calls the delimiter precedes
- * the associated value.
- */
-
-/* subroutine to initialize state */
-static StringInfo
-makeStringAggState(FunctionCallInfo fcinfo)
-{
-	StringInfo	state;
-	MemoryContext aggcontext;
-	MemoryContext oldcontext;
-
-	if (!AggCheckCallContext(fcinfo, &aggcontext))
-	{
-		/* cannot be called directly because of internal-type argument */
-		elog(ERROR, "string_agg_transfn called in non-aggregate context");
-	}
-
-	/*
-	 * Create state in aggregate context.  It'll stay there across subsequent
-	 * calls.
-	 */
-	oldcontext = MemoryContextSwitchTo(aggcontext);
-	state = makeStringInfo();
-	MemoryContextSwitchTo(oldcontext);
-
-	return state;
-}
-
-Datum
-string_agg_transfn(PG_FUNCTION_ARGS)
-{
-	StringInfo	state;
-
-	state = PG_ARGISNULL(0) ? NULL : (StringInfo) PG_GETARG_POINTER(0);
-
-	/* Append the value unless null. */
-	if (!PG_ARGISNULL(1))
-	{
-		/* On the first time through, we ignore the delimiter. */
-		if (state == NULL)
-			state = makeStringAggState(fcinfo);
-		else if (!PG_ARGISNULL(2))
-			appendStringInfoText(state, PG_GETARG_TEXT_PP(2));	/* delimiter */
-
-		appendStringInfoText(state, PG_GETARG_TEXT_PP(1));	/* value */
-	}
-
-	/*
-	 * The transition type for string_agg() is declared to be "internal",
-	 * which is a pass-by-value type the same size as a pointer.
-	 */
-	PG_RETURN_POINTER(state);
-}
-
-Datum
-string_agg_finalfn(PG_FUNCTION_ARGS)
-{
-	StringInfo	state;
-
-	/* cannot be called directly because of internal-type argument */
-	Assert(AggCheckCallContext(fcinfo, NULL));
-
-	state = PG_ARGISNULL(0) ? NULL : (StringInfo) PG_GETARG_POINTER(0);
-
-	if (state != NULL)
-		PG_RETURN_TEXT_P(cstring_to_text_with_len(state->data, state->len));
-	else
-		PG_RETURN_NULL();
 }
 
 /*

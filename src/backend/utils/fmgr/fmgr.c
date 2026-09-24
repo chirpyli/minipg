@@ -166,9 +166,7 @@ fmgr_info_cxt_security(Oid functionId, FmgrInfo *finfo, MemoryContext mcxt)
 			/*
 			 * For an ordinary builtin function, we should never get here
 			 * because the fmgr_isbuiltin() search above will have succeeded.
-			 * However, aggregate functions are not listed in
-			 * fmgr_builtins[], so those reach this code and have to be
-			 * looked up by name (they all point at aggregate_dummy).
+			 * If we do get here, fall back to looking the symbol up by name.
 			 */
 			prosrcdatum = SysCacheGetAttr(PROCOID, procedureTuple,
 										  Anum_pg_proc_prosrc, &isnull);

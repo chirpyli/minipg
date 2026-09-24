@@ -21,89 +21,84 @@
 
 
 /*
- * The different snapshot types.  We use SnapshotData structures to represent
- * both "regular" (MVCC) snapshots and "special" snapshots that have non-MVCC
- * semantics.  The specific semantics of a snapshot are encoded by its type.
+ * 各种快照类型。我们使用 SnapshotData 结构来表示"常规"（MVCC）快照
+ * 以及具有非 MVCC 语义的"特殊"快照。某个快照的具体语义由其类型编码。
  *
- * The behaviour of each type of snapshot should be documented alongside its
- * enum value, best in terms that are not specific to an individual table AM.
+ * 每种快照类型的行为都应在其枚举值旁加以说明，最好使用不针对某个
+ * 具体表访问方法（table AM）的表述。
  *
- * The reason the snapshot type rather than a callback as it used to be is
- * that that allows to use the same snapshot for different table AMs without
- * having one callback per AM.
+ * 之所以采用快照类型（而不是像过去那样使用回调函数），是因为这样
+ * 就可以让同一个快照服务于不同的表访问方法，而不必为每个 AM 各写
+ * 一个回调。
  */
 typedef enum SnapshotType
 {
 	/*-------------------------------------------------------------------------
-	 * A tuple is visible iff the tuple is valid for the given MVCC snapshot.
+	 * 当且仅当元组对给定的 MVCC 快照有效时，该元组才是可见的。
 	 *
-	 * Here, we consider the effects of:
-	 * - all transactions committed as of the time of the given snapshot
-	 * - previous commands of this transaction
+	 * 这里我们考虑以下影响：
+	 * - 在该快照生成时刻已提交的所有事务
+	 * - 本事务之前执行的命令
 	 *
-	 * Does _not_ include:
-	 * - transactions shown as in-progress by the snapshot
-	 * - transactions started after the snapshot was taken
-	 * - changes made by the current command
+	 * 不包括：
+	 * - 快照中显示为正在进行的事务
+	 * - 在快照生成之后才启动的事务
+	 * - 当前命令所做的修改
 	 * -------------------------------------------------------------------------
 	 */
 	SNAPSHOT_MVCC = 0,
 
 	/*-------------------------------------------------------------------------
-	 * A tuple is visible iff the tuple is valid "for itself".
+	 * 当且仅当元组"对自身"有效时，该元组才是可见的。
 	 *
-	 * Here, we consider the effects of:
-	 * - all committed transactions (as of the current instant)
-	 * - previous commands of this transaction
-	 * - changes made by the current command
+	 * 这里我们考虑以下影响：
+	 * - 所有已提交的事务（以当前时刻为准）
+	 * - 本事务之前执行的命令
+	 * - 当前命令所做的修改
 	 *
-	 * Does _not_ include:
-	 * - in-progress transactions (as of the current instant)
+	 * 不包括：
+	 * - 正在进行的事务（以当前时刻为准）
 	 * -------------------------------------------------------------------------
 	 */
 	SNAPSHOT_SELF,
 
 	/*
-	 * Any tuple is visible.
+	 * 任何元组都可见。
 	 */
 	SNAPSHOT_ANY,
 
 	/*
-	 * A tuple is visible iff the tuple is valid as a TOAST row.
+	 * 当且仅当元组作为 TOAST 行有效时，该元组才是可见的。
 	 */
 	SNAPSHOT_TOAST,
 
 	/*-------------------------------------------------------------------------
-	 * A tuple is visible iff the tuple is valid including effects of open
-	 * transactions.
+	 * 当且仅当元组在计入未结束事务的影响后仍然有效时，该元组才是可见的。
 	 *
-	 * Here, we consider the effects of:
-	 * - all committed and in-progress transactions (as of the current instant)
-	 * - previous commands of this transaction
-	 * - changes made by the current command
+	 * 这里我们考虑以下影响：
+	 * - 所有已提交和正在进行的事务（以当前时刻为准）
+	 * - 本事务之前执行的命令
+	 * - 当前命令所做的修改
 	 *
-	 * This is essentially like SNAPSHOT_SELF as far as effects of the current
-	 * transaction and committed/aborted xacts are concerned.  However, it
-	 * also includes the effects of other xacts still in progress.
+	 * 就本事务以及已提交/已回滚事务的影响而言，这基本上与
+	 * SNAPSHOT_SELF 相同。不过，它还会计入其他仍在进行中的事务的影响。
 	 *
-	 * A special hack is that when a snapshot of this type is used to
-	 * determine tuple visibility, the passed-in snapshot struct is used as an
-	 * output argument to return the xids of concurrent xacts that affected
-	 * the tuple.  snapshot->xmin is set to the tuple's xmin if that is
-	 * another transaction that's still in progress; or to
-	 * InvalidTransactionId if the tuple's xmin is committed good, committed
-	 * dead, or my own xact.  Similarly for snapshot->xmax and the tuple's
-	 * xmax.  See also InitDirtySnapshot().
+	 * 一个特殊的技巧是：当使用这种类型的快照来判断元组可见性时，传入的
+	 * snapshot 结构会被用作输出参数，返回影响该元组的并发事务的 xid。
+	 * 如果元组的 xmin 来自另一个仍在进行中的事务，则 snapshot->xmin 被
+	 * 设为该元组的 xmin；如果元组的 xmin 是已提交有效的、已提交但已死的
+	 * 或本事务自身的 xid，则设为 InvalidTransactionId。snapshot->xmax 与
+	 * 元组的 xmax 的关系同理。另请参见 InitDirtySnapshot()。
 	 * -------------------------------------------------------------------------
 	 */
 	 SNAPSHOT_DIRTY,
 
 	/*
-	 * A tuple is visible iff the tuple might be visible to some transaction;
-	 * false if it's surely dead to everyone, i.e., vacuumable.
+	 * 当且仅当元组可能对某个事务可见时，该元组才是可见的；如果它肯定
+	 * 对所有人都已死亡，即可以被 vacuum 回收，则为 false。
 	 *
-	 * For visibility checks snapshot->min must have been set up with the xmin
-	 * horizon to use.
+	 * 在进行可见性检查时，snapshot->min 必须已被设置为要使用的 xmin 水位线
+	 * （xmin horizon）。
 	 */
 	SNAPSHOT_NON_VACUUMABLE
 } SnapshotType;
@@ -113,87 +108,82 @@ typedef struct SnapshotData *Snapshot;
 #define InvalidSnapshot		((Snapshot) NULL)
 
 /*
- * Struct representing all kind of possible snapshots.
+ * 用于表示所有可能类型的快照的结构体。
  *
- * There are several different kinds of snapshots:
- * * MVCC snapshots
- * * MVCC snapshots taken during recovery (in Hot-Standby mode)
- * * snapshots passed to HeapTupleSatisfiesDirty()
- * * snapshots passed to HeapTupleSatisfiesNonVacuumable()
- * * snapshots used for SatisfiesAny, Toast, Self where no members are
- *	 accessed.
+ * 快照有以下几种不同的类型：
+ * * MVCC 快照
+ * * 在恢复期间（Hot-Standby 模式下）取得的 MVCC 快照
+ * * 传给 HeapTupleSatisfiesDirty() 的快照
+ * * 传给 HeapTupleSatisfiesNonVacuumable() 的快照
+ * * 用于 SatisfiesAny、Toast、Self 的快照，这些快照不会访问任何成员。
  *
- * TODO: It's probably a good idea to split this struct using a NodeTag
- * similar to how parser and executor nodes are handled, with one type for
- * each different kind of snapshot to avoid overloading the meaning of
- * individual fields.
+ * TODO: 使用 NodeTag 来拆分这个结构体大概是个好主意，就像解析器和执行器
+ * 节点那样处理，为每种不同类型的快照定义一种类型，以避免各个字段的含义
+ * 被过度复用。
  */
 typedef struct SnapshotData
 {
-	SnapshotType snapshot_type; /* type of snapshot */
+	SnapshotType snapshot_type; /* 快照类型 */
 
 	/*
-	 * The remaining fields are used only for MVCC snapshots, and are normally
-	 * just zeroes in special snapshots.  (But xmin and xmax are used
-	 * specially by HeapTupleSatisfiesDirty, and xmin is used specially by
-	 * HeapTupleSatisfiesNonVacuumable.)
+	 * 其余字段只用于 MVCC 快照，在特殊快照中通常都只是零值。
+	 * （不过 xmin 和 xmax 会被 HeapTupleSatisfiesDirty 特殊使用，
+	 * xmin 还会被 HeapTupleSatisfiesNonVacuumable 特殊使用。）
 	 *
-	 * An MVCC snapshot can never see the effects of XIDs >= xmax. It can see
-	 * the effects of all older XIDs except those listed in the snapshot. xmin
-	 * is stored as an optimization to avoid needing to search the XID arrays
-	 * for most tuples.
+	 * MVCC 快照永远看不到 XID >= xmax 的效果。除了快照中列出的那些之外，
+	 * 它能看见所有更老 XID 的效果。存储 xmin 是一种优化，用于在大多数
+	 * 元组上避免搜索 XID 数组。
 	 */
-	TransactionId xmin;			/* all XID < xmin are visible to me */
-	TransactionId xmax;			/* all XID >= xmax are invisible to me */
+	TransactionId xmin;			/* 所有 XID < xmin 对我可见 */
+	TransactionId xmax;			/* 所有 XID >= xmax 对我不可见 */
 
 	/*
-	 * For normal MVCC snapshot this contains the all xact IDs that are in
-	 * progress, unless the snapshot was taken during recovery in which case
-	 * it's empty.
+	 * 对于普通 MVCC 快照，这里包含所有正在进行中的事务 ID，除非该快照是
+	 * 在恢复期间取得的，此时它为空。
 	 *
-	 * note: all ids in xip[] satisfy xmin <= xip[i] < xmax
+	 * 注意：xip[] 中的所有 ID 都满足 xmin <= xip[i] < xmax
 	 */
 	TransactionId *xip;
-	uint32		xcnt;			/* # of xact ids in xip[] */
+	uint32		xcnt;			/* xip[] 中的事务 ID 个数 */
 
 	/*
-	 * For non-historic MVCC snapshots, this contains subxact IDs that are in
-	 * progress (and other transactions that are in progress if taken during
-	 * recovery). For historic snapshot it contains *all* xids assigned to the
-	 * replayed transaction, including the toplevel xid.
+	 * 对于非历史（non-historic）MVCC 快照，这里包含正在进行中的子事务 ID
+	 * （如果是恢复期间取得的，还包含其他正在进行中的事务）。对于历史
+	 * 快照（historic snapshot），它包含分配给被重放事务的*所有* xid，
+	 * 包括顶层 xid。
 	 *
-	 * note: all ids in subxip[] are >= xmin, but we don't bother filtering
-	 * out any that are >= xmax
+	 * 注意：subxip[] 中的所有 ID 都 >= xmin，但我们不费心过滤掉那些
+	 * >= xmax 的 ID
 	 */
 	TransactionId *subxip;
-	int32		subxcnt;		/* # of xact ids in subxip[] */
-	bool		suboverflowed;	/* has the subxip array overflowed? */
+	int32		subxcnt;		/* subxip[] 中的事务 ID 个数 */
+	bool		suboverflowed;	/* subxip 数组是否已溢出？ */
 
-	bool		takenDuringRecovery;	/* recovery-shaped snapshot? */
-	bool		copied;			/* false if it's a static snapshot */
+	bool		takenDuringRecovery;	/* 是否为恢复期间形成的快照？ */
+	bool		copied;			/* 若为静态快照则为 false */
 
-	CommandId	curcid;			/* in my xact, CID < curcid are visible */
+	CommandId	curcid;			/* 在本事务中，CID < curcid 的可见 */
 
 	/*
-	 * For SNAPSHOT_NON_VACUUMABLE (and hopefully more in the future) this is
-	 * used to determine whether row could be vacuumed.
+	 * 对于 SNAPSHOT_NON_VACUUMABLE（希望将来还能用于更多类型），
+	 * 它用于判断某行是否可以被 vacuum 回收。
 	 */
 	struct GlobalVisState *vistest;
 
 	/*
-	 * Book-keeping information, used by the snapshot manager
+	 * 记账信息，由快照管理器使用
 	 */
-	uint32		active_count;	/* refcount on ActiveSnapshot stack */
-	uint32		regd_count;		/* refcount on RegisteredSnapshots */
-	pairingheap_node ph_node;	/* link in the RegisteredSnapshots heap */
+	uint32		active_count;	/* ActiveSnapshot 栈上的引用计数 */
+	uint32		regd_count;		/* RegisteredSnapshots 上的引用计数 */
+	pairingheap_node ph_node;	/* RegisteredSnapshots 堆中的链接 */
 
-	TimestampTz whenTaken;		/* timestamp when snapshot was taken */
-	XLogRecPtr	lsn;			/* position in the WAL stream when taken */
+	TimestampTz whenTaken;		/* 取得快照时的时间戳 */
+	XLogRecPtr	lsn;			/* 取得快照时在 WAL 流中的位置 */
 
 	/*
-	 * The transaction completion count at the time GetSnapshotData() built
-	 * this snapshot. Allows to avoid re-computing static snapshots when no
-	 * transactions completed since the last GetSnapshotData().
+	 * GetSnapshotData() 构建该快照时的事务完成计数。当自上次
+	 * GetSnapshotData() 以来没有任何事务完成时，它可以用来避免重新计算
+	 * 静态快照。
 	 */
 	uint64		snapXactCompletionCount;
 } SnapshotData;

@@ -35,10 +35,10 @@ setup
  set enable_bitmapscan=off;
  set enable_indexonlyscan=on;
 }
-step rxy1	{ select sum(p) from hash_tbl where p=20; }
+step rxy1	{ select id from hash_tbl where p=20; }
 step wx1	{ insert into hash_tbl (id, p)
 			  select g, 30 from (SELECT generate_series(41, 50) AS g) AS _gs; }
-step rxy3	{ select sum(p) from hash_tbl where p=20; }
+step rxy3	{ select id from hash_tbl where p=20; }
 step wx3	{ insert into hash_tbl (id, p)
 			  select g, 50 from (SELECT generate_series(41, 50) AS g) AS _gs; }
 step c1		{ commit; }
@@ -52,10 +52,10 @@ setup
  set enable_bitmapscan=off;
  set enable_indexonlyscan=on;
 }
-step rxy2	{ select sum(p) from hash_tbl where p=30; }
+step rxy2	{ select id from hash_tbl where p=30; }
 step wy2	{ insert into hash_tbl (id, p)
 			  select g, 20 from (SELECT generate_series(51, 60) AS g) AS _gs; }
-step rxy4	{ select sum(p) from hash_tbl where p=30; }
+step rxy4	{ select id from hash_tbl where p=30; }
 step wy4	{ insert into hash_tbl (id, p)
 			  select g, 60 from (SELECT generate_series(51, 60) AS g) AS _gs; }
 step c2		{ commit; }

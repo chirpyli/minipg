@@ -774,16 +774,6 @@ static struct config_bool ConfigureNamesBool[] =
 		NULL, NULL, NULL
 	},
 	{
-		{"enable_hashagg", PGC_USERSET, QUERY_TUNING_METHOD,
-			gettext_noop("Enables the planner's use of hashed aggregation plans."),
-			NULL,
-			GUC_EXPLAIN
-		},
-		&enable_hashagg,
-		true,
-		NULL, NULL, NULL
-	},
-	{
 		{"enable_material", PGC_USERSET, QUERY_TUNING_METHOD,
 			gettext_noop("Enables the planner's use of materialization."),
 			NULL,

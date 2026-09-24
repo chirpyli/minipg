@@ -103,7 +103,6 @@
 #include "catalog/pg_am.h"
 #include "catalog/pg_operator.h"
 #include "catalog/pg_statistic.h"
-#include "executor/nodeAgg.h"
 #include "miscadmin.h"
 #include "nodes/makefuncs.h"
 #include "nodes/nodeFuncs.h"
@@ -3376,7 +3375,6 @@ estimate_num_groups(PlannerInfo *root, List *groupExprs, double input_rows,
 		 * down to ignoring the possible addition of nulls to the result set).
 		 */
 		varshere = pull_var_clause(groupexpr,
-								   PVC_RECURSE_AGGREGATES |
 								   PVC_RECURSE_PLACEHOLDERS);
 
 		/*
@@ -3735,38 +3733,6 @@ estimate_hash_bucket_stats(PlannerInfo *root, Node *hashkey, double nbuckets,
 	*bucketsize_frac = (Selectivity) estfract;
 
 	ReleaseVariableStats(vardata);
-}
-
-/*
- * estimate_hashagg_tablesize
- *	  estimate the number of bytes that a hash aggregate hashtable will
- *	  require based on the agg_costs, path width and number of groups.
- *
- * We return the result as "double" to forestall any possible overflow
- * problem in the multiplication by dNumGroups.
- *
- * XXX this may be over-estimating the size now that hashagg knows to omit
- * unneeded columns from the hashtable.  Also for mixed-mode grouping sets,
- * grouping columns not in the hashed set are counted here even though hashagg
- * won't store them.  Is this a problem?
- */
-double
-estimate_hashagg_tablesize(PlannerInfo *root, Path *path,
-						   const AggClauseCosts *agg_costs, double dNumGroups)
-{
-	Size		hashentrysize;
-
-	hashentrysize = hash_agg_entry_size(list_length(root->aggtransinfos),
-										path->pathtarget->width,
-										agg_costs->transitionSpace);
-
-	/*
-	 * Note that this disregards the effect of fill-factor and growth policy
-	 * of the hash table.  That's probably ok, given that the default
-	 * fill-factor is relatively high.  It'd be hard to meaningfully factor in
-	 * "double-in-size" growth policies here.
-	 */
-	return hashentrysize * dNumGroups;
 }
 
 
@@ -4740,15 +4706,9 @@ examine_simple_variable(PlannerInfo *root, Var *var,
 			return;
 
 		/*
-		 * Punt if subquery uses set operations or GROUP BY, as these will
-		 * mash underlying columns' stats beyond recognition.  (Set ops are
-		 * particularly nasty; if we forged ahead, we would return stats
-		 * relevant to only the leftmost subselect...)	DISTINCT is also
-		 * problematic, but we check that later because there is a possibility
-		 * of learning something even with it.
+		 * DISTINCT is problematic for column stats, but we check that later
+		 * because there is a possibility of learning something even with it.
 		 */
-		if (subquery->groupClause)
-			return;
 
 		/*
 		 * OK, fetch RelOptInfo for subquery.  Note that we don't change the

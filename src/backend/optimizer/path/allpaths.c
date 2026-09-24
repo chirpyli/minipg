@@ -613,14 +613,11 @@ set_subquery_pathlist(PlannerInfo *root, RelOptInfo *rel,
 
 	/*
 	 * We can safely pass the outer tuple_fraction down to the subquery if the
-	 * outer level has no joining, aggregation, or sorting to do. Otherwise
-	 * we'd better tell the subquery to plan for full retrieval. (XXX This
-	 * could probably be made more intelligent ...)
+	 * outer level has no joining or sorting to do. Otherwise we'd better tell
+	 * the subquery to plan for full retrieval. (XXX This could probably be
+	 * made more intelligent ...)
 	 */
-	if (parse->hasAggs ||
-		parse->groupClause ||
-		parse->havingQual ||
-		parse->distinctClause ||
+	if (parse->distinctClause ||
 		parse->sortClause ||
 		has_multiple_baserels(root))
 		tuple_fraction = 0.0;	/* default case */
@@ -933,10 +930,7 @@ standard_join_search(PlannerInfo *root, int levels_needed, List *initial_rels)
  * 3. If the subquery uses DISTINCT, we cannot push volatile quals into it.
  * This is because upper-level quals should semantically be evaluated only
  * once per distinct row, not once per original row, and if the qual is
- * volatile then extra evaluations could change the results.  (This issue
- * does not apply to other forms of aggregation such as GROUP BY, because
- * when those are present we push into HAVING not WHERE, so that the quals
- * are still applied after aggregation.)
+ * volatile then extra evaluations could change the results.
  *
  * 4. If the subquery contains window functions, we cannot push volatile quals
  * into it.  The issue here is a bit different from DISTINCT: a volatile qual
@@ -1197,20 +1191,14 @@ subquery_push_qual(Query *subquery, RangeTblEntry *rte, Index rti, Node *qual)
 										 &subquery->hasSubLinks);
 
 		/*
-		 * Now attach the qual to the proper place: normally WHERE, but if the
-		 * subquery uses grouping or aggregation, put it in HAVING (since the
-		 * qual really refers to the group-result rows).
+		 * Now attach the qual to WHERE.
 		 */
-		if (subquery->hasAggs || subquery->groupClause || subquery->havingQual)
-			subquery->havingQual = make_and_qual(subquery->havingQual, qual);
-		else
-			subquery->jointree->quals =
-				make_and_qual(subquery->jointree->quals, qual);
+		subquery->jointree->quals =
+			make_and_qual(subquery->jointree->quals, qual);
 
 		/*
-		 * We need not change the subquery's hasAggs or hasSubLinks flags,
-		 * since we can't be pushing down any aggregates that weren't there
-		 * before, and we don't push down subselects at all.
+		 * We need not change the subquery's hasSubLinks flag, since we don't
+		 * push down subselects at all.
 		 */
 		 }
 
@@ -1430,8 +1418,8 @@ print_path(PlannerInfo *root, Path *path, int indent)
 		case T_AppendPath:
 			ptype = "Append";
 			break;
-		case T_GroupResultPath:
-			ptype = "GroupResult";
+		case T_ResultPath:
+			ptype = "Result";
 			break;
 		case T_MaterialPath:
 			ptype = "Material";
@@ -1461,17 +1449,9 @@ print_path(PlannerInfo *root, Path *path, int indent)
 			ptype = "IncrementalSort";
 			subpath = ((SortPath *) path)->subpath;
 			break;
-		case T_GroupPath:
-			ptype = "Group";
-			subpath = ((GroupPath *) path)->subpath;
-			break;
 		case T_UpperUniquePath:
 			ptype = "UpperUnique";
 			subpath = ((UpperUniquePath *) path)->subpath;
-			break;
-		case T_AggPath:
-			ptype = "Agg";
-			subpath = ((AggPath *) path)->subpath;
 			break;
 
 		case T_ModifyTablePath:

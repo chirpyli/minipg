@@ -22,7 +22,6 @@
 
 #include "access/htup_details.h"
 #include "access/sysattr.h"
-#include "catalog/pg_aggregate.h"
 #include "catalog/pg_am.h"
 #include "catalog/pg_amop.h"
 #include "catalog/pg_amproc.h"
@@ -91,17 +90,6 @@ struct cachedesc
 };
 
 static const struct cachedesc cacheinfo[] = {
-	{AggregateRelationId,		/* AGGFNOID */
-		AggregateFnoidIndexId,
-		1,
-		{
-			Anum_pg_aggregate_aggfnoid,
-			0,
-			0,
-			0
-		},
-		16
-	},
 	{AccessMethodRelationId,	/* AMNAME */
 		AmNameIndexId,
 		1,

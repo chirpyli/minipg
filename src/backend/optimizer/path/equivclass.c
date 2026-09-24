@@ -724,15 +724,14 @@ get_eclass_for_sort_expr(PlannerInfo *root,
 						  nullable_relids, false, opcintype);
 
 	/*
-	 * add_eq_member doesn't check for volatile functions, set-returning
-	 * functions, or aggregates, but such could appear in sort expressions; so
-	 * we have to check whether its const-marking was correct.
+	 * add_eq_member doesn't check for volatile functions or set-returning
+	 * functions, but such could appear in sort expressions; so we have to
+	 * check whether its const-marking was correct.
 	 */
 	if (newec->ec_has_const)
 	{
 		if (newec->ec_has_volatile ||
-			expression_returns_set((Node *) expr) ||
-			contain_agg_clause((Node *) expr))
+			expression_returns_set((Node *) expr))
 		{
 			newec->ec_has_const = false;
 			newem->em_is_const = false;
@@ -829,10 +828,10 @@ find_ec_member_matching_expr(EquivalenceClass *ec,
  *		expressions appearing in "exprs"; return NULL if no match.
  *
  * "exprs" can be either a list of bare expression trees, or a list of
- * TargetEntry nodes.  Typically it will contain Vars and possibly Aggrefs;
- * however, when considering an appendrel member the list could contain
- * arbitrary expressions.  We consider an EC member to be computable if all
- * the Vars, PlaceHolderVars, and Aggrefs it needs are present in "exprs".
+ * TargetEntry nodes.  Typically it will contain Vars; however, when
+ * considering an appendrel member the list could contain arbitrary
+ * expressions.  We consider an EC member to be computable if all the Vars and
+ * PlaceHolderVars it needs are present in "exprs".
  *
  * There is some subtlety in that definition: for example, if an EC member is
  * Var_A + 1 while what is in "exprs" is Var_A + 2, it's still computable.
@@ -864,7 +863,6 @@ find_computable_ec_member(PlannerInfo *root,
 	 * list of plain expressions and a list of TargetEntrys.
 	 */
 	exprvars = pull_var_clause((Node *) exprs,
-							   PVC_INCLUDE_AGGREGATES |
 							   PVC_INCLUDE_PLACEHOLDERS);
 
 	foreach(lc, ec->ec_members)
@@ -891,7 +889,6 @@ find_computable_ec_member(PlannerInfo *root,
 		 * Match if all Vars and quasi-Vars are present in "exprs".
 		 */
 		emvars = pull_var_clause((Node *) em->em_expr,
-								 PVC_INCLUDE_AGGREGATES |
 								 PVC_INCLUDE_PLACEHOLDERS);
 		foreach(lc2, emvars)
 		{
@@ -1275,7 +1272,6 @@ generate_base_implied_equalities_no_const(PlannerInfo *root,
 	{
 		EquivalenceMember *cur_em = (EquivalenceMember *) lfirst(lc);
 		List	   *vars = pull_var_clause((Node *) cur_em->em_expr,
-										   PVC_RECURSE_AGGREGATES |
 										   PVC_INCLUDE_PLACEHOLDERS);
 
 		add_vars_to_targetlist(root, vars, ec->ec_relids, false);

@@ -68,10 +68,6 @@ static void show_sort_keys(SortState *sortstate, List *ancestors,
 						   ExplainState *es);
 static void show_incremental_sort_keys(IncrementalSortState *incrsortstate,
 									   List *ancestors, ExplainState *es);
-static void show_agg_keys(AggState *astate, List *ancestors,
-						  ExplainState *es);
-static void show_group_keys(GroupState *gstate, List *ancestors,
-							ExplainState *es);
 static void show_sort_group_keys(PlanState *planstate, const char *qlabel,
 								 int nkeys, int nPresortedKeys, AttrNumber *keycols,
 								 Oid *sortOperators, Oid *collations, bool *nullsFirst,
@@ -84,7 +80,6 @@ static void show_incremental_sort_info(IncrementalSortState *incrsortstate,
 static void show_hash_info(HashState *hashstate, ExplainState *es);
 static void show_memoize_info(MemoizeState *mstate, List *ancestors,
 							  ExplainState *es);
-static void show_hashagg_info(AggState *hashstate, ExplainState *es);
 static void show_tidbitmap_info(BitmapHeapScanState *planstate,
 								ExplainState *es);
 static void show_instrumentation_count(const char *qlabel, int which,
@@ -702,31 +697,6 @@ ExplainNode(PlanState *planstate, List *ancestors,
 		case T_IncrementalSort:
 			pname = "Incremental Sort";
 			break;
-		case T_Group:
-			pname = "Group";
-			break;
-		case T_Agg:
-			{
-				Agg		   *agg = (Agg *) plan;
-
-				switch (agg->aggstrategy)
-				{
-					case AGG_PLAIN:
-						pname = "Aggregate";
-						break;
-					case AGG_SORTED:
-						pname = "GroupAggregate";
-						break;
-					case AGG_HASHED:
-						pname = "HashAggregate";
-						break;
-					default:
-						pname = "Aggregate ???";
-						break;
-				}
-
-				}
-				break;
 		case T_Unique:
 			pname = "Unique";
 			break;
@@ -1037,21 +1007,6 @@ ExplainNode(PlanState *planstate, List *ancestors,
 				show_instrumentation_count("Rows Removed by Filter", 2,
 										   planstate, es);
 			break;
-		case T_Agg:
-			show_agg_keys(castNode(AggState, planstate), ancestors, es);
-			show_upper_qual(plan->qual, "Filter", planstate, ancestors, es);
-			show_hashagg_info((AggState *) planstate, es);
-			if (plan->qual)
-				show_instrumentation_count("Rows Removed by Filter", 1,
-										   planstate, es);
-			break;
-		case T_Group:
-			show_group_keys(castNode(GroupState, planstate), ancestors, es);
-			show_upper_qual(plan->qual, "Filter", planstate, ancestors, es);
-			if (plan->qual)
-				show_instrumentation_count("Rows Removed by Filter", 1,
-										   planstate, es);
-			break;
 		case T_Sort:
 			show_sort_keys(castNode(SortState, planstate), ancestors, es);
 			show_sort_info(castNode(SortState, planstate), es);
@@ -1293,47 +1248,6 @@ show_incremental_sort_keys(IncrementalSortState *incrsortstate,
 						 plan->sort.sortOperators, plan->sort.collations,
 						 plan->sort.nullsFirst,
 						 ancestors, es);
-}
-
-/*
- * Show the grouping keys for an Agg node.
- */
-static void
-show_agg_keys(AggState *astate, List *ancestors,
-			  ExplainState *es)
-{
-	Agg		   *plan = (Agg *) astate->ss.ps.plan;
-
-	if (plan->numCols > 0)
-	{
-		/* The key columns refer to the tlist of the child plan */
-		ancestors = lcons(plan, ancestors);
-
-		show_sort_group_keys(outerPlanState(astate), "Group Key",
-							 plan->numCols, 0, plan->grpColIdx,
-							 NULL, NULL, NULL,
-							 ancestors, es);
-
-		ancestors = list_delete_first(ancestors);
-	}
-}
-
-/*
- * Show the grouping keys for a Group node.
- */
-static void
-show_group_keys(GroupState *gstate, List *ancestors,
-				ExplainState *es)
-{
-	Group	   *plan = (Group *) gstate->ss.ps.plan;
-
-	/* The key columns refer to the tlist of the child plan */
-	ancestors = lcons(plan, ancestors);
-	show_sort_group_keys(outerPlanState(gstate), "Group Key",
-						 plan->numCols, 0, plan->grpColIdx,
-						 NULL, NULL, NULL,
-						 ancestors, es);
-	ancestors = list_delete_first(ancestors);
 }
 
 /*
@@ -1709,60 +1623,6 @@ show_memoize_info(MemoizeState *mstate, List *ancestors, ExplainState *es)
 						 memPeakKb);
 						 }
 						 }
-
-						 /*
-						 * Show information on hash aggregate memory usage and batches.
-						 */
-static void
-show_hashagg_info(AggState *aggstate, ExplainState *es)
-{
-	Agg		   *agg = (Agg *) aggstate->ss.ps.plan;
-	int64		memPeakKb = (aggstate->hash_mem_peak + 1023) / 1024;
-
-	if (agg->aggstrategy != AGG_HASHED)
-		return;
-
-	{
-		bool		gotone = false;
-
-		if (es->costs && aggstate->hash_planned_partitions > 0)
-		{
-			ExplainIndentText(es);
-			appendStringInfo(es->str, "Planned Partitions: %d",
-							 aggstate->hash_planned_partitions);
-			gotone = true;
-		}
-
-		/*
-		 * During parallel query the leader may have not helped out.  We
-		 * detect this by checking how much memory it used.  If we find it
-		 * didn't do any work then we don't show its properties.
-		 */
-		if (es->analyze && aggstate->hash_mem_peak > 0)
-		{
-			if (!gotone)
-				ExplainIndentText(es);
-			else
-				appendStringInfoString(es->str, "  ");
-
-			appendStringInfo(es->str, "Batches: %d  Memory Usage: " INT64_FORMAT "kB",
-							 aggstate->hash_batches_used, memPeakKb);
-			gotone = true;
-
-			/* Only display disk usage if we spilled to disk */
-			if (aggstate->hash_batches_used > 1)
-			{
-				appendStringInfo(es->str, "  Disk Usage: " UINT64_FORMAT "kB",
-								 aggstate->hash_disk_used);
-			}
-		}
-
-		if (gotone)
-			appendStringInfoChar(es->str, '\n');
-	}
-
-	/* Display stats for each parallel worker */
-}
 
 /*
  * If it's EXPLAIN ANALYZE, show exact/lossy pages for a BitmapHeapScan node

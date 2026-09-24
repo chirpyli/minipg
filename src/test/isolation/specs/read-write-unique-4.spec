@@ -19,13 +19,13 @@ teardown
 
 session s1
 setup { BEGIN ISOLATION LEVEL SERIALIZABLE; }
-step r1 { SELECT COALESCE(MAX(invoice_number) + 1, 1) FROM invoice WHERE year = 2016; }
+step r1 { SELECT COALESCE((SELECT i.invoice_number FROM invoice i WHERE i.year = 2016 AND NOT EXISTS (SELECT 1 FROM invoice j WHERE j.year = 2016 AND j.invoice_number > i.invoice_number)) + 1, 1); }
 step w1 { INSERT INTO invoice VALUES (2016, 3); }
 step c1 { COMMIT; }
 
 session s2
 setup { BEGIN ISOLATION LEVEL SERIALIZABLE; }
-step r2 { SELECT COALESCE(MAX(invoice_number) + 1, 1) FROM invoice WHERE year = 2016; }
+step r2 { SELECT COALESCE((SELECT i.invoice_number FROM invoice i WHERE i.year = 2016 AND NOT EXISTS (SELECT 1 FROM invoice j WHERE j.year = 2016 AND j.invoice_number > i.invoice_number)) + 1, 1); }
 step w2 { INSERT INTO invoice VALUES (2016, 3); }
 step c2 { COMMIT; }
 

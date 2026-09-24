@@ -1,7 +1,7 @@
 /*-------------------------------------------------------------------------
  *
  * execGrouping.c
- *	  executor utility routines for grouping, hashing, and aggregation
+ *	  executor utility routines for grouping and hashing
  *
  * Portions Copyright (c) 1996-2021, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
@@ -126,7 +126,7 @@ execTuplesHashPrepare(int numCols,
  *		Utility routines for all-in-memory hash tables
  *
  * These routines build hash tables for grouping tuples together (eg, for
- * hash aggregation).  There is one entry for each not-distinct set of tuples
+ * hashed subplans).  There is one entry for each not-distinct set of tuples
  * presented.
  *****************************************************************************/
 
@@ -282,33 +282,6 @@ LookupTupleHashEntry(TupleHashTable hashtable, TupleTableSlot *slot,
 }
 
 /*
- * A variant of LookupTupleHashEntry for callers that have already computed
- * the hash value.
- */
-TupleHashEntry
-LookupTupleHashEntryHash(TupleHashTable hashtable, TupleTableSlot *slot,
-						 bool *isnew, uint32 hash)
-{
-	TupleHashEntry entry;
-	MemoryContext oldContext;
-
-	/* Need to run the hash functions in short-lived context */
-	oldContext = MemoryContextSwitchTo(hashtable->tempcxt);
-
-	/* set up data needed by hash and match functions */
-	hashtable->inputslot = slot;
-	hashtable->in_hash_funcs = hashtable->tab_hash_funcs;
-	hashtable->cur_eq_func = hashtable->tab_eq_func;
-
-	entry = LookupTupleHashEntry_internal(hashtable, slot, isnew, hash);
-	Assert(entry == NULL || entry->hash == hash);
-
-	MemoryContextSwitchTo(oldContext);
-
-	return entry;
-}
-
-/*
  * Search for a hashtable entry matching the given tuple.  No entry is
  * created if there's not a match.  This is similar to the non-creating
  * case of LookupTupleHashEntry, except that it supports cross-type
@@ -413,9 +386,8 @@ TupleHashTableHash_internal(struct tuplehash_hash *tb,
 }
 
 /*
- * Does the work of LookupTupleHashEntry and LookupTupleHashEntryHash. Useful
- * so that we can avoid switching the memory context multiple times for
- * LookupTupleHashEntry.
+ * Does the work of LookupTupleHashEntry. Useful so that we can avoid
+ * switching the memory context multiple times for LookupTupleHashEntry.
  *
  * NB: This function may or may not change the memory context. Caller is
  * expected to change it back.

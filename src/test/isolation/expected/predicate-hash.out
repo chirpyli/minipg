@@ -1,99 +1,209 @@
 Parsed test spec with 2 sessions
 
 starting permutation: rxy1 wx1 c1 rxy2 wy2 c2
-step rxy1: select sum(p) from hash_tbl where p=20;
-sum
----
-200
-(1 row)
+step rxy1: select id from hash_tbl where p=20;
+id
+--
+20
+19
+18
+17
+16
+15
+14
+13
+12
+11
+(10 rows)
 
 step wx1: insert into hash_tbl (id, p)
 			  select g, 30 from (SELECT generate_series(41, 50) AS g) AS _gs;
 step c1: commit;
-step rxy2: select sum(p) from hash_tbl where p=30;
-sum
----
-600
-(1 row)
+step rxy2: select id from hash_tbl where p=30;
+id
+--
+50
+49
+48
+47
+46
+45
+44
+43
+42
+41
+30
+29
+28
+27
+26
+25
+24
+23
+22
+21
+(20 rows)
 
 step wy2: insert into hash_tbl (id, p)
 			  select g, 20 from (SELECT generate_series(51, 60) AS g) AS _gs;
 step c2: commit;
 
 starting permutation: rxy2 wy2 c2 rxy1 wx1 c1
-step rxy2: select sum(p) from hash_tbl where p=30;
-sum
----
-300
-(1 row)
+step rxy2: select id from hash_tbl where p=30;
+id
+--
+30
+29
+28
+27
+26
+25
+24
+23
+22
+21
+(10 rows)
 
 step wy2: insert into hash_tbl (id, p)
 			  select g, 20 from (SELECT generate_series(51, 60) AS g) AS _gs;
 step c2: commit;
-step rxy1: select sum(p) from hash_tbl where p=20;
-sum
----
-400
-(1 row)
+step rxy1: select id from hash_tbl where p=20;
+id
+--
+60
+59
+58
+57
+56
+55
+54
+53
+52
+51
+20
+19
+18
+17
+16
+15
+14
+13
+12
+11
+(20 rows)
 
 step wx1: insert into hash_tbl (id, p)
 			  select g, 30 from (SELECT generate_series(41, 50) AS g) AS _gs;
 step c1: commit;
 
 starting permutation: rxy3 wx3 c1 rxy4 wy4 c2
-step rxy3: select sum(p) from hash_tbl where p=20;
-sum
----
-200
-(1 row)
+step rxy3: select id from hash_tbl where p=20;
+id
+--
+20
+19
+18
+17
+16
+15
+14
+13
+12
+11
+(10 rows)
 
 step wx3: insert into hash_tbl (id, p)
 			  select g, 50 from (SELECT generate_series(41, 50) AS g) AS _gs;
 step c1: commit;
-step rxy4: select sum(p) from hash_tbl where p=30;
-sum
----
-300
-(1 row)
+step rxy4: select id from hash_tbl where p=30;
+id
+--
+30
+29
+28
+27
+26
+25
+24
+23
+22
+21
+(10 rows)
 
 step wy4: insert into hash_tbl (id, p)
 			  select g, 60 from (SELECT generate_series(51, 60) AS g) AS _gs;
 step c2: commit;
 
 starting permutation: rxy4 wy4 c2 rxy3 wx3 c1
-step rxy4: select sum(p) from hash_tbl where p=30;
-sum
----
-300
-(1 row)
+step rxy4: select id from hash_tbl where p=30;
+id
+--
+30
+29
+28
+27
+26
+25
+24
+23
+22
+21
+(10 rows)
 
 step wy4: insert into hash_tbl (id, p)
 			  select g, 60 from (SELECT generate_series(51, 60) AS g) AS _gs;
 step c2: commit;
-step rxy3: select sum(p) from hash_tbl where p=20;
-sum
----
-200
-(1 row)
+step rxy3: select id from hash_tbl where p=20;
+id
+--
+20
+19
+18
+17
+16
+15
+14
+13
+12
+11
+(10 rows)
 
 step wx3: insert into hash_tbl (id, p)
 			  select g, 50 from (SELECT generate_series(41, 50) AS g) AS _gs;
 step c1: commit;
 
 starting permutation: rxy1 wx1 rxy2 c1 wy2 c2
-step rxy1: select sum(p) from hash_tbl where p=20;
-sum
----
-200
-(1 row)
+step rxy1: select id from hash_tbl where p=20;
+id
+--
+20
+19
+18
+17
+16
+15
+14
+13
+12
+11
+(10 rows)
 
 step wx1: insert into hash_tbl (id, p)
 			  select g, 30 from (SELECT generate_series(41, 50) AS g) AS _gs;
-step rxy2: select sum(p) from hash_tbl where p=30;
-sum
----
-300
-(1 row)
+step rxy2: select id from hash_tbl where p=30;
+id
+--
+30
+29
+28
+27
+26
+25
+24
+23
+22
+21
+(10 rows)
 
 step c1: commit;
 step wy2: insert into hash_tbl (id, p)
@@ -102,19 +212,37 @@ ERROR:  could not serialize access due to read/write dependencies among transact
 step c2: commit;
 
 starting permutation: rxy1 wx1 rxy2 wy2 c1 c2
-step rxy1: select sum(p) from hash_tbl where p=20;
-sum
----
-200
-(1 row)
+step rxy1: select id from hash_tbl where p=20;
+id
+--
+20
+19
+18
+17
+16
+15
+14
+13
+12
+11
+(10 rows)
 
 step wx1: insert into hash_tbl (id, p)
 			  select g, 30 from (SELECT generate_series(41, 50) AS g) AS _gs;
-step rxy2: select sum(p) from hash_tbl where p=30;
-sum
----
-300
-(1 row)
+step rxy2: select id from hash_tbl where p=30;
+id
+--
+30
+29
+28
+27
+26
+25
+24
+23
+22
+21
+(10 rows)
 
 step wy2: insert into hash_tbl (id, p)
 			  select g, 20 from (SELECT generate_series(51, 60) AS g) AS _gs;
@@ -123,19 +251,37 @@ step c2: commit;
 ERROR:  could not serialize access due to read/write dependencies among transactions
 
 starting permutation: rxy1 wx1 rxy2 wy2 c2 c1
-step rxy1: select sum(p) from hash_tbl where p=20;
-sum
----
-200
-(1 row)
+step rxy1: select id from hash_tbl where p=20;
+id
+--
+20
+19
+18
+17
+16
+15
+14
+13
+12
+11
+(10 rows)
 
 step wx1: insert into hash_tbl (id, p)
 			  select g, 30 from (SELECT generate_series(41, 50) AS g) AS _gs;
-step rxy2: select sum(p) from hash_tbl where p=30;
-sum
----
-300
-(1 row)
+step rxy2: select id from hash_tbl where p=30;
+id
+--
+30
+29
+28
+27
+26
+25
+24
+23
+22
+21
+(10 rows)
 
 step wy2: insert into hash_tbl (id, p)
 			  select g, 20 from (SELECT generate_series(51, 60) AS g) AS _gs;
@@ -144,17 +290,35 @@ step c1: commit;
 ERROR:  could not serialize access due to read/write dependencies among transactions
 
 starting permutation: rxy1 rxy2 wx1 c1 wy2 c2
-step rxy1: select sum(p) from hash_tbl where p=20;
-sum
----
-200
-(1 row)
+step rxy1: select id from hash_tbl where p=20;
+id
+--
+20
+19
+18
+17
+16
+15
+14
+13
+12
+11
+(10 rows)
 
-step rxy2: select sum(p) from hash_tbl where p=30;
-sum
----
-300
-(1 row)
+step rxy2: select id from hash_tbl where p=30;
+id
+--
+30
+29
+28
+27
+26
+25
+24
+23
+22
+21
+(10 rows)
 
 step wx1: insert into hash_tbl (id, p)
 			  select g, 30 from (SELECT generate_series(41, 50) AS g) AS _gs;
@@ -165,17 +329,35 @@ ERROR:  could not serialize access due to read/write dependencies among transact
 step c2: commit;
 
 starting permutation: rxy1 rxy2 wx1 wy2 c1 c2
-step rxy1: select sum(p) from hash_tbl where p=20;
-sum
----
-200
-(1 row)
+step rxy1: select id from hash_tbl where p=20;
+id
+--
+20
+19
+18
+17
+16
+15
+14
+13
+12
+11
+(10 rows)
 
-step rxy2: select sum(p) from hash_tbl where p=30;
-sum
----
-300
-(1 row)
+step rxy2: select id from hash_tbl where p=30;
+id
+--
+30
+29
+28
+27
+26
+25
+24
+23
+22
+21
+(10 rows)
 
 step wx1: insert into hash_tbl (id, p)
 			  select g, 30 from (SELECT generate_series(41, 50) AS g) AS _gs;
@@ -186,17 +368,35 @@ step c2: commit;
 ERROR:  could not serialize access due to read/write dependencies among transactions
 
 starting permutation: rxy1 rxy2 wx1 wy2 c2 c1
-step rxy1: select sum(p) from hash_tbl where p=20;
-sum
----
-200
-(1 row)
+step rxy1: select id from hash_tbl where p=20;
+id
+--
+20
+19
+18
+17
+16
+15
+14
+13
+12
+11
+(10 rows)
 
-step rxy2: select sum(p) from hash_tbl where p=30;
-sum
----
-300
-(1 row)
+step rxy2: select id from hash_tbl where p=30;
+id
+--
+30
+29
+28
+27
+26
+25
+24
+23
+22
+21
+(10 rows)
 
 step wx1: insert into hash_tbl (id, p)
 			  select g, 30 from (SELECT generate_series(41, 50) AS g) AS _gs;
@@ -207,17 +407,35 @@ step c1: commit;
 ERROR:  could not serialize access due to read/write dependencies among transactions
 
 starting permutation: rxy1 rxy2 wy2 wx1 c1 c2
-step rxy1: select sum(p) from hash_tbl where p=20;
-sum
----
-200
-(1 row)
+step rxy1: select id from hash_tbl where p=20;
+id
+--
+20
+19
+18
+17
+16
+15
+14
+13
+12
+11
+(10 rows)
 
-step rxy2: select sum(p) from hash_tbl where p=30;
-sum
----
-300
-(1 row)
+step rxy2: select id from hash_tbl where p=30;
+id
+--
+30
+29
+28
+27
+26
+25
+24
+23
+22
+21
+(10 rows)
 
 step wy2: insert into hash_tbl (id, p)
 			  select g, 20 from (SELECT generate_series(51, 60) AS g) AS _gs;
@@ -228,17 +446,35 @@ step c2: commit;
 ERROR:  could not serialize access due to read/write dependencies among transactions
 
 starting permutation: rxy1 rxy2 wy2 wx1 c2 c1
-step rxy1: select sum(p) from hash_tbl where p=20;
-sum
----
-200
-(1 row)
+step rxy1: select id from hash_tbl where p=20;
+id
+--
+20
+19
+18
+17
+16
+15
+14
+13
+12
+11
+(10 rows)
 
-step rxy2: select sum(p) from hash_tbl where p=30;
-sum
----
-300
-(1 row)
+step rxy2: select id from hash_tbl where p=30;
+id
+--
+30
+29
+28
+27
+26
+25
+24
+23
+22
+21
+(10 rows)
 
 step wy2: insert into hash_tbl (id, p)
 			  select g, 20 from (SELECT generate_series(51, 60) AS g) AS _gs;
@@ -249,17 +485,35 @@ step c1: commit;
 ERROR:  could not serialize access due to read/write dependencies among transactions
 
 starting permutation: rxy1 rxy2 wy2 c2 wx1 c1
-step rxy1: select sum(p) from hash_tbl where p=20;
-sum
----
-200
-(1 row)
+step rxy1: select id from hash_tbl where p=20;
+id
+--
+20
+19
+18
+17
+16
+15
+14
+13
+12
+11
+(10 rows)
 
-step rxy2: select sum(p) from hash_tbl where p=30;
-sum
----
-300
-(1 row)
+step rxy2: select id from hash_tbl where p=30;
+id
+--
+30
+29
+28
+27
+26
+25
+24
+23
+22
+21
+(10 rows)
 
 step wy2: insert into hash_tbl (id, p)
 			  select g, 20 from (SELECT generate_series(51, 60) AS g) AS _gs;
@@ -270,17 +524,35 @@ ERROR:  could not serialize access due to read/write dependencies among transact
 step c1: commit;
 
 starting permutation: rxy2 rxy1 wx1 c1 wy2 c2
-step rxy2: select sum(p) from hash_tbl where p=30;
-sum
----
-300
-(1 row)
+step rxy2: select id from hash_tbl where p=30;
+id
+--
+30
+29
+28
+27
+26
+25
+24
+23
+22
+21
+(10 rows)
 
-step rxy1: select sum(p) from hash_tbl where p=20;
-sum
----
-200
-(1 row)
+step rxy1: select id from hash_tbl where p=20;
+id
+--
+20
+19
+18
+17
+16
+15
+14
+13
+12
+11
+(10 rows)
 
 step wx1: insert into hash_tbl (id, p)
 			  select g, 30 from (SELECT generate_series(41, 50) AS g) AS _gs;
@@ -291,17 +563,35 @@ ERROR:  could not serialize access due to read/write dependencies among transact
 step c2: commit;
 
 starting permutation: rxy2 rxy1 wx1 wy2 c1 c2
-step rxy2: select sum(p) from hash_tbl where p=30;
-sum
----
-300
-(1 row)
+step rxy2: select id from hash_tbl where p=30;
+id
+--
+30
+29
+28
+27
+26
+25
+24
+23
+22
+21
+(10 rows)
 
-step rxy1: select sum(p) from hash_tbl where p=20;
-sum
----
-200
-(1 row)
+step rxy1: select id from hash_tbl where p=20;
+id
+--
+20
+19
+18
+17
+16
+15
+14
+13
+12
+11
+(10 rows)
 
 step wx1: insert into hash_tbl (id, p)
 			  select g, 30 from (SELECT generate_series(41, 50) AS g) AS _gs;
@@ -312,17 +602,35 @@ step c2: commit;
 ERROR:  could not serialize access due to read/write dependencies among transactions
 
 starting permutation: rxy2 rxy1 wx1 wy2 c2 c1
-step rxy2: select sum(p) from hash_tbl where p=30;
-sum
----
-300
-(1 row)
+step rxy2: select id from hash_tbl where p=30;
+id
+--
+30
+29
+28
+27
+26
+25
+24
+23
+22
+21
+(10 rows)
 
-step rxy1: select sum(p) from hash_tbl where p=20;
-sum
----
-200
-(1 row)
+step rxy1: select id from hash_tbl where p=20;
+id
+--
+20
+19
+18
+17
+16
+15
+14
+13
+12
+11
+(10 rows)
 
 step wx1: insert into hash_tbl (id, p)
 			  select g, 30 from (SELECT generate_series(41, 50) AS g) AS _gs;
@@ -333,17 +641,35 @@ step c1: commit;
 ERROR:  could not serialize access due to read/write dependencies among transactions
 
 starting permutation: rxy2 rxy1 wy2 wx1 c1 c2
-step rxy2: select sum(p) from hash_tbl where p=30;
-sum
----
-300
-(1 row)
+step rxy2: select id from hash_tbl where p=30;
+id
+--
+30
+29
+28
+27
+26
+25
+24
+23
+22
+21
+(10 rows)
 
-step rxy1: select sum(p) from hash_tbl where p=20;
-sum
----
-200
-(1 row)
+step rxy1: select id from hash_tbl where p=20;
+id
+--
+20
+19
+18
+17
+16
+15
+14
+13
+12
+11
+(10 rows)
 
 step wy2: insert into hash_tbl (id, p)
 			  select g, 20 from (SELECT generate_series(51, 60) AS g) AS _gs;
@@ -354,17 +680,35 @@ step c2: commit;
 ERROR:  could not serialize access due to read/write dependencies among transactions
 
 starting permutation: rxy2 rxy1 wy2 wx1 c2 c1
-step rxy2: select sum(p) from hash_tbl where p=30;
-sum
----
-300
-(1 row)
+step rxy2: select id from hash_tbl where p=30;
+id
+--
+30
+29
+28
+27
+26
+25
+24
+23
+22
+21
+(10 rows)
 
-step rxy1: select sum(p) from hash_tbl where p=20;
-sum
----
-200
-(1 row)
+step rxy1: select id from hash_tbl where p=20;
+id
+--
+20
+19
+18
+17
+16
+15
+14
+13
+12
+11
+(10 rows)
 
 step wy2: insert into hash_tbl (id, p)
 			  select g, 20 from (SELECT generate_series(51, 60) AS g) AS _gs;
@@ -375,17 +719,35 @@ step c1: commit;
 ERROR:  could not serialize access due to read/write dependencies among transactions
 
 starting permutation: rxy2 rxy1 wy2 c2 wx1 c1
-step rxy2: select sum(p) from hash_tbl where p=30;
-sum
----
-300
-(1 row)
+step rxy2: select id from hash_tbl where p=30;
+id
+--
+30
+29
+28
+27
+26
+25
+24
+23
+22
+21
+(10 rows)
 
-step rxy1: select sum(p) from hash_tbl where p=20;
-sum
----
-200
-(1 row)
+step rxy1: select id from hash_tbl where p=20;
+id
+--
+20
+19
+18
+17
+16
+15
+14
+13
+12
+11
+(10 rows)
 
 step wy2: insert into hash_tbl (id, p)
 			  select g, 20 from (SELECT generate_series(51, 60) AS g) AS _gs;
@@ -396,19 +758,37 @@ ERROR:  could not serialize access due to read/write dependencies among transact
 step c1: commit;
 
 starting permutation: rxy2 wy2 rxy1 wx1 c1 c2
-step rxy2: select sum(p) from hash_tbl where p=30;
-sum
----
-300
-(1 row)
+step rxy2: select id from hash_tbl where p=30;
+id
+--
+30
+29
+28
+27
+26
+25
+24
+23
+22
+21
+(10 rows)
 
 step wy2: insert into hash_tbl (id, p)
 			  select g, 20 from (SELECT generate_series(51, 60) AS g) AS _gs;
-step rxy1: select sum(p) from hash_tbl where p=20;
-sum
----
-200
-(1 row)
+step rxy1: select id from hash_tbl where p=20;
+id
+--
+20
+19
+18
+17
+16
+15
+14
+13
+12
+11
+(10 rows)
 
 step wx1: insert into hash_tbl (id, p)
 			  select g, 30 from (SELECT generate_series(41, 50) AS g) AS _gs;
@@ -417,19 +797,37 @@ step c2: commit;
 ERROR:  could not serialize access due to read/write dependencies among transactions
 
 starting permutation: rxy2 wy2 rxy1 wx1 c2 c1
-step rxy2: select sum(p) from hash_tbl where p=30;
-sum
----
-300
-(1 row)
+step rxy2: select id from hash_tbl where p=30;
+id
+--
+30
+29
+28
+27
+26
+25
+24
+23
+22
+21
+(10 rows)
 
 step wy2: insert into hash_tbl (id, p)
 			  select g, 20 from (SELECT generate_series(51, 60) AS g) AS _gs;
-step rxy1: select sum(p) from hash_tbl where p=20;
-sum
----
-200
-(1 row)
+step rxy1: select id from hash_tbl where p=20;
+id
+--
+20
+19
+18
+17
+16
+15
+14
+13
+12
+11
+(10 rows)
 
 step wx1: insert into hash_tbl (id, p)
 			  select g, 30 from (SELECT generate_series(41, 50) AS g) AS _gs;
@@ -438,19 +836,37 @@ step c1: commit;
 ERROR:  could not serialize access due to read/write dependencies among transactions
 
 starting permutation: rxy2 wy2 rxy1 c2 wx1 c1
-step rxy2: select sum(p) from hash_tbl where p=30;
-sum
----
-300
-(1 row)
+step rxy2: select id from hash_tbl where p=30;
+id
+--
+30
+29
+28
+27
+26
+25
+24
+23
+22
+21
+(10 rows)
 
 step wy2: insert into hash_tbl (id, p)
 			  select g, 20 from (SELECT generate_series(51, 60) AS g) AS _gs;
-step rxy1: select sum(p) from hash_tbl where p=20;
-sum
----
-200
-(1 row)
+step rxy1: select id from hash_tbl where p=20;
+id
+--
+20
+19
+18
+17
+16
+15
+14
+13
+12
+11
+(10 rows)
 
 step c2: commit;
 step wx1: insert into hash_tbl (id, p)
@@ -459,19 +875,37 @@ ERROR:  could not serialize access due to read/write dependencies among transact
 step c1: commit;
 
 starting permutation: rxy3 wx3 rxy4 c1 wy4 c2
-step rxy3: select sum(p) from hash_tbl where p=20;
-sum
----
-200
-(1 row)
+step rxy3: select id from hash_tbl where p=20;
+id
+--
+20
+19
+18
+17
+16
+15
+14
+13
+12
+11
+(10 rows)
 
 step wx3: insert into hash_tbl (id, p)
 			  select g, 50 from (SELECT generate_series(41, 50) AS g) AS _gs;
-step rxy4: select sum(p) from hash_tbl where p=30;
-sum
----
-300
-(1 row)
+step rxy4: select id from hash_tbl where p=30;
+id
+--
+30
+29
+28
+27
+26
+25
+24
+23
+22
+21
+(10 rows)
 
 step c1: commit;
 step wy4: insert into hash_tbl (id, p)
@@ -479,19 +913,37 @@ step wy4: insert into hash_tbl (id, p)
 step c2: commit;
 
 starting permutation: rxy3 wx3 rxy4 wy4 c1 c2
-step rxy3: select sum(p) from hash_tbl where p=20;
-sum
----
-200
-(1 row)
+step rxy3: select id from hash_tbl where p=20;
+id
+--
+20
+19
+18
+17
+16
+15
+14
+13
+12
+11
+(10 rows)
 
 step wx3: insert into hash_tbl (id, p)
 			  select g, 50 from (SELECT generate_series(41, 50) AS g) AS _gs;
-step rxy4: select sum(p) from hash_tbl where p=30;
-sum
----
-300
-(1 row)
+step rxy4: select id from hash_tbl where p=30;
+id
+--
+30
+29
+28
+27
+26
+25
+24
+23
+22
+21
+(10 rows)
 
 step wy4: insert into hash_tbl (id, p)
 			  select g, 60 from (SELECT generate_series(51, 60) AS g) AS _gs;
@@ -499,19 +951,37 @@ step c1: commit;
 step c2: commit;
 
 starting permutation: rxy3 wx3 rxy4 wy4 c2 c1
-step rxy3: select sum(p) from hash_tbl where p=20;
-sum
----
-200
-(1 row)
+step rxy3: select id from hash_tbl where p=20;
+id
+--
+20
+19
+18
+17
+16
+15
+14
+13
+12
+11
+(10 rows)
 
 step wx3: insert into hash_tbl (id, p)
 			  select g, 50 from (SELECT generate_series(41, 50) AS g) AS _gs;
-step rxy4: select sum(p) from hash_tbl where p=30;
-sum
----
-300
-(1 row)
+step rxy4: select id from hash_tbl where p=30;
+id
+--
+30
+29
+28
+27
+26
+25
+24
+23
+22
+21
+(10 rows)
 
 step wy4: insert into hash_tbl (id, p)
 			  select g, 60 from (SELECT generate_series(51, 60) AS g) AS _gs;
@@ -519,17 +989,35 @@ step c2: commit;
 step c1: commit;
 
 starting permutation: rxy3 rxy4 wx3 c1 wy4 c2
-step rxy3: select sum(p) from hash_tbl where p=20;
-sum
----
-200
-(1 row)
+step rxy3: select id from hash_tbl where p=20;
+id
+--
+20
+19
+18
+17
+16
+15
+14
+13
+12
+11
+(10 rows)
 
-step rxy4: select sum(p) from hash_tbl where p=30;
-sum
----
-300
-(1 row)
+step rxy4: select id from hash_tbl where p=30;
+id
+--
+30
+29
+28
+27
+26
+25
+24
+23
+22
+21
+(10 rows)
 
 step wx3: insert into hash_tbl (id, p)
 			  select g, 50 from (SELECT generate_series(41, 50) AS g) AS _gs;
@@ -539,17 +1027,35 @@ step wy4: insert into hash_tbl (id, p)
 step c2: commit;
 
 starting permutation: rxy3 rxy4 wx3 wy4 c1 c2
-step rxy3: select sum(p) from hash_tbl where p=20;
-sum
----
-200
-(1 row)
+step rxy3: select id from hash_tbl where p=20;
+id
+--
+20
+19
+18
+17
+16
+15
+14
+13
+12
+11
+(10 rows)
 
-step rxy4: select sum(p) from hash_tbl where p=30;
-sum
----
-300
-(1 row)
+step rxy4: select id from hash_tbl where p=30;
+id
+--
+30
+29
+28
+27
+26
+25
+24
+23
+22
+21
+(10 rows)
 
 step wx3: insert into hash_tbl (id, p)
 			  select g, 50 from (SELECT generate_series(41, 50) AS g) AS _gs;
@@ -559,17 +1065,35 @@ step c1: commit;
 step c2: commit;
 
 starting permutation: rxy3 rxy4 wx3 wy4 c2 c1
-step rxy3: select sum(p) from hash_tbl where p=20;
-sum
----
-200
-(1 row)
+step rxy3: select id from hash_tbl where p=20;
+id
+--
+20
+19
+18
+17
+16
+15
+14
+13
+12
+11
+(10 rows)
 
-step rxy4: select sum(p) from hash_tbl where p=30;
-sum
----
-300
-(1 row)
+step rxy4: select id from hash_tbl where p=30;
+id
+--
+30
+29
+28
+27
+26
+25
+24
+23
+22
+21
+(10 rows)
 
 step wx3: insert into hash_tbl (id, p)
 			  select g, 50 from (SELECT generate_series(41, 50) AS g) AS _gs;
@@ -579,17 +1103,35 @@ step c2: commit;
 step c1: commit;
 
 starting permutation: rxy3 rxy4 wy4 wx3 c1 c2
-step rxy3: select sum(p) from hash_tbl where p=20;
-sum
----
-200
-(1 row)
+step rxy3: select id from hash_tbl where p=20;
+id
+--
+20
+19
+18
+17
+16
+15
+14
+13
+12
+11
+(10 rows)
 
-step rxy4: select sum(p) from hash_tbl where p=30;
-sum
----
-300
-(1 row)
+step rxy4: select id from hash_tbl where p=30;
+id
+--
+30
+29
+28
+27
+26
+25
+24
+23
+22
+21
+(10 rows)
 
 step wy4: insert into hash_tbl (id, p)
 			  select g, 60 from (SELECT generate_series(51, 60) AS g) AS _gs;
@@ -599,17 +1141,35 @@ step c1: commit;
 step c2: commit;
 
 starting permutation: rxy3 rxy4 wy4 wx3 c2 c1
-step rxy3: select sum(p) from hash_tbl where p=20;
-sum
----
-200
-(1 row)
+step rxy3: select id from hash_tbl where p=20;
+id
+--
+20
+19
+18
+17
+16
+15
+14
+13
+12
+11
+(10 rows)
 
-step rxy4: select sum(p) from hash_tbl where p=30;
-sum
----
-300
-(1 row)
+step rxy4: select id from hash_tbl where p=30;
+id
+--
+30
+29
+28
+27
+26
+25
+24
+23
+22
+21
+(10 rows)
 
 step wy4: insert into hash_tbl (id, p)
 			  select g, 60 from (SELECT generate_series(51, 60) AS g) AS _gs;
@@ -619,17 +1179,35 @@ step c2: commit;
 step c1: commit;
 
 starting permutation: rxy3 rxy4 wy4 c2 wx3 c1
-step rxy3: select sum(p) from hash_tbl where p=20;
-sum
----
-200
-(1 row)
+step rxy3: select id from hash_tbl where p=20;
+id
+--
+20
+19
+18
+17
+16
+15
+14
+13
+12
+11
+(10 rows)
 
-step rxy4: select sum(p) from hash_tbl where p=30;
-sum
----
-300
-(1 row)
+step rxy4: select id from hash_tbl where p=30;
+id
+--
+30
+29
+28
+27
+26
+25
+24
+23
+22
+21
+(10 rows)
 
 step wy4: insert into hash_tbl (id, p)
 			  select g, 60 from (SELECT generate_series(51, 60) AS g) AS _gs;
@@ -639,17 +1217,35 @@ step wx3: insert into hash_tbl (id, p)
 step c1: commit;
 
 starting permutation: rxy4 rxy3 wx3 c1 wy4 c2
-step rxy4: select sum(p) from hash_tbl where p=30;
-sum
----
-300
-(1 row)
+step rxy4: select id from hash_tbl where p=30;
+id
+--
+30
+29
+28
+27
+26
+25
+24
+23
+22
+21
+(10 rows)
 
-step rxy3: select sum(p) from hash_tbl where p=20;
-sum
----
-200
-(1 row)
+step rxy3: select id from hash_tbl where p=20;
+id
+--
+20
+19
+18
+17
+16
+15
+14
+13
+12
+11
+(10 rows)
 
 step wx3: insert into hash_tbl (id, p)
 			  select g, 50 from (SELECT generate_series(41, 50) AS g) AS _gs;
@@ -659,17 +1255,35 @@ step wy4: insert into hash_tbl (id, p)
 step c2: commit;
 
 starting permutation: rxy4 rxy3 wx3 wy4 c1 c2
-step rxy4: select sum(p) from hash_tbl where p=30;
-sum
----
-300
-(1 row)
+step rxy4: select id from hash_tbl where p=30;
+id
+--
+30
+29
+28
+27
+26
+25
+24
+23
+22
+21
+(10 rows)
 
-step rxy3: select sum(p) from hash_tbl where p=20;
-sum
----
-200
-(1 row)
+step rxy3: select id from hash_tbl where p=20;
+id
+--
+20
+19
+18
+17
+16
+15
+14
+13
+12
+11
+(10 rows)
 
 step wx3: insert into hash_tbl (id, p)
 			  select g, 50 from (SELECT generate_series(41, 50) AS g) AS _gs;
@@ -679,17 +1293,35 @@ step c1: commit;
 step c2: commit;
 
 starting permutation: rxy4 rxy3 wx3 wy4 c2 c1
-step rxy4: select sum(p) from hash_tbl where p=30;
-sum
----
-300
-(1 row)
+step rxy4: select id from hash_tbl where p=30;
+id
+--
+30
+29
+28
+27
+26
+25
+24
+23
+22
+21
+(10 rows)
 
-step rxy3: select sum(p) from hash_tbl where p=20;
-sum
----
-200
-(1 row)
+step rxy3: select id from hash_tbl where p=20;
+id
+--
+20
+19
+18
+17
+16
+15
+14
+13
+12
+11
+(10 rows)
 
 step wx3: insert into hash_tbl (id, p)
 			  select g, 50 from (SELECT generate_series(41, 50) AS g) AS _gs;
@@ -699,17 +1331,35 @@ step c2: commit;
 step c1: commit;
 
 starting permutation: rxy4 rxy3 wy4 wx3 c1 c2
-step rxy4: select sum(p) from hash_tbl where p=30;
-sum
----
-300
-(1 row)
+step rxy4: select id from hash_tbl where p=30;
+id
+--
+30
+29
+28
+27
+26
+25
+24
+23
+22
+21
+(10 rows)
 
-step rxy3: select sum(p) from hash_tbl where p=20;
-sum
----
-200
-(1 row)
+step rxy3: select id from hash_tbl where p=20;
+id
+--
+20
+19
+18
+17
+16
+15
+14
+13
+12
+11
+(10 rows)
 
 step wy4: insert into hash_tbl (id, p)
 			  select g, 60 from (SELECT generate_series(51, 60) AS g) AS _gs;
@@ -719,17 +1369,35 @@ step c1: commit;
 step c2: commit;
 
 starting permutation: rxy4 rxy3 wy4 wx3 c2 c1
-step rxy4: select sum(p) from hash_tbl where p=30;
-sum
----
-300
-(1 row)
+step rxy4: select id from hash_tbl where p=30;
+id
+--
+30
+29
+28
+27
+26
+25
+24
+23
+22
+21
+(10 rows)
 
-step rxy3: select sum(p) from hash_tbl where p=20;
-sum
----
-200
-(1 row)
+step rxy3: select id from hash_tbl where p=20;
+id
+--
+20
+19
+18
+17
+16
+15
+14
+13
+12
+11
+(10 rows)
 
 step wy4: insert into hash_tbl (id, p)
 			  select g, 60 from (SELECT generate_series(51, 60) AS g) AS _gs;
@@ -739,17 +1407,35 @@ step c2: commit;
 step c1: commit;
 
 starting permutation: rxy4 rxy3 wy4 c2 wx3 c1
-step rxy4: select sum(p) from hash_tbl where p=30;
-sum
----
-300
-(1 row)
+step rxy4: select id from hash_tbl where p=30;
+id
+--
+30
+29
+28
+27
+26
+25
+24
+23
+22
+21
+(10 rows)
 
-step rxy3: select sum(p) from hash_tbl where p=20;
-sum
----
-200
-(1 row)
+step rxy3: select id from hash_tbl where p=20;
+id
+--
+20
+19
+18
+17
+16
+15
+14
+13
+12
+11
+(10 rows)
 
 step wy4: insert into hash_tbl (id, p)
 			  select g, 60 from (SELECT generate_series(51, 60) AS g) AS _gs;
@@ -759,19 +1445,37 @@ step wx3: insert into hash_tbl (id, p)
 step c1: commit;
 
 starting permutation: rxy4 wy4 rxy3 wx3 c1 c2
-step rxy4: select sum(p) from hash_tbl where p=30;
-sum
----
-300
-(1 row)
+step rxy4: select id from hash_tbl where p=30;
+id
+--
+30
+29
+28
+27
+26
+25
+24
+23
+22
+21
+(10 rows)
 
 step wy4: insert into hash_tbl (id, p)
 			  select g, 60 from (SELECT generate_series(51, 60) AS g) AS _gs;
-step rxy3: select sum(p) from hash_tbl where p=20;
-sum
----
-200
-(1 row)
+step rxy3: select id from hash_tbl where p=20;
+id
+--
+20
+19
+18
+17
+16
+15
+14
+13
+12
+11
+(10 rows)
 
 step wx3: insert into hash_tbl (id, p)
 			  select g, 50 from (SELECT generate_series(41, 50) AS g) AS _gs;
@@ -779,19 +1483,37 @@ step c1: commit;
 step c2: commit;
 
 starting permutation: rxy4 wy4 rxy3 wx3 c2 c1
-step rxy4: select sum(p) from hash_tbl where p=30;
-sum
----
-300
-(1 row)
+step rxy4: select id from hash_tbl where p=30;
+id
+--
+30
+29
+28
+27
+26
+25
+24
+23
+22
+21
+(10 rows)
 
 step wy4: insert into hash_tbl (id, p)
 			  select g, 60 from (SELECT generate_series(51, 60) AS g) AS _gs;
-step rxy3: select sum(p) from hash_tbl where p=20;
-sum
----
-200
-(1 row)
+step rxy3: select id from hash_tbl where p=20;
+id
+--
+20
+19
+18
+17
+16
+15
+14
+13
+12
+11
+(10 rows)
 
 step wx3: insert into hash_tbl (id, p)
 			  select g, 50 from (SELECT generate_series(41, 50) AS g) AS _gs;
@@ -799,19 +1521,37 @@ step c2: commit;
 step c1: commit;
 
 starting permutation: rxy4 wy4 rxy3 c2 wx3 c1
-step rxy4: select sum(p) from hash_tbl where p=30;
-sum
----
-300
-(1 row)
+step rxy4: select id from hash_tbl where p=30;
+id
+--
+30
+29
+28
+27
+26
+25
+24
+23
+22
+21
+(10 rows)
 
 step wy4: insert into hash_tbl (id, p)
 			  select g, 60 from (SELECT generate_series(51, 60) AS g) AS _gs;
-step rxy3: select sum(p) from hash_tbl where p=20;
-sum
----
-200
-(1 row)
+step rxy3: select id from hash_tbl where p=20;
+id
+--
+20
+19
+18
+17
+16
+15
+14
+13
+12
+11
+(10 rows)
 
 step c2: commit;
 step wx3: insert into hash_tbl (id, p)

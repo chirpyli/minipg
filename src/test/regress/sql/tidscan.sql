@@ -61,12 +61,12 @@ RESET enable_hashjoin;
 -- (these plans don't use TID scans, but this still seems like an
 -- appropriate place for these tests)
 EXPLAIN (COSTS OFF)
-SELECT count(*) FROM tenk1 t1 JOIN tenk1 t2 ON t1.ctid = t2.ctid;
-SELECT count(*) FROM tenk1 t1 JOIN tenk1 t2 ON t1.ctid = t2.ctid;
+SELECT DISTINCT 1 FROM tenk1 t1 JOIN tenk1 t2 ON t1.ctid = t2.ctid;
+SELECT DISTINCT 1 FROM tenk1 t1 JOIN tenk1 t2 ON t1.ctid = t2.ctid;
 SET enable_hashjoin TO off;
 EXPLAIN (COSTS OFF)
-SELECT count(*) FROM tenk1 t1 JOIN tenk1 t2 ON t1.ctid = t2.ctid;
-SELECT count(*) FROM tenk1 t1 JOIN tenk1 t2 ON t1.ctid = t2.ctid;
+SELECT DISTINCT 1 FROM tenk1 t1 JOIN tenk1 t2 ON t1.ctid = t2.ctid;
+SELECT DISTINCT 1 FROM tenk1 t1 JOIN tenk1 t2 ON t1.ctid = t2.ctid;
 RESET enable_hashjoin;
 
 -- check predicate lock on CTID

@@ -589,36 +589,6 @@ _outHashJoin(StringInfo str, const HashJoin *node)
 }
 
 static void
-_outAgg(StringInfo str, const Agg *node)
-{
-	WRITE_NODE_TYPE("AGG");
-
-	_outPlanInfo(str, (const Plan *) node);
-
-	WRITE_ENUM_FIELD(aggstrategy, AggStrategy);
-	WRITE_INT_FIELD(numCols);
-	WRITE_ATTRNUMBER_ARRAY(grpColIdx, node->numCols);
-	WRITE_OID_ARRAY(grpOperators, node->numCols);
-	WRITE_OID_ARRAY(grpCollations, node->numCols);
-	WRITE_LONG_FIELD(numGroups);
-	WRITE_UINT64_FIELD(transitionSpace);
-	WRITE_BITMAPSET_FIELD(aggParams);
-}
-
-static void
-_outGroup(StringInfo str, const Group *node)
-{
-	WRITE_NODE_TYPE("GROUP");
-
-	_outPlanInfo(str, (const Plan *) node);
-
-	WRITE_INT_FIELD(numCols);
-	WRITE_ATTRNUMBER_ARRAY(grpColIdx, node->numCols);
-	WRITE_OID_ARRAY(grpOperators, node->numCols);
-	WRITE_OID_ARRAY(grpCollations, node->numCols);
-}
-
-static void
 _outMaterial(StringInfo str, const Material *node)
 {
 	WRITE_NODE_TYPE("MATERIAL");
@@ -806,30 +776,6 @@ _outParam(StringInfo str, const Param *node)
 	WRITE_OID_FIELD(paramtype);
 	WRITE_INT_FIELD(paramtypmod);
 	WRITE_OID_FIELD(paramcollid);
-	WRITE_LOCATION_FIELD(location);
-}
-
-static void
-_outAggref(StringInfo str, const Aggref *node)
-{
-	WRITE_NODE_TYPE("AGGREF");
-
-	WRITE_OID_FIELD(aggfnoid);
-	WRITE_OID_FIELD(aggtype);
-	WRITE_OID_FIELD(aggcollid);
-	WRITE_OID_FIELD(inputcollid);
-	WRITE_OID_FIELD(aggtranstype);
-	WRITE_NODE_FIELD(aggargtypes);
-	WRITE_NODE_FIELD(aggdirectargs);
-	WRITE_NODE_FIELD(args);
-	WRITE_NODE_FIELD(aggorder);
-	WRITE_NODE_FIELD(aggdistinct);
-	WRITE_BOOL_FIELD(aggstar);
-	WRITE_BOOL_FIELD(aggvariadic);
-	WRITE_CHAR_FIELD(aggkind);
-	WRITE_UINT_FIELD(agglevelsup);
-	WRITE_INT_FIELD(aggno);
-	WRITE_INT_FIELD(aggtransno);
 	WRITE_LOCATION_FIELD(location);
 }
 
@@ -1360,7 +1306,7 @@ _outAppendPath(StringInfo str, const AppendPath *node)
 }
 
 static void
-_outGroupResultPath(StringInfo str, const GroupResultPath *node)
+_outResultPath(StringInfo str, const ResultPath *node)
 {
 	WRITE_NODE_TYPE("GROUPRESULTPATH");
 
@@ -1456,18 +1402,6 @@ _outIncrementalSortPath(StringInfo str, const IncrementalSortPath *node)
 }
 
 static void
-_outGroupPath(StringInfo str, const GroupPath *node)
-{
-	WRITE_NODE_TYPE("GROUPPATH");
-
-	_outPathInfo(str, (const Path *) node);
-
-	WRITE_NODE_FIELD(subpath);
-	WRITE_NODE_FIELD(groupClause);
-	WRITE_NODE_FIELD(qual);
-}
-
-static void
 _outUpperUniquePath(StringInfo str, const UpperUniquePath *node)
 {
 	WRITE_NODE_TYPE("UPPERUNIQUEPATH");
@@ -1476,21 +1410,6 @@ _outUpperUniquePath(StringInfo str, const UpperUniquePath *node)
 
 	WRITE_NODE_FIELD(subpath);
 	WRITE_INT_FIELD(numkeys);
-}
-
-static void
-_outAggPath(StringInfo str, const AggPath *node)
-{
-	WRITE_NODE_TYPE("AGGPATH");
-
-	_outPathInfo(str, (const Path *) node);
-
-	WRITE_NODE_FIELD(subpath);
-	WRITE_ENUM_FIELD(aggstrategy, AggStrategy);
-	WRITE_FLOAT_FIELD(numGroups, "%.0f");
-	WRITE_UINT64_FIELD(transitionSpace);
-	WRITE_NODE_FIELD(groupClause);
-	WRITE_NODE_FIELD(qual);
 }
 
 
@@ -1600,7 +1519,6 @@ _outPlannerInfo(StringInfo str, const PlannerInfo *node)
 	WRITE_NODE_FIELD(rowMarks);
 	WRITE_NODE_FIELD(placeholder_list);
 	WRITE_NODE_FIELD(query_pathkeys);
-	WRITE_NODE_FIELD(group_pathkeys);
 	WRITE_NODE_FIELD(distinct_pathkeys);
 	WRITE_NODE_FIELD(sort_pathkeys);
 	WRITE_NODE_FIELD(processed_tlist);
@@ -1610,7 +1528,6 @@ _outPlannerInfo(StringInfo str, const PlannerInfo *node)
 	WRITE_UINT_FIELD(qual_security_level);
 	WRITE_BOOL_FIELD(hasJoinRTEs);
 	WRITE_BOOL_FIELD(hasLateralRTEs);
-	WRITE_BOOL_FIELD(hasHavingQual);
 	WRITE_BOOL_FIELD(hasPseudoConstantQuals);
 	WRITE_BOOL_FIELD(hasRecursion);
 	WRITE_INT_FIELD(wt_param_id);
@@ -1838,7 +1755,6 @@ _outSpecialJoinInfo(StringInfo str, const SpecialJoinInfo *node)
 	WRITE_BOOL_FIELD(lhs_strict);
 	WRITE_BOOL_FIELD(delay_upper_joins);
 	WRITE_BOOL_FIELD(semi_can_btree);
-	WRITE_BOOL_FIELD(semi_can_hash);
 	WRITE_NODE_FIELD(semi_operators);
 	WRITE_NODE_FIELD(semi_rhs_exprs);
 }
@@ -1950,8 +1866,6 @@ _outSelectStmt(StringInfo str, const SelectStmt *node)
 	WRITE_NODE_FIELD(targetList);
 	WRITE_NODE_FIELD(fromClause);
 	WRITE_NODE_FIELD(whereClause);
-	WRITE_NODE_FIELD(groupClause);
-	WRITE_NODE_FIELD(havingClause);
 	WRITE_NODE_FIELD(valuesLists);
 	WRITE_NODE_FIELD(sortClause);
 }
@@ -1963,10 +1877,6 @@ _outFuncCall(StringInfo str, const FuncCall *node)
 
 	WRITE_NODE_FIELD(funcname);
 	WRITE_NODE_FIELD(args);
-	WRITE_NODE_FIELD(agg_order);
-	WRITE_BOOL_FIELD(agg_within_group);
-	WRITE_BOOL_FIELD(agg_star);
-	WRITE_BOOL_FIELD(agg_distinct);
 	WRITE_ENUM_FIELD(funcformat, CoercionForm);
 	WRITE_LOCATION_FIELD(location);
 }
@@ -2070,14 +1980,11 @@ _outQuery(StringInfo str, const Query *node)
 		appendStringInfoString(str, " :utilityStmt <>");
 
 	WRITE_INT_FIELD(resultRelation);
-	WRITE_BOOL_FIELD(hasAggs);
 	WRITE_BOOL_FIELD(hasTargetSRFs);
 	WRITE_BOOL_FIELD(hasSubLinks);
 	WRITE_NODE_FIELD(rtable);
 	WRITE_NODE_FIELD(jointree);
 	WRITE_NODE_FIELD(targetList);
-	WRITE_NODE_FIELD(groupClause);
-	WRITE_NODE_FIELD(havingQual);
 	WRITE_NODE_FIELD(distinctClause);
 	WRITE_NODE_FIELD(sortClause);
 	WRITE_NODE_FIELD(constraintDeps);
@@ -2474,12 +2381,6 @@ outNode(StringInfo str, const void *obj)
 			case T_HashJoin:
 				_outHashJoin(str, obj);
 				break;
-			case T_Agg:
-				_outAgg(str, obj);
-				break;
-			case T_Group:
-				_outGroup(str, obj);
-				break;
 			case T_Material:
 				_outMaterial(str, obj);
 				break;
@@ -2521,9 +2422,6 @@ outNode(StringInfo str, const void *obj)
 				break;
 			case T_Param:
 				_outParam(str, obj);
-				break;
-			case T_Aggref:
-				_outAggref(str, obj);
 				break;
 			case T_SubscriptingRef:
 				_outSubscriptingRef(str, obj);
@@ -2639,8 +2537,8 @@ outNode(StringInfo str, const void *obj)
 			case T_AppendPath:
 				_outAppendPath(str, obj);
 				break;
-			case T_GroupResultPath:
-				_outGroupResultPath(str, obj);
+			case T_ResultPath:
+				_outResultPath(str, obj);
 				break;
 			case T_MaterialPath:
 				_outMaterialPath(str, obj);
@@ -2663,14 +2561,8 @@ outNode(StringInfo str, const void *obj)
 			case T_IncrementalSortPath:
 				_outIncrementalSortPath(str, obj);
 				break;
-			case T_GroupPath:
-				_outGroupPath(str, obj);
-				break;
 			case T_UpperUniquePath:
 				_outUpperUniquePath(str, obj);
-				break;
-			case T_AggPath:
-				_outAggPath(str, obj);
 				break;
 			case T_ModifyTablePath:
 				_outModifyTablePath(str, obj);

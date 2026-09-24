@@ -50,7 +50,6 @@ extern PGDLLIMPORT bool enable_bitmapscan;
 extern PGDLLIMPORT bool enable_tidscan;
 extern PGDLLIMPORT bool enable_sort;
 extern PGDLLIMPORT bool enable_incremental_sort;
-extern PGDLLIMPORT bool enable_hashagg;
 extern PGDLLIMPORT bool enable_nestloop;
 extern PGDLLIMPORT bool enable_material;
 extern PGDLLIMPORT bool enable_memoize;
@@ -93,17 +92,6 @@ extern void cost_append(AppendPath *path);
 extern void cost_material(Path *path,
 						  Cost input_startup_cost, Cost input_total_cost,
 						  double tuples, int width);
-extern void cost_agg(Path *path, PlannerInfo *root,
-					 AggStrategy aggstrategy, const AggClauseCosts *aggcosts,
-					 int numGroupCols, double numGroups,
-					 List *quals,
-					 Cost input_startup_cost, Cost input_total_cost,
-					 double input_tuples, double input_width);
-extern void cost_group(Path *path, PlannerInfo *root,
-					   int numGroupCols, double numGroups,
-					   List *quals,
-					   Cost input_startup_cost, Cost input_total_cost,
-					   double input_tuples);
 extern void initial_cost_nestloop(PlannerInfo *root,
 								  JoinCostWorkspace *workspace,
 								  JoinType jointype,

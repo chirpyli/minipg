@@ -1023,42 +1023,6 @@ transformWhereClause(ParseState *pstate, Node *clause,
 
 
 /*
- * checkTargetlistEntrySQL92 -
- *	  Validate a targetlist entry found by findTargetlistEntrySQL92
- *
- * When we select a pre-existing tlist entry as a result of syntax such
- * as "GROUP BY 1", we have to make sure it is acceptable for use in the
- * indicated clause type; transformExpr() will have treated it as a regular
- * targetlist item.
- */
-static void
-checkTargetlistEntrySQL92(ParseState *pstate, TargetEntry *tle,
-						  ParseExprKind exprKind)
-{
-	switch (exprKind)
-	{
-		case EXPR_KIND_GROUP_BY:
-			/* reject aggregates and window functions */
-			if (pstate->p_hasAggs &&
-				contain_aggs_of_level((Node *) tle->expr, 0))
-				ereport(ERROR,
-						(errcode(ERRCODE_GROUPING_ERROR),
-				/* translator: %s is name of a SQL construct, eg GROUP BY */
-						 errmsg("aggregate functions are not allowed in %s",
-								ParseExprKindName(exprKind)),
-						 parser_errposition(pstate,
-											locate_agg_of_level((Node *) tle->expr, 0))));
-			break;
-		case EXPR_KIND_ORDER_BY:
-			/* no extra checks needed */
-			break;
-		default:
-			elog(ERROR, "unexpected exprKind in checkTargetlistEntrySQL92");
-			break;
-	}
-}
-
-/*
  *	findTargetlistEntrySQL92 -
  *	  Returns the targetlist entry matching the given (untransformed) node.
  *	  If no matching entry exists, one is created and appended to the target
@@ -1123,28 +1087,6 @@ findTargetlistEntrySQL92(ParseState *pstate, Node *node, List **tlist,
 		char	   *name = strVal(linitial(((ColumnRef *) node)->fields));
 		int			location = ((ColumnRef *) node)->location;
 
-		if (exprKind == EXPR_KIND_GROUP_BY)
-		{
-			/*
-			 * In GROUP BY, we must prefer a match against a FROM-clause
-			 * column to one against the targetlist.  Look to see if there is
-			 * a matching column.  If so, fall through to use SQL99 rules.
-			 * NOTE: if name could refer ambiguously to more than one column
-			 * name exposed by FROM, colNameToVar will ereport(ERROR). That's
-			 * just what we want here.
-			 *
-			 * Small tweak for 7.4.3: ignore matches in upper query levels.
-			 * This effectively changes the search order for bare names to (1)
-			 * local FROM variables, (2) local targetlist aliases, (3) outer
-			 * FROM variables, whereas before it was (1) (3) (2). SQL92 and
-			 * SQL99 do not allow GROUPing BY an outer reference, so this
-			 * breaks no cases that are legal per spec, and it seems a more
-			 * self-consistent behavior.
-			 */
-			if (colNameToVar(pstate, name, true, location) != NULL)
-				name = NULL;
-		}
-
 		if (name != NULL)
 		{
 			TargetEntry *target_result = NULL;
@@ -1176,8 +1118,7 @@ findTargetlistEntrySQL92(ParseState *pstate, Node *node, List **tlist,
 			}
 			if (target_result != NULL)
 			{
-				/* return the first match, after suitable validation */
-				checkTargetlistEntrySQL92(pstate, target_result, exprKind);
+				/* return the first match */
 				return target_result;
 			}
 		}
@@ -1206,8 +1147,7 @@ findTargetlistEntrySQL92(ParseState *pstate, Node *node, List **tlist,
 			{
 				if (++targetlist_pos == target_pos)
 				{
-					/* return the unique match, after suitable validation */
-					checkTargetlistEntrySQL92(pstate, tle, exprKind);
+					/* return the unique match */
 					return tle;
 				}
 			}
@@ -1267,8 +1207,7 @@ findTargetlistEntrySQL99(ParseState *pstate, Node *node, List **tlist,
 		 * This essentially allows the ORDER/GROUP/etc item to adopt the same
 		 * datatype previously selected for a textually-equivalent tlist item.
 		 * There can't be any implicit cast at top level in an ordinary SELECT
-		 * tlist at this stage, but the case does arise with ORDER BY in an
-		 * aggregate function.
+		 * tlist at this stage, but the case does arise in other places.
 		 */
 		texpr = strip_implicit_coercions((Node *) tle->expr);
 
@@ -1290,157 +1229,8 @@ findTargetlistEntrySQL99(ParseState *pstate, Node *node, List **tlist,
 }
 
 
-/*
- * Transform a single expression within a GROUP BY clause or grouping set.
- *
- * The expression is added to the targetlist if not already present, and to the
- * flatresult list (which will become the groupClause) if not already present
- * there.  The sortClause is consulted for operator and sort order hints.
- *
- * Returns the ressortgroupref of the expression.
- *
- * flatresult	reference to flat list of SortGroupClause nodes
- * seen_local	bitmapset of sortgrouprefs already seen at the local level
- * pstate		ParseState
- * gexpr		node to transform
- * targetlist	reference to TargetEntry list
- * sortClause	ORDER BY clause (SortGroupClause nodes)
- * exprKind		expression kind
- * useSQL99		SQL99 rather than SQL92 syntax
- * toplevel		false if within any grouping set
- */
-static Index
-transformGroupClauseExpr(List **flatresult, Bitmapset *seen_local,
-						 ParseState *pstate, Node *gexpr,
-						 List **targetlist, List *sortClause,
-						 ParseExprKind exprKind, bool useSQL99, bool toplevel)
-{
-	TargetEntry *tle;
-	bool		found = false;
-
-	if (useSQL99)
-		tle = findTargetlistEntrySQL99(pstate, gexpr,
-									   targetlist, exprKind);
-	else
-		tle = findTargetlistEntrySQL92(pstate, gexpr,
-									   targetlist, exprKind);
-
-	if (tle->ressortgroupref > 0)
-	{
-		ListCell   *sl;
-
-		/*
-		 * Eliminate duplicates (GROUP BY x, x) but only at local level.
-		 * (Duplicates in grouping sets can affect the number of returned
-		 * rows, so can't be dropped indiscriminately.)
-		 *
-		 * Since we don't care about anything except the sortgroupref, we can
-		 * use a bitmapset rather than scanning lists.
-		 */
-		if (bms_is_member(tle->ressortgroupref, seen_local))
-			return 0;
-
-		/*
-		 * If we're already in the flat clause list, we don't need to consider
-		 * adding ourselves again.
-		 */
-		found = targetIsInSortList(tle, InvalidOid, *flatresult);
-		if (found)
-			return tle->ressortgroupref;
-
-		/*
-		 * If the GROUP BY tlist entry also appears in ORDER BY, copy operator
-		 * info from the (first) matching ORDER BY item.  This means that if
-		 * you write something like "GROUP BY foo ORDER BY foo USING <<<", the
-		 * GROUP BY operation silently takes on the equality semantics implied
-		 * by the ORDER BY.  There are two reasons to do this: it improves the
-		 * odds that we can implement both GROUP BY and ORDER BY with a single
-		 * sort step, and it allows the user to choose the equality semantics
-		 * used by GROUP BY, should she be working with a datatype that has
-		 * more than one equality operator.
-		 *
-		 * If we're in a grouping set, though, we force our requested ordering
-		 * to be NULLS LAST, because if we have any hope of using a sorted agg
-		 * for the job, we're going to be tacking on generated NULL values
-		 * after the corresponding groups. If the user demands nulls first,
-		 * another sort step is going to be inevitable, but that's the
-		 * planner's problem.
-		 */
-
-		foreach(sl, sortClause)
-		{
-			SortGroupClause *sc = (SortGroupClause *) lfirst(sl);
-
-			if (sc->tleSortGroupRef == tle->ressortgroupref)
-			{
-				SortGroupClause *grpc = copyObject(sc);
-
-				if (!toplevel)
-					grpc->nulls_first = false;
-				*flatresult = lappend(*flatresult, grpc);
-				found = true;
-				break;
-			}
-		}
-	}
-
-	/*
-	 * If no match in ORDER BY, just add it to the result using default
-	 * sort/group semantics.
-	 */
-	if (!found)
-		*flatresult = addTargetToGroupList(pstate, tle,
-										   *flatresult, *targetlist,
-										   exprLocation(gexpr));
-
-	/*
-	 * _something_ must have assigned us a sortgroupref by now...
-	 */
-
-	return tle->ressortgroupref;
-}
 
 
-
-
-/*
- * transformGroupClause -
- *	  transform a GROUP BY clause
- *
- * GROUP BY items will be added to the targetlist (as resjunk columns)
- * if not already present, so the targetlist must be passed by reference.
- *
- * Returns the transformed (flat) groupClause.
- *
- * pstate		ParseState
- * grouplist	clause to transform
- * targetlist	reference to TargetEntry list
- * sortClause	ORDER BY clause (SortGroupClause nodes)
- * exprKind		expression kind
- * useSQL99		SQL99 rather than SQL92 syntax
- */
-List *
-transformGroupClause(ParseState *pstate, List *grouplist, List **targetlist,
-					 List *sortClause, ParseExprKind exprKind, bool useSQL99)
-{
-	List	   *result = NIL;
-	ListCell   *gl;
-	Bitmapset  *seen_local = NULL;
-
-	foreach(gl, grouplist)
-	{
-		Node	   *gexpr = (Node *) lfirst(gl);
-		Index		ref = transformGroupClauseExpr(&result, seen_local,
-												   pstate, gexpr,
-												   targetlist, sortClause,
-												   exprKind, useSQL99, true);
-
-		if (ref > 0)
-			seen_local = bms_add_member(seen_local, ref);
-	}
-
-	return result;
-}
 
 /*
  * transformSortClause -
@@ -1449,8 +1239,8 @@ transformGroupClause(ParseState *pstate, List *grouplist, List **targetlist,
  * ORDER BY items will be added to the targetlist (as resjunk columns)
  * if not already present, so the targetlist must be passed by reference.
  *
- * This is also used for window and aggregate ORDER BY clauses (which act
- * almost the same, but are always interpreted per SQL99 rules).
+ * This is also used for the ORDER BY clauses of window definitions (which
+ * act almost the same, but are always interpreted per SQL99 rules).
  */
 List *
 transformSortClause(ParseState *pstate,
@@ -1488,19 +1278,14 @@ transformSortClause(ParseState *pstate,
  * Since we may need to add items to the query's targetlist, that list
  * is passed by reference.
  *
- * As with GROUP BY, we absorb the sorting semantics of ORDER BY as much as
- * possible into the distinctClause.  This avoids a possible need to re-sort,
- * and allows the user to choose the equality semantics used by DISTINCT,
- * should she be working with a datatype that has more than one equality
- * operator.
- *
- * is_agg is true if we are transforming an aggregate(DISTINCT ...)
- * function call.  This does not affect any behavior, only the phrasing
- * of error messages.
+ * We absorb the sorting semantics of ORDER BY as much as possible into the
+ * distinctClause.  This avoids a possible need to re-sort, and allows the
+ * user to choose the equality semantics used by DISTINCT, should she be
+ * working with a datatype that has more than one equality operator.
  */
 List *
 transformDistinctClause(ParseState *pstate,
-						List **targetlist, List *sortClause, bool is_agg)
+						List **targetlist, List *sortClause)
 {
 	List	   *result = NIL;
 	ListCell   *slitem;
@@ -1529,8 +1314,6 @@ transformDistinctClause(ParseState *pstate,
 		if (tle->resjunk)
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
-					 is_agg ?
-					 errmsg("in an aggregate with DISTINCT, ORDER BY expressions must appear in argument list") :
 					 errmsg("for SELECT DISTINCT, ORDER BY expressions must appear in select list"),
 					 parser_errposition(pstate,
 										exprLocation((Node *) tle->expr))));
@@ -1555,15 +1338,11 @@ transformDistinctClause(ParseState *pstate,
 	/*
 	 * Complain if we found nothing to make DISTINCT.  Returning an empty list
 	 * would cause the parsed Query to look like it didn't have DISTINCT, with
-	 * results that would probably surprise the user.  Note: this case is
-	 * presently impossible for aggregates because of grammar restrictions,
-	 * but we check anyway.
+	 * results that would probably surprise the user.
 	 */
 	if (result == NIL)
 		ereport(ERROR,
 				(errcode(ERRCODE_SYNTAX_ERROR),
-				 is_agg ?
-				 errmsg("an aggregate with DISTINCT must have at least one argument") :
 				 errmsg("SELECT DISTINCT must have at least one column")));
 
 	return result;
@@ -1692,8 +1471,8 @@ addTargetToSortList(ParseState *pstate, TargetEntry *tle,
  *
  * location is the parse location to be fingered in event of trouble.  Note
  * that we can't rely on exprLocation(tle->expr), because that might point
- * to a SELECT item that matches the GROUP BY item; it'd be pretty confusing
- * to report such a location.
+ * to a different SELECT item; it'd be pretty confusing to report such a
+ * location.
  *
  * Returns the updated SortGroupClause list.
  */

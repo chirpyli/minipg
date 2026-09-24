@@ -59,7 +59,7 @@
  * CP_LABEL_TLIST specifies that the plan node must return columns matching
  * any sortgrouprefs specified in its pathtarget, with appropriate
  * ressortgroupref labels.  This is passed down by parent nodes such as Sort
- * and Group, which need these values to be available in their inputs.
+ * and Unique, which need these values to be available in their inputs.
  *
  * CP_IGNORE_TLIST specifies that the caller plans to replace the targetlist,
  * and therefore it doesn't matter a bit what target list gets generated.
@@ -82,8 +82,8 @@ static Plan *create_gating_plan(PlannerInfo *root, Path *path, Plan *plan,
 static Plan *create_join_plan(PlannerInfo *root, JoinPath *best_path);
 static Plan *create_append_plan(PlannerInfo *root, AppendPath *best_path,
 								int flags);
-static Result *create_group_result_plan(PlannerInfo *root,
-										GroupResultPath *best_path);
+static Result *create_result_plan(PlannerInfo *root,
+										ResultPath *best_path);
 static ProjectSet *create_project_set_plan(PlannerInfo *root, ProjectSetPath *best_path);
 static Material *create_material_plan(PlannerInfo *root, MaterialPath *best_path,
 									  int flags);
@@ -98,10 +98,8 @@ static Plan *inject_projection_plan(Plan *subplan, List *tlist);
 static Sort *create_sort_plan(PlannerInfo *root, SortPath *best_path, int flags);
 static IncrementalSort *create_incrementalsort_plan(PlannerInfo *root,
 													IncrementalSortPath *best_path, int flags);
-static Group *create_group_plan(PlannerInfo *root, GroupPath *best_path);
 static Unique *create_upper_unique_plan(PlannerInfo *root, UpperUniquePath *best_path,
 										int flags);
-static Agg *create_agg_plan(PlannerInfo *root, AggPath *best_path);
 static ModifyTable *create_modifytable_plan(PlannerInfo *root, ModifyTablePath *best_path);
 static SeqScan *create_seqscan_plan(PlannerInfo *root, Path *best_path,
 									List *tlist, List *scan_clauses);
@@ -226,9 +224,6 @@ static Memoize *make_memoize(Plan *lefttree, Oid *hashoperators,
 							 Oid *collations, List *param_exprs,
 							 bool singlerow, bool binary_mode,
 							 uint32 est_entries, Bitmapset *keyparamids);
-							 static Group *make_group(List *tlist, List *qual, int numGroupCols,
-						 AttrNumber *grpColIdx, Oid *grpOperators, Oid *grpCollations,
-						 Plan *lefttree);
 static Unique *make_unique_from_sortclauses(Plan *lefttree, List *distinctList);
 static Unique *make_unique_from_pathkeys(Plan *lefttree,
 										 List *pathkeys, int numCols);
@@ -346,10 +341,10 @@ create_plan_recurse(PlannerInfo *root, Path *best_path, int flags)
 											  (ProjectionPath *) best_path,
 											  flags);
 			}
-			else if (IsA(best_path, GroupResultPath))
+			else if (IsA(best_path, ResultPath))
 			{
-				plan = (Plan *) create_group_result_plan(root,
-														 (GroupResultPath *) best_path);
+				plan = (Plan *) create_result_plan(root,
+														 (ResultPath *) best_path);
 			}
 			else
 			{
@@ -396,15 +391,6 @@ create_plan_recurse(PlannerInfo *root, Path *best_path, int flags)
 			plan = (Plan *) create_incrementalsort_plan(root,
 														(IncrementalSortPath *) best_path,
 														flags);
-			break;
-		case T_Group:
-			plan = (Plan *) create_group_plan(root,
-											  (GroupPath *) best_path);
-			break;
-		case T_Agg:
-			Assert(IsA(best_path, AggPath));
-			plan = (Plan *) create_agg_plan(root,
-											(AggPath *) best_path);
 			break;
 		case T_ModifyTable:
 			plan = (Plan *) create_modifytable_plan(root,
@@ -939,14 +925,14 @@ create_append_plan(PlannerInfo *root, AppendPath *best_path, int flags)
 }
 
 /*
- * create_group_result_plan
+ * create_result_plan
  *	  Create a Result plan for 'best_path'.
- *	  This is only used for degenerate grouping cases.
+ *	  This is used for a FROM-less SELECT on an RTE_RESULT relation.
  *
  *	  Returns a Plan node.
  */
 static Result *
-create_group_result_plan(PlannerInfo *root, GroupResultPath *best_path)
+create_result_plan(PlannerInfo *root, ResultPath *best_path)
 {
 	Result	   *plan;
 	List	   *tlist;
@@ -1092,6 +1078,8 @@ create_unique_plan(PlannerInfo *root, UniquePath *best_path, int flags)
 	AttrNumber *groupColIdx;
 	Oid		   *groupCollations;
 	int			groupColPos;
+	List	   *sortList = NIL;
+	Sort	   *sort;
 	ListCell   *l;
 
 	/* Unique doesn't project, so tlist requirements pass through */
@@ -1109,13 +1097,10 @@ create_unique_plan(PlannerInfo *root, UniquePath *best_path, int flags)
 	 *
 	 * The subplan may have a "physical" tlist if it is a simple scan plan. If
 	 * we're going to sort, this should be reduced to the regular tlist, so
-	 * that we don't sort more data than we need to.  For hashing, the tlist
-	 * should be left as-is if we don't need to add any expressions; but if we
-	 * do have to add expressions, then a projection step will be needed at
-	 * runtime anyway, so we may as well remove unneeded items. Therefore
-	 * newtlist starts from build_path_tlist() not just a copy of the
-	 * subplan's tlist; and we don't install it into the subplan unless we are
-	 * sorting or stuff has to be added.
+	 * that we don't sort more data than we need to.  Therefore newtlist starts
+	 * from build_path_tlist() not just a copy of the subplan's tlist; and we
+	 * don't install it into the subplan unless we are sorting or stuff has to
+	 * be added.
 	 */
 	in_operators = best_path->in_operators;
 	uniq_exprs = best_path->uniq_exprs;
@@ -1144,7 +1129,7 @@ create_unique_plan(PlannerInfo *root, UniquePath *best_path, int flags)
 	}
 
 	/* Use change_plan_targetlist in case we need to insert a Result node */
-	if (newitems || best_path->umethod == UNIQUE_PATH_SORT)
+	if (newitems)
 		subplan = change_plan_targetlist(subplan, newtlist);
 
 	/*
@@ -1172,94 +1157,49 @@ create_unique_plan(PlannerInfo *root, UniquePath *best_path, int flags)
 		groupColPos++;
 	}
 
-	if (best_path->umethod == UNIQUE_PATH_HASH)
+	/* Create an ORDER BY list to sort the input compatibly */
+	groupColPos = 0;
+	foreach(l, in_operators)
 	{
-		Oid		   *groupOperators;
+		Oid			in_oper = lfirst_oid(l);
+		Oid			sortop;
+		Oid			eqop;
+		TargetEntry *tle;
+		SortGroupClause *sortcl;
+
+		sortop = get_ordering_op_for_equality_op(in_oper, false);
+		if (!OidIsValid(sortop))	/* shouldn't happen */
+			elog(ERROR, "could not find ordering operator for equality operator %u",
+				 in_oper);
 
 		/*
-		 * Get the hashable equality operators for the Agg node to use.
-		 * Normally these are the same as the IN clause operators, but if
-		 * those are cross-type operators then the equality operators are the
-		 * ones for the IN clause operators' RHS datatype.
+		 * The Unique node will need equality operators.  Normally these
+		 * are the same as the IN clause operators, but if those are
+		 * cross-type operators then the equality operators are the ones
+		 * for the IN clause operators' RHS datatype.
 		 */
-		groupOperators = (Oid *) palloc(numGroupCols * sizeof(Oid));
-		groupColPos = 0;
-		foreach(l, in_operators)
-		{
-			Oid			in_oper = lfirst_oid(l);
-			Oid			eq_oper;
+		eqop = get_equality_op_for_ordering_op(sortop, NULL);
+		if (!OidIsValid(eqop))	/* shouldn't happen */
+			elog(ERROR, "could not find equality operator for ordering operator %u",
+				 sortop);
 
-			if (!get_compatible_hash_operators(in_oper, NULL, &eq_oper))
-				elog(ERROR, "could not find compatible hash operator for operator %u",
-					 in_oper);
-			groupOperators[groupColPos++] = eq_oper;
-		}
+		tle = get_tle_by_resno(subplan->targetlist,
+							   groupColIdx[groupColPos]);
+		Assert(tle != NULL);
 
-		/*
-		 * Since the Agg node is going to project anyway, we can give it the
-		 * minimum output tlist, without any stuff we might have added to the
-		 * subplan tlist.
-		 */
-		plan = (Plan *) make_agg(build_path_tlist(root, &best_path->path),
-								 NIL,
-								 AGG_HASHED,
-								 numGroupCols,
-								 groupColIdx,
-								 groupOperators,
-								 groupCollations,
-								 best_path->path.rows,
-								 0,
-								 subplan);
+		sortcl = makeNode(SortGroupClause);
+		sortcl->tleSortGroupRef = assignSortGroupRef(tle,
+													 subplan->targetlist);
+		sortcl->eqop = eqop;
+		sortcl->sortop = sortop;
+		sortcl->nulls_first = false;
+		sortcl->hashable = false;	/* no need to make this accurate */
+		sortList = lappend(sortList, sortcl);
+		groupColPos++;
 	}
-	else
-	{
-		List	   *sortList = NIL;
-		Sort	   *sort;
-
-		/* Create an ORDER BY list to sort the input compatibly */
-		groupColPos = 0;
-		foreach(l, in_operators)
-		{
-			Oid			in_oper = lfirst_oid(l);
-			Oid			sortop;
-			Oid			eqop;
-			TargetEntry *tle;
-			SortGroupClause *sortcl;
-
-			sortop = get_ordering_op_for_equality_op(in_oper, false);
-			if (!OidIsValid(sortop))	/* shouldn't happen */
-				elog(ERROR, "could not find ordering operator for equality operator %u",
-					 in_oper);
-
-			/*
-			 * The Unique node will need equality operators.  Normally these
-			 * are the same as the IN clause operators, but if those are
-			 * cross-type operators then the equality operators are the ones
-			 * for the IN clause operators' RHS datatype.
-			 */
-			eqop = get_equality_op_for_ordering_op(sortop, NULL);
-			if (!OidIsValid(eqop))	/* shouldn't happen */
-				elog(ERROR, "could not find equality operator for ordering operator %u",
-					 sortop);
-
-			tle = get_tle_by_resno(subplan->targetlist,
-								   groupColIdx[groupColPos]);
-			Assert(tle != NULL);
-
-			sortcl = makeNode(SortGroupClause);
-			sortcl->tleSortGroupRef = assignSortGroupRef(tle,
-														 subplan->targetlist);
-			sortcl->eqop = eqop;
-			sortcl->sortop = sortop;
-			sortcl->nulls_first = false;
-			sortcl->hashable = false;	/* no need to make this accurate */
-			sortList = lappend(sortList, sortcl);
-			groupColPos++;
-		}
-		sort = make_sort_from_sortclauses(sortList, subplan);
-		label_sort_with_costsize(root, sort);
-		plan = (Plan *) make_unique_from_sortclauses((Plan *) sort, sortList);
-	}
+	sort = make_sort_from_sortclauses(sortList, subplan);
+	label_sort_with_costsize(root, sort);
+	plan = (Plan *) make_unique_from_sortclauses((Plan *) sort, sortList);
 
 	/* Copy cost data from Path to Plan */
 	copy_generic_path_info(plan, &best_path->path);
@@ -1479,45 +1419,6 @@ create_incrementalsort_plan(PlannerInfo *root, IncrementalSortPath *best_path,
 }
 
 /*
- * create_group_plan
- *
- *	  Create a Group plan for 'best_path' and (recursively) plans
- *	  for its subpaths.
- */
-static Group *
-create_group_plan(PlannerInfo *root, GroupPath *best_path)
-{
-	Group	   *plan;
-	Plan	   *subplan;
-	List	   *tlist;
-	List	   *quals;
-
-	/*
-	 * Group can project, so no need to be terribly picky about child tlist,
-	 * but we do need grouping columns to be available
-	 */
-	subplan = create_plan_recurse(root, best_path->subpath, CP_LABEL_TLIST);
-
-	tlist = build_path_tlist(root, &best_path->path);
-
-	quals = order_qual_clauses(root, best_path->qual);
-
-	plan = make_group(tlist,
-					  quals,
-					  list_length(best_path->groupClause),
-					  extract_grouping_cols(best_path->groupClause,
-											subplan->targetlist),
-					  extract_grouping_ops(best_path->groupClause),
-					  extract_grouping_collations(best_path->groupClause,
-												  subplan->targetlist),
-					  subplan);
-
-	copy_generic_path_info(&plan->plan, (Path *) best_path);
-
-	return plan;
-}
-
-/*
  * create_upper_unique_plan
  *
  *	  Create a Unique plan for 'best_path' and (recursively) plans
@@ -1539,47 +1440,6 @@ create_upper_unique_plan(PlannerInfo *root, UpperUniquePath *best_path, int flag
 	plan = make_unique_from_pathkeys(subplan,
 									 best_path->path.pathkeys,
 									 best_path->numkeys);
-
-	copy_generic_path_info(&plan->plan, (Path *) best_path);
-
-	return plan;
-}
-
-/*
- * create_agg_plan
- *
- *	  Create an Agg plan for 'best_path' and (recursively) plans
- *	  for its subpaths.
- */
-static Agg *
-create_agg_plan(PlannerInfo *root, AggPath *best_path)
-{
-	Agg		   *plan;
-	Plan	   *subplan;
-	List	   *tlist;
-	List	   *quals;
-
-	/*
-	 * Agg can project, so no need to be terribly picky about child tlist, but
-	 * we do need grouping columns to be available
-	 */
-	subplan = create_plan_recurse(root, best_path->subpath, CP_LABEL_TLIST);
-
-	tlist = build_path_tlist(root, &best_path->path);
-
-	quals = order_qual_clauses(root, best_path->qual);
-
-	plan = make_agg(tlist, quals,
-					best_path->aggstrategy,
-					list_length(best_path->groupClause),
-					extract_grouping_cols(best_path->groupClause,
-										  subplan->targetlist),
-					extract_grouping_ops(best_path->groupClause),
-					extract_grouping_collations(best_path->groupClause,
-												subplan->targetlist),
-					best_path->numGroups,
-					best_path->transitionSpace,
-					subplan);
 
 	copy_generic_path_info(&plan->plan, (Path *) best_path);
 
@@ -4391,58 +4251,6 @@ make_memoize(Plan *lefttree, Oid *hashoperators, Oid *collations,
 	node->binary_mode = binary_mode;
 	node->est_entries = est_entries;
 	node->keyparamids = keyparamids;
-
-	return node;
-}
-
-Agg *
-make_agg(List *tlist, List *qual,
-		 AggStrategy aggstrategy,
-		 int numGroupCols, AttrNumber *grpColIdx, Oid *grpOperators, Oid *grpCollations,
-		 double dNumGroups,
-		 Size transitionSpace, Plan *lefttree)
-{
-	Agg		   *node = makeNode(Agg);
-	Plan	   *plan = &node->plan;
-	long		numGroups;
-
-	/* Reduce to long, but 'ware overflow! */
-	numGroups = (long) Min(dNumGroups, (double) LONG_MAX);
-
-	node->aggstrategy = aggstrategy;
-	node->numCols = numGroupCols;
-	node->grpColIdx = grpColIdx;
-	node->grpOperators = grpOperators;
-	node->grpCollations = grpCollations;
-	node->numGroups = numGroups;
-	node->transitionSpace = transitionSpace;
-	node->aggParams = NULL;		/* SS_finalize_plan() will fill this */
-
-	plan->qual = qual;
-	plan->targetlist = tlist;
-	plan->lefttree = lefttree;
-	plan->righttree = NULL;
-
-	return node;
-}
-
-static Group *
-make_group(List *tlist, List *qual, int numGroupCols,
-		   AttrNumber *grpColIdx, Oid *grpOperators, Oid *grpCollations,
-		   Plan *lefttree)
-{
-	Group	   *node = makeNode(Group);
-	Plan	   *plan = &node->plan;
-
-	node->numCols = numGroupCols;
-	node->grpColIdx = grpColIdx;
-	node->grpOperators = grpOperators;
-	node->grpCollations = grpCollations;
-
-	plan->qual = qual;
-	plan->targetlist = tlist;
-	plan->lefttree = lefttree;
-	plan->righttree = NULL;
 
 	return node;
 }

@@ -18,7 +18,7 @@ SELECT locktype, classid, objid, objsubid, mode, granted
 -- pg_advisory_unlock_all() shouldn't release xact locks
 SELECT pg_advisory_unlock_all();
 
-SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND database = :datoid;
+SELECT 1 FROM pg_locks WHERE locktype = 'advisory' AND database = :datoid;
 
 
 -- can't unlock xact locks
@@ -30,7 +30,7 @@ SELECT
 -- automatically release xact locks at commit
 COMMIT;
 
-SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND database = :datoid;
+SELECT 1 FROM pg_locks WHERE locktype = 'advisory' AND database = :datoid;
 
 
 BEGIN;
@@ -62,7 +62,7 @@ SELECT
 	pg_advisory_unlock(1, 1), pg_advisory_unlock(1, 1),
 	pg_advisory_unlock_shared(2, 2), pg_advisory_unlock_shared(2, 2);
 
-SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND database = :datoid;
+SELECT 1 FROM pg_locks WHERE locktype = 'advisory' AND database = :datoid;
 
 
 BEGIN;
@@ -90,7 +90,7 @@ SELECT locktype, classid, objid, objsubid, mode, granted
 -- releasing all session locks
 SELECT pg_advisory_unlock_all();
 
-SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND database = :datoid;
+SELECT 1 FROM pg_locks WHERE locktype = 'advisory' AND database = :datoid;
 
 
 BEGIN;
@@ -109,7 +109,7 @@ SELECT locktype, classid, objid, objsubid, mode, granted
 
 COMMIT;
 
-SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND database = :datoid;
+SELECT 1 FROM pg_locks WHERE locktype = 'advisory' AND database = :datoid;
 
 -- grabbing session locks multiple times
 
@@ -129,7 +129,7 @@ SELECT
 	pg_advisory_unlock(1, 1), pg_advisory_unlock(1, 1),
 	pg_advisory_unlock_shared(2, 2), pg_advisory_unlock_shared(2, 2);
 
-SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND database = :datoid;
+SELECT 1 FROM pg_locks WHERE locktype = 'advisory' AND database = :datoid;
 
 -- .. and releasing them all at once
 
@@ -145,4 +145,4 @@ SELECT locktype, classid, objid, objsubid, mode, granted
 
 SELECT pg_advisory_unlock_all();
 
-SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND database = :datoid;
+SELECT 1 FROM pg_locks WHERE locktype = 'advisory' AND database = :datoid;

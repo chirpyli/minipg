@@ -19,12 +19,12 @@ teardown
 
 session s1
 setup		{ BEGIN ISOLATION LEVEL SERIALIZABLE; }
-step rx1	{ SELECT count(*) FROM person WHERE person_id = 1 AND is_project_manager; }
+step rx1	{ SELECT ctid FROM person WHERE person_id = 1 AND is_project_manager; }
 step wy1	{ INSERT INTO project VALUES (101, 'Build Great Wall', 1); }
 step c1		{ COMMIT; }
 
 session s2
 setup		{ BEGIN ISOLATION LEVEL SERIALIZABLE; }
-step ry2	{ SELECT count(*) FROM project WHERE project_manager = 1; }
+step ry2	{ SELECT ctid FROM project WHERE project_manager = 1; }
 step wx2	{ UPDATE person SET is_project_manager = false WHERE person_id = 1; }
 step c2		{ COMMIT; }

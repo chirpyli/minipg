@@ -149,31 +149,12 @@ void
 build_base_rel_tlists(PlannerInfo *root, List *final_tlist)
 {
 	List	   *tlist_vars = pull_var_clause((Node *) final_tlist,
-										 PVC_RECURSE_AGGREGATES |
 										 PVC_INCLUDE_PLACEHOLDERS);
 
 	if (tlist_vars != NIL)
 	{
 		add_vars_to_targetlist(root, tlist_vars, bms_make_singleton(0), true);
 		list_free(tlist_vars);
-	}
-
-	/*
-	 * If there's a HAVING clause, we'll need the Vars it uses, too.  Note
-	 * that HAVING can contain Aggrefs.
-	 */
-	if (root->parse->havingQual)
-	{
-		List	   *having_vars = pull_var_clause(root->parse->havingQual,
-												  PVC_RECURSE_AGGREGATES |
-												  PVC_INCLUDE_PLACEHOLDERS);
-
-		if (having_vars != NIL)
-		{
-			add_vars_to_targetlist(root, having_vars,
-								   bms_make_singleton(0), true);
-			list_free(having_vars);
-		}
 	}
 }
 
@@ -1265,12 +1246,10 @@ compute_semijoin_info(PlannerInfo *root, SpecialJoinInfo *sjinfo, List *clause)
 	List	   *semi_operators;
 	List	   *semi_rhs_exprs;
 	bool		all_btree;
-	bool		all_hash;
 	ListCell   *lc;
 
 	/* Initialize semijoin-related fields in case we can't unique-ify */
 	sjinfo->semi_can_btree = false;
-	sjinfo->semi_can_hash = false;
 	sjinfo->semi_operators = NIL;
 	sjinfo->semi_rhs_exprs = NIL;
 
@@ -1307,7 +1286,6 @@ compute_semijoin_info(PlannerInfo *root, SpecialJoinInfo *sjinfo, List *clause)
 	semi_operators = NIL;
 	semi_rhs_exprs = NIL;
 	all_btree = true;
-	all_hash = enable_hashagg;	/* don't consider hash if not enabled */
 	foreach(lc, clause)
 	{
 		OpExpr	   *op = (OpExpr *) lfirst(lc);
@@ -1386,7 +1364,7 @@ compute_semijoin_info(PlannerInfo *root, SpecialJoinInfo *sjinfo, List *clause)
 			return;
 		}
 
-		/* all operators must be btree equality or hash equality */
+		/* all operators must be btree equality */
 		if (all_btree)
 		{
 			/* oprcanmerge is considered a hint... */
@@ -1394,13 +1372,7 @@ compute_semijoin_info(PlannerInfo *root, SpecialJoinInfo *sjinfo, List *clause)
 				get_mergejoin_opfamilies(opno) == NIL)
 				all_btree = false;
 		}
-		if (all_hash)
-		{
-			/* ... but oprcanhash had better be correct */
-			if (!op_hashjoinable(opno, opinputtype))
-				all_hash = false;
-		}
-		if (!(all_btree || all_hash))
+		if (!all_btree)
 			return;
 
 		/* so far so good, keep building lists */
@@ -1419,11 +1391,10 @@ compute_semijoin_info(PlannerInfo *root, SpecialJoinInfo *sjinfo, List *clause)
 		return;
 
 	/*
-	 * If we get here, we can unique-ify the semijoin's RHS using at least one
-	 * of sorting and hashing.  Save the information about how to do that.
+	 * If we get here, we can unique-ify the semijoin's RHS using sorting.
+	 * Save the information about how to do that.
 	 */
 	sjinfo->semi_can_btree = all_btree;
-	sjinfo->semi_can_hash = all_hash;
 	sjinfo->semi_operators = semi_operators;
 	sjinfo->semi_rhs_exprs = semi_rhs_exprs;
 }
@@ -1729,7 +1700,6 @@ distribute_qual_to_rels(PlannerInfo *root, Node *clause,
 	if (bms_membership(relids) == BMS_MULTIPLE)
 	{
 		List	   *vars = pull_var_clause(clause,
-										   PVC_RECURSE_AGGREGATES |
 										   PVC_INCLUDE_PLACEHOLDERS);
 
 		add_vars_to_targetlist(root, vars, relids, false);
@@ -2242,7 +2212,6 @@ process_implied_equality(PlannerInfo *root,
 	if (bms_membership(relids) == BMS_MULTIPLE)
 	{
 		List	   *vars = pull_var_clause(clause,
-										   PVC_RECURSE_AGGREGATES |
 										   PVC_INCLUDE_PLACEHOLDERS);
 
 		add_vars_to_targetlist(root, vars, relids, false);

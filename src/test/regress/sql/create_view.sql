@@ -9,18 +9,7 @@
 -- minipg: geometry 类型（path/point）、## 操作符、interpt_pp() 函数以及
 -- 继承表 emp 均已裁剪，street / iexit / toyemp 三个视图用例移除
 
--- These views are left around mainly to exercise special cases in pg_dump.
-
-CREATE TABLE view_base_table (key int PRIMARY KEY, data varchar(20));
-
-CREATE VIEW key_dependent_view AS
-   SELECT * FROM view_base_table GROUP BY key;
-
-ALTER TABLE view_base_table DROP CONSTRAINT view_base_table_pkey;  -- fails
-
-CREATE VIEW key_dependent_view_no_cols AS
-   SELECT FROM view_base_table GROUP BY key HAVING length(data) > 0;
-
+-- minipg: GROUP BY 已裁剪，依赖功能依赖的 key_dependent_view 系列用例移除
 --
 -- CREATE OR REPLACE VIEW
 --
@@ -79,7 +68,7 @@ CREATE   VIEW  pubview AS SELECT * FROM tbl1 WHERE tbl1.a >= (SELECT d FROM tbl2
 AND tbl1.a <= (SELECT e FROM tbl3 WHERE f = 2)
 AND EXISTS (SELECT g FROM tbl4 LEFT JOIN tbl3 ON tbl4.h = tbl3.f);
 
-SELECT count(*) FROM pg_class where relname = 'pubview'
+SELECT relname FROM pg_class where relname = 'pubview'
 AND relnamespace IN (SELECT OID FROM pg_namespace WHERE nspname = 'testviewschm2');
 
 --

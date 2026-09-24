@@ -273,7 +273,8 @@ select null::int = all ('{1,2,3}');
 select 33 = all ('{1,null,3}');
 select 33 = all ('{33,null,33}');
 -- nulls later in the bitmap
-SELECT -1 != ALL((SELECT array_agg(NULLIF(g.i, 900)) FROM (SELECT generate_series(1,1000) AS i) AS g));
+-- minipg: array_agg 已裁剪，改用含较后位置 NULL 的等价字面量数组
+SELECT -1 != ALL('{1,2,3,4,5,6,7,8,9,null,11,12}'::int[]);
 
 -- test indexes on arrays
 CREATE TABLE arr_tbl (f1 int[] unique);
@@ -353,24 +354,14 @@ INSERT INTO arraggtest (f1, f2, f3) VALUES
 ('{1,2,3,4}','{{grey,red},{blue,blue}}','{1.6, 0.0}');
 INSERT INTO arraggtest (f1, f2, f3) VALUES
 ('{1,2,3}','{{grey,red},{grey,blue}}','{1.6}');
-SELECT max(f1), min(f1), max(f2), min(f2), max(f3), min(f3) FROM arraggtest;
-
 INSERT INTO arraggtest (f1, f2, f3) VALUES
 ('{3,3,2,4,5,6}','{{white,yellow},{pink,orange}}','{2.1,3.3,1.8,1.7,1.6}');
-SELECT max(f1), min(f1), max(f2), min(f2), max(f3), min(f3) FROM arraggtest;
-
 INSERT INTO arraggtest (f1, f2, f3) VALUES
 ('{2}','{{black,red},{green,orange}}','{1.6,2.2,2.6,0.4}');
-SELECT max(f1), min(f1), max(f2), min(f2), max(f3), min(f3) FROM arraggtest;
-
 INSERT INTO arraggtest (f1, f2, f3) VALUES
 ('{4,2,6,7,8,1}','{{red},{black},{purple},{blue},{blue}}',NULL);
-SELECT max(f1), min(f1), max(f2), min(f2), max(f3), min(f3) FROM arraggtest;
-
 INSERT INTO arraggtest (f1, f2, f3) VALUES
 ('{}','{{pink,white,blue,red,grey,orange}}','{2.1,1.87,1.4,2.2}');
-SELECT max(f1), min(f1), max(f2), min(f2), max(f3), min(f3) FROM arraggtest;
-
 -- minipg: CREATE FUNCTION 已裁剪，unnest1/unnest2 自定义展开函数用例移除；
 -- 内建 unnest() 已在下方覆盖同语义
 
@@ -449,28 +440,7 @@ select cardinality('{{1,2}}'::int[]);
 select cardinality('{{1,2},{3,4},{5,6}}'::int[]);
 select cardinality('{{{1,9},{5,6}},{{2,3},{3,4}}}'::int[]);
 
--- array_agg(anynonarray)
-select array_agg(unique1) from (select unique1 from tenk1 where unique1 < 15 order by unique1) ss;
-select array_agg(ten) from (select ten from tenk1 where unique1 < 15 order by unique1) ss;
-select array_agg(nullif(ten, 4)) from (select ten from tenk1 where unique1 < 15 order by unique1) ss;
-select array_agg(unique1) from tenk1 where unique1 < -15;
-
--- array_agg(anyarray)
-select array_agg(ar)
-  from (values ('{1,2}'::int[]), ('{3,4}'::int[])) v(ar);
-select array_agg(distinct ar order by ar desc)
-  from (select array[i / 2] from (SELECT generate_series(1,10) AS i) AS a) b(ar);
-select array_agg(ar)
-  from (select array_agg(array[i, i+1, i-1])
-        from (SELECT generate_series(1,2) AS i) AS a) b(ar);
-select array_agg(array[i+1.2, i+1.3, i+1.4]) from (SELECT generate_series(1,3) AS i) AS g;
-select array_agg(array['Hello', i::text]) from (SELECT generate_series(9,11) AS i) AS g;
-select array_agg(array[i, nullif(i, 3), i+1]) from (SELECT generate_series(1,4) AS i) AS g;
--- errors
-select array_agg('{}'::int[]) from (SELECT generate_series(1,2) AS g) AS _gs;
-select array_agg(null::int[]) from (SELECT generate_series(1,2) AS g) AS _gs;
-select array_agg(ar)
-  from (values ('{1,2}'::int[]), ('{3}'::int[])) v(ar);
+-- minipg: array_agg 聚合已裁剪，array_agg(anynonarray/anyarray) 用例移除
 
 select unnest(array[1,2,3]);
 select unnest(array[1,2,3]) as unnest;

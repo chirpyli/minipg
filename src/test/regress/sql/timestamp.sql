@@ -19,9 +19,9 @@ INSERT INTO TIMESTAMP_TBL VALUES ('tomorrow');
 INSERT INTO TIMESTAMP_TBL VALUES ('tomorrow EST');
 INSERT INTO TIMESTAMP_TBL VALUES ('tomorrow zulu');
 
-SELECT count(*) AS One FROM TIMESTAMP_TBL WHERE d1 = timestamp without time zone 'today';
-SELECT count(*) AS Three FROM TIMESTAMP_TBL WHERE d1 = timestamp without time zone 'tomorrow';
-SELECT count(*) AS One FROM TIMESTAMP_TBL WHERE d1 = timestamp without time zone 'yesterday';
+SELECT true AS One FROM TIMESTAMP_TBL WHERE d1 = timestamp without time zone 'today';
+SELECT true AS Three FROM TIMESTAMP_TBL WHERE d1 = timestamp without time zone 'tomorrow';
+SELECT true AS One FROM TIMESTAMP_TBL WHERE d1 = timestamp without time zone 'yesterday';
 
 COMMIT;
 

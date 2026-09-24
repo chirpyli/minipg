@@ -535,13 +535,6 @@ locate_var_of_level_walker(Node *node,
  * pull_var_clause
  *	  Recursively pulls all Var nodes from an expression clause.
  *
- *	  Aggrefs are handled according to these bits in 'flags':
- *		PVC_INCLUDE_AGGREGATES		include Aggrefs in output list
- *		PVC_RECURSE_AGGREGATES		recurse into Aggref arguments
- *		neither flag				throw error if Aggref found
- *	  Vars within an Aggref's expression are included in the result only
- *	  when PVC_RECURSE_AGGREGATES is specified.
- *
  *	  PlaceHolderVars are handled according to these bits in 'flags':
  *		PVC_INCLUDE_PLACEHOLDERS	include PlaceHolderVars in output list
  *		PVC_RECURSE_PLACEHOLDERS	recurse into PlaceHolderVar arguments
@@ -549,11 +542,8 @@ locate_var_of_level_walker(Node *node,
  *	  Vars within a PHV's expression are included in the result only
  *	  when PVC_RECURSE_PLACEHOLDERS is specified.
  *
- *	  Aggrefs are handled above, and so do not need
- *	  their own flag bits.
- *
  *	  Upper-level vars (with varlevelsup > 0) should not be seen here,
- *	  likewise for upper-level Aggrefs and PlaceHolderVars.
+ *	  likewise for upper-level PlaceHolderVars.
  *
  *	  Returns list of nodes found.  Note the nodes themselves are not
  *	  copied, only referenced.
@@ -567,8 +557,6 @@ pull_var_clause(Node *node, int flags)
 	pull_var_clause_context context;
 
 	/* Assert that caller has not specified inconsistent flags */
-	Assert((flags & (PVC_INCLUDE_AGGREGATES | PVC_RECURSE_AGGREGATES))
-		   != (PVC_INCLUDE_AGGREGATES | PVC_RECURSE_AGGREGATES));
 	Assert((flags & (PVC_INCLUDE_PLACEHOLDERS | PVC_RECURSE_PLACEHOLDERS))
 		   != (PVC_INCLUDE_PLACEHOLDERS | PVC_RECURSE_PLACEHOLDERS));
 
@@ -591,24 +579,6 @@ pull_var_clause_walker(Node *node, pull_var_clause_context *context)
 		context->varlist = lappend(context->varlist, node);
 		return false;
 	}
-	else if (IsA(node, Aggref))
-	{
-		if (((Aggref *) node)->agglevelsup != 0)
-			elog(ERROR, "Upper-level Aggref found where not expected");
-		if (context->flags & PVC_INCLUDE_AGGREGATES)
-		{
-			context->varlist = lappend(context->varlist, node);
-			/* we do NOT descend into the contained expression */
-			return false;
-		}
-		else if (context->flags & PVC_RECURSE_AGGREGATES)
-		{
-			/* fall through to recurse into the aggregate's arguments */
-		}
-		else
-			elog(ERROR, "Aggref found where not expected");
-	}
-
 	else if (IsA(node, PlaceHolderVar))
 	{
 		if (((PlaceHolderVar *) node)->phlevelsup != 0)

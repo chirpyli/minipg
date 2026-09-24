@@ -191,14 +191,6 @@ SELECT ss.f1 AS "Correlated Field", ss.f3 AS "Second Field"
                 8 |             
 (6 rows)
 
-select q1, float8(count(*)) / (select count(*) from int8_tbl)
-from int8_tbl group by q1 order by q1;
-        q1        | ?column? 
-------------------+----------
-              123 |      0.4
- 4567890123456789 |      0.6
-(2 rows)
-
 -- Unspecified-type literals in output columns should resolve as text
 SELECT *, pg_typeof(f1) FROM
   (SELECT 'foo' AS f1 FROM (SELECT generate_series(1,3) AS g) AS _gs) ss ORDER BY 1;
@@ -238,37 +230,55 @@ select 1 = all (select (select 1));
 -- Test cases to catch unpleasant interactions between IN-join processing
 -- and subquery pullup.
 --
-select count(*) from
+select distinct 1 as one from
   (select 1 from tenk1 a
    where unique1 IN (select hundred from tenk1 b)) ss;
- count 
--------
-   100
+ one 
+-----
+   1
 (1 row)
 
-select count(distinct ss.ten) from
+select distinct ss.ten from
   (select ten from tenk1 a
    where unique1 IN (select hundred from tenk1 b)) ss;
- count 
--------
-    10
-(1 row)
+ ten 
+-----
+   0
+   1
+   2
+   3
+   4
+   5
+   6
+   7
+   8
+   9
+(10 rows)
 
-select count(*) from
+select distinct 1 as one from
   (select 1 from tenk1 a
    where unique1 IN (select distinct hundred from tenk1 b)) ss;
- count 
--------
-   100
+ one 
+-----
+   1
 (1 row)
 
-select count(distinct ss.ten) from
+select distinct ss.ten from
   (select ten from tenk1 a
    where unique1 IN (select distinct hundred from tenk1 b)) ss;
- count 
--------
-    10
-(1 row)
+ ten 
+-----
+   0
+   1
+   2
+   3
+   4
+   5
+   6
+   7
+   8
+   9
+(10 rows)
 
 --
 -- Test cases to check for overenthusiastic optimization of
@@ -290,13 +300,6 @@ SELECT * FROM foo WHERE id IN
 (1 row)
 
 SELECT * FROM foo WHERE id IN
-    (SELECT id2 FROM (SELECT id1,id2 FROM bar GROUP BY id1,id2) AS s);
- id 
-----
-  1
-(1 row)
-
-SELECT * FROM foo WHERE id IN
     (SELECT id2 FROM (SELECT DISTINCT id1, id2 FROM bar) AS s);
  id 
 ----
@@ -304,13 +307,6 @@ SELECT * FROM foo WHERE id IN
 (1 row)
 
 -- These cases do not
-SELECT * FROM foo WHERE id IN
-    (SELECT id2 FROM (SELECT id2 FROM bar GROUP BY id2) AS s);
- id 
-----
-  1
-(1 row)
-
 SELECT * FROM foo WHERE id IN
     (SELECT id2 FROM (SELECT DISTINCT id2 FROM bar) AS s);
  id 
@@ -393,39 +389,18 @@ SELECT * FROM orders_view;
 DROP TABLE orderstest cascade;
 NOTICE:  drop cascades to view orders_view
 select f1, ss1 as relabel from
-    (select *, (select sum(f1) from int4_tbl b where f1 >= a.f1) as ss1
+    (select *, (select b.f1 from int4_tbl b where b.f1 = a.f1) as ss1
      from int4_tbl a) ss;
-     f1      |  relabel   
--------------+------------
-           0 | 2147607103
-      123456 | 2147607103
-     -123456 | 2147483647
-  2147483647 | 2147483647
- -2147483647 |          0
+     f1      |   relabel   
+-------------+-------------
+           0 |           0
+      123456 |      123456
+     -123456 |     -123456
+  2147483647 |  2147483647
+ -2147483647 | -2147483647
 (5 rows)
 
---
--- Test cases involving PARAM_EXEC parameters and min/max index optimizations.
--- Per bug report from David Sanchez i Gregori.
---
-select * from (
-  select max(unique1) from tenk1 as a
-  where exists (select 1 from tenk1 as b where b.thousand = a.unique2)
-) ss;
- max  
-------
- 9997
-(1 row)
-
-select * from (
-  select min(unique1) from tenk1 as a
-  where not exists (select 1 from tenk1 as b where b.unique2 = 10000)
-) ss;
- min 
------
-   0
-(1 row)
-
+-- minipg: 聚合已裁剪，min/max 索引优化用例移除
 --
 -- Test that an IN implemented using a UniquePath does unique-ification
 -- with the right semantics, as per bug #4113.  (Unfortunately we have
@@ -451,13 +426,15 @@ CREATE TABLE tc (id int primary key, aid int);
 insert into tc values(1,1);
 insert into tc values(2,2);
 select
-  ( select min(tb.id) from tb
-    where tb.aval = (select ta.val from ta where ta.id = tc.aid) ) as min_tb_id
+  ( select tb.id from tb
+    where tb.aval = (select ta.val from ta where ta.id = tc.aid)
+      and not exists (select 1 from tb t2
+                      where t2.aval = tb.aval and t2.id < tb.id) ) as tb_id
 from tc;
- min_tb_id 
------------
-         1
-         3
+ tb_id 
+-------
+     1
+     3
 (2 rows)
 
 --
@@ -465,10 +442,9 @@ from tc;
 --
 -- minipg: numeric 已裁剪，改用 int8
 CREATE TABLE t1 (f1 int8, f2 varchar(30));
-select * from
+select distinct f1, f2, fs from
   (select distinct f1, f2, (select f2 from t1 x where x.f1 = up.f1) as fs
-   from t1 up) ss
-group by f1,f2,fs;
+   from t1 up) ss;
  f1 | f2 | fs 
 ----+----+----
 (0 rows)
@@ -507,7 +483,7 @@ select (select (a.*)::text) from view_a a;
 -- Check that whole-row Vars reading the result of a subselect don't include
 -- any junk columns therein
 --
-select q from (select max(f1) from int4_tbl group by f1 order by f1) q;
+select q from (select f1 from int4_tbl order by f1) q;
        q       
 ---------------
  (-2147483647)
@@ -527,7 +503,7 @@ where exists (
   select 1
   from
     int4_tbl cross join
-    ( select f1, (select array_agg(q1) from int8_tbl) as arr
+    ( select f1, (select 0::bigint) as arr
       from text_tbl ) ss
   where road.name = ss.f1 );
 rollback;
@@ -617,11 +593,11 @@ select '1'::text in (select '1'::name from (SELECT generate_series(1,2) AS g) AS
 -- Test resolution of hashed vs non-hashed implementation of EXISTS subplan
 --
 explain (costs off)
-select count(*) from tenk1 t
+select distinct 1 as one from tenk1 t
 where (exists(select 1 from tenk1 k where k.unique1 = t.unique2) or ten < 0);
                           QUERY PLAN                          
 --------------------------------------------------------------
- Aggregate
+ Unique
    ->  Seq Scan on tenk1 t
          Filter: ((SubPlan 1) OR (ten < 0))
          SubPlan 1
@@ -629,20 +605,20 @@ where (exists(select 1 from tenk1 k where k.unique1 = t.unique2) or ten < 0);
                  Index Cond: (unique1 = t.unique2)
 (6 rows)
 
-select count(*) from tenk1 t
+select distinct 1 as one from tenk1 t
 where (exists(select 1 from tenk1 k where k.unique1 = t.unique2) or ten < 0);
- count 
--------
- 10000
+ one 
+-----
+   1
 (1 row)
 
 explain (costs off)
-select count(*) from tenk1 t
+select distinct 1 as one from tenk1 t
 where (exists(select 1 from tenk1 k where k.unique1 = t.unique2) or ten < 0)
   and thousand = 1;
                           QUERY PLAN                          
 --------------------------------------------------------------
- Aggregate
+ Unique
    ->  Bitmap Heap Scan on tenk1 t
          Recheck Cond: (thousand = 1)
          Filter: ((SubPlan 1) OR (ten < 0))
@@ -653,12 +629,12 @@ where (exists(select 1 from tenk1 k where k.unique1 = t.unique2) or ten < 0)
                  Index Cond: (unique1 = t.unique2)
 (9 rows)
 
-select count(*) from tenk1 t
+select distinct 1 as one from tenk1 t
 where (exists(select 1 from tenk1 k where k.unique1 = t.unique2) or ten < 0)
   and thousand = 1;
- count 
--------
-    10
+ one 
+-----
+   1
 (1 row)
 
 -- It's possible for the same EXISTS to get resolved both ways
@@ -743,41 +719,44 @@ explain (verbose, costs off)
 -- sub-select from being pulled up, which would result in not hashing)
 --
 explain (verbose, costs off)
-select sum(ss.tst::int) from
+select distinct ss.tst from
   onek o cross join lateral (
   select i.ten in (select f1 from int4_tbl where f1 <= o.hundred) as tst,
          random() as r
   from onek i where i.unique1 = o.unique1 ) ss
 where o.ten = 0;
-                                                                                         QUERY PLAN                                                                                          
----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
- Aggregate
-   Output: sum((((hashed SubPlan 1)))::integer)
-   ->  Nested Loop
+                                                                                            QUERY PLAN                                                                                             
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Unique
+   Output: ((hashed SubPlan 1))
+   ->  Sort
          Output: ((hashed SubPlan 1))
-         ->  Seq Scan on public.onek o
-               Output: o.unique1, o.unique2, o.two, o.four, o.ten, o.twenty, o.hundred, o.thousand, o.twothousand, o.fivethous, o.tenthous, o.odd, o.even, o.stringu1, o.stringu2, o.string4
-               Filter: (o.ten = 0)
-         ->  Bitmap Heap Scan on public.onek i
-               Output: (hashed SubPlan 1), random()
-               Recheck Cond: (i.unique1 = o.unique1)
-               ->  Bitmap Index Scan on onek_unique1
-                     Index Cond: (i.unique1 = o.unique1)
-               SubPlan 1
-                 ->  Seq Scan on public.int4_tbl
-                       Output: int4_tbl.f1
-                       Filter: (int4_tbl.f1 <= $0)
-(16 rows)
+         Sort Key: ((hashed SubPlan 1))
+         ->  Nested Loop
+               Output: ((hashed SubPlan 1))
+               ->  Seq Scan on public.onek o
+                     Output: o.unique1, o.unique2, o.two, o.four, o.ten, o.twenty, o.hundred, o.thousand, o.twothousand, o.fivethous, o.tenthous, o.odd, o.even, o.stringu1, o.stringu2, o.string4
+                     Filter: (o.ten = 0)
+               ->  Bitmap Heap Scan on public.onek i
+                     Output: (hashed SubPlan 1), random()
+                     Recheck Cond: (i.unique1 = o.unique1)
+                     ->  Bitmap Index Scan on onek_unique1
+                           Index Cond: (i.unique1 = o.unique1)
+                     SubPlan 1
+                       ->  Seq Scan on public.int4_tbl
+                             Output: int4_tbl.f1
+                             Filter: (int4_tbl.f1 <= $0)
+(19 rows)
 
-select sum(ss.tst::int) from
+select distinct ss.tst from
   onek o cross join lateral (
   select i.ten in (select f1 from int4_tbl where f1 <= o.hundred) as tst,
          random() as r
   from onek i where i.unique1 = o.unique1 ) ss
 where o.ten = 0;
- sum 
+ tst 
 -----
- 100
+ t
 (1 row)
 
 --
@@ -868,24 +847,21 @@ explain (verbose, costs off)
 select * from int4_tbl where
   (case when f1 in (select unique1 from tenk1 a) then f1 else null end) in
   (select ten from tenk1 b);
-                                                                                         QUERY PLAN                                                                                          
----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
- Hash Join
+                                         QUERY PLAN                                          
+---------------------------------------------------------------------------------------------
+ Hash Semi Join
    Output: int4_tbl.f1
-   Hash Cond: (b.ten = CASE WHEN (hashed SubPlan 1) THEN int4_tbl.f1 ELSE NULL::integer END)
-   ->  HashAggregate
-         Output: b.ten
-         Group Key: b.ten
-         ->  Seq Scan on public.tenk1 b
-               Output: b.unique1, b.unique2, b.two, b.four, b.ten, b.twenty, b.hundred, b.thousand, b.twothousand, b.fivethous, b.tenthous, b.odd, b.even, b.stringu1, b.stringu2, b.string4
-   ->  Hash
+   Hash Cond: (CASE WHEN (hashed SubPlan 1) THEN int4_tbl.f1 ELSE NULL::integer END = b.ten)
+   ->  Seq Scan on public.int4_tbl
          Output: int4_tbl.f1
-         ->  Seq Scan on public.int4_tbl
-               Output: int4_tbl.f1
-         SubPlan 1
-           ->  Index Only Scan using tenk1_unique1 on public.tenk1 a
-                 Output: a.unique1
-(15 rows)
+   ->  Hash
+         Output: b.ten
+         ->  Seq Scan on public.tenk1 b
+               Output: b.ten
+   SubPlan 1
+     ->  Index Only Scan using tenk1_unique1 on public.tenk1 a
+           Output: a.unique1
+(12 rows)
 
 select * from int4_tbl where
   (case when f1 in (select unique1 from tenk1 a) then f1 else null end) in
@@ -900,31 +876,29 @@ select * from int4_tbl where
 --
 explain (verbose, costs off)
 select * from int4_tbl o where f1 in
-  (select generate_series(1,50) / 10 g from int4_tbl i group by f1);
-                            QUERY PLAN                             
--------------------------------------------------------------------
- Hash Semi Join
+  (select distinct generate_series(1,50) / 10 g from int4_tbl i);
+                         QUERY PLAN                          
+-------------------------------------------------------------
+ Nested Loop
    Output: o.f1
-   Hash Cond: (o.f1 = "ANY_subquery".g)
+   Join Filter: (o.f1 = (((generate_series(1, 50)) / 10)))
+   ->  Unique
+         Output: (((generate_series(1, 50)) / 10))
+         ->  Sort
+               Output: (((generate_series(1, 50)) / 10))
+               Sort Key: (((generate_series(1, 50)) / 10))
+               ->  Result
+                     Output: ((generate_series(1, 50)) / 10)
+                     ->  ProjectSet
+                           Output: generate_series(1, 50)
+                           ->  Seq Scan on public.int4_tbl i
+                                 Output: i.f1
    ->  Seq Scan on public.int4_tbl o
          Output: o.f1
-   ->  Hash
-         Output: "ANY_subquery".g
-         ->  Subquery Scan on "ANY_subquery"
-               Output: "ANY_subquery".g
-               ->  Result
-                     Output: ((generate_series(1, 50)) / 10), i.f1
-                     ->  ProjectSet
-                           Output: generate_series(1, 50), i.f1
-                           ->  HashAggregate
-                                 Output: i.f1
-                                 Group Key: i.f1
-                                 ->  Seq Scan on public.int4_tbl i
-                                       Output: i.f1
-(18 rows)
+(16 rows)
 
 select * from int4_tbl o where f1 in
-  (select generate_series(1,50) / 10 g from int4_tbl i group by f1);
+  (select distinct generate_series(1,50) / 10 g from int4_tbl i);
  f1 
 ----
   0

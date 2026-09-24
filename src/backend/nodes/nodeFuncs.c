@@ -56,9 +56,6 @@ exprType(const Node *expr)
 		case T_Param:
 			type = ((const Param *) expr)->paramtype;
 			break;
-		case T_Aggref:
-			type = ((const Aggref *) expr)->aggtype;
-			break;
 		case T_SubscriptingRef:
 			type = ((const SubscriptingRef *) expr)->refrestype;
 			break;
@@ -606,10 +603,6 @@ expression_returns_set_walker(Node *node, void *context)
 	 * tlist.c.
 	 */
 
-	/* Avoid recursion for some cases that parser checks not to return a set */
-	if (IsA(node, Aggref))
-		return false;
-
 	return expression_tree_walker(node, expression_returns_set_walker,
 								  context);
 }
@@ -644,9 +637,6 @@ exprCollation(const Node *expr)
 			break;
 		case T_Param:
 			coll = ((const Param *) expr)->paramcollid;
-			break;
-		case T_Aggref:
-			coll = ((const Aggref *) expr)->aggcollid;
 			break;
 		case T_SubscriptingRef:
 			coll = ((const SubscriptingRef *) expr)->refcollid;
@@ -793,9 +783,6 @@ exprInputCollation(const Node *expr)
 
 	switch (nodeTag(expr))
 	{
-		case T_Aggref:
-			coll = ((const Aggref *) expr)->inputcollid;
-			break;
 		case T_FuncExpr:
 			coll = ((const FuncExpr *) expr)->inputcollid;
 			break;
@@ -835,9 +822,6 @@ exprSetCollation(Node *expr, Oid collation)
 			break;
 		case T_Param:
 			((Param *) expr)->paramcollid = collation;
-			break;
-		case T_Aggref:
-			((Aggref *) expr)->aggcollid = collation;
 			break;
 		case T_SubscriptingRef:
 			((SubscriptingRef *) expr)->refcollid = collation;
@@ -950,9 +934,6 @@ exprSetInputCollation(Node *expr, Oid inputcollation)
 {
 	switch (nodeTag(expr))
 	{
-		case T_Aggref:
-			((Aggref *) expr)->inputcollid = inputcollation;
-			break;
 		case T_FuncExpr:
 			((FuncExpr *) expr)->inputcollid = inputcollation;
 			break;
@@ -1020,10 +1001,6 @@ exprLocation(const Node *expr)
 			break;
 		case T_Param:
 			loc = ((const Param *) expr)->location;
-			break;
-		case T_Aggref:
-			/* function name should always be the first thing */
-			loc = ((const Aggref *) expr)->location;
 			break;
 		case T_SubscriptingRef:
 			/* just use container argument's location */
@@ -1370,14 +1347,6 @@ check_functions_in_node(Node *node, check_function_callback checker,
 {
 	switch (nodeTag(node))
 	{
-		case T_Aggref:
-			{
-				Aggref	   *expr = (Aggref *) node;
-
-				if (checker(expr->aggfnoid, context))
-					return true;
-			}
-			break;
 		case T_FuncExpr:
 			{
 				FuncExpr   *expr = (FuncExpr *) node;
@@ -1555,25 +1524,6 @@ expression_tree_walker(Node *node,
 		case T_RangeTblRef:
 		case T_SortGroupClause:
 			/* primitive node types with no expression subnodes */
-			break;
-		case T_Aggref:
-			{
-				Aggref	   *expr = (Aggref *) node;
-
-				/* recurse directly on List */
-				if (expression_tree_walker((Node *) expr->aggdirectargs,
-										   walker, context))
-					return true;
-				if (expression_tree_walker((Node *) expr->args,
-										   walker, context))
-					return true;
-				if (expression_tree_walker((Node *) expr->aggorder,
-										   walker, context))
-					return true;
-				if (expression_tree_walker((Node *) expr->aggdistinct,
-										   walker, context))
-					return true;
-			}
 			break;
 		case T_SubscriptingRef:
 			{
@@ -1825,8 +1775,6 @@ query_tree_walker(Query *query,
 		return true;
 	if (walker((Node *) query->jointree, context))
 		return true;
-	if (walker(query->havingQual, context))
-		return true;
 
 	/*
 	 * Most callers aren't interested in SortGroupClause nodes since those
@@ -1835,8 +1783,6 @@ query_tree_walker(Query *query,
 	 */
 	if ((flags & QTW_EXAMINE_SORTGROUP))
 	{
-		if (walker((Node *) query->groupClause, context))
-			return true;
 		if (walker((Node *) query->sortClause, context))
 			return true;
 		if (walker((Node *) query->distinctClause, context))
@@ -2046,21 +1992,6 @@ expression_tree_mutator(Node *node,
 		case T_RangeTblRef:
 		case T_SortGroupClause:
 			return (Node *) copyObject(node);
-		case T_Aggref:
-			{
-				Aggref	   *aggref = (Aggref *) node;
-				Aggref	   *newnode;
-
-				FLATCOPY(newnode, aggref, Aggref);
-				/* assume mutation doesn't change types of arguments */
-				newnode->aggargtypes = list_copy(aggref->aggargtypes);
-				MUTATE(newnode->aggdirectargs, aggref->aggdirectargs, List *);
-				MUTATE(newnode->args, aggref->args, List *);
-				MUTATE(newnode->aggorder, aggref->aggorder, List *);
-				MUTATE(newnode->aggdistinct, aggref->aggdistinct, List *);
-				return (Node *) newnode;
-			}
-			break;
 		case T_SubscriptingRef:
 			{
 				SubscriptingRef *sbsref = (SubscriptingRef *) node;
@@ -2464,7 +2395,6 @@ query_tree_mutator(Query *query,
 
 	MUTATE(query->targetList, query->targetList, List *);
 	MUTATE(query->jointree, query->jointree, FromExpr *);
-	MUTATE(query->havingQual, query->havingQual, Node *);
 
 	/*
 	 * Most callers aren't interested in SortGroupClause nodes since those
@@ -2474,7 +2404,6 @@ query_tree_mutator(Query *query,
 
 	if ((flags & QTW_EXAMINE_SORTGROUP))
 	{
-		MUTATE(query->groupClause, query->groupClause, List *);
 		MUTATE(query->sortClause, query->sortClause, List *);
 		MUTATE(query->distinctClause, query->distinctClause, List *);
 	}
@@ -2746,10 +2675,6 @@ raw_expression_tree_walker(Node *node,
 					return true;
 				if (walker(stmt->whereClause, context))
 					return true;
-				if (walker(stmt->groupClause, context))
-					return true;
-				if (walker(stmt->havingClause, context))
-					return true;
 				if (walker(stmt->valuesLists, context))
 					return true;
 				if (walker(stmt->sortClause, context))
@@ -2783,8 +2708,6 @@ raw_expression_tree_walker(Node *node,
 				FuncCall   *fcall = (FuncCall *) node;
 
 				if (walker(fcall->args, context))
-					return true;
-				if (walker(fcall->agg_order, context))
 					return true;
 				/* function name is deemed uninteresting */
 			}

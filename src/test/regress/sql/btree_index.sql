@@ -73,9 +73,10 @@ CREATE UNIQUE INDEX plain_unique ON dedup_unique_test_table (a);
 -- the same amount of index churn.
 INSERT INTO dedup_unique_test_table
 SELECT 1 FROM (SELECT generate_series(1, 1350) AS g) AS _gs;
-DELETE FROM dedup_unique_test_table WHERE ctid NOT IN (
-    SELECT min(ctid) FROM dedup_unique_test_table
-);
+DELETE FROM dedup_unique_test_table
+WHERE ctid NOT IN (SELECT a.ctid FROM dedup_unique_test_table a
+                   WHERE NOT EXISTS (SELECT 1 FROM dedup_unique_test_table b
+                                     WHERE b.ctid < a.ctid));
 
 -- Exercise the LP_DEAD-bit-set tuple deletion code with a posting list tuple.
 -- The implementation prefers deleting existing items to merging any duplicate

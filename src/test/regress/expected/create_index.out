@@ -65,21 +65,33 @@ DROP TABLE hash_index_table;
 SET maintenance_work_mem = '1MB';
 CREATE INDEX hash_tuplesort_idx ON tenk1 USING hash (stringu1 name_ops);
 EXPLAIN (COSTS OFF)
-SELECT count(*) FROM tenk1 WHERE stringu1 = 'TVAAAA';
-                      QUERY PLAN                       
--------------------------------------------------------
- Aggregate
-   ->  Bitmap Heap Scan on tenk1
-         Recheck Cond: (stringu1 = 'TVAAAA'::name)
-         ->  Bitmap Index Scan on hash_tuplesort_idx
-               Index Cond: (stringu1 = 'TVAAAA'::name)
-(5 rows)
+SELECT ctid FROM tenk1 WHERE stringu1 = 'TVAAAA';
+                   QUERY PLAN                    
+-------------------------------------------------
+ Bitmap Heap Scan on tenk1
+   Recheck Cond: (stringu1 = 'TVAAAA'::name)
+   ->  Bitmap Index Scan on hash_tuplesort_idx
+         Index Cond: (stringu1 = 'TVAAAA'::name)
+(4 rows)
 
-SELECT count(*) FROM tenk1 WHERE stringu1 = 'TVAAAA';
- count 
--------
-    14
-(1 row)
+SELECT ctid FROM tenk1 WHERE stringu1 = 'TVAAAA' ORDER BY ctid;
+   ctid   
+----------
+ (1,1)
+ (21,9)
+ (56,27)
+ (73,18)
+ (102,16)
+ (104,24)
+ (165,5)
+ (194,9)
+ (271,4)
+ (277,7)
+ (296,9)
+ (314,18)
+ (321,13)
+ (341,16)
+(14 rows)
 
 DROP INDEX hash_tuplesort_idx;
 RESET maintenance_work_mem;
@@ -365,155 +377,151 @@ CREATE UNIQUE INDEX onek_nulltest ON onek_with_null (unique2,unique1);
 SET enable_seqscan = OFF;
 SET enable_indexscan = ON;
 SET enable_bitmapscan = ON;
-SELECT count(*) FROM onek_with_null WHERE unique1 IS NULL;
- count 
--------
-     2
-(1 row)
-
-SELECT count(*) FROM onek_with_null WHERE unique1 IS NULL AND unique2 IS NULL;
- count 
+SELECT DISTINCT 1 AS found FROM onek_with_null WHERE unique1 IS NULL;
+ found 
 -------
      1
 (1 row)
 
-SELECT count(*) FROM onek_with_null WHERE unique1 IS NOT NULL;
- count 
--------
-  1000
-(1 row)
-
-SELECT count(*) FROM onek_with_null WHERE unique1 IS NULL AND unique2 IS NOT NULL;
- count 
+SELECT DISTINCT 1 AS found FROM onek_with_null WHERE unique1 IS NULL AND unique2 IS NULL;
+ found 
 -------
      1
 (1 row)
 
-SELECT count(*) FROM onek_with_null WHERE unique1 IS NOT NULL AND unique1 > 500;
- count 
+SELECT DISTINCT 1 AS found FROM onek_with_null WHERE unique1 IS NOT NULL;
+ found 
 -------
-   499
+     1
 (1 row)
 
-SELECT count(*) FROM onek_with_null WHERE unique1 IS NULL AND unique1 > 500;
- count 
+SELECT DISTINCT 1 AS found FROM onek_with_null WHERE unique1 IS NULL AND unique2 IS NOT NULL;
+ found 
 -------
-     0
+     1
 (1 row)
+
+SELECT DISTINCT 1 AS found FROM onek_with_null WHERE unique1 IS NOT NULL AND unique1 > 500;
+ found 
+-------
+     1
+(1 row)
+
+SELECT DISTINCT 1 AS found FROM onek_with_null WHERE unique1 IS NULL AND unique1 > 500;
+ found 
+-------
+(0 rows)
 
 DROP INDEX onek_nulltest;
 CREATE UNIQUE INDEX onek_nulltest ON onek_with_null (unique2 desc,unique1);
-SELECT count(*) FROM onek_with_null WHERE unique1 IS NULL;
- count 
--------
-     2
-(1 row)
-
-SELECT count(*) FROM onek_with_null WHERE unique1 IS NULL AND unique2 IS NULL;
- count 
+SELECT DISTINCT 1 AS found FROM onek_with_null WHERE unique1 IS NULL;
+ found 
 -------
      1
 (1 row)
 
-SELECT count(*) FROM onek_with_null WHERE unique1 IS NOT NULL;
- count 
--------
-  1000
-(1 row)
-
-SELECT count(*) FROM onek_with_null WHERE unique1 IS NULL AND unique2 IS NOT NULL;
- count 
+SELECT DISTINCT 1 AS found FROM onek_with_null WHERE unique1 IS NULL AND unique2 IS NULL;
+ found 
 -------
      1
 (1 row)
 
-SELECT count(*) FROM onek_with_null WHERE unique1 IS NOT NULL AND unique1 > 500;
- count 
+SELECT DISTINCT 1 AS found FROM onek_with_null WHERE unique1 IS NOT NULL;
+ found 
 -------
-   499
+     1
 (1 row)
 
-SELECT count(*) FROM onek_with_null WHERE unique1 IS NULL AND unique1 > 500;
- count 
+SELECT DISTINCT 1 AS found FROM onek_with_null WHERE unique1 IS NULL AND unique2 IS NOT NULL;
+ found 
 -------
-     0
+     1
 (1 row)
+
+SELECT DISTINCT 1 AS found FROM onek_with_null WHERE unique1 IS NOT NULL AND unique1 > 500;
+ found 
+-------
+     1
+(1 row)
+
+SELECT DISTINCT 1 AS found FROM onek_with_null WHERE unique1 IS NULL AND unique1 > 500;
+ found 
+-------
+(0 rows)
 
 DROP INDEX onek_nulltest;
 CREATE UNIQUE INDEX onek_nulltest ON onek_with_null (unique2 desc nulls last,unique1);
-SELECT count(*) FROM onek_with_null WHERE unique1 IS NULL;
- count 
--------
-     2
-(1 row)
-
-SELECT count(*) FROM onek_with_null WHERE unique1 IS NULL AND unique2 IS NULL;
- count 
+SELECT DISTINCT 1 AS found FROM onek_with_null WHERE unique1 IS NULL;
+ found 
 -------
      1
 (1 row)
 
-SELECT count(*) FROM onek_with_null WHERE unique1 IS NOT NULL;
- count 
--------
-  1000
-(1 row)
-
-SELECT count(*) FROM onek_with_null WHERE unique1 IS NULL AND unique2 IS NOT NULL;
- count 
+SELECT DISTINCT 1 AS found FROM onek_with_null WHERE unique1 IS NULL AND unique2 IS NULL;
+ found 
 -------
      1
 (1 row)
 
-SELECT count(*) FROM onek_with_null WHERE unique1 IS NOT NULL AND unique1 > 500;
- count 
+SELECT DISTINCT 1 AS found FROM onek_with_null WHERE unique1 IS NOT NULL;
+ found 
 -------
-   499
+     1
 (1 row)
 
-SELECT count(*) FROM onek_with_null WHERE unique1 IS NULL AND unique1 > 500;
- count 
+SELECT DISTINCT 1 AS found FROM onek_with_null WHERE unique1 IS NULL AND unique2 IS NOT NULL;
+ found 
 -------
-     0
+     1
 (1 row)
+
+SELECT DISTINCT 1 AS found FROM onek_with_null WHERE unique1 IS NOT NULL AND unique1 > 500;
+ found 
+-------
+     1
+(1 row)
+
+SELECT DISTINCT 1 AS found FROM onek_with_null WHERE unique1 IS NULL AND unique1 > 500;
+ found 
+-------
+(0 rows)
 
 DROP INDEX onek_nulltest;
 CREATE UNIQUE INDEX onek_nulltest ON onek_with_null (unique2  nulls first,unique1);
-SELECT count(*) FROM onek_with_null WHERE unique1 IS NULL;
- count 
--------
-     2
-(1 row)
-
-SELECT count(*) FROM onek_with_null WHERE unique1 IS NULL AND unique2 IS NULL;
- count 
+SELECT DISTINCT 1 AS found FROM onek_with_null WHERE unique1 IS NULL;
+ found 
 -------
      1
 (1 row)
 
-SELECT count(*) FROM onek_with_null WHERE unique1 IS NOT NULL;
- count 
--------
-  1000
-(1 row)
-
-SELECT count(*) FROM onek_with_null WHERE unique1 IS NULL AND unique2 IS NOT NULL;
- count 
+SELECT DISTINCT 1 AS found FROM onek_with_null WHERE unique1 IS NULL AND unique2 IS NULL;
+ found 
 -------
      1
 (1 row)
 
-SELECT count(*) FROM onek_with_null WHERE unique1 IS NOT NULL AND unique1 > 500;
- count 
+SELECT DISTINCT 1 AS found FROM onek_with_null WHERE unique1 IS NOT NULL;
+ found 
 -------
-   499
+     1
 (1 row)
 
-SELECT count(*) FROM onek_with_null WHERE unique1 IS NULL AND unique1 > 500;
- count 
+SELECT DISTINCT 1 AS found FROM onek_with_null WHERE unique1 IS NULL AND unique2 IS NOT NULL;
+ found 
 -------
-     0
+     1
 (1 row)
+
+SELECT DISTINCT 1 AS found FROM onek_with_null WHERE unique1 IS NOT NULL AND unique1 > 500;
+ found 
+-------
+     1
+(1 row)
+
+SELECT DISTINCT 1 AS found FROM onek_with_null WHERE unique1 IS NULL AND unique1 > 500;
+ found 
+-------
+(0 rows)
 
 DROP INDEX onek_nulltest;
 -- minipg: LIMIT 已裁剪，依赖 LIMIT 的索引 initial-positioning 用例整节移除
@@ -545,29 +553,37 @@ SELECT * FROM tenk1
 (1 row)
 
 EXPLAIN (COSTS OFF)
-SELECT count(*) FROM tenk1
+SELECT ctid FROM tenk1
   WHERE hundred = 42 AND (thousand = 42 OR thousand = 99);
-                                   QUERY PLAN                                    
----------------------------------------------------------------------------------
- Aggregate
-   ->  Bitmap Heap Scan on tenk1
-         Recheck Cond: ((hundred = 42) AND ((thousand = 42) OR (thousand = 99)))
-         ->  BitmapAnd
-               ->  Bitmap Index Scan on tenk1_hundred
-                     Index Cond: (hundred = 42)
-               ->  BitmapOr
-                     ->  Bitmap Index Scan on tenk1_thous_tenthous
-                           Index Cond: (thousand = 42)
-                     ->  Bitmap Index Scan on tenk1_thous_tenthous
-                           Index Cond: (thousand = 99)
-(11 rows)
+                                QUERY PLAN                                 
+---------------------------------------------------------------------------
+ Bitmap Heap Scan on tenk1
+   Recheck Cond: ((hundred = 42) AND ((thousand = 42) OR (thousand = 99)))
+   ->  BitmapAnd
+         ->  Bitmap Index Scan on tenk1_hundred
+               Index Cond: (hundred = 42)
+         ->  BitmapOr
+               ->  Bitmap Index Scan on tenk1_thous_tenthous
+                     Index Cond: (thousand = 42)
+               ->  Bitmap Index Scan on tenk1_thous_tenthous
+                     Index Cond: (thousand = 99)
+(10 rows)
 
-SELECT count(*) FROM tenk1
-  WHERE hundred = 42 AND (thousand = 42 OR thousand = 99);
- count 
--------
-    10
-(1 row)
+SELECT ctid FROM tenk1
+  WHERE hundred = 42 AND (thousand = 42 OR thousand = 99) ORDER BY ctid;
+   ctid   
+----------
+ (13,5)
+ (32,5)
+ (81,21)
+ (154,11)
+ (190,21)
+ (218,21)
+ (235,28)
+ (240,2)
+ (269,17)
+ (274,28)
+(10 rows)
 
 --
 -- Check behavior with duplicate index column contents
@@ -582,16 +598,16 @@ ERROR:  relation "dupindexcols" does not exist
 ANALYZE dupindexcols;
 ERROR:  relation "dupindexcols" does not exist
 EXPLAIN (COSTS OFF)
-  SELECT count(*) FROM dupindexcols
+  SELECT ctid FROM dupindexcols
     WHERE f1 >= 'WA' AND f1 <= 'ZZZ' and id < 1000 and f1 ~<~ 'YX';
 ERROR:  relation "dupindexcols" does not exist
-LINE 2:   SELECT count(*) FROM dupindexcols
-                               ^
-SELECT count(*) FROM dupindexcols
-  WHERE f1 >= 'WA' AND f1 <= 'ZZZ' and id < 1000 and f1 ~<~ 'YX';
+LINE 2:   SELECT ctid FROM dupindexcols
+                           ^
+SELECT ctid FROM dupindexcols
+  WHERE f1 >= 'WA' AND f1 <= 'ZZZ' and id < 1000 and f1 ~<~ 'YX' ORDER BY ctid;
 ERROR:  relation "dupindexcols" does not exist
-LINE 1: SELECT count(*) FROM dupindexcols
-                             ^
+LINE 1: SELECT ctid FROM dupindexcols
+                         ^
 --
 -- Check ordering of =ANY indexqual results (bug in 9.2.0)
 --
@@ -858,14 +874,14 @@ CREATE UNIQUE INDEX concur_exprs_index_pred_2
   WHERE ('-H') >= (c2::TEXT);
 ALTER INDEX concur_exprs_index_expr ALTER COLUMN 1 SET STATISTICS 100;
 ANALYZE concur_exprs_tab;
-SELECT starelid::regclass, count(*) FROM pg_statistic WHERE starelid IN (
+SELECT DISTINCT starelid::regclass FROM pg_statistic WHERE starelid IN (
   'concur_exprs_index_expr'::regclass,
   'concur_exprs_index_pred'::regclass,
   'concur_exprs_index_pred_2'::regclass)
-  GROUP BY starelid ORDER BY starelid::regclass::text;
-        starelid         | count 
--------------------------+-------
- concur_exprs_index_expr |     1
+  ORDER BY starelid::regclass;
+        starelid         
+-------------------------
+ concur_exprs_index_expr
 (1 row)
 
 SELECT pg_get_indexdef('concur_exprs_index_expr'::regclass);
@@ -925,14 +941,14 @@ SELECT pg_get_indexdef('concur_exprs_index_pred_2'::regclass);
 (1 row)
 
 -- Statistics should remain intact.
-SELECT starelid::regclass, count(*) FROM pg_statistic WHERE starelid IN (
+SELECT DISTINCT starelid::regclass FROM pg_statistic WHERE starelid IN (
   'concur_exprs_index_expr'::regclass,
   'concur_exprs_index_pred'::regclass,
   'concur_exprs_index_pred_2'::regclass)
-  GROUP BY starelid ORDER BY starelid::regclass::text;
-        starelid         | count 
--------------------------+-------
- concur_exprs_index_expr |     1
+  ORDER BY starelid::regclass;
+        starelid         
+-------------------------
+ concur_exprs_index_expr
 (1 row)
 
 -- attstattarget should remain intact

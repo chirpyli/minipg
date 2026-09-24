@@ -31,7 +31,7 @@ setup
   SET LOCAL random_page_cost = 0.1;
   SET LOCAL cpu_tuple_cost = 0.03;
 }
-step rxwy1 { DELETE FROM taby WHERE id = (SELECT min(id) FROM tabx); }
+step rxwy1 { DELETE FROM taby WHERE id = (SELECT i.id FROM tabx i WHERE NOT EXISTS (SELECT 1 FROM tabx j WHERE j.id < i.id)); }
 step c1 { COMMIT; }
 
 session s2
@@ -42,5 +42,5 @@ setup
   SET LOCAL random_page_cost = 0.1;
   SET LOCAL cpu_tuple_cost = 0.03;
 }
-step rywx2 { DELETE FROM tabx WHERE id = (SELECT min(id) FROM taby); }
+step rywx2 { DELETE FROM tabx WHERE id = (SELECT i.id FROM taby i WHERE NOT EXISTS (SELECT 1 FROM taby j WHERE j.id < i.id)); }
 step c2 { COMMIT; }

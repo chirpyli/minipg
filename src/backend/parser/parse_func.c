@@ -15,7 +15,6 @@
 #include "postgres.h"
 
 #include "access/htup_details.h"
-#include "catalog/pg_aggregate.h"
 #include "catalog/pg_collation.h"
 #include "catalog/pg_proc.h"
 #include "catalog/pg_type.h"
@@ -23,7 +22,6 @@
 #include "lib/stringinfo.h"
 #include "nodes/makefuncs.h"
 #include "nodes/nodeFuncs.h"
-#include "parser/parse_agg.h"
 #include "parser/parse_clause.h"
 #include "parser/parse_coerce.h"
 #include "parser/parse_expr.h"
@@ -80,10 +78,6 @@ ParseFuncOrColumn(ParseState *pstate, List *funcname, List *fargs,
 				  FuncCall *fn, int location)
 {
 	bool		is_column = (fn == NULL);
-	List	   *agg_order = (fn ? fn->agg_order : NIL);
-	bool		agg_within_group = (fn ? fn->agg_within_group : false);
-	bool		agg_star = (fn ? fn->agg_star : false);
-	bool		agg_distinct = (fn ? fn->agg_distinct : false);
 	bool		func_variadic = false;
 	CoercionForm funcformat = (fn ? fn->funcformat : COERCE_EXPLICIT_CALL);
 	bool		could_be_projection;
@@ -100,7 +94,6 @@ ParseFuncOrColumn(ParseState *pstate, List *funcname, List *fargs,
 	int			nvargs;
 	Oid			vatype;
 	FuncDetailCode fdresult;
-	char		aggkind = 0;
 	ParseCallbackState pcbstate;
 
 	/*
@@ -124,9 +117,7 @@ ParseFuncOrColumn(ParseState *pstate, List *funcname, List *fargs,
 	 * If any arguments are Param markers of type VOID, we discard them from
 	 * the parameter list. This is a hack to allow the JDBC driver to not have
 	 * to distinguish "input" and "output" parameter symbols while parsing
-	 * function-call constructs.  Don't do this if dealing with column syntax,
-	 * nor if we had WITHIN GROUP (because in that case it's critical to keep
-	 * the argument count unchanged).
+	 * function-call constructs.  Don't do this if dealing with column syntax.
 	 */
 	nargs = 0;
 	foreach(l, fargs)
@@ -134,8 +125,7 @@ ParseFuncOrColumn(ParseState *pstate, List *funcname, List *fargs,
 		Node	   *arg = lfirst(l);
 		Oid			argtype = exprType(arg);
 
-		if (argtype == VOIDOID && IsA(arg, Param) &&
-			!is_column && !agg_within_group)
+		if (argtype == VOIDOID && IsA(arg, Param) && !is_column)
 		{
 			fargs = foreach_delete_current(fargs, l);
 			continue;
@@ -195,11 +185,9 @@ ParseFuncOrColumn(ParseState *pstate, List *funcname, List *fargs,
 	 * projection.  For that, there has to be a single argument of complex
 	 * type, the function name must not be qualified, and there cannot be any
 	 * syntactic decoration that'd require it to be a function (such as
-	 * aggregate or variadic decoration, or named arguments).
+	 * variadic decoration or named arguments).
 	 */
 	could_be_projection = (nargs == 1 &&
-						   agg_order == NIL &&
-						   !agg_star && !agg_distinct &&
 						   argnames == NIL &&
 						   list_length(funcname) == 1 &&
 						   (actual_arg_types[0] == RECORDOID ||
@@ -250,74 +238,11 @@ ParseFuncOrColumn(ParseState *pstate, List *funcname, List *fargs,
 	cancel_parser_errposition_callback(&pcbstate);
 
 	/*
-	 * Check for various wrong-kind-of-routine cases.
-	 */
-	if (fdresult == FUNCDETAIL_NORMAL ||
-		fdresult == FUNCDETAIL_COERCION)
-	{
-		/*
-		 * In these cases, complain if there was anything indicating it must
-		 * be an aggregate or window function.
-		 */
-		if (agg_star)
-			ereport(ERROR,
-					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-					 errmsg("%s(*) specified, but %s is not an aggregate function",
-							NameListToString(funcname),
-							NameListToString(funcname)),
-					 parser_errposition(pstate, location)));
-		if (agg_distinct)
-			ereport(ERROR,
-					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-					 errmsg("DISTINCT specified, but %s is not an aggregate function",
-							NameListToString(funcname)),
-					 parser_errposition(pstate, location)));
-		if (agg_within_group)
-			ereport(ERROR,
-					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-					 errmsg("WITHIN GROUP specified, but %s is not an aggregate function",
-							NameListToString(funcname)),
-					 parser_errposition(pstate, location)));
-		if (agg_order != NIL)
-			ereport(ERROR,
-					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-					 errmsg("ORDER BY specified, but %s is not an aggregate function",
-							NameListToString(funcname)),
-					 parser_errposition(pstate, location)));
-	}
-
-	/*
 	 * So far so good, so do some fdresult-type-specific processing.
 	 */
 	if (fdresult == FUNCDETAIL_NORMAL)
 	{
 		/* Nothing special to do for this case. */
-	}
-	else if (fdresult == FUNCDETAIL_AGGREGATE)
-	{
-		/*
-		 * It's an aggregate; fetch needed info from the pg_aggregate entry.
-		 */
-		HeapTuple	tup;
-		Form_pg_aggregate classForm;
-
-		tup = SearchSysCache1(AGGFNOID, ObjectIdGetDatum(funcid));
-		if (!HeapTupleIsValid(tup)) /* should not happen */
-			elog(ERROR, "cache lookup failed for aggregate %u", funcid);
-		classForm = (Form_pg_aggregate) GETSTRUCT(tup);
-		aggkind = classForm->aggkind;
-		ReleaseSysCache(tup);
-
-		/* Now check various disallowed cases. */
-		{
-			/* Normal aggregate, so it can't have WITHIN GROUP */
-			if (agg_within_group)
-				ereport(ERROR,
-						(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-						 errmsg("%s is not an ordered-set aggregate, so it cannot have WITHIN GROUP",
-								NameListToString(funcname)),
-						 parser_errposition(pstate, location)));
-		}
 	}
 	else if (fdresult == FUNCDETAIL_COERCION)
 	{
@@ -377,28 +302,14 @@ ParseFuncOrColumn(ParseState *pstate, List *funcname, List *fargs,
 		 * No function, and no column either.  Since we're dealing with
 		 * function notation, report "function does not exist".
 		 */
-		if (list_length(agg_order) > 1 && !agg_within_group)
-		{
-			/* It's agg(x, ORDER BY y,z) ... perhaps misplaced ORDER BY */
-			ereport(ERROR,
-					(errcode(ERRCODE_UNDEFINED_FUNCTION),
-					 errmsg("function %s does not exist",
-							func_signature_string(funcname, nargs, argnames,
-												  actual_arg_types)),
-					 errhint("No aggregate function matches the given name and argument types. "
-							 "Perhaps you misplaced ORDER BY; ORDER BY must appear "
-							 "after all regular arguments of the aggregate."),
-					 parser_errposition(pstate, location)));
-		}
-		else
-			ereport(ERROR,
-					(errcode(ERRCODE_UNDEFINED_FUNCTION),
-					 errmsg("function %s does not exist",
-							func_signature_string(funcname, nargs, argnames,
-												  actual_arg_types)),
-					 errhint("No function matches the given name and argument types. "
-							 "You might need to add explicit type casts."),
-					 parser_errposition(pstate, location)));
+		ereport(ERROR,
+				(errcode(ERRCODE_UNDEFINED_FUNCTION),
+				 errmsg("function %s does not exist",
+						func_signature_string(funcname, nargs, argnames,
+											  actual_arg_types)),
+				 errhint("No function matches the given name and argument types. "
+						 "You might need to add explicit type casts."),
+				 parser_errposition(pstate, location)));
 	}
 
 	/*
@@ -469,70 +380,9 @@ ParseFuncOrColumn(ParseState *pstate, List *funcname, List *fargs,
 
 		retval = (Node *) funcexpr;
 	}
-	else if (fdresult == FUNCDETAIL_AGGREGATE)
-	{
-		/* aggregate function */
-		Aggref	   *aggref = makeNode(Aggref);
-
-		aggref->aggfnoid = funcid;
-		aggref->aggtype = rettype;
-		/* aggcollid and inputcollid will be set by parse_collate.c */
-		aggref->aggtranstype = InvalidOid;	/* will be set by planner */
-		/* aggargtypes will be set by transformAggregateCall */
-		/* aggdirectargs and args will be set by transformAggregateCall */
-		/* aggorder and aggdistinct will be set by transformAggregateCall */
-		aggref->aggstar = agg_star;
-		aggref->aggvariadic = func_variadic;
-		aggref->aggkind = aggkind;
-		/* agglevelsup will be set by transformAggregateCall */
-		aggref->aggno = -1;		/* planner will set aggno and aggtransno */
-		aggref->aggtransno = -1;
-		aggref->location = location;
-
-		/*
-		 * Reject attempt to call a parameterless aggregate without (*)
-		 * syntax.  This is mere pedantry but some folks insisted ...
-		 */
-		if (fargs == NIL && !agg_star && !agg_within_group)
-			ereport(ERROR,
-					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-					 errmsg("%s(*) must be used to call a parameterless aggregate function",
-							NameListToString(funcname)),
-					 parser_errposition(pstate, location)));
-
-		if (retset)
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_FUNCTION_DEFINITION),
-					 errmsg("aggregates cannot return sets"),
-					 parser_errposition(pstate, location)));
-
-		/*
-		 * We might want to support named arguments later, but disallow it for
-		 * now.  We'd need to figure out the parsed representation (should the
-		 * NamedArgExprs go above or below the TargetEntry nodes?) and then
-		 * teach the planner to reorder the list properly.  Or maybe we could
-		 * make transformAggregateCall do that?  However, if you'd also like
-		 * to allow default arguments for aggregates, we'd need to do it in
-		 * planning to avoid semantic problems.
-		 */
-		if (argnames != NIL)
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("aggregates cannot use named arguments"),
-					 parser_errposition(pstate, location)));
-
-		/* parse_agg.c does additional aggregate-specific processing */
-		transformAggregateCall(pstate, aggref, fargs, agg_order, agg_distinct);
-
-		retval = (Node *) aggref;
-	}
 	else
 	{
-		/*
-		 * This branch is for aggregate functions (including plain aggregates
-		 * invoked as window functions); true window functions are no longer
-		 * supported (window function feature cropped).
-		 */
+		/* Ran out of plausible interpretations. */
 		elog(ERROR, "unrecognized function detail result");
 		retval = NULL;
 	}
@@ -1261,19 +1111,9 @@ func_get_detail(List *funcname,
 		*retset = pform->proretset;
 		*vatype = pform->provariadic;
 
-		switch (pform->prokind)
-		{
-			case PROKIND_AGGREGATE:
-				result = FUNCDETAIL_AGGREGATE;
-				break;
-			case PROKIND_FUNCTION:
-				result = FUNCDETAIL_NORMAL;
-				break;
-			default:
-				elog(ERROR, "unrecognized prokind: %c", pform->prokind);
-				result = FUNCDETAIL_NORMAL; /* keep compiler quiet */
-				break;
-		}
+		if (pform->prokind != PROKIND_FUNCTION)
+			elog(ERROR, "unrecognized prokind: %c", pform->prokind);
+		result = FUNCDETAIL_NORMAL;
 
 		ReleaseSysCache(ftup);
 		return result;
@@ -1798,9 +1638,6 @@ check_srf_call_placement(ParseState *pstate, int location)
 		case EXPR_KIND_WHERE:
 			errkind = true;
 			break;
-		case EXPR_KIND_HAVING:
-			errkind = true;
-			break;
 		case EXPR_KIND_SELECT_TARGET:
 		case EXPR_KIND_INSERT_TARGET:
 			/* okay */
@@ -1811,7 +1648,6 @@ check_srf_call_placement(ParseState *pstate, int location)
 			/* disallowed because it would be ambiguous what to do */
 			errkind = true;
 			break;
-		case EXPR_KIND_GROUP_BY:
 		case EXPR_KIND_ORDER_BY:
 			/* okay */
 			pstate->p_hasTargetSRFs = true;

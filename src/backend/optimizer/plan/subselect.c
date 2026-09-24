@@ -85,7 +85,6 @@ static Bitmapset *finalize_plan(PlannerInfo *root,
 								Bitmapset *valid_params,
 								Bitmapset *scan_params);
 static bool finalize_primnode(Node *node, finalize_primnode_context *context);
-static bool finalize_agg_primnode(Node *node, finalize_primnode_context *context);
 
 
 /*
@@ -259,16 +258,14 @@ build_subplan(PlannerInfo *root, Plan *plan, PlannerInfo *subroot,
 		Node	   *arg = pitem->item;
 
 		/*
-		 * The Var, PlaceHolderVar, or Aggref has already been
-		 * adjusted to have the correct varlevelsup, phlevelsup, or
-		 * agglevelsup.
+		 * The Var or PlaceHolderVar has already been adjusted to have the
+		 * correct varlevelsup or phlevelsup.
 		 *
-		 * If it's a PlaceHolderVar or Aggref, its arguments
-		 * might contain SubLinks, which have not yet been processed (see the
-		 * comments for SS_replace_correlation_vars).  Do that now.
+		 * If it's a PlaceHolderVar, its arguments might contain SubLinks,
+		 * which have not yet been processed (see the comments for
+		 * SS_replace_correlation_vars).  Do that now.
 		 */
-		if (IsA(arg, PlaceHolderVar) ||
-			IsA(arg, Aggref))
+		if (IsA(arg, PlaceHolderVar))
 			arg = SS_process_sublinks(root, arg, false);
 
 		splan->parParam = lappend_int(splan->parParam, pitem->paramId);
@@ -972,27 +969,24 @@ static bool
 simplify_EXISTS_query(PlannerInfo *root, Query *query)
 {
 	/*
-	 * We don't try to simplify at all if the query uses set operations,
-	 * aggregates, grouping sets, SRFs, modifying CTEs, or HAVING; none of
-	 * these seem likely in normal usage and their possible effects are
-	 * complex.  (Note: we could ignore an "OFFSET 0" clause, but that
-	 * traditionally is used as an optimization fence, so we don't.)
+	 * We don't try to simplify at all if the query uses set operations, SRFs,
+	 * or modifying CTEs; none of these seem likely in normal usage and their
+	 * possible effects are complex.  (Note: we could ignore an "OFFSET 0"
+	 * clause, but that traditionally is used as an optimization fence, so we
+	 * don't.)
 	 */
 	if (query->commandType != CMD_SELECT ||
-		query->hasAggs ||
-		query->hasTargetSRFs ||
-		query->havingQual)
+		query->hasTargetSRFs)
 		return false;
 
 	/*
-	 * Otherwise, we can throw away the targetlist, as well as any GROUP,
-	 * WINDOW, DISTINCT, and ORDER BY clauses; none of those clauses will
-	 * change a nonzero-rows result to zero rows or vice versa.  (Furthermore,
-	 * since our parsetree representation of these clauses depends on the
+	 * Otherwise, we can throw away the targetlist, as well as any WINDOW,
+	 * DISTINCT, and ORDER BY clauses; none of those clauses will change a
+	 * nonzero-rows result to zero rows or vice versa.  (Furthermore, since
+	 * our parsetree representation of these clauses depends on the
 	 * targetlist, we'd better throw them away if we drop the targetlist.)
 	 */
 	query->targetList = NIL;
-	query->groupClause = NIL;
 	query->distinctClause = NIL;
 	query->sortClause = NIL;
 
@@ -1003,26 +997,25 @@ simplify_EXISTS_query(PlannerInfo *root, Query *query)
 /*
  * Replace correlation vars (uplevel vars) with Params.
  *
- * Uplevel PlaceHolderVars and aggregates are replaced, too.
+ * Uplevel PlaceHolderVars are replaced, too.
  *
  * Note: it is critical that this runs immediately after SS_process_sublinks.
- * Since we do not recurse into the arguments of uplevel PHVs and aggregates,
- * they will get copied to the appropriate subplan args list in the parent
- * query with uplevel vars not replaced by Params, but only adjusted in level
- * (see replace_outer_placeholdervar and replace_outer_agg).  That's exactly
- * what we want for the vars of the parent level --- but if a PHV's or
- * aggregate's argument contains any further-up variables, they have to be
- * replaced with Params in their turn. That will happen when the parent level
- * runs SS_replace_correlation_vars.  Therefore it must do so after expanding
- * its sublinks to subplans.  And we don't want any steps in between, else
- * those steps would never get applied to the argument expressions, either in
- * the parent or the child level.
+ * Since we do not recurse into the arguments of uplevel PHVs, they will get
+ * copied to the appropriate subplan args list in the parent query with
+ * uplevel vars not replaced by Params, but only adjusted in level (see
+ * replace_outer_placeholdervar).  That's exactly what we want for the vars of
+ * the parent level --- but if a PHV's argument contains any further-up
+ * variables, they have to be replaced with Params in their turn. That will
+ * happen when the parent level runs SS_replace_correlation_vars.  Therefore
+ * it must do so after expanding its sublinks to subplans.  And we don't want
+ * any steps in between, else those steps would never get applied to the
+ * argument expressions, either in the parent or the child level.
  *
  * Another fairly tricky thing going on here is the handling of SubLinks in
- * the arguments of uplevel PHVs/aggregates.  Those are not touched inside the
+ * the arguments of uplevel PHVs.  Those are not touched inside the
  * intermediate query level, either.  Instead, SS_process_sublinks recurses on
- * them after copying the PHV or Aggref expression into the parent plan level
- * (this is actually taken care of in build_subplan).
+ * them after copying the PHV expression into the parent plan level (this is
+ * actually taken care of in build_subplan).
  */
 Node *
 SS_replace_correlation_vars(PlannerInfo *root, Node *expr)
@@ -1047,12 +1040,6 @@ replace_correlation_vars_mutator(Node *node, PlannerInfo *root)
 			return (Node *) replace_outer_placeholdervar(root,
 														 (PlaceHolderVar *) node);
 	}
-	if (IsA(node, Aggref))
-	{
-		if (((Aggref *) node)->agglevelsup > 0)
-			return (Node *) replace_outer_agg(root, (Aggref *) node);
-	}
-
 	return expression_tree_mutator(node,
 								   replace_correlation_vars_mutator,
 								   (void *) root);
@@ -1107,19 +1094,14 @@ process_sublinks_mutator(Node *node, process_sublinks_context *context)
 	}
 
 	/*
-	 * Don't recurse into the arguments of an outer PHV or Aggref here.
-	 * Any SubLinks in the arguments have to be dealt with at the outer query
-	 * level; they'll be handled when build_subplan collects the PHV or Aggref
-	 * into the arguments to be passed down to the current subplan.
+	 * Don't recurse into the arguments of an outer PHV here.  Any SubLinks in
+	 * the arguments have to be dealt with at the outer query level; they'll
+	 * be handled when build_subplan collects the PHV into the arguments to be
+	 * passed down to the current subplan.
 	 */
 	if (IsA(node, PlaceHolderVar))
 	{
 		if (((PlaceHolderVar *) node)->phlevelsup > 0)
-			return node;
-	}
-	else if (IsA(node, Aggref))
-	{
-		if (((Aggref *) node)->agglevelsup > 0)
 			return node;
 	}
 
@@ -1234,7 +1216,7 @@ SS_identify_outer_params(PlannerInfo *root)
 	outer_params = NULL;
 	for (proot = root->parent_root; proot != NULL; proot = proot->parent_root)
 	{
-		/* Include ordinary Var/PHV/Aggref params */
+		/* Include ordinary Var/PHV params */
 		foreach(l, proot->plan_params)
 		{
 			PlannerParamItem *pitem = (PlannerParamItem *) lfirst(l);
@@ -1607,29 +1589,6 @@ finalize_plan(PlannerInfo *root, Plan *plan,
 			break;
 
 
-		case T_Agg:
-			{
-				Agg		   *agg = (Agg *) plan;
-
-				/*
-				 * AGG_HASHED plans need to know which Params are referenced
-				 * in aggregate calls.  Do a separate scan to identify them.
-				 */
-				if (agg->aggstrategy == AGG_HASHED)
-				{
-					finalize_primnode_context aggcontext;
-
-					aggcontext.root = root;
-					aggcontext.paramids = NULL;
-					finalize_agg_primnode((Node *) agg->plan.targetlist,
-										  &aggcontext);
-					finalize_agg_primnode((Node *) agg->plan.qual,
-										  &aggcontext);
-					agg->aggParams = aggcontext.paramids;
-				}
-			}
-			break;
-
 		case T_Memoize:
 			finalize_primnode((Node *) ((Memoize *) plan)->param_exprs,
 							  &context);
@@ -1640,7 +1599,6 @@ finalize_plan(PlannerInfo *root, Plan *plan,
 		case T_Sort:
 		case T_IncrementalSort:
 		case T_Unique:
-		case T_Group:
 			/* no node-type-specific fields need fixing */
 			break;
 
@@ -1783,28 +1741,6 @@ finalize_primnode(Node *node, finalize_primnode_context *context)
 		return false;			/* no more to do here */
 	}
 	return expression_tree_walker(node, finalize_primnode,
-								  (void *) context);
-}
-
-/*
- * finalize_agg_primnode: find all Aggref nodes in the given expression tree,
- * and add IDs of all PARAM_EXEC params appearing within their aggregated
- * arguments to the result set.
- */
-static bool
-finalize_agg_primnode(Node *node, finalize_primnode_context *context)
-{
-	if (node == NULL)
-		return false;
-	if (IsA(node, Aggref))
-	{
-		Aggref	   *agg = (Aggref *) node;
-
-		/* we should not consider the direct arguments, if any */
-		finalize_primnode((Node *) agg->args, context);
-		return false;			/* there can't be any Aggrefs below here */
-	}
-	return expression_tree_walker(node, finalize_agg_primnode,
 								  (void *) context);
 }
 

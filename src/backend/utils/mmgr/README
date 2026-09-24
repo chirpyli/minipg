@@ -335,14 +335,12 @@ have been modified to run opclass support functions in short-lived
 contexts, so that leakage is not a problem; this is necessary in view
 of the fact that their support functions tend to be far more complex.
 
-There are some special cases, such as aggregate functions.  nodeAgg.c
-needs to remember the results of evaluation of aggregate transition
-functions from one tuple cycle to the next, so it can't just discard
-all per-tuple state in each cycle.  The easiest way to handle this seems
-to be to have two per-tuple contexts in an aggregate node, and to
-ping-pong between them, so that at each tuple one is the active allocation
-context and the other holds any results allocated by the prior cycle's
-transition function.
+There are some special cases where a node needs to remember results from
+one tuple cycle to the next, so it can't just discard all per-tuple state
+in each cycle.  The easiest way to handle this seems to be to have two
+per-tuple contexts in such a node, and to ping-pong between them, so that
+at each tuple one is the active allocation context and the other holds any
+results allocated by the prior cycle's evaluation.
 
 Executor routines that switch the active CurrentMemoryContext may need
 to copy data into their caller's current memory context before returning.
@@ -449,10 +447,10 @@ The accounting built into the memory contexts is transparent and works
 transparently for all allocations as long as they end up in the right
 memory context subtree.
 
-Consider for example aggregate functions - the aggregate state is often
-represented by an arbitrary structure, allocated from the transition
-function, so the ad hoc accounting is unlikely to work. The built-in
-accounting will however handle such cases just fine.
+Consider for example a node-local state structure that is allocated by a
+support function rather than by simple expression evaluation, so the ad hoc
+accounting is unlikely to work. The built-in accounting will however handle
+such cases just fine.
 
 To minimize overhead, the accounting is done at the block level, not for
 individual allocation chunks.

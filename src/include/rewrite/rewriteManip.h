@@ -57,8 +57,6 @@ extern Query *getInsertSelectQuery(Query *parsetree, Query ***subquery_ptr);
 extern void AddQual(Query *parsetree, Node *qual);
 extern void AddInvertedQual(Query *parsetree, Node *qual);
 
-extern bool contain_aggs_of_level(Node *node, int levelsup);
-extern int	locate_agg_of_level(Node *node, int levelsup);
 extern bool checkExprHasSubLink(Node *node);
 
 extern Node *replace_rte_variables(Node *node,

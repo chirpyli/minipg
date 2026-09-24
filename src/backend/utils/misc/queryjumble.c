@@ -233,8 +233,6 @@ JumbleQueryInternal(JumbleState *jstate, Query *query)
 	JumbleRangeTable(jstate, query->rtable);
 	JumbleExpr(jstate, (Node *) query->jointree);
 	JumbleExpr(jstate, (Node *) query->targetList);
-	JumbleExpr(jstate, (Node *) query->groupClause);
-	JumbleExpr(jstate, query->havingQual);
 	JumbleExpr(jstate, (Node *) query->distinctClause);
 	JumbleExpr(jstate, (Node *) query->sortClause);
 }
@@ -341,18 +339,6 @@ JumbleExpr(JumbleState *jstate, Node *node)
 					jstate->highest_extern_param_id = p->paramid;
 			}
 			break;
-		case T_Aggref:
-			{
-				Aggref	   *expr = (Aggref *) node;
-
-				APP_JUMB(expr->aggfnoid);
-				JumbleExpr(jstate, (Node *) expr->aggdirectargs);
-				JumbleExpr(jstate, (Node *) expr->args);
-				JumbleExpr(jstate, (Node *) expr->aggorder);
-				JumbleExpr(jstate, (Node *) expr->aggdistinct);
-			}
-			break;
-
 		case T_SubscriptingRef:
 			{
 				SubscriptingRef *sbsref = (SubscriptingRef *) node;

@@ -2511,9 +2511,7 @@ getProcedureTypeDescription(StringInfo buffer, Oid procid,
 	}
 	procForm = (Form_pg_proc) GETSTRUCT(procTup);
 
-	if (procForm->prokind == PROKIND_AGGREGATE)
-		appendStringInfoString(buffer, "aggregate");
-	else if (procForm->prokind == PROKIND_PROCEDURE)
+	if (procForm->prokind == PROKIND_PROCEDURE)
 		appendStringInfoString(buffer, "procedure");
 	else						/* function or window function */
 		appendStringInfoString(buffer, "function");

@@ -33,7 +33,6 @@
 #include "catalog/pg_opclass.h"
 #include "catalog/pg_operator.h"
 #include "catalog/pg_opfamily.h"
-#include "catalog/pg_aggregate.h"
 #include "catalog/pg_proc.h"
 #include "catalog/pg_rewrite.h"
 #include "catalog/pg_tablespace.h"
@@ -52,16 +51,14 @@
 
 
 /*
- * Remove a function (or aggregate) by OID, including its pg_aggregate tuple
- * if it is an aggregate.  Moved here from commands/functioncmds.c, which was
- * otherwise emptied when CREATE/ALTER FUNCTION support was trimmed.
+ * Remove a function by OID.  Moved here from commands/functioncmds.c, which
+ * was otherwise emptied when CREATE/ALTER FUNCTION support was trimmed.
  */
 static void
 RemoveFunctionById(Oid funcOid)
 {
 	Relation	relation;
 	HeapTuple	tup;
-	char		prokind;
 
 	relation = table_open(ProcedureRelationId, RowExclusiveLock);
 
@@ -69,31 +66,11 @@ RemoveFunctionById(Oid funcOid)
 	if (!HeapTupleIsValid(tup))	/* should not happen */
 		elog(ERROR, "cache lookup failed for function %u", funcOid);
 
-	prokind = ((Form_pg_proc) GETSTRUCT(tup))->prokind;
-
 	CatalogTupleDelete(relation, &tup->t_self);
 
 	ReleaseSysCache(tup);
 
 	table_close(relation, RowExclusiveLock);
-
-	/*
-	 * If there's a pg_aggregate tuple, delete that too.
-	 */
-	if (prokind == PROKIND_AGGREGATE)
-	{
-		relation = table_open(AggregateRelationId, RowExclusiveLock);
-
-		tup = SearchSysCache1(AGGFNOID, ObjectIdGetDatum(funcOid));
-		if (!HeapTupleIsValid(tup))	/* should not happen */
-			elog(ERROR, "cache lookup failed for pg_aggregate tuple for function %u", funcOid);
-
-		CatalogTupleDelete(relation, &tup->t_self);
-
-		ReleaseSysCache(tup);
-
-		table_close(relation, RowExclusiveLock);
-	}
 }
 
 
@@ -1668,14 +1645,6 @@ find_expr_references_walker(Node *node,
 		ScalarArrayOpExpr *opexpr = (ScalarArrayOpExpr *) node;
 
 		add_object_address(OCLASS_OPERATOR, opexpr->opno, 0,
-						   context->addrs);
-		/* fall through to examine arguments */
-	}
-	else if (IsA(node, Aggref))
-	{
-		Aggref	   *aggref = (Aggref *) node;
-
-		add_object_address(OCLASS_PROC, aggref->aggfnoid, 0,
 						   context->addrs);
 		/* fall through to examine arguments */
 	}

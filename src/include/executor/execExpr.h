@@ -14,7 +14,7 @@
 #ifndef EXEC_EXPR_H
 #define EXEC_EXPR_H
 
-#include "executor/nodeAgg.h"
+
 #include "nodes/execnodes.h"
 
 /* forward references to avoid circularity */
@@ -210,21 +210,7 @@ typedef enum ExprEvalOp
 	EEOP_CONVERT_ROWTYPE,
 	EEOP_SCALARARRAYOP,
 	EEOP_HASHED_SCALARARRAYOP,
-	EEOP_AGGREF,
 	EEOP_SUBPLAN,
-
-	/* aggregation related nodes */
-	EEOP_AGG_STRICT_INPUT_CHECK_ARGS,
-	EEOP_AGG_STRICT_INPUT_CHECK_NULLS,
-	EEOP_AGG_PLAIN_PERGROUP_NULLCHECK,
-	EEOP_AGG_PLAIN_TRANS_INIT_STRICT_BYVAL,
-	EEOP_AGG_PLAIN_TRANS_STRICT_BYVAL,
-	EEOP_AGG_PLAIN_TRANS_BYVAL,
-	EEOP_AGG_PLAIN_TRANS_INIT_STRICT_BYREF,
-	EEOP_AGG_PLAIN_TRANS_STRICT_BYREF,
-	EEOP_AGG_PLAIN_TRANS_BYREF,
-	EEOP_AGG_ORDERED_TRANS_DATUM,
-	EEOP_AGG_ORDERED_TRANS_TUPLE,
 
 	/* non-existent operation, used e.g. to check array lengths */
 	EEOP_LAST
@@ -509,53 +495,12 @@ typedef struct ExprEvalStep
 			PGFunction	hash_fn_addr;	/* actual call address */
 		}			hashedscalararrayop;
 
-		/* for EEOP_AGGREF */
-		struct
-		{
-			int			aggno;
-		}			aggref;
-
 		/* for EEOP_SUBPLAN */
 		struct
 		{
 			/* out-of-line state, created by nodeSubplan.c */
 			SubPlanState *sstate;
 		}			subplan;
-
-		/* for EEOP_AGG_STRICT_INPUT_CHECK_NULLS / STRICT_INPUT_CHECK_ARGS */
-		struct
-		{
-			/*
-			 * For EEOP_AGG_STRICT_INPUT_CHECK_ARGS args contains pointers to
-			 * the NullableDatums that need to be checked for NULLs.
-			 *
-			 * For EEOP_AGG_STRICT_INPUT_CHECK_NULLS nulls contains pointers
-			 * to booleans that need to be checked for NULLs.
-			 *
-			 * Both cases currently need to exist because sometimes the
-			 * to-be-checked nulls are in TupleTableSlot.isnull array, and
-			 * sometimes in FunctionCallInfoBaseData.args[i].isnull.
-			 */
-			NullableDatum *args;
-			bool	   *nulls;
-			int			nargs;
-			int			jumpnull;
-		}			agg_strict_input_check;
-
-		/* for EEOP_AGG_PLAIN_PERGROUP_NULLCHECK */
-		struct
-		{
-			int			jumpnull;
-		}			agg_plain_pergroup_nullcheck;
-
-		/* for EEOP_AGG_PLAIN_TRANS_[INIT_][STRICT_]{BYVAL,BYREF} */
-		/* for EEOP_AGG_ORDERED_TRANS_{DATUM,TUPLE} */
-		struct
-		{
-			AggStatePerTrans pertrans;
-			ExprContext *aggcontext;
-			int			transno;
-		}			agg_trans;
 	}			d;
 } ExprEvalStep;
 
@@ -644,15 +589,5 @@ extern void ExecEvalWholeRowVar(ExprState *state, ExprEvalStep *op,
 								ExprContext *econtext);
 extern void ExecEvalSysVar(ExprState *state, ExprEvalStep *op,
 						   ExprContext *econtext, TupleTableSlot *slot);
-
-extern void ExecAggInitGroup(AggState *aggstate, AggStatePerTrans pertrans, AggStatePerGroup pergroup,
-							 ExprContext *aggcontext);
-extern Datum ExecAggTransReparent(AggState *aggstate, AggStatePerTrans pertrans,
-								  Datum newValue, bool newValueIsNull,
-								  Datum oldValue, bool oldValueIsNull);
-extern void ExecEvalAggOrderedTransDatum(ExprState *state, ExprEvalStep *op,
-										 ExprContext *econtext);
-extern void ExecEvalAggOrderedTransTuple(ExprState *state, ExprEvalStep *op,
-										 ExprContext *econtext);
 
 #endif							/* EXEC_EXPR_H */

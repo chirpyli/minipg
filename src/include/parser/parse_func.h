@@ -24,7 +24,6 @@ typedef enum
 	FUNCDETAIL_NOTFOUND,		/* no matching function */
 	FUNCDETAIL_MULTIPLE,		/* too many matching functions */
 	FUNCDETAIL_NORMAL,			/* found a matching regular function */
-	FUNCDETAIL_AGGREGATE,		/* found a matching aggregate function */
 	FUNCDETAIL_COERCION			/* it's a type coercion request */
 } FuncDetailCode;
 
