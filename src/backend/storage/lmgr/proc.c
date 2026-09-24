@@ -55,7 +55,6 @@
 int			DeadlockTimeout = 1000;
 int			LockTimeout = 0;
 int			IdleInTransactionSessionTimeout = 0;
-int			IdleSessionTimeout = 0;
 bool		log_lock_waits = false;
 
 /* Pointer to this process's PGPROC struct, if any */

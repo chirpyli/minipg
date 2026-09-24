@@ -66,7 +66,6 @@ static void ShutdownPostgres(int code, Datum arg);
 static void StatementTimeoutHandler(void);
 static void LockTimeoutHandler(void);
 static void IdleInTransactionSessionTimeoutHandler(void);
-static void IdleSessionTimeoutHandler(void);
 static void process_startup_options(Port *port, bool am_superuser);
 
 
@@ -491,7 +490,6 @@ InitPostgres(const char *in_dbname, Oid dboid, const char *username,
 		RegisterTimeout(LOCK_TIMEOUT, LockTimeoutHandler);
 		RegisterTimeout(IDLE_IN_TRANSACTION_SESSION_TIMEOUT,
 						IdleInTransactionSessionTimeoutHandler);
-		RegisterTimeout(IDLE_SESSION_TIMEOUT, IdleSessionTimeoutHandler);
 	}
 
 	/*
@@ -941,14 +939,6 @@ static void
 IdleInTransactionSessionTimeoutHandler(void)
 {
 	IdleInTransactionSessionTimeoutPending = true;
-	InterruptPending = true;
-	SetLatch(MyLatch);
-}
-
-static void
-IdleSessionTimeoutHandler(void)
-{
-	IdleSessionTimeoutPending = true;
 	InterruptPending = true;
 	SetLatch(MyLatch);
 }

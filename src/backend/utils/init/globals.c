@@ -32,7 +32,6 @@ volatile sig_atomic_t QueryCancelPending = false;
 volatile sig_atomic_t ProcDiePending = false;
 volatile sig_atomic_t ClientConnectionLost = false;
 volatile sig_atomic_t IdleInTransactionSessionTimeoutPending = false;
-volatile sig_atomic_t IdleSessionTimeoutPending = false;
 volatile sig_atomic_t ProcSignalBarrierPending = false;
 volatile sig_atomic_t LogMemoryContextPending = false;
 volatile uint32 InterruptHoldoffCount = 0;

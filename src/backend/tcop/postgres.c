@@ -1341,16 +1341,6 @@ ProcessInterrupts(void)
 			IdleInTransactionSessionTimeoutPending = false;
 	}
 
-	if (IdleSessionTimeoutPending)
-	{
-		/* As above, ignore the signal if the GUC has been reset to zero. */
-		if (IdleSessionTimeout > 0)
-			ereport(FATAL,
-					(errcode(ERRCODE_IDLE_SESSION_TIMEOUT),
-					 errmsg("terminating connection due to idle-session timeout")));
-		else
-			IdleSessionTimeoutPending = false;
-	}
 
 	if (ProcSignalBarrierPending)
 		ProcessProcSignalBarrier();
@@ -1969,7 +1959,6 @@ PostgresMain(int argc, char *argv[],
 	/* these must be volatile to ensure state is preserved across longjmp: */
 	volatile bool send_ready_for_query = true;
 	volatile bool idle_in_transaction_timeout_enabled = false;
-	volatile bool idle_session_timeout_enabled = false;
 
 	/* Initialize startup process environment if necessary. */
 	if (!IsUnderPostmaster)
@@ -2220,7 +2209,6 @@ PostgresMain(int argc, char *argv[],
 		disable_all_timeouts(false);	/* do first to avoid race condition */
 		QueryCancelPending = false;
 		idle_in_transaction_timeout_enabled = false;
-		idle_session_timeout_enabled = false;
 
 		/* Not reading from the client anymore. */
 		DoingCommandRead = false;
@@ -2352,13 +2340,6 @@ PostgresMain(int argc, char *argv[],
 				set_ps_display("idle");
 				pgstat_report_activity(STATE_IDLE, NULL);
 
-				/* Start the idle-session timer */
-				if (IdleSessionTimeout > 0)
-				{
-					idle_session_timeout_enabled = true;
-					enable_timeout_after(IDLE_SESSION_TIMEOUT,
-										 IdleSessionTimeout);
-				}
 			}
 
 			/* Report any recently-changed GUC options */
@@ -2391,11 +2372,6 @@ PostgresMain(int argc, char *argv[],
 		{
 			disable_timeout(IDLE_IN_TRANSACTION_SESSION_TIMEOUT, false);
 			idle_in_transaction_timeout_enabled = false;
-		}
-		if (idle_session_timeout_enabled)
-		{
-			disable_timeout(IDLE_SESSION_TIMEOUT, false);
-			idle_session_timeout_enabled = false;
 		}
 
 		/*
