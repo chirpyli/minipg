@@ -59,7 +59,7 @@ int			IdleSessionTimeout = 0;
 bool		log_lock_waits = false;
 
 /* Pointer to this process's PGPROC struct, if any */
-PGPROC	   *MyProc = NULL;
+PGPROC	   *MyProc = NULL; // 进程本地的全局指针
 
 /*
  * This spinlock protects the freelist of recycled PGPROC structures.
@@ -71,7 +71,7 @@ PGPROC	   *MyProc = NULL;
 static slock_t *ProcStructLock = NULL;
 
 /* Pointers to shared-memory structures */
-PROC_HDR   *ProcGlobal = NULL;
+PROC_HDR   *ProcGlobal = NULL;  // 全局共享内存指针
 static PGPROC *AuxiliaryProcs = NULL;
 
 /* If we are waiting for a lock, this points to the associated LOCALLOCK */
@@ -125,25 +125,19 @@ ProcGlobalSemas(void)
 
 /*
  * InitProcGlobal -
- *	  Initialize the global process table during postmaster or standalone
- *	  backend startup.
+ *	  postmaster 或独立后端（standalone backend）启动时，初始化全局进程表。
  *
- *	  We also create all the per-process semaphores we will need to support
- *	  the requested number of backends.  We used to allocate semaphores
- *	  only when backends were actually started up, but that is bad because
- *	  it lets Postgres fail under load --- a lot of Unix systems are
- *	  (mis)configured with small limits on the number of semaphores, and
- *	  running out when trying to start another backend is a common failure.
- *	  So, now we grab enough semaphores to support the desired max number
- *	  of backends immediately at initialization --- if the sysadmin has set
- *	  MaxConnections higher than his kernel will support, he'll find out
- *	  sooner rather than later.
+ *	  同时还会创建支撑所需数量后端的所有“每进程信号量”。以前我们只在后端
+ *	  真正启动时才分配信号量，但那样很糟糕——很多 Unix 系统对信号量数量的
+ *	  限制配置得过小（一种常见的错误配置），于是“启动新后端时信号量耗尽”
+ *	  成了一种常见故障。所以现在我们改为在初始化时一次性申请足够的信号量，
+ *	  以支撑期望的最大后端数——如果管理员把 MaxConnections 设得高于内核所能
+ *	  支持的上限，他会更早发现，而不是等到负载上来之后才发现。
  *
- *	  Another reason for creating semaphores here is that the semaphore
- *	  implementation typically requires us to create semaphores in the
- *	  postmaster, not in backends.
+ *	  在这里创建信号量的另一个原因是：信号量的实现通常要求信号量必须在
+ *	  postmaster 中创建，而不能在各后端中创建。
  *
- * Note: this is NOT called by individual backends under a postmaster.
+ * 注意：postmaster 管理下的各个后端并不会调用本函数。
  */
 void
 InitProcGlobal(void)
@@ -289,7 +283,7 @@ InitProcess(void)
 
 	set_spins_per_delay(ProcGlobal->spins_per_delay);
 
-	MyProc = *procgloballist;
+	MyProc = *procgloballist; // 指向本进程在共享内存 ProcGlobal->allProcs[] 数组中的那一个 PGPROC 槽位
 
 	if (MyProc != NULL)
 	{

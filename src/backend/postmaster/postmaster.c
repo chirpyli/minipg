@@ -323,7 +323,7 @@ static void BackendRun(Port *port) pg_attribute_noreturn();
 static void ExitPostmaster(int status) pg_attribute_noreturn();
 static int	ServerLoop(void);
 static int	BackendStartup(Port *port);
-static int	ProcessStartupPacket(Port *port, bool ssl_done);
+static int	ProcessStartupPacket(Port *port);
 static void SendNegotiateProtocolVersion(List *unrecognized_protocol_options);
 static void processCancelRequest(Port *port, void *pkt);
 static int	initMasks(fd_set *rmask);
@@ -1285,11 +1285,9 @@ initMasks(fd_set *rmask)
  * if that's what you want.  Return STATUS_ERROR if you don't want to
  * send anything to the client, which would typically be appropriate
  * if we detect a communications failure.)
- *
- * Set ssl_done when negotiation of an encrypted layer (TLS) is completed.
  */
 static int
-ProcessStartupPacket(Port *port, bool ssl_done)
+ProcessStartupPacket(Port *port)
 {
 	int32		len;
 	char	   *buf;
@@ -1319,10 +1317,9 @@ ProcessStartupPacket(Port *port, bool ssl_done)
 	if (pq_getbytes(((char *) &len) + 1, 3) == EOF)
 	{
 		/* Got a partial length word, so bleat about that */
-		if (!ssl_done)
-			ereport(COMMERROR,
-					(errcode(ERRCODE_PROTOCOL_VIOLATION),
-					 errmsg("incomplete startup packet")));
+		ereport(COMMERROR,
+				(errcode(ERRCODE_PROTOCOL_VIOLATION),
+				 errmsg("incomplete startup packet")));
 		return STATUS_ERROR;
 	}
 
@@ -3082,7 +3079,7 @@ BackendInitialize(Port *port)
 	 * Receive the startup packet (which might turn out to be a cancel request
 	 * packet).
 	 */
-	status = ProcessStartupPacket(port, false);
+	status = ProcessStartupPacket(port);
 
 	/*
 	 * Disable the timeout, and prevent SIGTERM again.
