@@ -1,38 +1,35 @@
 /*-------------------------------------------------------------------------
  *
  * snapmgr.c
- *		PostgreSQL snapshot manager
+ *		PostgreSQL 快照管理器
  *
- * We keep track of snapshots in two ways: those "registered" by resowner.c,
- * and the "active snapshot" stack.  All snapshots in either of them live in
- * persistent memory.  When a snapshot is no longer in any of these lists
- * (tracked by separate refcounts on each snapshot), its memory can be freed.
+ * 我们以两种方式跟踪快照：一种是由 resowner.c "注册"的快照，
+ * 另一种是"活动快照"（active snapshot）栈。这两种方式中的所有快照
+ * 都存放在持久内存中。当某个快照不再位于这两个列表中的任何一个时
+ * （每个快照各自有一个引用计数来跟踪），它的内存就可以被释放了。
  *
- * The FirstXactSnapshot, if any, is treated a bit specially: we increment its
- * regd_count and list it in RegisteredSnapshots, but this reference is not
- * tracked by a resource owner. We used to use the TopTransactionResourceOwner
- * to track this snapshot reference, but that introduces logical circularity
- * and thus makes it impossible to clean up in a sane fashion.  It's better to
- * handle this reference as an internally-tracked registration, so that this
- * module is entirely lower-level than ResourceOwners.
+ * FirstXactSnapshot（如果存在）的处理稍显特殊：我们会递增它的
+ * regd_count，并把它列入 RegisteredSnapshots，但这个引用并不由
+ * 资源所有者（resource owner）跟踪。我们过去使用
+ * TopTransactionResourceOwner 来跟踪该快照引用，但那样会引入逻辑上的
+ * 循环依赖，导致无法以合理的方式完成清理。更好的做法是把该引用当作
+ * 模块内部自行跟踪的注册来处理，这样本模块就完全处于
+ * ResourceOwners 之下的更底层。
  *
- * Likewise, any snapshots that have been exported by pg_export_snapshot
- * have regd_count = 1 and are listed in RegisteredSnapshots, but are not
- * tracked by any resource owner.
+ * 同样地，任何由 pg_export_snapshot 导出的快照都具有 regd_count = 1
+ * 并被列入 RegisteredSnapshots，但并不由任何资源所有者跟踪。
  *
- * Likewise, the CatalogSnapshot is listed in RegisteredSnapshots when it
- * is valid, but is not tracked by any resource owner.
+ * 同样地，CatalogSnapshot 在有效时会被列入 RegisteredSnapshots，
+ * 但并不由任何资源所有者跟踪。
  *
- * The same is true for historic snapshots used during logical decoding,
- * their lifetime is managed separately (as they live longer than one xact.c
- * transaction).
+ * 逻辑解码期间使用的历史快照（historic snapshot）也是如此，
+ * 它们的生命周期是单独管理的（因为它们存活的时间比 xact.c 中的
+ * 一个事务更长）。
  *
- * These arrangements let us reset MyProc->xmin when there are no snapshots
- * referenced by this transaction, and advance it when the one with oldest
- * Xmin is no longer referenced.  For simplicity however, only registered
- * snapshots not active snapshots participate in tracking which one is oldest;
- * we don't try to change MyProc->xmin except when the active-snapshot
- * stack is empty.
+ * 这些安排使得我们可以在本事务不再引用任何快照时重置
+ * MyProc->xmin，并在引用最老 Xmin 的那个快照不再被引用时推进它。
+ * 不过为了简单起见，只有已注册的快照（而非活动快照）参与"谁最老"的
+ * 跟踪；除非活动快照栈为空，我们不会尝试修改 MyProc->xmin。
  *
  *
  * Portions Copyright (c) 1996-2021, PostgreSQL Global Development Group
