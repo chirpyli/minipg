@@ -1062,30 +1062,6 @@ sub promote
 	return;
 }
 
-=pod
-
-=item $node->logrotate()
-
-Wrapper for pg_ctl logrotate
-
-=cut
-
-sub logrotate
-{
-	my ($self)  = @_;
-	my $port    = $self->port;
-	my $pgdata  = $self->data_dir;
-	my $logfile = $self->logfile;
-	my $name    = $self->name;
-
-	local %ENV = $self->_get_env();
-
-	print "### Rotating log in node \"$name\"\n";
-	TestLib::system_or_bail('pg_ctl', '-D', $pgdata, '-l', $logfile,
-		'logrotate');
-	return;
-}
-
 # Internal routine to enable archive recovery command on a standby node
 sub enable_restoring
 {

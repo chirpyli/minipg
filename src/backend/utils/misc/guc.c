@@ -1212,15 +1212,6 @@ static struct config_bool ConfigureNamesBool[] =
 		false,
 		NULL, NULL, NULL
 	},
-	{
-		{"log_truncate_on_rotation", PGC_SIGHUP, LOGGING_WHERE,
-			gettext_noop("Truncate existing log files of same name during log rotation."),
-			NULL
-		},
-		&Log_truncate_on_rotation,
-		false,
-		NULL, NULL, NULL
-	},
 
 #ifdef TRACE_SORT
 	{
@@ -2002,28 +1993,6 @@ static struct config_int ConfigureNamesInt[] =
 		},
 		&backend_flush_after,
 		DEFAULT_BACKEND_FLUSH_AFTER, 0, WRITEBACK_MAX_PENDING_FLUSHES,
-		NULL, NULL, NULL
-	},
-
-	{
-		{"log_rotation_age", PGC_SIGHUP, LOGGING_WHERE,
-			gettext_noop("Automatic log file rotation will occur after N minutes."),
-			NULL,
-			GUC_UNIT_MIN
-		},
-		&Log_RotationAge,
-		HOURS_PER_DAY * MINS_PER_HOUR, 0, INT_MAX / SECS_PER_MINUTE,
-		NULL, NULL, NULL
-	},
-
-	{
-		{"log_rotation_size", PGC_SIGHUP, LOGGING_WHERE,
-			gettext_noop("Automatic log file rotation will occur after N kilobytes."),
-			NULL,
-			GUC_UNIT_KB
-		},
-		&Log_RotationSize,
-		10 * 1024, 0, INT_MAX / 1024,
 		NULL, NULL, NULL
 	},
 

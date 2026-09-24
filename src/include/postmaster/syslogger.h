@@ -63,11 +63,8 @@ typedef union
 
 /* GUC options */
 extern bool Logging_collector;
-extern int	Log_RotationAge;
-extern int	Log_RotationSize;
 extern PGDLLIMPORT char *Log_directory;
 extern PGDLLIMPORT char *Log_filename;
-extern bool Log_truncate_on_rotation;
 extern int	Log_file_mode;
 
 extern int	syslogPipe[2];
@@ -76,15 +73,5 @@ extern int	syslogPipe[2];
 extern int	SysLogger_Start(void);
 
 extern void write_syslogger_file(const char *buffer, int count);
-
-extern bool CheckLogrotateSignal(void);
-extern void RemoveLogrotateSignalFiles(void);
-
-/*
- * Name of files saving meta-data information about the log
- * files currently in use by the syslogger
- */
-#define LOG_METAINFO_DATAFILE  "current_logfiles"
-#define LOG_METAINFO_DATAFILE_TMP  LOG_METAINFO_DATAFILE ".tmp"
 
 #endif							/* _SYSLOGGER_H */

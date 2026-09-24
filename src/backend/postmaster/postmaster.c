@@ -740,17 +740,7 @@ PostmasterMain(int argc, char *argv[])
 	 * brought up to be the primary.  Then, if a new standby starts by using
 	 * the backup taken from the new primary, the files can exist at server
 	 * startup and must be removed in order to avoid an unexpected promotion.
-	 *
-	 * Do the same for logrotate signal file
 	 */
-	RemoveLogrotateSignalFiles();
-
-	/* Remove any outdated file holding the current log filenames. */
-	if (unlink(LOG_METAINFO_DATAFILE) < 0 && errno != ENOENT)
-		ereport(LOG,
-				(errcode_for_file_access(),
-				 errmsg("could not remove file \"%s\": %m",
-						LOG_METAINFO_DATAFILE)));
 
 	/*
 	 * Initialize input sockets.
@@ -3190,20 +3180,6 @@ static void
 sigusr1_handler(SIGNAL_ARGS)
 {
 	int			save_errno = errno;
-
-	/* Tell syslogger to rotate logfile if requested */
-	if (SysLoggerPID != 0)
-	{
-		if (CheckLogrotateSignal())
-		{
-			signal_child(SysLoggerPID, SIGUSR1);
-			RemoveLogrotateSignalFiles();
-		}
-		else if (CheckPostmasterSignal(PMSIGNAL_ROTATE_LOGFILE))
-		{
-			signal_child(SysLoggerPID, SIGUSR1);
-		}
-	}
 
 	/*
 	 * Try to advance postmaster's state machine, if a child requests it.

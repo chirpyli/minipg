@@ -58,20 +58,13 @@
  */
 #define READ_BUF_SIZE (2 * PIPE_CHUNK_SIZE)
 
-/* Log rotation signal file path, relative to $PGDATA */
-#define LOGROTATE_SIGNAL_FILE	"logrotate"
-
-
 /*
  * GUC parameters.  Logging_collector cannot be changed after postmaster
  * start, but the rest can change at SIGHUP.
  */
 bool		Logging_collector = false;
-int			Log_RotationAge = HOURS_PER_DAY * MINS_PER_HOUR;
-int			Log_RotationSize = 10 * 1024;
 char	   *Log_directory = NULL;
 char	   *Log_filename = NULL;
-bool		Log_truncate_on_rotation = false;
 int			Log_file_mode = S_IRUSR | S_IWUSR;
 
 extern bool redirection_done;
@@ -79,12 +72,9 @@ extern bool redirection_done;
 /*
  * Private state
  */
-static pg_time_t next_rotation_time;
 static bool pipe_eof_seen = false;
-static bool rotation_disabled = false;
 static FILE *syslogFile = NULL;
 static pg_time_t first_syslogger_file_time = 0;
-static char *last_file_name = NULL;
 
 /*
  * Buffers for saving partial messages from different backends.
@@ -109,11 +99,6 @@ static List *buffer_lists[NBUFFER_LISTS];
 /* Exported so that other modules can write into the syslogger pipe */
 int			syslogPipe[2] = {-1, -1};
 
-/*
- * Flags set by interrupt handlers for later service in the main loop.
- */
-static volatile sig_atomic_t rotation_requested = false;
-
 
 /* Local subroutines */
 static void SysLoggerMain(int argc, char *argv[]) pg_attribute_noreturn();
@@ -122,11 +107,7 @@ static void flush_pipe_input(char *logbuffer, int *bytes_in_logbuffer);
 static FILE *logfile_open(const char *filename, const char *mode,
 						  bool allow_errors);
 
-static void logfile_rotate(bool time_based_rotation, int size_rotation_for);
 static char *logfile_getname(pg_time_t timestamp, const char *suffix);
-static void set_next_rotation_time(void);
-static void sigUsr1Handler(SIGNAL_ARGS);
-static void update_metainfo_datafile(void);
 
 
 /*
@@ -137,13 +118,7 @@ SysLoggerMain(int argc, char *argv[])
 {
 	char		logbuffer[READ_BUF_SIZE];
 	int			bytes_in_logbuffer = 0;
-	char	   *currentLogDir;
-	char	   *currentLogFilename;
-	int			currentLogRotationAge;
-	pg_time_t	now;
 	WaitEventSet *wes;
-
-	now = MyStartTime;
 
 	MyBackendType = B_LOGGER;
 	init_ps_display(NULL);
@@ -204,7 +179,6 @@ SysLoggerMain(int argc, char *argv[])
 	pqsignal(SIGQUIT, SIG_IGN);
 	pqsignal(SIGALRM, SIG_IGN);
 	pqsignal(SIGPIPE, SIG_IGN);
-	pqsignal(SIGUSR1, sigUsr1Handler);	/* request log rotation */
 	pqsignal(SIGUSR2, SIG_IGN);
 
 	/*
@@ -213,21 +187,6 @@ SysLoggerMain(int argc, char *argv[])
 	pqsignal(SIGCHLD, SIG_DFL);
 
 	PG_SETMASK(&UnBlockSig);
-
-	/*
-	 * Remember active logfiles' name(s).  We recompute 'em from the reference
-	 * time because passing down just the pg_time_t is a lot cheaper than
-	 * passing a whole file path.
-	 */
-	last_file_name = logfile_getname(first_syslogger_file_time, NULL);
-
-	/* remember active logfile parameters */
-	currentLogDir = pstrdup(Log_directory);
-	currentLogFilename = pstrdup(Log_filename);
-	currentLogRotationAge = Log_RotationAge;
-	/* set next planned rotation time */
-	set_next_rotation_time();
-	update_metainfo_datafile();
 
 	/*
 	 * Reset whereToSendOutput, as the postmaster will do (but hasn't yet, at
@@ -253,8 +212,6 @@ SysLoggerMain(int argc, char *argv[])
 	/* main worker loop */
 	for (;;)
 	{
-		bool		time_based_rotation = false;
-		int			size_rotation_for = 0;
 		long		cur_timeout;
 		WaitEvent	event;
 		int			rc;
@@ -269,119 +226,14 @@ SysLoggerMain(int argc, char *argv[])
 		{
 			ConfigReloadPending = false;
 			ProcessConfigFile(PGC_SIGHUP);
-
-			/*
-			 * Check if the log directory or filename pattern changed in
-			 * postgresql.conf. If so, force rotation to make sure we're
-			 * writing the logfiles in the right place.
-			 */
-			if (strcmp(Log_directory, currentLogDir) != 0)
-			{
-				pfree(currentLogDir);
-				currentLogDir = pstrdup(Log_directory);
-				rotation_requested = true;
-
-				/*
-				 * Also, create new directory if not present; ignore errors
-				 */
-				(void) MakePGDirectory(Log_directory);
-			}
-			if (strcmp(Log_filename, currentLogFilename) != 0)
-			{
-				pfree(currentLogFilename);
-				currentLogFilename = pstrdup(Log_filename);
-				rotation_requested = true;
-			}
-
-			/*
-			 * If rotation time parameter changed, reset next rotation time,
-			 * but don't immediately force a rotation.
-			 */
-			if (currentLogRotationAge != Log_RotationAge)
-			{
-				currentLogRotationAge = Log_RotationAge;
-				set_next_rotation_time();
-			}
-
-			/*
-			 * If we had a rotation-disabling failure, re-enable rotation
-			 * attempts after SIGHUP, and force one immediately.
-			 */
-			if (rotation_disabled)
-			{
-				rotation_disabled = false;
-				rotation_requested = true;
-			}
-
-			/*
-			 * Force rewriting last log filename when reloading configuration.
-			 * Even if rotation_requested is false, log_destination may have
-			 * been changed and we don't want to wait the next file rotation.
-			 */
-			update_metainfo_datafile();
-		}
-
-		if (Log_RotationAge > 0 && !rotation_disabled)
-		{
-			/* Do a logfile rotation if it's time */
-			now = (pg_time_t) time(NULL);
-			if (now >= next_rotation_time)
-				rotation_requested = time_based_rotation = true;
-		}
-
-		if (!rotation_requested && Log_RotationSize > 0 && !rotation_disabled)
-		{
-			/* Do a rotation if file is too big */
-			if (ftell(syslogFile) >= Log_RotationSize * 1024L)
-			{
-				rotation_requested = true;
-				size_rotation_for |= LOG_DESTINATION_STDERR;
-			}
-		}
-
-		if (rotation_requested)
-		{
-			/*
-			 * Force rotation when both values are zero. It means the request
-			 * was sent by pg_rotate_logfile() or "pg_ctl logrotate".
-			 */
-			if (!time_based_rotation && size_rotation_for == 0)
-				size_rotation_for = LOG_DESTINATION_STDERR;
-			logfile_rotate(time_based_rotation, size_rotation_for);
 		}
 
 		/*
-		 * Calculate time till next time-based rotation, so that we don't
-		 * sleep longer than that.  We assume the value of "now" obtained
-		 * above is still close enough.  Note we can't make this calculation
-		 * until after calling logfile_rotate(), since it will advance
-		 * next_rotation_time.
-		 *
-		 * Also note that we need to beware of overflow in calculation of the
-		 * timeout: with large settings of Log_RotationAge, next_rotation_time
-		 * could be more than INT_MAX msec in the future.  In that case we'll
-		 * wait no more than INT_MAX msec, and try again.
+		 * Sleep until there's something to do.  Without log rotation there is
+		 * no timeout to compute, so wait indefinitely.
 		 */
-		if (Log_RotationAge > 0 && !rotation_disabled)
-		{
-			pg_time_t	delay;
+		cur_timeout = -1L;
 
-			delay = next_rotation_time - now;
-			if (delay > 0)
-			{
-				if (delay > INT_MAX / 1000)
-					delay = INT_MAX / 1000;
-				cur_timeout = delay * 1000L;	/* msec */
-			}
-			else
-				cur_timeout = 0;
-		}
-		else
-			cur_timeout = -1L;
-
-		/*
-		 * Sleep until there's something to do
-		 */
 		rc = WaitEventSetWait(wes, cur_timeout, &event, 1,
 							  WAIT_EVENT_SYSLOGGER_MAIN);
 
@@ -852,85 +704,6 @@ logfile_open(const char *filename, const char *mode, bool allow_errors)
 }
 
 /*
- * perform logfile rotation
- */
-static void
-logfile_rotate(bool time_based_rotation, int size_rotation_for)
-{
-	char	   *filename;
-	pg_time_t	fntime;
-	FILE	   *fh;
-
-	rotation_requested = false;
-
-	/*
-	 * When doing a time-based rotation, invent the new logfile name based on
-	 * the planned rotation time, not current time, to avoid "slippage" in the
-	 * file name when we don't do the rotation immediately.
-	 */
-	if (time_based_rotation)
-		fntime = next_rotation_time;
-	else
-		fntime = time(NULL);
-	filename = logfile_getname(fntime, NULL);
-
-	/*
-	 * Decide whether to overwrite or append.  We can overwrite if (a)
-	 * Log_truncate_on_rotation is set, (b) the rotation was triggered by
-	 * elapsed time and not something else, and (c) the computed file name is
-	 * different from what we were previously logging into.
-	 *
-	 * Note: last_file_name should never be NULL here, but if it is, append.
-	 */
-	if (time_based_rotation || (size_rotation_for & LOG_DESTINATION_STDERR))
-	{
-		if (Log_truncate_on_rotation && time_based_rotation &&
-			last_file_name != NULL &&
-			strcmp(filename, last_file_name) != 0)
-			fh = logfile_open(filename, "w", true);
-		else
-			fh = logfile_open(filename, "a", true);
-
-		if (!fh)
-		{
-			/*
-			 * ENFILE/EMFILE are not too surprising on a busy system; just
-			 * keep using the old file till we manage to get a new one.
-			 * Otherwise, assume something's wrong with Log_directory and stop
-			 * trying to create files.
-			 */
-			if (errno != ENFILE && errno != EMFILE)
-			{
-				ereport(LOG,
-						(errmsg("disabling automatic rotation (use SIGHUP to re-enable)")));
-				rotation_disabled = true;
-			}
-
-			if (filename)
-				pfree(filename);
-			return;
-		}
-
-		fclose(syslogFile);
-		syslogFile = fh;
-
-		/* instead of pfree'ing filename, remember it for next time */
-		if (last_file_name != NULL)
-			pfree(last_file_name);
-		last_file_name = filename;
-		filename = NULL;
-	}
-
-	if (filename)
-		pfree(filename);
-
-	update_metainfo_datafile();
-
-	set_next_rotation_time();
-}
-
-
-/*
  * construct logfile name using timestamp information
  *
  * If suffix isn't NULL, append it to the name, replacing any ".log"
@@ -963,138 +736,4 @@ logfile_getname(pg_time_t timestamp, const char *suffix)
 	}
 
 	return filename;
-}
-
-/*
- * Determine the next planned rotation time, and store in next_rotation_time.
- */
-static void
-set_next_rotation_time(void)
-{
-	pg_time_t	now;
-	struct pg_tm *tm;
-	int			rotinterval;
-
-	/* nothing to do if time-based rotation is disabled */
-	if (Log_RotationAge <= 0)
-		return;
-
-	/*
-	 * The requirements here are to choose the next time > now that is a
-	 * "multiple" of the log rotation interval.  "Multiple" can be interpreted
-	 * fairly loosely.  In this version we align to log_timezone rather than
-	 * GMT.
-	 */
-	rotinterval = Log_RotationAge * SECS_PER_MINUTE;	/* convert to seconds */
-	now = (pg_time_t) time(NULL);
-	tm = pg_localtime(&now, log_timezone);
-	now += tm->tm_gmtoff;
-	now -= now % rotinterval;
-	now += rotinterval;
-	now -= tm->tm_gmtoff;
-	next_rotation_time = now;
-}
-
-/*
- * Store the name of the file(s) where the log collector, when enabled, writes
- * log messages.  Useful for finding the name(s) of the current log file(s)
- * when there is time-based logfile rotation.  Filenames are stored in a
- * temporary file and which is renamed into the final destination for
- * atomicity.  The file is opened with the same permissions as what gets
- * created in the data directory and has proper buffering options.
- */
-static void
-update_metainfo_datafile(void)
-{
-	FILE	   *fh;
-	mode_t		oumask;
-
-	if (!(Log_destination & LOG_DESTINATION_STDERR))
-	{
-		if (unlink(LOG_METAINFO_DATAFILE) < 0 && errno != ENOENT)
-			ereport(LOG,
-					(errcode_for_file_access(),
-					 errmsg("could not remove file \"%s\": %m",
-							LOG_METAINFO_DATAFILE)));
-		return;
-	}
-
-	/* use the same permissions as the data directory for the new file */
-	oumask = umask(pg_mode_mask);
-	fh = fopen(LOG_METAINFO_DATAFILE_TMP, "w");
-	umask(oumask);
-
-	if (fh)
-	{
-		setvbuf(fh, NULL, PG_IOLBF, 0);
-	}
-	else
-	{
-		ereport(LOG,
-				(errcode_for_file_access(),
-				 errmsg("could not open file \"%s\": %m",
-						LOG_METAINFO_DATAFILE_TMP)));
-		return;
-	}
-
-	if (last_file_name && (Log_destination & LOG_DESTINATION_STDERR))
-	{
-		if (fprintf(fh, "stderr %s\n", last_file_name) < 0)
-		{
-			ereport(LOG,
-					(errcode_for_file_access(),
-					 errmsg("could not write file \"%s\": %m",
-							LOG_METAINFO_DATAFILE_TMP)));
-			fclose(fh);
-			return;
-		}
-	}
-	fclose(fh);
-
-	if (rename(LOG_METAINFO_DATAFILE_TMP, LOG_METAINFO_DATAFILE) != 0)
-		ereport(LOG,
-				(errcode_for_file_access(),
-				 errmsg("could not rename file \"%s\" to \"%s\": %m",
-						LOG_METAINFO_DATAFILE_TMP, LOG_METAINFO_DATAFILE)));
-}
-
-/* --------------------------------
- *		signal handler routines
- * --------------------------------
- */
-
-/*
- * Check to see if a log rotation request has arrived.  Should be
- * called by postmaster after receiving SIGUSR1.
- */
-bool
-CheckLogrotateSignal(void)
-{
-	struct stat stat_buf;
-
-	if (stat(LOGROTATE_SIGNAL_FILE, &stat_buf) == 0)
-		return true;
-
-	return false;
-}
-
-/*
- * Remove the file signaling a log rotation request.
- */
-void
-RemoveLogrotateSignalFiles(void)
-{
-	unlink(LOGROTATE_SIGNAL_FILE);
-}
-
-/* SIGUSR1: set flag to rotate logfile */
-static void
-sigUsr1Handler(SIGNAL_ARGS)
-{
-	int			save_errno = errno;
-
-	rotation_requested = true;
-	SetLatch(MyLatch);
-
-	errno = save_errno;
 }

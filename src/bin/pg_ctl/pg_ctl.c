@@ -58,7 +58,6 @@ typedef enum
 	RESTART_COMMAND,
 	RELOAD_COMMAND,
 	STATUS_COMMAND,
-	LOGROTATE_COMMAND,
 	KILL_COMMAND
 } CtlCommand;
 
@@ -90,7 +89,6 @@ static char postopts_file[MAXPGPATH];
 static char version_file[MAXPGPATH];
 static char pid_file[MAXPGPATH];
 static char backup_file[MAXPGPATH];
-static char logrotate_file[MAXPGPATH];
 
 static volatile pgpid_t postmasterPID = -1;
 
@@ -106,7 +104,6 @@ static void do_stop(void);
 static void do_restart(void);
 static void do_reload(void);
 static void do_status(void);
-static void do_logrotate(void);
 static void do_kill(pgpid_t pid);
 static void print_msg(const char *msg);
 static void adjust_data_dir(void);
@@ -978,63 +975,6 @@ do_reload(void)
 
 
 /*
- * log rotate
- */
-
-static void
-do_logrotate(void)
-{
-	FILE	   *logrotatefile;
-	pgpid_t		pid;
-
-	pid = get_pgpid(false);
-
-	if (pid == 0)				/* no pid file */
-	{
-		write_stderr(_("%s: PID file \"%s\" does not exist\n"), progname, pid_file);
-		write_stderr(_("Is server running?\n"));
-		exit(1);
-	}
-	else if (pid < 0)			/* standalone backend, not postmaster */
-	{
-		pid = -pid;
-		write_stderr(_("%s: cannot rotate log file; "
-					   "single-user server is running (PID: %ld)\n"),
-					 progname, pid);
-		exit(1);
-	}
-
-	snprintf(logrotate_file, MAXPGPATH, "%s/logrotate", pg_data);
-
-	if ((logrotatefile = fopen(logrotate_file, "w")) == NULL)
-	{
-		write_stderr(_("%s: could not create log rotation signal file \"%s\": %s\n"),
-					 progname, logrotate_file, strerror(errno));
-		exit(1);
-	}
-	if (fclose(logrotatefile))
-	{
-		write_stderr(_("%s: could not write log rotation signal file \"%s\": %s\n"),
-					 progname, logrotate_file, strerror(errno));
-		exit(1);
-	}
-
-	sig = SIGUSR1;
-	if (kill((pid_t) pid, sig) != 0)
-	{
-		write_stderr(_("%s: could not send log rotation signal (PID: %ld): %s\n"),
-					 progname, pid, strerror(errno));
-		if (unlink(logrotate_file) != 0)
-			write_stderr(_("%s: could not remove log rotation signal file \"%s\": %s\n"),
-						 progname, logrotate_file, strerror(errno));
-		exit(1);
-	}
-
-	print_msg(_("server signaled to rotate log file\n"));
-}
-
-
-/*
  *	utility routines
  */
 
@@ -1150,7 +1090,6 @@ do_help(void)
 			 "                    [-o OPTIONS] [-c]\n"), progname);
 	printf(_("  %s reload     [-D DATADIR] [-s]\n"), progname);
 	printf(_("  %s status     [-D DATADIR]\n"), progname);
-	printf(_("  %s logrotate  [-D DATADIR] [-s]\n"), progname);
 	printf(_("  %s kill       SIGNALNAME PID\n"), progname);
 
 	printf(_("\nCommon options:\n"));
@@ -1523,8 +1462,6 @@ main(int argc, char **argv)
 				ctl_command = RELOAD_COMMAND;
 			else if (strcmp(argv[optind], "status") == 0)
 				ctl_command = STATUS_COMMAND;
-			else if (strcmp(argv[optind], "logrotate") == 0)
-				ctl_command = LOGROTATE_COMMAND;
 			else if (strcmp(argv[optind], "kill") == 0)
 			{
 				if (argc - optind < 3)
@@ -1619,9 +1556,6 @@ main(int argc, char **argv)
 			break;
 		case RELOAD_COMMAND:
 			do_reload();
-			break;
-		case LOGROTATE_COMMAND:
-			do_logrotate();
 			break;
 		case KILL_COMMAND:
 			do_kill(killproc);

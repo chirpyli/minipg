@@ -18,7 +18,6 @@
 
 #include "miscadmin.h"
 #include "utils/wait_event.h"
-#include "postmaster/syslogger.h"
 #include "storage/pmsignal.h"
 #include "storage/proc.h"
 #include "storage/procarray.h"
@@ -248,42 +247,4 @@ pg_reload_conf(PG_FUNCTION_ARGS)
 }
 
 
-/*
- * Rotate log file
- *
- * This function is kept to support adminpack 1.0.
- */
-Datum
-pg_rotate_logfile(PG_FUNCTION_ARGS)
-{
 
-	if (!Logging_collector)
-	{
-		ereport(WARNING,
-				(errmsg("rotation not possible because log collection not active")));
-		PG_RETURN_BOOL(false);
-	}
-
-	SendPostmasterSignal(PMSIGNAL_ROTATE_LOGFILE);
-	PG_RETURN_BOOL(true);
-}
-
-/*
- * Rotate log file
- *
- * Permission checking for this function is managed through the normal
- * GRANT system.
- */
-Datum
-pg_rotate_logfile_v2(PG_FUNCTION_ARGS)
-{
-	if (!Logging_collector)
-	{
-		ereport(WARNING,
-				(errmsg("rotation not possible because log collection not active")));
-		PG_RETURN_BOOL(false);
-	}
-
-	SendPostmasterSignal(PMSIGNAL_ROTATE_LOGFILE);
-	PG_RETURN_BOOL(true);
-}

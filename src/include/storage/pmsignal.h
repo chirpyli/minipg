@@ -32,7 +32,6 @@
  */
 typedef enum
 {
-	PMSIGNAL_ROTATE_LOGFILE,	/* send SIGUSR1 to syslogger to rotate logfile */
 	PMSIGNAL_ADVANCE_STATE_MACHINE, /* advance postmaster's state machine */
 
 	NUM_PMSIGNALS				/* Must be last value of enum! */
