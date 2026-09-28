@@ -131,20 +131,20 @@ struct PGPROC
 	Latch		procLatch;		/* generic latch for process */
 
 
-	TransactionId xid;			/* id of top-level transaction currently being
-								 * executed by this proc, if running and XID
-								 * is assigned; else InvalidTransactionId.
-								 * mirrored in ProcGlobal->xids[pgxactoff] */
+	TransactionId xid;			/* 顶层事务的 id，该事务当前正在
+								 * 由本进程执行，若正在运行且 XID
+								 * 已分配；否则为 InvalidTransactionId。
+								 * 镜像保存在 ProcGlobal->xids[pgxactoff] 中 */
 
-	TransactionId xmin;			/* minimal running XID as it was when we were
-								 * starting our xact, excluding LAZY VACUUM:
-								 * vacuum must not remove tuples deleted by
-								 * xid >= xmin ! */
+	TransactionId xmin;			/* 当我们启动事务时的最小运行 XID：
+								 * 不含 LAZY VACUUM；
+								 * vacuum 不得移除由 xid >= xmin 的事务
+								 * 所删除的元组 ! */
 
-	LocalTransactionId lxid;	/* local id of top-level transaction currently
-								 * being executed by this proc, if running;
-								 * else InvalidLocalTransactionId */
-	int			pid;			/* Backend's process ID */
+	LocalTransactionId lxid;	/* 顶层事务的本地 id，该事务当前正在
+								 * 由本进程执行，若正在运行；
+								 * 否则为 InvalidLocalTransactionId */
+	int			pid;			/* 后端进程 ID */
 
 	int			pgxactoff;		/* offset into various ProcGlobal->arrays with
 								 * data mirrored from this PGPROC */
@@ -239,58 +239,49 @@ struct PGPROC
 extern PGDLLIMPORT PGPROC *MyProc;
 
 /*
- * There is one ProcGlobal struct for the whole database cluster.
+ * 整个数据库集群只有一个 ProcGlobal 结构体。
  *
- * Adding/Removing an entry into the procarray requires holding *both*
- * ProcArrayLock and XidGenLock in exclusive mode (in that order). Both are
- * needed because the dense arrays (see below) are accessed from
- * GetNewTransactionId() and GetSnapshotData(), and we don't want to add
- * further contention by both using the same lock. Adding/Removing a procarray
- * entry is much less frequent.
+ * 向 procarray 中添加/移除条目需要以排他模式同时（*both*）持有
+ * ProcArrayLock 和 XidGenLock（按此顺序）。之所以两者都需要，是因为
+ * 稠密数组（dense array，见下文）会被 GetNewTransactionId() 和
+ * GetSnapshotData() 访问，而我们不希望让这两个函数使用同一把锁而进一步
+ * 加剧争用。添加/移除 procarray 条目的频率则低得多。
  *
- * Some fields in PGPROC are mirrored into more densely packed arrays (e.g.
- * xids), with one entry for each backend. These arrays only contain entries
- * for PGPROCs that have been added to the shared array with ProcArrayAdd()
- * (in contrast to PGPROC array which has unused PGPROCs interspersed).
+ * PGPROC 中的某些字段会被镜像到打包得更紧密的数组中（例如 xids），
+ * 每个后端对应一个条目。这些数组只包含那些已经用 ProcArrayAdd() 加入
+ * 共享数组的 PGPROC 的条目（这与 PGPROC 数组不同，后者中间还夹杂着
+ * 未被使用的 PGPROC）。
  *
- * The dense arrays are indexed by PGPROC->pgxactoff. Any concurrent
- * ProcArrayAdd() / ProcArrayRemove() can lead to pgxactoff of a procarray
- * member to change.  Therefore it is only safe to use PGPROC->pgxactoff to
- * access the dense array while holding either ProcArrayLock or XidGenLock.
+ * 稠密数组用 PGPROC->pgxactoff 作为索引。任何并发的 ProcArrayAdd() /
+ * ProcArrayRemove() 都可能导致某个 procarray 成员的 pgxactoff 发生变化。
+ * 因此，只有在持有 ProcArrayLock 或 XidGenLock 时，使用
+ * PGPROC->pgxactoff 访问稠密数组才是安全的。
  *
- * As long as a PGPROC is in the procarray, the mirrored values need to be
- * maintained in both places in a coherent manner.
+ * 只要某个 PGPROC 还在 procarray 中，镜像到两处的值就必须以一致的
+ * 方式加以维护。
  *
- * The denser separate arrays are beneficial for three main reasons: First, to
- * allow for as tight loops accessing the data as possible. Second, to prevent
- * updates of frequently changing data (e.g. xmin) from invalidating
- * cachelines also containing less frequently changing data (e.g. xid,
- * statusFlags). Third to condense frequently accessed data into as few
- * cachelines as possible.
+ * 使用这些更紧凑的独立数组主要有三个好处：第一，可以让访问数据的循环
+ * 尽可能紧凑。第二，可以避免对频繁变化数据（例如 xmin）的更新使得同时
+ * 包含较少变化数据（例如 xid、statusFlags）的缓存行失效。第三，把频繁
+ * 访问的数据压缩到尽可能少的缓存行中。
  *
- * There are two main reasons to have the data mirrored between these dense
- * arrays and PGPROC. First, as explained above, a PGPROC's array entries can
- * only be accessed with either ProcArrayLock or XidGenLock held, whereas the
- * PGPROC entries do not require that (obviously there may still be locking
- * requirements around the individual field, separate from the concerns
- * here). That is particularly important for a backend to efficiently checks
- * it own values, which it often can safely do without locking.  Second, the
- * PGPROC fields allow to avoid unnecessary accesses and modification to the
- * dense arrays. A backend's own PGPROC is more likely to be in a local cache,
- * whereas the cachelines for the dense array will be modified by other
- * backends (often removing it from the cache for other cores/sockets). At
- * commit/abort time a check of the PGPROC value can avoid accessing/dirtying
- * the corresponding array value.
+ * 让数据在这些稠密数组与 PGPROC 之间保持镜像，主要有两个原因。第一，
+ * 如上所述，PGPROC 的数组条目只能在持有 ProcArrayLock 或 XidGenLock 时
+ * 访问，而 PGPROC 中的条目则没有这一要求（显然，围绕各个字段本身可能
+ * 仍有加锁要求，这与这里讨论的问题无关）。这一点对后端高效地检查自己的
+ * 取值尤为重要，因为它通常可以在不加锁的情况下安全地这样做。第二，
+ * PGPROC 中的字段可以避免对稠密数组进行不必要的访问和修改。后端自己的
+ * PGPROC 更可能位于本地缓存中，而稠密数组的缓存行则会被其他后端修改
+ * （因而常常会从其他核心/插槽的缓存中被逐出）。在提交/回滚时，检查
+ * PGPROC 中的取值就可以避免访问/弄脏稠密数组中对应的值。
  *
- * Basically it makes sense to access the PGPROC variable when checking a
- * single backend's data, especially when already looking at the PGPROC for
- * other reasons already.  It makes sense to look at the "dense" arrays if we
- * need to look at many / most entries, because we then benefit from the
- * reduced indirection and better cross-process cache-ability.
+ * 基本上，当检查单个后端的数据时，访问 PGPROC 中的变量是合理的做法，
+ * 特别是在已经出于其他原因查看该 PGPROC 的情况下。如果我们需要查看
+ * 许多/大部分条目，则查看"稠密"数组是合理的，因为这样可以从更少的
+ * 间接跳转以及更好的跨进程缓存友好性中获益。
  *
- * When entering a PGPROC for 2PC transactions with ProcArrayAdd(), the data
- * in the dense arrays is initialized from the PGPROC while it already holds
- * ProcArrayLock.
+ * 当通过 ProcArrayAdd() 为 2PC 事务加入一个 PGPROC 时，稠密数组中的
+ * 数据是在已持有 ProcArrayLock 的情况下从 PGPROC 初始化的。
  */
 typedef struct PROC_HDR
 {

@@ -1,24 +1,19 @@
 /*-------------------------------------------------------------------------
  *
  * lwlock.c
- *	  Lightweight lock manager
+ *	  轻量级锁管理器
  *
- * Lightweight locks are intended primarily to provide mutual exclusion of
- * access to shared-memory data structures.  Therefore, they offer both
- * exclusive and shared lock modes (to support read/write and read-only
- * access to a shared object).  There are few other frammishes.  User-level
- * locking should be done with the full lock manager --- which depends on
- * LWLocks to protect its shared state.
+ * 轻量级锁主要用来为共享内存数据结构的访问提供互斥。因此它们同时提供
+ * 排他锁和共享锁两种模式（以支持对共享对象的读写访问和只读访问）。
+ * 除此之外没有太多其他花样。用户级别的加锁应当使用完整的锁管理器
+ * —— 而后者依赖 LWLock 来保护其共享状态。
  *
- * In addition to exclusive and shared modes, lightweight locks can be used to
- * wait until a variable changes value.  The variable is initially not set
- * when the lock is acquired with LWLockAcquire, i.e. it remains set to the
- * value it was set to when the lock was released last, and can be updated
- * without releasing the lock by calling LWLockUpdateVar.  LWLockWaitForVar
- * waits for the variable to be updated, or until the lock is free.  When
- * releasing the lock with LWLockReleaseClearVar() the value can be set to an
- * appropriate value for a free lock.  The meaning of the variable is up to
- * the caller, the lightweight lock code just assigns and compares it.
+ * 除排他与共享模式之外，轻量级锁还可用于等待某个变量发生值变化。
+ * 用 LWLockAcquire 获取锁时，该变量最初并不会被设置，也就是说它保持为
+ * 上次释放锁时所设置的值；可以通过调用 LWLockUpdateVar 在不释放锁的
+ * 情况下更新它。LWLockWaitForVar 会等待该变量被更新，或等到锁变为空闲。
+ * 当用 LWLockReleaseClearVar() 释放锁时，可以把该值设置为适合空闲锁的
+ * 某个值。该变量的含义由调用者决定，轻量级锁代码只负责对它赋值和比较。
  *
  * Portions Copyright (c) 1996-2021, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
@@ -28,50 +23,43 @@
  *
  * NOTES:
  *
- * This used to be a pretty straight forward reader-writer lock
- * implementation, in which the internal state was protected by a
- * spinlock. Unfortunately the overhead of taking the spinlock proved to be
- * too high for workloads/locks that were taken in shared mode very
- * frequently. Often we were spinning in the (obviously exclusive) spinlock,
- * while trying to acquire a shared lock that was actually free.
+ * 这曾经是一个相当直白的读写锁实现，其内部状态由一个自旋锁保护。
+ * 不幸的是，对于非常频繁地以共享模式获取的负载/锁来说，获取自旋锁的
+ * 开销被证明过高。我们常常在（显然是排他的）自旋锁上自旋，同时试图
+ * 获取一个实际上已经空闲的共享锁。
  *
- * Thus a new implementation was devised that provides wait-free shared lock
- * acquisition for locks that aren't exclusively locked.
+ * 因此我们设计了一个新实现，为未被排他锁定的锁提供无等待
+ * （wait-free）的共享锁获取。
  *
- * The basic idea is to have a single atomic variable 'lockcount' instead of
- * the formerly separate shared and exclusive counters and to use atomic
- * operations to acquire the lock. That's fairly easy to do for plain
- * rw-spinlocks, but a lot harder for something like LWLocks that want to wait
- * in the OS.
+ * 基本思路是用一个单一的原子变量 'lockcount' 取代过去彼此分离的
+ * 共享计数器和排他计数器，并使用原子操作来获取锁。对于普通的
+ * rw-spinlock 而言这相当容易，但对于像 LWLock 这样需要在操作系统层面
+ * 等待的对象来说就困难得多。
  *
- * For lock acquisition we use an atomic compare-and-exchange on the lockcount
- * variable. For exclusive lock we swap in a sentinel value
- * (LW_VAL_EXCLUSIVE), for shared locks we count the number of holders.
+ * 获取锁时我们在 lockcount 变量上使用原子的 compare-and-exchange。
+ * 对于排他锁，我们换入一个哨兵值（LW_VAL_EXCLUSIVE）；对于共享锁，
+ * 我们统计持有者的数量。
  *
- * To release the lock we use an atomic decrement to release the lock. If the
- * new value is zero (we get that atomically), we know we can/have to release
- * waiters.
+ * 释放锁时我们使用原子递减。如果新值为零（这是我们原子地获知的），
+ * 我们就知道自己可以/必须唤醒等待者。
  *
- * Obviously it is important that the sentinel value for exclusive locks
- * doesn't conflict with the maximum number of possible share lockers -
- * luckily MAX_BACKENDS makes that easily possible.
+ * 显然，重要的是排他锁的哨兵值不能与可能的最大共享持锁者数量冲突
+ * —— 幸运的是 MAX_BACKENDS 让这一点很容易满足。
  *
  *
- * The attentive reader might have noticed that naively doing the above has a
- * glaring race condition: We try to lock using the atomic operations and
- * notice that we have to wait. Unfortunately by the time we have finished
- * queuing, the former locker very well might have already finished it's
- * work. That's problematic because we're now stuck waiting inside the OS.
+ * 细心的读者可能已经注意到，天真地照上面做会有一个明显的竞态条件：
+ * 我们尝试用原子操作加锁，并注意到自己必须等待。不幸的是，等到我们
+ * 完成入队时，先前持锁者很可能早已完成了自己的工作。这会带来问题，
+ * 因为此时我们已经陷在操作系统内部的等待中。
 
- * To mitigate those races we use a two phased attempt at locking:
- *	 Phase 1: Try to do it atomically, if we succeed, nice
- *	 Phase 2: Add ourselves to the waitqueue of the lock
- *	 Phase 3: Try to grab the lock again, if we succeed, remove ourselves from
- *			  the queue
- *	 Phase 4: Sleep till wake-up, goto Phase 1
+ * 为缓解这些竞态，我们采用分阶段的加锁尝试：
+ *	 Phase 1: 先尝试以原子方式完成，成功就皆大欢喜
+ *	 Phase 2: 把自己加入该锁的等待队列
+ *	 Phase 3: 再次尝试抢占该锁，若成功则把自己从队列中移除
+ *	 Phase 4: 睡眠直到被唤醒，回到 Phase 1
  *
- * This protects us against the problem from above as nobody can release too
- *	  quick, before we're queued, since after Phase 2 we're already queued.
+ * 由于 Phase 2 之后我们已经入队，没有人能够"释放得太快"（即抢在我们
+ * 入队之前），这就保护我们免受上述问题的影响。
  * -------------------------------------------------------------------------
  */
 #include "postgres.h"

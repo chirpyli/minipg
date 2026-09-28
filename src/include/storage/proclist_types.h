@@ -16,12 +16,11 @@
 #define PROCLIST_TYPES_H
 
 /*
- * A node in a doubly-linked list of processes.  The link fields contain
- * the 0-based PGPROC indexes of the next and previous process, or
- * INVALID_PGPROCNO in the next-link of the last node and the prev-link
- * of the first node.  A node that is currently not in any list
- * should have next == prev == 0; this is not a possible state for a node
- * that is in a list, because we disallow circularity.
+ * 进程双向链表中的一个节点。链接字段保存下一个和上一个进程的、从 0 开始的
+ * PGPROC 索引；对于最后一个节点的 next 链接和第一个节点的 prev 链接，
+ * 其值为 INVALID_PGPROCNO。当前不在任何链表中的节点应当满足
+ * next == prev == 0；而对于处于链表中的节点，这不可能是合法状态，
+ * 因为我们不允许出现环形结构。
  */
 typedef struct proclist_node
 {
@@ -30,8 +29,8 @@ typedef struct proclist_node
 } proclist_node;
 
 /*
- * Header of a doubly-linked list of PGPROCs, identified by pgprocno.
- * An empty list is represented by head == tail == INVALID_PGPROCNO.
+ * 以 pgprocno 标识的 PGPROC 双向链表的头部。
+ * 空链表用 head == tail == INVALID_PGPROCNO 表示。
  */
 typedef struct proclist_head
 {

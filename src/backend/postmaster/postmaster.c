@@ -1,35 +1,26 @@
 /*-------------------------------------------------------------------------
  *
  * postmaster.c
- *	  This program acts as a clearing house for requests to the
- *	  POSTGRES system.  Frontend programs send a startup message
- *	  to the Postmaster and the postmaster uses the info in the
- *	  message to setup a backend process.
+ *	  本程序充当发往 POSTGRES 系统的请求的中转站（clearing house）。
+ *	  前端程序向 Postmaster 发送启动消息（startup message），
+ *	  postmaster 利用消息中的信息来建立后端进程。
  *
- *	  The postmaster also manages system-wide operations such as
- *	  startup and shutdown. The postmaster itself doesn't do those
- *	  operations, mind you --- it just forks off a subprocess to do them
- *	  at the right times.  It also takes care of resetting the system
- *	  if a backend crashes.
+ *	  postmaster 还管理系统级的操作，例如启动和关闭。请注意，
+ *	  postmaster 自身并不执行这些操作 —— 它只是在恰当的时机 fork 出
+ *	  子进程来做这些事。如果某个后端崩溃，它也负责重置系统。
  *
- *	  The postmaster process creates the shared memory and semaphore
- *	  pools during startup, but as a rule does not touch them itself.
- *	  In particular, it is not a member of the PGPROC array of backends
- *	  and so it cannot participate in lock-manager operations.  Keeping
- *	  the postmaster away from shared memory operations makes it simpler
- *	  and more reliable.  The postmaster is almost always able to recover
- *	  from crashes of individual backends by resetting shared memory;
- *	  if it did much with shared memory then it would be prone to crashing
- *	  along with the backends.
+ *	  postmaster 进程在启动期间创建共享内存和信号量池，但通常它自己
+ *	  并不访问它们。特别是，它不属于后端的 PGPROC 数组的成员，
+ *	  因此无法参与锁管理器（lock manager）的操作。让 postmaster 远离
+ *	  共享内存操作，可以让它更简单、更可靠。postmaster 几乎总能在单个
+ *	  后端崩溃时通过重置共享内存来恢复；如果它大量涉足共享内存，
+ *	  那么它自身也容易随后端一起崩溃。
  *
- *	  When a request message is received, we now fork() immediately.
- *	  The child process performs authentication of the request, and
- *	  then becomes a backend if successful.  This allows the auth code
- *	  to be written in a simple single-threaded style (as opposed to the
- *	  crufty "poor man's multitasking" code that used to be needed).
- *	  More importantly, it ensures that blockages in non-multithreaded
- *	  libraries like SSL or PAM cannot cause denial of service to other
- *	  clients.
+ *	  现在，一旦收到请求消息，我们就立即执行 fork()。
+ *	  子进程负责对请求进行认证，认证成功后即成为后端。这样一来，
+ *	  认证代码就可以用简单的单线程风格编写（而不需要过去那种
+ *	  粗糙的"穷人版多任务"代码）。更重要的是，它确保了 SSL 或 PAM 这类
+ *	  非多线程库中的阻塞不会导致其他客户端遭到拒绝服务。
  *
  *
  * Portions Copyright (c) 1996-2021, PostgreSQL Global Development Group
@@ -41,24 +32,22 @@
  *
  * NOTES
  *
- * Initialization:
- *		The Postmaster sets up shared memory data structures
- *		for the backends.
+ * 初始化（Initialization）：
+ *		Postmaster 为各后端建立共享内存数据结构。
  *
- * Synchronization:
- *		The Postmaster shares memory with the backends but should avoid
- *		touching shared memory, so as not to become stuck if a crashing
- *		backend screws up locks or shared memory.  Likewise, the Postmaster
- *		should never block on messages from frontend clients.
+ * 同步（Synchronization）：
+ *		Postmaster 与后端共享内存，但应避免访问共享内存，以免在某个
+ *		后端崩溃并破坏了锁或共享内存时自己也卡住。同样地，Postmaster
+ *		绝不应该阻塞在前端客户端发来的消息上。
  *
- * Garbage Collection:
- *		The Postmaster cleans up after backends if they have an emergency
- *		exit and/or core dump.
+ * 垃圾回收（Garbage Collection）：
+ *		如果后端发生紧急退出和/或核心转储（core dump），
+ *		Postmaster 会为其做清理工作。
  *
- * Error Reporting:
- *		Use write_stderr() only for reporting "interactive" errors
- *		(essentially, bogus arguments on the command line).  Once the
- *		postmaster is launched, use ereport().
+ * 错误报告（Error Reporting）：
+ *		仅在报告"交互式"错误（基本上就是命令行中传入的非法参数）时
+ *		使用 write_stderr()。一旦 postmaster 启动完成，就应使用
+ *		ereport()。
  *
  *-------------------------------------------------------------------------
  */
@@ -123,22 +112,19 @@
 
 
 /*
- * List of active backends (or child processes anyway; we don't actually
- * know whether a given child has become a backend or is still in the
- * authorization phase).  This is used mainly to keep track of how many
- * children we have and send them appropriate signals when necessary.
+ * 活动后端（严格说是子进程；我们实际上并不知道某个子进程已经成为后端，
+ * 还是仍处于认证阶段）的链表。它主要用于记录我们当前有多少个子进程，
+ * 并在必要时向它们发送相应的信号。
  *
- * Also, "dead_end" children are in it: these are children launched just for
- * the purpose of sending a friendly rejection message to a would-be client.
- * We must track them because they are attached to shared memory, but we know
- * they will never become live backends.  dead_end children are not assigned a
- * PMChildSlot.
+ * 此外，链表中的还包括 "dead_end" 子进程：这类子进程只是为了向想要连接的
+ * 客户端发送一条友好的拒绝消息而启动的。我们必须跟踪它们，因为它们已经
+ * 挂接到共享内存上，但我们知道它们永远不会成为真正的后端。dead_end
+ * 子进程不会被分配 PMChildSlot。
  *
- * "Special" children such as the startup, bgwriter
- * tasks are not in this list.  They are tracked via StartupPID and other
- * pid_t variables below.  (Thus, there can't be more than one of any given
- * "special" child process type.  We use BackendList entries for any child
- * process there can be more than one of.)
+ * 诸如 startup、bgwriter 之类的"特殊"子进程不在这个链表中。它们通过
+ * 下面的 StartupPID 以及其他 pid_t 变量来跟踪。（因此，任何一类"特殊"
+ * 子进程都不会有多个。对于可能存在多个的子进程，我们使用 BackendList
+ * 条目来跟踪。）
  */
 typedef struct bkend
 {

@@ -32,13 +32,12 @@ typedef enum LWLockWaitState
 } LWLockWaitState;
 
 /*
- * Code outside of lwlock.c should not manipulate the contents of this
- * structure directly, but we have to declare it here to allow LWLocks to be
- * incorporated into other data structures.
+ * lwlock.c 之外的代码不应直接操作本结构体的内容，但我们必须在这里声明它，
+ * 以便把 LWLock 嵌入到其他数据结构中。
  */
 typedef struct LWLock
 {
-	uint16		tranche;		/* tranche ID */
+	uint16		tranche;		/* tranche ID,  16位锁族（tranche）编号, 相当于身份标签，是LWLock对外可观测性的关键字段  */  
 	pg_atomic_uint32 state;		/* state of exclusive/nonexclusive lockers */
 	proclist_head waiters;		/* list of waiting PGPROCs */
 #ifdef LOCK_DEBUG
@@ -48,14 +47,12 @@ typedef struct LWLock
 } LWLock;
 
 /*
- * In most cases, it's desirable to force each tranche of LWLocks to be aligned
- * on a cache line boundary and make the array stride a power of 2.  This saves
- * a few cycles in indexing, but more importantly ensures that individual
- * LWLocks don't cross cache line boundaries.  This reduces cache contention
- * problems, especially on AMD Opterons.  In some cases, it's useful to add
- * even more padding so that each LWLock takes up an entire cache line; this is
- * useful, for example, in the main LWLock array, where the overall number of
- * locks is small but some are heavily contended.
+ * 大多数情况下，最好让每一组（tranche）LWLock 按缓存行边界对齐，并让数组
+ * 的步长（stride）为 2 的幂。这能在索引计算时省下几个周期，但更重要的是
+ * 保证单个 LWLock 不会跨越缓存行边界。这样可以减少缓存争用问题，
+ * 在 AMD Opteron 平台上尤其明显。某些情况下，加入更多填充、让每个 LWLock
+ * 独占一整条缓存行是有用的；例如在主 LWLock 数组（MainLWLockArray）中，
+ * 锁的总数很少，但其中一些锁争用非常激烈，此时这种做法就很有价值。
  */
 #define LWLOCK_PADDED_SIZE	PG_CACHE_LINE_SIZE
 
@@ -72,9 +69,9 @@ extern PGDLLIMPORT LWLockPadded *MainLWLockArray;
 #include "storage/lwlocknames.h"
 
 /*
- * It's a bit odd to declare NUM_BUFFER_PARTITIONS and NUM_LOCK_PARTITIONS
- * here, but we need them to figure out offsets within MainLWLockArray, and
- * having this file include lock.h or bufmgr.h would be backwards.
+ * 把 NUM_BUFFER_PARTITIONS 和 NUM_LOCK_PARTITIONS 声明在这里有点奇怪，
+ * 但我们需要它们来计算 MainLWLockArray 中的偏移量，而让本文件包含
+ * lock.h 或 bufmgr.h 则会造成依赖倒置。
  */
 
 /* Number of partitions of the shared buffer mapping hashtable */
@@ -134,9 +131,9 @@ extern const char *GetLWLockIdentifier(uint32 classId, uint16 eventId);
 extern void LWLockInitialize(LWLock *lock, int tranche_id);
 
 /*
- * Every tranche ID less than NUM_INDIVIDUAL_LWLOCKS is reserved; also,
- * we reserve additional tranche IDs for builtin tranches not included in
- * the set of individual LWLocks.
+ * 所有小于 NUM_INDIVIDUAL_LWLOCKS 的 tranche ID 都是保留的；此外，
+ * 对于那些不在单个 LWLock 集合中的内置 tranche，我们还额外保留了一些
+ * tranche ID。
  */
 typedef enum BuiltinTrancheIds
 {
@@ -166,9 +163,9 @@ typedef enum BuiltinTrancheIds
 }			BuiltinTrancheIds;
 
 /*
- * Prior to PostgreSQL 9.4, we used an enum type called LWLockId to refer
- * to LWLocks.  New code should instead use LWLock *.  However, for the
- * convenience of third-party code, we include the following typedef.
+ * 在 PostgreSQL 9.4 之前，我们使用名为 LWLockId 的枚举类型来引用 LWLock。
+ * 新代码应当改用 LWLock *。不过，为了方便第三方代码，我们仍提供下面这个
+ * typedef。
  */
 typedef LWLock *LWLockId;
 
