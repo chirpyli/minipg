@@ -1,13 +1,12 @@
 /*-------------------------------------------------------------------------
  *
  * planmain.c
- *	  Routines to plan a single query
+ *	  规划单条查询的例程
  *
- * What's in a name, anyway?  The top-level entry point of the planner/
- * optimizer is over in planner.c, not here as you might think from the
- * file name.  But this is the main code for planning a basic join operation,
- * shorn of features like subselects, inheritance, and so on.  (Those are
- * the things planner.c deals with.)
+ * 名字有什么要紧的呢？规划器/优化器的顶层入口其实在 planner.c 中，
+ * 而不像你从这个文件名想象的那样在这里。不过，这里确实是规划基本连接
+ * （join）操作的主要代码，只是去掉了子查询（subselect）、继承
+ * （inheritance）等特性。（那些是 planner.c 负责处理的东西。）
  *
  * Portions Copyright (c) 1996-2021, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
@@ -32,23 +31,21 @@
 
 /*
  * query_planner
- *	  Generate a path (that is, a simplified plan) for a basic query,
- *	  which may involve joins but not any fancier features.
+ *	  为一条基本查询生成路径（path，也就是简化版的计划），
+ *	  该查询可以包含连接（join），但不涉及任何更花哨的特性。
  *
- * Since query_planner does not handle the toplevel processing (grouping,
- * sorting, etc) it cannot select the best path by itself.  Instead, it
- * returns the RelOptInfo for the top level of joining, and the caller
- * (upper_planner) can choose among the surviving paths for the rel.
+ * 由于 query_planner 不负责顶层处理（分组、排序等），它无法独自选出
+ * 最优路径。因此它返回连接顶层的 RelOptInfo，由调用方
+ * （upper_planner）在该 rel 存活的诸多路径中进行选择。
  *
- * root describes the query to plan
- * qp_callback is a function to compute query_pathkeys once it's safe to do so
- * qp_extra is optional extra data to pass to qp_callback
+ * root 描述要规划的查询
+ * qp_callback 是一个函数，用于在可以安全计算时算出 query_pathkeys
+ * qp_extra 是要传给 qp_callback 的可选额外数据
  *
- * Note: the PlannerInfo node also includes a query_pathkeys field, which
- * tells query_planner the sort order that is desired in the final output
- * plan.  This value is *not* available at call time, but is computed by
- * qp_callback once we have completed merging the query's equivalence classes.
- * (We cannot construct canonical pathkeys until that's done.)
+ * 注意：PlannerInfo 节点中还包含一个 query_pathkeys 字段，它告诉
+ * query_planner 最终输出计划所期望的排序顺序。该值在调用时 *并不* 可用，
+ * 而是在我们完成查询等价类（equivalence class）合并之后，由
+ * qp_callback 计算出来。（在那之前我们无法构造规范的 pathkeys。）
  */
 RelOptInfo *
 query_planner(PlannerInfo *root,

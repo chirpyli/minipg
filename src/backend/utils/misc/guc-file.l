@@ -180,68 +180,13 @@ ProcessConfigFileInternal(GucContext context, bool applySettings, int elevel)
 	ConfFileWithError = ConfigFileName;
 	head = tail = NULL;
 
-	if (!ParseConfigFile(ConfigFileName, true,
+	if (!ParseConfigFile(ConfigFileName,
 						 elevel,
 						 &head, &tail))
 	{
 		/* Syntax error(s) detected in the file, so bail out */
 		error = true;
 		goto bail_out;
-	}
-
-	/*
-	 * Parse the PG_AUTOCONF_FILENAME file, if present, after the main file to
-	 * replace any parameters set by ALTER SYSTEM command.  Because this file
-	 * is in the data directory, we can't read it until the DataDir has been
-	 * set.
-	 */
-	if (DataDir)
-	{
-		if (!ParseConfigFile(PG_AUTOCONF_FILENAME, false,
-							 elevel,
-							 &head, &tail))
-		{
-			/* Syntax error(s) detected in the file, so bail out */
-			error = true;
-			ConfFileWithError = PG_AUTOCONF_FILENAME;
-			goto bail_out;
-		}
-	}
-	else
-	{
-		/*
-		 * If DataDir is not set, the PG_AUTOCONF_FILENAME file cannot be
-		 * read.  In this case, we don't want to accept any settings but
-		 * data_directory from postgresql.conf, because they might be
-		 * overwritten with settings in the PG_AUTOCONF_FILENAME file which
-		 * will be read later. OTOH, since data_directory isn't allowed in the
-		 * PG_AUTOCONF_FILENAME file, it will never be overwritten later.
-		 */
-		ConfigVariable *newlist = NULL;
-
-		/*
-		 * Prune all items except the last "data_directory" from the list.
-		 */
-		for (item = head; item; item = item->next)
-		{
-			if (!item->ignore &&
-				strcmp(item->name, "data_directory") == 0)
-				newlist = item;
-		}
-
-		if (newlist)
-			newlist->next = NULL;
-		head = tail = newlist;
-
-		/*
-		 * Quick exit if data_directory is not present in file.
-		 *
-		 * We need not do any further processing, in particular we don't set
-		 * PgReloadTime; that will be set soon by subsequent full loading of
-		 * the config file.
-		 */
-		if (head == NULL)
-			goto bail_out;
 	}
 
 	/*
@@ -532,21 +477,20 @@ AbsoluteConfigLocation(const char *location)
 /*
  * Read and parse a single configuration file.
  *
- * If "strict" is true, treat failure to open the config file as an error,
- * otherwise just skip the file.
+ * Failure to open the config file is treated as an error.
  *
  * See ParseConfigFp for further details.  This one merely adds opening the
  * config file rather than working from a caller-supplied file descriptor,
  * and absolute-ifying the path name if necessary.
  */
 bool
-ParseConfigFile(const char *config_file, bool strict,
+ParseConfigFile(const char *config_file,
 				int elevel,
 				ConfigVariable **head_p,
 				ConfigVariable **tail_p)
 {
 	char	   *abs_path;
-	bool		OK = true;
+	bool		OK;
 	FILE	   *fp;
 
 	/*
@@ -570,24 +514,15 @@ ParseConfigFile(const char *config_file, bool strict,
 	fp = AllocateFile(abs_path, "r");
 	if (!fp)
 	{
-		if (strict)
-		{
-			ereport(elevel,
-					(errcode_for_file_access(),
-					 errmsg("could not open configuration file \"%s\": %m",
-							abs_path)));
-			record_config_file_error(psprintf("could not open file \"%s\"",
-											  abs_path),
-									 NULL, 0,
-									 head_p, tail_p);
-			OK = false;
-		}
-		else
-		{
-			ereport(LOG,
-					(errmsg("skipping missing configuration file \"%s\"",
-							abs_path)));
-		}
+		ereport(elevel,
+				(errcode_for_file_access(),
+				 errmsg("could not open configuration file \"%s\": %m",
+						abs_path)));
+		record_config_file_error(psprintf("could not open file \"%s\"",
+										  abs_path),
+								 NULL, 0,
+								 head_p, tail_p);
+		OK = false;
 		goto cleanup;
 	}
 

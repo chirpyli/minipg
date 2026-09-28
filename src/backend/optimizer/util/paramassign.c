@@ -1,43 +1,36 @@
 /*-------------------------------------------------------------------------
  *
  * paramassign.c
- *		Functions for assigning PARAM_EXEC slots during planning.
+ *		在规划期间分配 PARAM_EXEC 槽位的函数。
  *
- * This module is responsible for managing three planner data structures:
+ * 本模块负责管理三种规划器数据结构：
  *
- * root->glob->paramExecTypes: records actual assignments of PARAM_EXEC slots.
- * The i'th list element holds the data type OID of the i'th parameter slot.
- * (Elements can be InvalidOid if they represent slots that are needed for
- * chgParam signaling, but will never hold a value at runtime.)  This list is
- * global to the whole plan since the executor has only one PARAM_EXEC array.
- * Assignments are permanent for the plan: we never remove entries once added.
+ * root->glob->paramExecTypes：记录 PARAM_EXEC 槽位的实际分配情况。
+ * 第 i 个列表元素保存第 i 个参数槽位的数据类型 OID。（如果某个槽位只是
+ * 用于 chgParam 信号传递、在运行时永远不会存放取值，则相应元素可以是
+ * InvalidOid。）由于执行器只有一个 PARAM_EXEC 数组，这个列表对于整个计划
+ * 是全局的。分配结果对计划而言是永久的：一旦加入条目就绝不删除。
  *
- * root->plan_params: a list of PlannerParamItem nodes, recording Vars and
- * PlaceHolderVars that the root's query level needs to supply to lower-level
- * subqueries, along with the PARAM_EXEC number to use for each such value.
- * Elements are added to this list while planning a subquery, and the list
- * is reset to empty after completion of each subquery.
+ * root->plan_params：一个由 PlannerParamItem 节点组成的列表，记录本查询
+ * 层级（root 所在的层级）需要提供给下层子查询的 Var 和 PlaceHolderVar，
+ * 以及每个这样的取值所使用的 PARAM_EXEC 编号。元素在规划子查询的过程中
+ * 被加入该列表，并在每个子查询处理完成后把列表重置为空。
  *
- * root->curOuterParams: a list of NestLoopParam nodes, recording Vars and
- * PlaceHolderVars that some outer level of nestloop needs to pass down to
- * a lower-level plan node in its righthand side.  Elements are added to this
- * list as createplan.c creates lower Plan nodes that need such Params, and
- * are removed when it creates a NestLoop Plan node that will supply those
- * values.
+ * root->curOuterParams：一个由 NestLoopParam 节点组成的列表，记录某一外层
+ * nestloop 需要向下传递到其右侧下层计划节点的 Var 和 PlaceHolderVar。
+ * 当 createplan.c 创建需要这类 Param 的下层 Plan 节点时，元素会被加入该
+ * 列表；而当它创建出能够提供这些取值的 NestLoop Plan 节点时，元素会被
+ * 移除。
  *
- * The latter two data structures are used to prevent creating multiple
- * PARAM_EXEC slots (each requiring work to fill) when the same upper
- * SubPlan or NestLoop supplies a value that is referenced in more than
- * one place in its child plan nodes.  However, when the same Var has to
- * be supplied to different subplan trees by different SubPlan or NestLoop
- * parent nodes, we don't recognize any commonality; a fresh plan_params or
- * curOuterParams entry will be made (since the old one has been removed
- * when we finished processing the earlier SubPlan or NestLoop) and a fresh
- * PARAM_EXEC number will be assigned.  At one time we tried to avoid
- * allocating duplicate PARAM_EXEC numbers in such cases, but it's harder
- * than it seems to avoid bugs due to overlapping Param lifetimes, so we
- * don't risk that anymore.  Minimizing the number of PARAM_EXEC slots
- * doesn't really save much executor work anyway.
+ * 后两种数据结构用来避免在同一个上层 SubPlan 或 NestLoop 提供的取值被其
+ * 子计划节点中的多处引用时，创建出多个 PARAM_EXEC 槽位（每个槽位都需要
+ * 额外工作来填充）。然而，当同一个 Var 必须由不同的 SubPlan 或 NestLoop
+ * 父节点提供给不同的子计划树时，我们并不识别其中的共性；此时会新建一个
+ * plan_params 或 curOuterParams 条目（因为旧的条目在处理完先前的 SubPlan
+ * 或 NestLoop 时已被移除），并分配一个新的 PARAM_EXEC 编号。我们曾经尝试
+ * 在这类情况下避免重复分配 PARAM_EXEC 编号，但由于 Param 生命周期可能
+ * 相互重叠，避免由此引发的 bug 比看上去要困难，所以现在我们不再冒这个
+ * 风险。何况，尽量减少 PARAM_EXEC 槽位数量其实也节省不了多少执行器工作。
  *
  *
  * Portions Copyright (c) 1996-2021, PostgreSQL Global Development Group

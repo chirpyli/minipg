@@ -122,14 +122,12 @@ main(int argc, char *argv[])
 
 
 /*
- * Place platform-specific startup hacks here.  This is the right
- * place to put code that must be executed early in the launch of any new
- * server process.  Note that this code will NOT be executed when a backend
- * or sub-bootstrap process is forked.
+ * 在此放置平台相关的启动补丁代码。这里是放置那些必须在任何新的
+ * 服务器进程启动早期执行的代码的合适位置。注意，当 fork 出后端进程
+ * 或 sub-bootstrap 进程时，这段代码不会被执行。
  *
- * XXX The need for code here is proof that the platform in question
- * is too brain-dead to provide a standard C execution environment
- * without help.  Avoid adding more here, if you can.
+ * XXX 这里之所以需要代码，本身就证明相关平台太笨，无法在无需帮助的
+ * 情况下提供标准的 C 执行环境。如有可能，请避免在此添加更多内容。
  */
 static void
 startup_hacks(const char *progname)

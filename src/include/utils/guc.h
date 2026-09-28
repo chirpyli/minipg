@@ -27,13 +27,6 @@
 #endif
 
 /*
- * Automatic configuration file name for ALTER SYSTEM.
- * This file will be used to store values of configuration parameters
- * set by ALTER SYSTEM command.
- */
-#define PG_AUTOCONF_FILENAME		"postgresql.auto.conf"
-
-/*
  * Certain options can only be set at certain times. The rules are
  * like this:
  *
@@ -141,7 +134,7 @@ typedef struct ConfigVariable
 	struct ConfigVariable *next;
 } ConfigVariable;
 
-extern bool ParseConfigFile(const char *config_file, bool strict,
+extern bool ParseConfigFile(const char *config_file,
 							int elevel,
 							ConfigVariable **head_p, ConfigVariable **tail_p);
 extern bool ParseConfigFp(FILE *fp, const char *config_file,
@@ -205,8 +198,6 @@ typedef enum
 #define GUC_SUPERUSER_ONLY		0x0100	/* show only to superusers */
 #define GUC_IS_NAME				0x0200	/* limit string to NAMEDATALEN-1 */
 #define GUC_NOT_WHILE_SEC_REST	0x0400	/* can't set if security restricted */
-#define GUC_DISALLOW_IN_AUTO_FILE 0x0800	/* can't set in
-											 * PG_AUTOCONF_FILENAME */
 
 #define GUC_UNIT_KB				0x1000	/* value is in kilobytes */
 #define GUC_UNIT_BLOCKS			0x2000	/* value is in blocks */

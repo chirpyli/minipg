@@ -22,31 +22,27 @@
 
 
 /*
- * The "eflags" argument to ExecutorStart and the various ExecInitNode
- * routines is a bitwise OR of the following flag bits, which tell the
- * called plan node what to expect.  Note that the flags will get modified
- * as they are passed down the plan tree, since an upper node may require
- * functionality in its subnode not demanded of the plan as a whole
- * (example: MergeJoin requires mark/restore capability in its inner input),
- * or an upper node may shield its input from some functionality requirement
- * (example: Materialize shields its input from needing to do backward scan).
+ * 传给 ExecutorStart 以及各 ExecInitNode 例程的 "eflags" 参数，是下列标志位
+ * 的按位或，它们告诉被调用的计划节点应该预期什么。注意这些标志在沿计划树
+ * 向下传递的过程中会被修改，因为上层节点可能要求其子节点具备整个计划并未
+ * 要求的功能（例如：MergeJoin 要求其内侧输入具备 mark/restore 能力），
+ * 或者上层节点可能替其输入屏蔽掉某些功能要求
+ *（例如：Materialize 使其输入无需支持反向扫描）。
  *
- * EXPLAIN_ONLY indicates that the plan tree is being initialized just so
- * EXPLAIN can print it out; it will not be run.  Hence, no side-effects
- * of startup should occur.  However, error checks (such as permission checks)
- * should be performed.
+ * EXPLAIN_ONLY 表示计划树被初始化只是为了便于 EXPLAIN 打印输出，而不会
+ * 真正被执行。因此，启动阶段不应产生任何副作用。不过，错误检查
+ *（例如权限检查）仍然应当执行。
  *
- * REWIND indicates that the plan node should try to efficiently support
- * rescans without parameter changes.  (Nodes must support ExecReScan calls
- * in any case, but if this flag was not given, they are at liberty to do it
- * through complete recalculation.  Note that a parameter change forces a
- * full recalculation in any case.)
+ * REWIND 表示计划节点应尽量高效地支持不改变参数的重扫描（rescan）。
+ *（节点在任何情况下都必须支持 ExecReScan 调用；但如果没有给出这个标志，
+ * 它们可以通过完全重新计算来实现。注意，参数变化在任何情况下都会强制
+ * 完全重新计算。）
  *
- * BACKWARD indicates that the plan node must respect the es_direction flag.
- * When this is not passed, the plan node will only be run forwards.
+ * BACKWARD 表示计划节点必须遵循 es_direction 标志。
+ * 如果不传这个标志，计划节点只会向前运行。
  *
- * MARK indicates that the plan node must support Mark/Restore calls.
- * When this is not passed, no Mark/Restore will occur.
+ * MARK 表示计划节点必须支持 Mark/Restore 调用。
+ * 如果不传这个标志，就不会发生任何 Mark/Restore。
  */
 #define EXEC_FLAG_EXPLAIN_ONLY	0x0001	/* EXPLAIN, no ANALYZE */
 #define EXEC_FLAG_REWIND		0x0002	/* need efficient rescan */

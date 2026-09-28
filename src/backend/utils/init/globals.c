@@ -1,7 +1,7 @@
 /*-------------------------------------------------------------------------
  *
  * globals.c
- *	  global variable declarations
+ *	  全局变量声明
  *
  * Portions Copyright (c) 1996-2021, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
@@ -11,8 +11,7 @@
  *	  src/backend/utils/init/globals.c
  *
  * NOTES
- *	  Globals used all over the place should be declared here and not
- *	  in other modules.
+ *	  各处都会用到的全局变量应在此处声明，而不要放在其他模块中。
  *
  *-------------------------------------------------------------------------
  */
@@ -46,32 +45,29 @@ int32		MyCancelKey;
 int			MyPMChildSlot;
 
 /*
- * MyLatch points to the latch that should be used for signal handling by the
- * current process. It will either point to a process local latch if the
- * current process does not have a PGPROC entry in that moment, or to
- * PGPROC->procLatch if it has. Thus it can always be used in signal handlers,
- * without checking for its existence.
+ * MyLatch 指向当前进程应用于信号处理的 latch。如果当前进程此刻没有
+ * PGPROC 条目，它指向进程本地的 latch；如果有，则指向 PGPROC->procLatch。
+ * 因此它总是可以在信号处理函数中使用，无需检查其是否存在。
  */
 struct Latch *MyLatch;
 
 /*
- * DataDir is the absolute path to the top level of the PGDATA directory tree.
- * Except during early startup, this is also the server's working directory;
- * most code therefore can simply use relative paths and not reference DataDir
- * explicitly.
+ * DataDir 是 PGDATA 目录树顶层目录的绝对路径。除早期启动阶段之外，
+ * 它也是服务器的工作目录；因此大多数代码都可以简单地使用相对路径，
+ * 而不必显式引用 DataDir。
  */
 char	   *DataDir = NULL;
 
 /*
- * Mode of the data directory.  The default is 0700 but it may be changed in
- * checkDataDir() to 0750 if the data directory actually has that mode.
+ * 数据目录的模式。默认为 0700，但如果数据目录实际就是 0750 模式，
+ * checkDataDir() 可能会将其改为 0750。
  */
 int			data_directory_mode = PG_DIR_MODE_OWNER;
 
-char		OutputFileName[MAXPGPATH];	/* debugging output file */
+char		OutputFileName[MAXPGPATH];	/* 调试输出文件 */
 
-char		my_exec_path[MAXPGPATH];	/* full path to my executable */
-char		pkglib_path[MAXPGPATH]; /* full path to lib directory */
+char		my_exec_path[MAXPGPATH];	/* 我的可执行文件的完整路径 */
+char		pkglib_path[MAXPGPATH]; /* lib 目录的完整路径 */
 
 BackendId	MyBackendId = InvalidBackendId;
 
@@ -82,23 +78,22 @@ Oid			MyDatabaseId = InvalidOid;
 Oid			MyDatabaseTableSpace = InvalidOid;
 
 /*
- * DatabasePath is the path (relative to DataDir) of my database's
- * primary directory, ie, its directory in the default tablespace.
+ * DatabasePath 是当前数据库主目录（即在默认表空间中的目录）的路径
+ * （相对于 DataDir）。
  */
 char	   *DatabasePath = NULL;
 
 pid_t		PostmasterPid = 0;
 
 /*
- * IsPostmasterEnvironment is true in a postmaster process and any postmaster
- * child process; it is false in a standalone process (bootstrap or
- * standalone backend).  IsUnderPostmaster is true in postmaster child
- * processes.  Note that "child process" includes all children, not only
- * regular backends.  These should be set correctly as early as possible
- * in the execution of a process, so that error handling will do the right
- * things if an error should occur during process initialization.
+ * IsPostmasterEnvironment 在 postmaster 进程及任何 postmaster 子进程中为
+ * true；在独立进程（bootstrap 或独立后端）中为 false。
+ * IsUnderPostmaster 在 postmaster 子进程中为 true。注意，"子进程"包括
+ * 所有子进程，而不仅限于普通后端。这些变量应尽可能在进程执行的早期
+ * 设置正确，这样如果进程初始化期间发生错误，错误处理才能做出正确的
+ * 行为。
  *
- * These are initialized for the bootstrap/standalone case.
+ * 这些变量是针对 bootstrap/独立运行场景初始化的。
  */
 bool		IsPostmasterEnvironment = false;
 bool		IsUnderPostmaster = false;
@@ -117,15 +112,15 @@ double		hash_mem_multiplier = 1.0;
 int			maintenance_work_mem = 65536;
 
 /*
- * Primary determinants of sizes of shared-memory structures.
+ * 决定共享内存结构大小的主要因素。
  *
- * MaxBackends is computed by PostmasterMain.
+ * MaxBackends 由 PostmasterMain 计算得到。
  */
 int			NBuffers = 1000;
 int			MaxConnections = 90;
 int			MaxBackends = 0;
 
-int			VacuumCostPageHit = 1;	/* GUC parameters for vacuum */
+int			VacuumCostPageHit = 1;	/* vacuum 的 GUC 参数 */
 int			VacuumCostPageMiss = 2;
 int			VacuumCostPageDirty = 20;
 int			VacuumCostLimit = 200;
@@ -135,5 +130,5 @@ int64		VacuumPageHit = 0;
 int64		VacuumPageMiss = 0;
 int64		VacuumPageDirty = 0;
 
-int			VacuumCostBalance = 0;	/* working state for vacuum */
+int			VacuumCostBalance = 0;	/* vacuum 的工作状态 */
 bool		VacuumCostActive = false;

@@ -54,9 +54,6 @@
 #include "utils/selfuncs.h"
 #include "utils/syscache.h"
 
-/* Hook for plugins to get control when upper_planner() plans upper rels */
-create_upper_paths_hook_type create_upper_paths_hook = NULL;
-
 
 /* Expression kind codes for preprocess_expression */
 #define EXPRKIND_QUAL				0
@@ -687,9 +684,6 @@ upper_planner(PlannerInfo *root, double tuple_fraction)
 
 		/* Make tuple_fraction accessible to lower-level routines */
 		root->tuple_fraction = tuple_fraction;
-
-		/* A recursive query (WITH RECURSIVE) is handled separately */
-		Assert(!root->hasRecursion);
 
 		/*
 		 * Preprocess targetlist.  Note that much of the remaining planning
@@ -1639,11 +1633,6 @@ create_distinct_paths(PlannerInfo *root,
 				 errmsg("could not implement DISTINCT"),
 				 errdetail("Some of the datatypes only support sorting for DISTINCT.")));
 
-	/* Let extensions possibly add some more paths */
-	if (create_upper_paths_hook)
-		(*create_upper_paths_hook) (root, UPPERREL_DISTINCT,
-									input_rel, distinct_rel, NULL);
-
 	/* Now choose the best path(s) */
 	set_cheapest(distinct_rel);
 
@@ -1749,11 +1738,6 @@ create_ordered_paths(PlannerInfo *root,
 			add_path(ordered_rel, sorted_path);
 		}
 	}
-
-	/* Let extensions possibly add some more paths */
-	if (create_upper_paths_hook)
-		(*create_upper_paths_hook) (root, UPPERREL_ORDERED,
-									input_rel, ordered_rel, NULL);
 
 	/*
 	 * No need to bother with set_cheapest here; upper_planner does not

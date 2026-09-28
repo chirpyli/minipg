@@ -150,11 +150,10 @@ char	   *ListenAddresses;
 static pgsocket ListenSocket[MAXLISTEN];
 
 /*
- * These globals control the behavior of the postmaster in case some
- * backend dumps core.  Normally, it kills all peers of the dead backend
- * and reinitializes shared memory.  By specifying -s or -n, we can have
- * the postmaster stop (rather than kill) peers and not reinitialize
- * shared data structures.  (Reinit is currently dead code, though.)
+ * 这些全局变量控制 postmaster 在后端进程 core dump（崩溃）时的行为。
+ * 正常情况下，它会杀掉已死后端的所有同伴进程，并重新初始化共享内存。
+ * 通过指定 -s 或 -n，我们可以让 postmaster 停止（而不是杀掉）同伴进程，
+ * 并且不重新初始化共享数据结构。（不过目前 Reinit 是死代码。）
  */
 static bool Reinit = true;
 static int	SendStop = false;
@@ -195,45 +194,40 @@ static int	Shutdown = NoShutdown;
 static bool FatalError = false; /* T if recovering from backend crash */
 
 /*
- * We use a simple state machine to control startup, shutdown, and
- * crash recovery (which is rather like shutdown followed by startup).
+ * 我们用一个简单的状态机来控制启动、关闭和崩溃恢复
+ * （崩溃恢复相当于是"先关闭、再启动"）。
  *
- * After doing all the postmaster initialization work, we enter PM_STARTUP
- * state and the startup process is launched. The startup process begins by
- * reading the control file and other preliminary initialization steps.
- * In a normal startup, or after crash recovery, the startup process exits
- * with exit code 0 and we switch to PM_RUN state.  However, archive recovery
- * is handled specially since it takes much longer and we would like to support
- * hot standby during archive recovery.
+ * 在完成 postmaster 的全部初始化工作后，我们进入 PM_STARTUP 状态，
+ * 并启动 startup 进程。startup 进程首先读取控制文件，并做其他
+ * 预备性初始化工作。在正常启动或崩溃恢复之后，startup 进程以退出码 0
+ * 结束，我们便切换到 PM_RUN 状态。不过，归档恢复（archive recovery）
+ * 要特殊处理，因为它耗时长得多了，而且我们希望能在归档恢复期间
+ * 支持热备（hot standby）。
  *
- * When the startup process is ready to start archive recovery, it signals the
- * postmaster, and we switch to PM_RECOVERY state. The background writer and
- * checkpointer are launched, while the startup process continues applying WAL.
- * If Hot Standby is enabled, then, after reaching a consistent point in WAL
- * redo, startup process signals us again, and we switch to PM_HOT_STANDBY
- * state and begin accepting connections to perform read-only queries.  When
- * archive recovery is finished, the startup process exits with exit code 0
- * and we switch to PM_RUN state.
+ * 当 startup 进程准备开始归档恢复时，它会向 postmaster 发信号，
+ * 我们便切换到 PM_RECOVERY 状态。此时会启动 background writer 和
+ * checkpointer，而 startup 进程继续回放 WAL。如果启用了 Hot Standby，
+ * 那么在 WAL redo 达到一致性点之后，startup 进程会再次向我们发信号，
+ * 我们切换到 PM_HOT_STANDBY 状态，并开始接受连接以执行只读查询。
+ * 归档恢复结束时，startup 进程以退出码 0 结束，我们切换到 PM_RUN 状态。
  *
- * Normal child backends can only be launched when we are in PM_RUN or
- * PM_HOT_STANDBY state.  (connsAllowed can also restrict launching.)
- * In other states we handle connection requests by launching "dead_end"
- * child processes, which will simply send the client an error message and
- * quit.  (We track these in the BackendList so that we can know when they
- * are all gone; this is important because they're still connected to shared
- * memory, and would interfere with an attempt to destroy the shmem segment,
- * possibly leading to SHMALL failure when we try to make a new one.)
- * In PM_WAIT_DEAD_END state we are waiting for all the dead_end children
- * to drain out of the system, and therefore stop accepting connection
- * requests at all until the last existing child has quit (which hopefully
- * will not be very long).
+ * 只有在 PM_RUN 或 PM_HOT_STANDBY 状态下，才能启动普通的子后端进程。
+ * （connsAllowed 也能起到限制启动的作用。）在其他状态下，我们通过
+ * 启动 "dead_end" 子进程来处理连接请求，这些进程只是给客户端发一条
+ * 错误消息然后退出。（我们把它们记录在 BackendList 里，这样就能知道
+ * 它们何时全部消失；这一点很重要，因为它们仍然连着共享内存，会干扰
+ * 我们销毁共享内存段的尝试，进而在我们尝试新建共享内存段时可能导致
+ * SHMALL 失败。）
+ * 在 PM_WAIT_DEAD_END 状态下，我们等待所有 dead_end 子进程从系统中
+ * 排空，因此完全停止接受连接请求，直到最后一个已存在的子进程退出
+ * （希望这不会太久）。
  *
- * Notice that this state variable does not distinguish *why* we entered
- * states later than PM_RUN --- Shutdown and FatalError must be consulted
- * to find that out.  FatalError is never true in PM_RECOVERY, PM_HOT_STANDBY,
- * or PM_RUN states, nor in PM_SHUTDOWN states (because we don't enter those
- * states when trying to recover from a crash).  It can be true in PM_STARTUP
- * state, because we don't clear it until we've successfully started WAL redo.
+ * 注意，这个状态变量并不区分我们"为什么"进入了 PM_RUN 之后的状态
+ * ——要弄清这一点必须去看 Shutdown 和 FatalError。在 PM_RECOVERY、
+ * PM_HOT_STANDBY、PM_RUN 状态下，FatalError 永不为真，在各 PM_SHUTDOWN
+ * 状态下也不为真（因为从崩溃中恢复时我们不会进入这些状态）。在
+ * PM_STARTUP 状态下它可能为真，因为在我们成功启动 WAL redo 之前
+ * 不会清除它。
  */
 typedef enum
 {
@@ -1115,10 +1109,7 @@ ServerLoop(void)
 					{
 						BackendStartup(port);
 
-						/*
-						 * We no longer need the open socket or port structure
-						 * in this process
-						 */
+						/* We no longer need the open socket or port structure in this process */
 						StreamClose(port->sock);
 						ConnFree(port);
 					}

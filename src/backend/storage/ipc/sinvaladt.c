@@ -28,78 +28,61 @@
 #include "storage/spin.h"
 
 /*
- * Conceptually, the shared cache invalidation messages are stored in an
- * infinite array, where maxMsgNum is the next array subscript to store a
- * submitted message in, minMsgNum is the smallest array subscript containing
- * a message not yet read by all backends, and we always have maxMsgNum >=
- * minMsgNum.  (They are equal when there are no messages pending.)  For each
- * active backend, there is a nextMsgNum pointer indicating the next message it
- * needs to read; we have maxMsgNum >= nextMsgNum >= minMsgNum for every
- * backend.
+ * 从概念上讲，共享的缓存失效消息存储在一个无限长的数组中：maxMsgNum 是
+ * 存放下一条提交消息的数组下标，minMsgNum 是"尚未被所有后端读到"的消息
+ * 所占据的最小数组下标，且始终有 maxMsgNum >= minMsgNum。（当没有待处理
+ * 消息时二者相等。）每个活跃后端都有一个 nextMsgNum 指针，指示它下一条
+ * 需要读取的消息；对每个后端都有 maxMsgNum >= nextMsgNum >= minMsgNum。
  *
- * (In the current implementation, minMsgNum is a lower bound for the
- * per-process nextMsgNum values, but it isn't rigorously kept equal to the
- * smallest nextMsgNum --- it may lag behind.  We only update it when
- * SICleanupQueue is called, and we try not to do that often.)
+ * （在当前实现中，minMsgNum 是各进程 nextMsgNum 值的下界，但并没有严格
+ * 保持等于最小的 nextMsgNum --- 它可能滞后。我们只在调用 SICleanupQueue
+ * 时更新它，并且尽量不频繁地调用该函数。）
  *
- * In reality, the messages are stored in a circular buffer of MAXNUMMESSAGES
- * entries.  We translate MsgNum values into circular-buffer indexes by
- * computing MsgNum % MAXNUMMESSAGES (this should be fast as long as
- * MAXNUMMESSAGES is a constant and a power of 2).  As long as maxMsgNum
- * doesn't exceed minMsgNum by more than MAXNUMMESSAGES, we have enough space
- * in the buffer.  If the buffer does overflow, we recover by setting the
- * "reset" flag for each backend that has fallen too far behind.  A backend
- * that is in "reset" state is ignored while determining minMsgNum.  When
- * it does finally attempt to receive inval messages, it must discard all
- * its invalidatable state, since it won't know what it missed.
+ * 实际上，这些消息存放在一个含 MAXNUMMESSAGES 个条目的环形缓冲区中。
+ * 我们通过计算 MsgNum % MAXNUMMESSAGES 把 MsgNum 值翻译成环形缓冲区下标
+ * （只要 MAXNUMMESSAGES 是常量且为 2 的幂，这个计算就应当很快）。只要
+ * maxMsgNum 超出 minMsgNum 的量不超过 MAXNUMMESSAGES，缓冲区空间就够用。
+ * 如果缓冲区确实溢出，我们就把落后太多的每个后端都置上 "reset" 标志，
+ * 以此恢复。处于 "reset" 状态的后端在确定 minMsgNum 时会被忽略。当它
+ * 最终尝试接收失效消息时，必须丢弃它所有可失效的状态，因为它不知道自己
+ * 错过了什么。
  *
- * To reduce the probability of needing resets, we send a "catchup" interrupt
- * to any backend that seems to be falling unreasonably far behind.  The
- * normal behavior is that at most one such interrupt is in flight at a time;
- * when a backend completes processing a catchup interrupt, it executes
- * SICleanupQueue, which will signal the next-furthest-behind backend if
- * needed.  This avoids undue contention from multiple backends all trying
- * to catch up at once.  However, the furthest-back backend might be stuck
- * in a state where it can't catch up.  Eventually it will get reset, so it
- * won't cause any more problems for anyone but itself.  But we don't want
- * to find that a bunch of other backends are now too close to the reset
- * threshold to be saved.  So SICleanupQueue is designed to occasionally
- * send extra catchup interrupts as the queue gets fuller, to backends that
- * are far behind and haven't gotten one yet.  As long as there aren't a lot
- * of "stuck" backends, we won't need a lot of extra interrupts, since ones
- * that aren't stuck will propagate their interrupts to the next guy.
+ * 为了降低需要 reset 的概率，我们会向任何看起来落后得离谱的后端发送
+ * "catchup"（追赶）中断。通常的行为是：同时至多只有一个这样的中断在途；
+ * 当某个后端处理完一个 catchup 中断时，它会执行 SICleanupQueue，后者会
+ * 在需要时向下一个最落后的后端发信号。这避免了多个后端同时追赶所造成的
+ * 过度争抢。不过，最落后的那个后端可能卡在某种无法追赶的状态中。它最终
+ * 会被 reset，因此除了它自己，不会再给其他人添麻烦。但我们不愿意看到
+ * 一批其他后端现在也逼近 reset 阈值、来不及挽救。所以 SICleanupQueue
+ * 被设计成：随着队列变满，偶尔会向那些落后很远、但还没收到过中断的后端
+ * 额外发送 catchup 中断。只要"卡住"的后端不多，我们就不需要太多额外
+ * 中断，因为没卡住的后端会把中断传递给下一个进程。
  *
- * We would have problems if the MsgNum values overflow an integer, so
- * whenever minMsgNum exceeds MSGNUMWRAPAROUND, we subtract MSGNUMWRAPAROUND
- * from all the MsgNum variables simultaneously.  MSGNUMWRAPAROUND can be
- * large so that we don't need to do this often.  It must be a multiple of
- * MAXNUMMESSAGES so that the existing circular-buffer entries don't need
- * to be moved when we do it.
+ * 如果 MsgNum 的值溢出了整数范围，就会出问题，所以每当 minMsgNum 超过
+ * MSGNUMWRAPAROUND 时，我们就同时从所有 MsgNum 变量中减去
+ * MSGNUMWRAPAROUND。MSGNUMWRAPAROUND 可以取得很大，这样就不必频繁做这
+ * 件事。它必须是 MAXNUMMESSAGES 的整数倍，这样在做这种调整时，已有的
+ * 环形缓冲区条目不需要移动。
  *
- * Access to the shared sinval array is protected by two locks, SInvalReadLock
- * and SInvalWriteLock.  Readers take SInvalReadLock in shared mode; this
- * authorizes them to modify their own ProcState but not to modify or even
- * look at anyone else's.  When we need to perform array-wide updates,
- * such as in SICleanupQueue, we take SInvalReadLock in exclusive mode to
- * lock out all readers.  Writers take SInvalWriteLock (always in exclusive
- * mode) to serialize adding messages to the queue.  Note that a writer
- * can operate in parallel with one or more readers, because the writer
- * has no need to touch anyone's ProcState, except in the infrequent cases
- * when SICleanupQueue is needed.  The only point of overlap is that
- * the writer wants to change maxMsgNum while readers need to read it.
- * We deal with that by having a spinlock that readers must take for just
- * long enough to read maxMsgNum, while writers take it for just long enough
- * to write maxMsgNum.  (The exact rule is that you need the spinlock to
- * read maxMsgNum if you are not holding SInvalWriteLock, and you need the
- * spinlock to write maxMsgNum unless you are holding both locks.)
+ * 对共享 sinval 数组的访问由两把锁保护：SInvalReadLock 和
+ * SInvalWriteLock。读者以共享模式获取 SInvalReadLock；这授权它们修改
+ * 自己的 ProcState，但不得修改、甚至不得查看他人的 ProcState。当需要做
+ * 数组范围的更新时（例如 SICleanupQueue 中），我们以排他模式获取
+ * SInvalReadLock，把所有读者挡在外面。写者获取 SInvalWriteLock（总是
+ * 排他模式）来串行化向队列中添加消息的操作。注意，写者可以与一个或多个
+ * 读者并行工作，因为写者无需触碰任何人的 ProcState，除非在少数需要
+ * SICleanupQueue 的情况下。唯一的重叠点是：写者想修改 maxMsgNum，而
+ * 读者需要读取它。我们的处理办法是使用一把自旋锁，读者必须持有它刚好
+ * 足够读取 maxMsgNum 的时间，写者持有它刚好足够写入 maxMsgNum 的时间。
+ * （确切的规则是：如果你没有持有 SInvalWriteLock，读取 maxMsgNum 时
+ * 需要持有该自旋锁；除非你同时持有两把锁，否则写入 maxMsgNum 时也需要
+ * 持有该自旋锁。）
  *
- * Note: since maxMsgNum is an int and hence presumably atomically readable/
- * writable, the spinlock might seem unnecessary.  The reason it is needed
- * is to provide a memory barrier: we need to be sure that messages written
- * to the array are actually there before maxMsgNum is increased, and that
- * readers will see that data after fetching maxMsgNum.  Multiprocessors
- * that have weak memory-ordering guarantees can fail without the memory
- * barrier instructions that are included in the spinlock sequences.
+ * 注意：既然 maxMsgNum 是 int，因而大概可以原子地读写，那么这把自旋锁
+ * 似乎没有必要。之所以需要它，是为了提供内存屏障：我们必须确保写入数组
+ * 的消息在 maxMsgNum 增加之前确实已经就位，并且读者在取到 maxMsgNum
+ * 之后能看到那些数据。内存序保证较弱的多处理器，如果没有自旋锁序列中
+ * 包含的内存屏障指令，就可能出错。
  */
 
 
@@ -791,17 +774,15 @@ SIResetAll(void)
 
 
 /*
- * GetNextLocalTransactionId --- allocate a new LocalTransactionId
+ * GetNextLocalTransactionId --- 分配一个新的 LocalTransactionId
  *
- * We split VirtualTransactionIds into two parts so that it is possible
- * to allocate a new one without any contention for shared memory, except
- * for a bit of additional overhead during backend startup/shutdown.
- * The high-order part of a VirtualTransactionId is a BackendId, and the
- * low-order part is a LocalTransactionId, which we assign from a local
- * counter.  To avoid the risk of a VirtualTransactionId being reused
- * within a short interval, successive procs occupying the same backend ID
- * slot should use a consecutive sequence of local IDs, which is implemented
- * by copying nextLocalTransactionId as seen above.
+ * 我们把 VirtualTransactionId 拆分为两部分，这样就可以在不受共享内存
+ * 竞争影响的情况下分配新的 ID，代价只是后端启动/关闭期间的一点额外
+ * 开销。VirtualTransactionId 的高位部分是 BackendId，低位部分是
+ * LocalTransactionId，后者由一个本地计数器分配。为了避免
+ * VirtualTransactionId 在短时间间隔内被重复使用，先后占用同一个
+ * backend ID 槽位的进程应使用连续的一段 local ID，其实现方式就是
+ * 如上文那样把 nextLocalTransactionId 一并复制过去。
  */
 LocalTransactionId
 GetNextLocalTransactionId(void)

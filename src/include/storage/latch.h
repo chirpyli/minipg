@@ -1,44 +1,37 @@
 /*-------------------------------------------------------------------------
  *
  * latch.h
- *	  Routines for interprocess latches
+ *	  进程间 latch（闩锁）相关例程
  *
- * A latch is a boolean variable, with operations that let processes sleep
- * until it is set. A latch can be set from another process, or a signal
- * handler within the same process.
+ * latch 是一个布尔变量，并附带一组操作，使进程可以休眠直到它被置位。
+ * latch 可以由另一个进程置位，也可以由同一进程内的信号处理函数置位。
  *
- * The latch interface is a reliable replacement for the common pattern of
- * using pg_usleep() or select() to wait until a signal arrives, where the
- * signal handler sets a flag variable. Because on some platforms an
- * incoming signal doesn't interrupt sleep, and even on platforms where it
- * does there is a race condition if the signal arrives just before
- * entering the sleep, the common pattern must periodically wake up and
- * poll the flag variable. The pselect() system call was invented to solve
- * this problem, but it is not portable enough. Latches are designed to
- * overcome these limitations, allowing you to sleep without polling and
- * ensuring quick response to signals from other processes.
+ * latch 接口是对以下常见模式的可靠替代：用 pg_usleep() 或 select() 等待
+ * 信号到来，由信号处理函数设置一个标志变量。因为：在某些平台上，到来的
+ * 信号不会打断 sleep；即使在会打断 sleep 的平台上，如果信号恰好在进入
+ * sleep 之前到达，也存在竞态条件。因此，上述常见模式必须定期醒来并轮询
+ * 标志变量。pselect() 系统调用正是为解决此问题而发明的，但它的可移植性
+ * 不够好。latch 的设计目的就是克服这些限制：让你无需轮询即可休眠，同时
+ * 保证对其他进程发来的信号快速响应。
  *
- * There are two kinds of latches: local and shared. A local latch is
- * initialized by InitLatch, and can only be set from the same process.
- * A local latch can be used to wait for a signal to arrive, by calling
- * SetLatch in the signal handler. A shared latch resides in shared memory,
- * and must be initialized at postmaster startup by InitSharedLatch. Before
- * a shared latch can be waited on, it must be associated with a process
- * with OwnLatch. Only the process owning the latch can wait on it, but any
- * process can set it.
+ * latch 分两种：本地 latch 和共享 latch。本地 latch 由 InitLatch 初始化，
+ * 只能由同一进程置位。在信号处理函数中调用 SetLatch，即可用本地 latch
+ * 等待信号到来。共享 latch 位于共享内存中，必须在 postmaster 启动时由
+ * InitSharedLatch 初始化。共享 latch 在被等待之前，必须先通过 OwnLatch
+ * 与某个进程关联。只有拥有该 latch 的进程才能等待它，但任何进程都可以
+ * 置位它。
  *
- * There are three basic operations on a latch:
+ * latch 有三种基本操作：
  *
- * SetLatch		- Sets the latch
- * ResetLatch	- Clears the latch, allowing it to be set again
- * WaitLatch	- Waits for the latch to become set
+ * SetLatch		- 置位 latch
+ * ResetLatch	- 清除 latch，使其可以再次被置位
+ * WaitLatch	- 等待 latch 被置位
  *
- * WaitLatch includes a provision for timeouts (which should be avoided
- * when possible, as they incur extra overhead) and a provision for
- * postmaster child processes to wake up immediately on postmaster death.
- * See latch.c for detailed specifications for the exported functions.
+ * WaitLatch 提供了超时机制（应尽量避免使用，因为会带来额外开销），还提供
+ * 了让 postmaster 子进程在 postmaster 死亡时立即醒来的机制。导出函数的
+ * 详细规格说明见 latch.c。
  *
- * The correct pattern to wait for event(s) is:
+ * 等待事件的正确模式是：
  *
  * for (;;)
  * {
@@ -48,46 +41,40 @@
  *	   WaitLatch();
  * }
  *
- * It's important to reset the latch *before* checking if there's work to
- * do. Otherwise, if someone sets the latch between the check and the
- * ResetLatch call, you will miss it and Wait will incorrectly block.
+ * 关键是要在检查"是否有工作要做" *之前* 重置 latch。否则，如果有人在检查
+ * 与 ResetLatch 调用之间置位了 latch，你就会漏掉它，Wait 将会错误地阻塞。
  *
- * Another valid coding pattern looks like:
+ * 另一种有效的编码模式如下：
  *
  * for (;;)
  * {
  *	   if (work to do)
- *		   Do Stuff(); // in particular, exit loop if some condition satisfied
+ *		   Do Stuff(); // 特别地，如果某个条件满足就退出循环
  *	   WaitLatch();
  *	   ResetLatch();
  * }
  *
- * This is useful to reduce latch traffic if it's expected that the loop's
- * termination condition will often be satisfied in the first iteration;
- * the cost is an extra loop iteration before blocking when it is not.
- * What must be avoided is placing any checks for asynchronous events after
- * WaitLatch and before ResetLatch, as that creates a race condition.
+ * 如果预期循环的终止条件经常在第一次迭代就得到满足，这种写法有助于减少
+ * latch 的交互流量；代价是条件不满足时会多绕一轮循环才进入阻塞。必须避免
+ * 的是：把任何异步事件检查放在 WaitLatch 之后、ResetLatch 之前，因为那会
+ * 造成竞态条件。
  *
- * To wake up the waiter, you must first set a global flag or something
- * else that the wait loop tests in the "if (work to do)" part, and call
- * SetLatch *after* that. SetLatch is designed to return quickly if the
- * latch is already set.
+ * 要唤醒等待者，必须首先设置一个全局标志、或其他会被等待循环在
+ * "if (work to do)" 部分检查的东西，然后 *再* 调用 SetLatch。如果 latch
+ * 已经被置位，SetLatch 被设计为快速返回。
  *
- * On some platforms, signals will not interrupt the latch wait primitive
- * by themselves.  Therefore, it is critical that any signal handler that
- * is meant to terminate a WaitLatch wait calls SetLatch.
+ * 在某些平台上，信号本身不会打断 latch 等待原语。因此，任何旨在终止
+ * WaitLatch 等待的信号处理函数都必须调用 SetLatch，这一点至关重要。
  *
- * Note that use of the process latch (PGPROC.procLatch) is generally better
- * than an ad-hoc shared latch for signaling auxiliary processes.  This is
- * because generic signal handlers will call SetLatch on the process latch
- * only, so using any latch other than the process latch effectively precludes
- * use of any generic handler.
+ * 注意：在向辅助进程发信号时，使用进程 latch（PGPROC.procLatch）通常比
+ * 临时自建的共享 latch 更好。因为通用信号处理函数只会对进程 latch 调用
+ * SetLatch，所以使用进程 latch 之外的任何 latch，实际上就等于无法使用
+ * 任何通用处理函数。
  *
  *
- * WaitEventSets allow to wait for latches being set and additional events -
- * postmaster dying and socket readiness of several sockets currently - at the
- * same time.  On many platforms using a long lived event set is more
- * efficient than using WaitLatch or WaitLatchOrSocket.
+ * WaitEventSet 允许同时等待 latch 被置位以及一些附加事件——目前包括
+ * postmaster 死亡和多个套接字的就绪状态。在许多平台上，使用长期存在的
+ * 事件集比使用 WaitLatch 或 WaitLatchOrSocket 更高效。
  *
  *
  * Portions Copyright (c) 1996-2021, PostgreSQL Global Development Group
@@ -103,9 +90,8 @@
 #include <signal.h>
 
 /*
- * Latch structure should be treated as opaque and only accessed through
- * the public functions. It is defined here to allow embedding Latches as
- * part of bigger structs.
+ * Latch 结构体应视为不透明的，只能通过公共函数访问。之所以在这里给出
+ * 定义，是为了允许把 Latch 作为成员内嵌到更大的结构体中。
  */
 typedef struct Latch
 {
@@ -116,16 +102,16 @@ typedef struct Latch
 } Latch;
 
 /*
- * Bitmasks for events that may wake-up WaitLatch(), WaitLatchOrSocket(), or
- * WaitEventSetWait().
+ * 可能唤醒 WaitLatch()、WaitLatchOrSocket() 或 WaitEventSetWait() 的
+ * 事件的位掩码。
  */
 #define WL_LATCH_SET		 (1 << 0)
 #define WL_SOCKET_READABLE	 (1 << 1)
 #define WL_SOCKET_WRITEABLE  (1 << 2)
-#define WL_TIMEOUT			 (1 << 3)	/* not for WaitEventSetWait() */
+#define WL_TIMEOUT			 (1 << 3)	/* 不适用于 WaitEventSetWait() */
 #define WL_POSTMASTER_DEATH  (1 << 4)
 #define WL_EXIT_ON_PM_DEATH	 (1 << 5)
-/* avoid having to deal with case on platforms not requiring it */
+/* 避免在不要求该语义的平台上做特殊处理 */
 #define WL_SOCKET_CONNECTED  WL_SOCKET_WRITEABLE
 
 #define WL_SOCKET_MASK		(WL_SOCKET_READABLE | \
@@ -134,17 +120,17 @@ typedef struct Latch
 
 typedef struct WaitEvent
 {
-	int			pos;			/* position in the event data structure */
-	uint32		events;			/* triggered events */
-	pgsocket	fd;				/* socket fd associated with event */
-	void	   *user_data;		/* pointer provided in AddWaitEventToSet */
+	int			pos;			/* 在事件数据结构中的位置 */
+	uint32		events;			/* 被触发的事件 */
+	pgsocket	fd;				/* 与该事件关联的套接字 fd */
+	void	   *user_data;		/* 在 AddWaitEventToSet 中提供的指针 */
 } WaitEvent;
 
-/* forward declaration to avoid exposing latch.c implementation details */
+/* 前向声明，以免暴露 latch.c 的实现细节 */
 typedef struct WaitEventSet WaitEventSet;
 
 /*
- * prototypes for functions in latch.c
+ * latch.c 中函数的原型声明
  */
 extern void InitializeLatchSupport(void);
 extern void InitLatch(Latch *latch);

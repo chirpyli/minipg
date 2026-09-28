@@ -28,15 +28,15 @@
  */
 
 /* ----------------
- *		PlannedStmt node
+ *		PlannedStmt 节点
  *
- * The output of the planner is a Plan tree headed by a PlannedStmt node.
- * PlannedStmt holds the "one time" information needed by the executor.
+ * 规划器的输出是一棵由 PlannedStmt 节点作为头的 Plan 树。
+ * PlannedStmt 保存执行器所需的"一次性"信息。
  *
- * For simplicity in APIs, we also wrap utility statements in PlannedStmt
- * nodes; in such cases, commandType == CMD_UTILITY, the statement itself
- * is in the utilityStmt field, and the rest of the struct is mostly dummy.
- * (We do use canSetTag, stmt_location, stmt_len, and possibly queryId.)
+ * 为了简化 API，我们也把工具语句（utility statement）包装进 PlannedStmt
+ * 节点；在这种情况下 commandType == CMD_UTILITY，语句本身存放在
+ * utilityStmt 字段中，结构体的其余部分基本上是占位的。
+ *（我们确实会用到 canSetTag、stmt_location、stmt_len，可能还有 queryId。）
  * ----------------
  */
 typedef struct PlannedStmt

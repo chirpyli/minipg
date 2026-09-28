@@ -2521,14 +2521,10 @@ static struct config_string ConfigureNamesString[] =
 	},
 
 	{
-		/*
-		 * Can't be set by ALTER SYSTEM as it can lead to recursive definition
-		 * of data_directory.
-		 */
 		{"data_directory", PGC_POSTMASTER, FILE_LOCATIONS,
 			gettext_noop("Sets the server's data directory."),
 			NULL,
-			GUC_SUPERUSER_ONLY | GUC_DISALLOW_IN_AUTO_FILE
+			GUC_SUPERUSER_ONLY
 		},
 		&data_directory,
 		NULL,
@@ -3703,9 +3699,7 @@ SelectConfigFiles(const char *userDoption, const char *progname)
 	}
 
 	/*
-	 * Read the configuration file for the first time.  This time only the
-	 * data_directory parameter is picked up to determine the data directory,
-	 * so that we can read the PG_AUTOCONF_FILENAME file next time.
+	 * Read the configuration file.
 	 */
 	ProcessConfigFile(PGC_POSTMASTER);
 
@@ -3734,14 +3728,6 @@ SelectConfigFiles(const char *userDoption, const char *progname)
 	 * Reflect the final DataDir value back into the data_directory GUC var.
 	 */
 	SetConfigOption("data_directory", DataDir, PGC_POSTMASTER, PGC_S_OVERRIDE);
-
-	/*
-	 * Now read the config file a second time, allowing any settings in the
-	 * PG_AUTOCONF_FILENAME file to take effect.  (This is pretty ugly, but
-	 * since we have to determine the DataDir before we can find the autoconf
-	 * file, the alternatives seem worse.)
-	 */
-	ProcessConfigFile(PGC_POSTMASTER);
 
 	/*
 	 * If timezone_abbreviations wasn't set in the configuration file, install
