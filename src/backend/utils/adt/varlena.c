@@ -2564,12 +2564,11 @@ btvarstrequalimage(PG_FUNCTION_ARGS)
 
 	check_collation_set(collid);
 
-	if (lc_collate_is_c(collid) ||
-		collid == DEFAULT_COLLATION_OID ||
-		get_collation_isdeterministic(collid))
-		PG_RETURN_BOOL(true);
-	else
-		PG_RETURN_BOOL(false);
+	/*
+	 * minipg 只有 C 排序规则（见 pg_locale.c），字节序比较下存在 equality
+	 * image，因此恒为 true。
+	 */
+	PG_RETURN_BOOL(true);
 }
 
 Datum

@@ -137,13 +137,13 @@ static const ObjectPropertyType ObjectProperty[] =
 	},
 	{
 		"collation",
-		CollationRelationId,
-		CollationOidIndexId,
-		COLLOID,
-		InvalidOid,				/* COLLNAMEENCNSP also takes encoding */
-		Anum_pg_collation_oid,
-		Anum_pg_collation_collname,
-		Anum_pg_collation_collnamespace,
+		InvalidOid,				/* pg_collation 已移除 */
+		InvalidOid,
+		InvalidOid,
+		InvalidOid,
+		InvalidAttrNumber,
+		InvalidAttrNumber,
+		InvalidAttrNumber,
 		InvalidAttrNumber,
 		OBJECT_COLLATION,
 		true
@@ -534,7 +534,7 @@ get_object_address(ObjectType objtype, Node *object,
 				address.objectSubId = 0;
 				break;
 			case OBJECT_COLLATION:
-				address.classId = CollationRelationId;
+				address.classId = InvalidOid;	/* pg_collation 已移除 */
 				address.objectId = get_collation_oid(castNode(List, object), missing_ok);
 				address.objectSubId = 0;
 				break;
@@ -1603,13 +1603,9 @@ getObjectDescription(const ObjectAddress *object, bool missing_ok)
 
 		case OCLASS_COLLATION:
 			{
-				HeapTuple	collTup;
-				Form_pg_collation coll;
-				char	   *nspname;
+				char	   *collname = get_collation_name(object->objectId);
 
-				collTup = SearchSysCache1(COLLOID,
-										  ObjectIdGetDatum(object->objectId));
-				if (!HeapTupleIsValid(collTup))
+				if (collname == NULL)
 				{
 					if (!missing_ok)
 						elog(ERROR, "cache lookup failed for collation %u",
@@ -1617,18 +1613,10 @@ getObjectDescription(const ObjectAddress *object, bool missing_ok)
 					break;
 				}
 
-				coll = (Form_pg_collation) GETSTRUCT(collTup);
-
 				/* Qualify the name if not visible in search path */
-				if (CollationIsVisible(object->objectId))
-					nspname = NULL;
-				else
-					nspname = get_namespace_name(coll->collnamespace);
-
 				appendStringInfo(&buffer, _("collation %s"),
-								 quote_qualified_identifier(nspname,
-															NameStr(coll->collname)));
-				ReleaseSysCache(collTup);
+								 quote_qualified_identifier(CollationIsVisible(object->objectId) ? NULL : "pg_catalog",
+															collname));
 				break;
 			}
 
@@ -2669,28 +2657,21 @@ getObjectIdentityParts(const ObjectAddress *object,
 
 		case OCLASS_COLLATION:
 			{
-				HeapTuple	collTup;
-				Form_pg_collation coll;
-				char	   *schema;
+				char	   *collname = get_collation_name(object->objectId);
 
-				collTup = SearchSysCache1(COLLOID,
-										  ObjectIdGetDatum(object->objectId));
-				if (!HeapTupleIsValid(collTup))
+				if (collname == NULL)
 				{
 					if (!missing_ok)
 						elog(ERROR, "cache lookup failed for collation %u",
 							 object->objectId);
 					break;
 				}
-				coll = (Form_pg_collation) GETSTRUCT(collTup);
-				schema = get_namespace_name(coll->collnamespace);
 				appendStringInfoString(&buffer,
-									   quote_qualified_identifier(schema,
-																  NameStr(coll->collname)));
+									   quote_qualified_identifier(CollationIsVisible(object->objectId) ? NULL : "pg_catalog",
+																  collname));
 				if (objname)
-					*objname = list_make2(schema,
-										  pstrdup(NameStr(coll->collname)));
-				ReleaseSysCache(collTup);
+					*objname = list_make2(pstrdup("pg_catalog"),
+										  pstrdup(collname));
 				break;
 			}
 

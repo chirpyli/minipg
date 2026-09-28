@@ -1,54 +1,28 @@
 /*-------------------------------------------------------------------------
  *
  * pg_collation.h
- *	  definition of the "collation" system catalog (pg_collation)
+ *	  排序规则（collation）相关的固定 OID 常量
  *
+ * minipg 已裁剪 collation 功能：COLLATE 语法、CREATE COLLATION 命令以及
+ * pg_collation 系统表都已移除，所有表达式一律使用默认排序规则（C，即字节
+ * 序比较，详见 pg_locale.c）。这里保留原有的 OID 常量，供表达式树中的
+ * collation 字段占位使用。
  *
  * Portions Copyright (c) 1996-2021, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  * src/include/catalog/pg_collation.h
  *
- * NOTES
- *	  The Catalog.pm module reads this file and derives schema
- *	  information.
- *
  *-------------------------------------------------------------------------
  */
 #ifndef PG_COLLATION_H
 #define PG_COLLATION_H
 
-#include "catalog/genbki.h"
-#include "catalog/pg_collation_d.h"
-
-/* ----------------
- *		pg_collation definition.  cpp turns this into
- *		typedef struct FormData_pg_collation
- * ----------------
- */
-CATALOG(pg_collation,3456,CollationRelationId)
-{
-	Oid			oid;			/* oid */
-	NameData	collname;		/* collation name */
-
-	/* OID of namespace containing this collation */
-	Oid			collnamespace BKI_DEFAULT(pg_catalog) BKI_LOOKUP(pg_namespace);
-	bool		collisdeterministic BKI_DEFAULT(t);
-	int32		collencoding;	/* encoding for this collation; -1 = "all" */
-	NameData	collcollate;	/* LC_COLLATE setting */
-	NameData	collctype;		/* LC_CTYPE setting */
-} FormData_pg_collation;
-
-/* ----------------
- *		Form_pg_collation corresponds to a pointer to a row with
- *		the format of pg_collation relation.
- * ----------------
- */
-typedef FormData_pg_collation *Form_pg_collation;
-
-DECLARE_UNIQUE_INDEX(pg_collation_name_enc_nsp_index, 3164, on pg_collation using btree(collname name_ops, collencoding int4_ops, collnamespace oid_ops));
-#define CollationNameEncNspIndexId 3164
-DECLARE_UNIQUE_INDEX_PKEY(pg_collation_oid_index, 3085, on pg_collation using btree(oid oid_ops));
-#define CollationOidIndexId  3085
+/* pg_collation 中 "default" 条目原有的 OID */
+#define DEFAULT_COLLATION_OID	100
+/* pg_collation 中 "C" 条目原有的 OID */
+#define C_COLLATION_OID			950
+/* pg_collation 中 "POSIX" 条目原有的 OID */
+#define POSIX_COLLATION_OID		951
 
 #endif							/* PG_COLLATION_H */

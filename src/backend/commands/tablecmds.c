@@ -265,7 +265,6 @@ static ObjectAddress ATExecAddColumn(List **wqueue, AlteredTableInfo *tab,
 static bool check_for_column_name_collision(Relation rel, const char *colname,
 											bool if_not_exists);
 static void add_column_datatype_dependency(Oid relid, int32 attnum, Oid typid);
-static void add_column_collation_dependency(Oid relid, int32 attnum, Oid collid);
 static ObjectAddress ATExecSetStatistics(Relation rel, const char *colName, int16 colNum,
 										 Node *newValue, LOCKMODE lockmode);
 static ObjectAddress ATExecSetStorage(Relation rel, const char *colName,
@@ -2834,7 +2833,6 @@ ATExecAddColumn(List **wqueue, AlteredTableInfo *tab, Relation rel,
 	 * Add needed dependency entries for the new column.
 	 */
 	add_column_datatype_dependency(myrelid, newattnum, attribute.atttypid);
-	add_column_collation_dependency(myrelid, newattnum, DEFAULT_COLLATION_OID);
 
 	ObjectAddressSubSet(address, RelationRelationId, myrelid, newattnum);
 	return address;
@@ -2911,29 +2909,6 @@ add_column_datatype_dependency(Oid relid, int32 attnum, Oid typid)
 	referenced.objectSubId = 0;
 	recordDependencyOn(&myself, &referenced, DEPENDENCY_NORMAL);
 }
-
-/*
- * Install a column's dependency on its collation.
- */
-static void
-add_column_collation_dependency(Oid relid, int32 attnum, Oid collid)
-{
-	ObjectAddress myself,
-				referenced;
-
-	/* We know the default collation is pinned, so don't bother recording it */
-	if (OidIsValid(collid) && collid != DEFAULT_COLLATION_OID)
-	{
-		myself.classId = RelationRelationId;
-		myself.objectId = relid;
-		myself.objectSubId = attnum;
-		referenced.classId = CollationRelationId;
-		referenced.objectId = collid;
-		referenced.objectSubId = 0;
-		recordDependencyOn(&myself, &referenced, DEPENDENCY_NORMAL);
-	}
-}
-
 
 static ObjectAddress
 ATExecSetStatistics(Relation rel, const char *colName, int16 colNum, Node *newValue, LOCKMODE lockmode)
@@ -3912,8 +3887,6 @@ ATExecAlterColumnType(AlteredTableInfo *tab, Relation rel,
 				 foundDep->deptype);
 		if (!(foundDep->refclassid == TypeRelationId &&
 			  foundDep->refobjid == attTup->atttypid) &&
-			!(foundDep->refclassid == CollationRelationId &&
-			  foundDep->refobjid == DEFAULT_COLLATION_OID) &&
 			!(foundDep->refclassid == RelationRelationId &&
 			  foundDep->refobjid == RelationGetRelid(rel) &&
 			  foundDep->refobjsubid != 0)
@@ -3947,9 +3920,8 @@ ATExecAlterColumnType(AlteredTableInfo *tab, Relation rel,
 
 	table_close(attrelation, RowExclusiveLock);
 
-	/* Install dependencies on new datatype and collation */
+	/* Install dependencies on new datatype */
 	add_column_datatype_dependency(RelationGetRelid(rel), attnum, targettype);
-	add_column_collation_dependency(RelationGetRelid(rel), attnum, targetcollid);
 
 	/*
 	 * Drop any pg_statistic entry for the column, since it's now wrong type

@@ -37,12 +37,6 @@ CATALOG(pg_database,1262,DatabaseRelationId) BKI_SHARED_RELATION BKI_ROWTYPE_OID
 	/* character encoding */
 	int32		encoding;
 
-	/* LC_COLLATE setting */
-	NameData	datcollate;
-
-	/* LC_CTYPE setting */
-	NameData	datctype;
-
 	/* allowed as CREATE DATABASE template? */
 	bool		datistemplate;
 

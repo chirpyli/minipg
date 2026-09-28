@@ -1678,11 +1678,9 @@ create_database(const char *dbname)
 	 */
 	header(_("creating database \"%s\""), dbname);
 	if (encoding)
-		psql_command("postgres", "CREATE DATABASE \"%s\" TEMPLATE=template0 ENCODING='%s'%s", dbname, encoding,
-					 (nolocale) ? " LC_COLLATE='C' LC_CTYPE='C'" : "");
+		psql_command("postgres", "CREATE DATABASE \"%s\" TEMPLATE=template0 ENCODING='%s'", dbname, encoding);
 	else
-		psql_command("postgres", "CREATE DATABASE \"%s\" TEMPLATE=template0%s", dbname,
-					 (nolocale) ? " LC_COLLATE='C' LC_CTYPE='C'" : "");
+		psql_command("postgres", "CREATE DATABASE \"%s\" TEMPLATE=template0", dbname);
 	psql_command(dbname,
 				 "SET bytea_output TO 'hex';"
 				 "SET timezone_abbreviations TO 'Default';");

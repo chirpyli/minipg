@@ -1762,120 +1762,42 @@ OpfamilyIsVisible(Oid opfid)
 
 /*
  * lookup_collation
- *		If there's a collation of the given name/namespace, and it works
- *		with the given encoding, return its OID.  Else return InvalidOid.
+ *		If there's a collation of the given name/namespace, return its OID.
+ *		Else return InvalidOid.
+ *
+ * minipg 已裁剪 pg_collation 系统表：只保留内置的 default/C/POSIX 三个
+ * 名字，它们都属于 pg_catalog 且适用于任何编码。
  */
 static Oid
-lookup_collation(const char *collname, Oid collnamespace, int32 encoding)
+lookup_collation(const char *collname, Oid collnamespace)
 {
-	Oid			collid;
-	HeapTuple	colltup;
-	Form_pg_collation collform;
-
-	/* Check for encoding-specific entry (exact match) */
-	collid = GetSysCacheOid3(COLLNAMEENCNSP, Anum_pg_collation_oid,
-							 PointerGetDatum(collname),
-							 Int32GetDatum(encoding),
-							 ObjectIdGetDatum(collnamespace));
-	if (OidIsValid(collid))
-		return collid;
-
-	/*
-	 * Check for any-encoding entry.  libc collations with collencoding = -1
-	 * work with all encodings, so we can use them directly.
-	 */
-	colltup = SearchSysCache3(COLLNAMEENCNSP,
-							  PointerGetDatum(collname),
-							  Int32GetDatum(-1),
-							  ObjectIdGetDatum(collnamespace));
-	if (!HeapTupleIsValid(colltup))
+	if (collnamespace != PG_CATALOG_NAMESPACE)
 		return InvalidOid;
-	collform = (Form_pg_collation) GETSTRUCT(colltup);
-	collid = collform->oid;
-	ReleaseSysCache(colltup);
-	return collid;
-}
 
-/*
- * CollationGetCollid
- *		Try to resolve an unqualified collation name.
- *		Returns OID if collation found in search path, else InvalidOid.
- *
- * Note that this will only find collations that work with the current
- * database's encoding.
- */
-Oid
-CollationGetCollid(const char *collname)
-{
-	int32		dbencoding = GetDatabaseEncoding();
-	ListCell   *l;
+	if (strcmp(collname, "default") == 0)
+		return DEFAULT_COLLATION_OID;
+	if (strcmp(collname, "C") == 0)
+		return C_COLLATION_OID;
+	if (strcmp(collname, "POSIX") == 0)
+		return POSIX_COLLATION_OID;
 
-	recomputeNamespacePath();
-
-	foreach(l, activeSearchPath)
-	{
-		Oid			namespaceId = lfirst_oid(l);
-		Oid			collid;
-
-		collid = lookup_collation(collname, namespaceId, dbencoding);
-		if (OidIsValid(collid))
-			return collid;
-	}
-
-	/* Not found in path */
 	return InvalidOid;
 }
 
 /*
  * CollationIsVisible
  *		Determine whether a collation (identified by OID) is visible in the
- *		current search path.  Visible means "would be found by searching
- *		for the unqualified collation name".
+ *		current search path.
  *
- * Note that only collations that work with the current database's encoding
- * will be considered visible.
+ * minipg 的内置 collation 都属于 pg_catalog，而 pg_catalog 隐含在搜索
+ * 路径中，因此内置 collation 一律可见。
  */
 bool
 CollationIsVisible(Oid collid)
 {
-	HeapTuple	colltup;
-	Form_pg_collation collform;
-	Oid			collnamespace;
-	bool		visible;
-
-	colltup = SearchSysCache1(COLLOID, ObjectIdGetDatum(collid));
-	if (!HeapTupleIsValid(colltup))
-		elog(ERROR, "cache lookup failed for collation %u", collid);
-	collform = (Form_pg_collation) GETSTRUCT(colltup);
-
-	recomputeNamespacePath();
-
-	/*
-	 * Quick check: if it ain't in the path at all, it ain't visible. Items in
-	 * the system namespace are surely in the path and so we needn't even do
-	 * list_member_oid() for them.
-	 */
-	collnamespace = collform->collnamespace;
-	if (collnamespace != PG_CATALOG_NAMESPACE &&
-		!list_member_oid(activeSearchPath, collnamespace))
-		visible = false;
-	else
-	{
-		/*
-		 * If it is in the path, it might still not be visible; it could be
-		 * hidden by another collation of the same name earlier in the path,
-		 * or it might not work with the current DB encoding.  So we must do a
-		 * slow check to see if this collation would be found by
-		 * CollationGetCollid.
-		 */
-		char	   *collname = NameStr(collform->collname);
-
-		visible = (CollationGetCollid(collname) == collid);
-	}
-
-	ReleaseSysCache(colltup);
-
-	return visible;
+	return (collid == DEFAULT_COLLATION_OID ||
+			collid == C_COLLATION_OID ||
+			collid == POSIX_COLLATION_OID);
 }
 
 
@@ -2388,7 +2310,6 @@ get_collation_oid(List *name, bool missing_ok)
 {
 	char	   *schemaname;
 	char	   *collation_name;
-	int32		dbencoding = GetDatabaseEncoding();
 	Oid			namespaceId;
 	Oid			colloid;
 	ListCell   *l;
@@ -2403,7 +2324,7 @@ get_collation_oid(List *name, bool missing_ok)
 		if (missing_ok && !OidIsValid(namespaceId))
 			return InvalidOid;
 
-		colloid = lookup_collation(collation_name, namespaceId, dbencoding);
+		colloid = lookup_collation(collation_name, namespaceId);
 		if (OidIsValid(colloid))
 			return colloid;
 	}
@@ -2416,7 +2337,7 @@ get_collation_oid(List *name, bool missing_ok)
 		{
 			namespaceId = lfirst_oid(l);
 
-			colloid = lookup_collation(collation_name, namespaceId, dbencoding);
+			colloid = lookup_collation(collation_name, namespaceId);
 			if (OidIsValid(colloid))
 				return colloid;
 		}

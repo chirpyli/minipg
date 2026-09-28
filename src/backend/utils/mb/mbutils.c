@@ -43,7 +43,6 @@
  */
 static const pg_enc2name *ClientEncoding = &pg_enc2name_tbl[PG_SQL_ASCII];
 static const pg_enc2name *DatabaseEncoding = &pg_enc2name_tbl[PG_SQL_ASCII];
-static const pg_enc2name *MessageEncoding = &pg_enc2name_tbl[PG_SQL_ASCII];
 
 /*
  * During backend startup we can't set client encoding because we (a)
@@ -865,16 +864,6 @@ SetDatabaseEncoding(int encoding)
 
 	DatabaseEncoding = &pg_enc2name_tbl[encoding];
 	Assert(DatabaseEncoding->encoding == encoding);
-}
-
-void
-SetMessageEncoding(int encoding)
-{
-	/* Some calls happen before we can elog()! */
-	Assert(PG_VALID_ENCODING(encoding));
-
-	MessageEncoding = &pg_enc2name_tbl[encoding];
-	Assert(MessageEncoding->encoding == encoding);
 }
 
 /*

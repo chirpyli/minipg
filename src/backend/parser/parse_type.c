@@ -506,28 +506,6 @@ TypeNameListToString(List *typenames)
 }
 
 /*
- * LookupCollation
- *
- * Look up collation by name, return OID, with support for error location.
- */
-Oid
-LookupCollation(ParseState *pstate, List *collnames, int location)
-{
-	Oid			colloid;
-	ParseCallbackState pcbstate;
-
-	if (pstate)
-		setup_parser_errposition_callback(&pcbstate, pstate, location);
-
-	colloid = get_collation_oid(collnames, false);
-
-	if (pstate)
-		cancel_parser_errposition_callback(&pcbstate);
-
-	return colloid;
-}
-
-/*
  * GetColumnDefCollation
  *
  * Get the collation to be used for a column being defined, given the

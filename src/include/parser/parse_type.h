@@ -35,7 +35,6 @@ extern void typenameTypeIdAndMod(ParseState *pstate, const TypeName *typeName,
 extern char *TypeNameToString(const TypeName *typeName);
 extern char *TypeNameListToString(List *typenames);
 
-extern Oid	LookupCollation(ParseState *pstate, List *collnames, int location);
 extern Oid	GetColumnDefCollation(Oid typeOid);
 
 extern Type typeidType(Oid id);

@@ -26,7 +26,6 @@
 #include "catalog/pg_amop.h"
 #include "catalog/pg_amproc.h"
 #include "catalog/pg_cast.h"
-#include "catalog/pg_collation.h"
 #include "catalog/pg_constraint.h"
 #include "catalog/pg_database.h"
 #include "catalog/pg_depend.h"
@@ -195,28 +194,6 @@ static const struct cachedesc cacheinfo[] = {
 		1,
 		{
 			Anum_pg_opclass_oid,
-			0,
-			0,
-			0
-		},
-		8
-	},
-	{CollationRelationId,		/* COLLNAMEENCNSP */
-		CollationNameEncNspIndexId,
-		3,
-		{
-			Anum_pg_collation_collname,
-			Anum_pg_collation_collencoding,
-			Anum_pg_collation_collnamespace,
-			0
-		},
-		8
-	},
-	{CollationRelationId,		/* COLLOID */
-		CollationOidIndexId,
-		1,
-		{
-			Anum_pg_collation_oid,
 			0,
 			0,
 			0

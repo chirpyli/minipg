@@ -1146,7 +1146,7 @@ regcollationout(PG_FUNCTION_ARGS)
 {
 	Oid			collationid = PG_GETARG_OID(0);
 	char	   *result;
-	HeapTuple	collationtup;
+	char	   *collationname;
 
 	if (collationid == InvalidOid)
 	{
@@ -1154,12 +1154,10 @@ regcollationout(PG_FUNCTION_ARGS)
 		PG_RETURN_CSTRING(result);
 	}
 
-	collationtup = SearchSysCache1(COLLOID, ObjectIdGetDatum(collationid));
+	collationname = get_collation_name(collationid);
 
-	if (HeapTupleIsValid(collationtup))
+	if (collationname != NULL)
 	{
-		Form_pg_collation collationform = (Form_pg_collation) GETSTRUCT(collationtup);
-		char	   *collationname = NameStr(collationform->collname);
 
 		/*
 		 * In bootstrap mode, skip the fancy namespace stuff and just return
@@ -1167,7 +1165,7 @@ regcollationout(PG_FUNCTION_ARGS)
 		 * anyway.)
 		 */
 		if (IsBootstrapProcessingMode())
-			result = pstrdup(collationname);
+			result = collationname;
 		else
 		{
 			char	   *nspname;
@@ -1179,16 +1177,14 @@ regcollationout(PG_FUNCTION_ARGS)
 			if (CollationIsVisible(collationid))
 				nspname = NULL;
 			else
-				nspname = get_namespace_name(collationform->collnamespace);
+				nspname = "pg_catalog";
 
 			result = quote_qualified_identifier(nspname, collationname);
 		}
-
-		ReleaseSysCache(collationtup);
 	}
 	else
 	{
-		/* If OID doesn't match any pg_collation entry, return it numerically */
+		/* If OID doesn't match any built-in collation, return it numerically */
 		result = (char *) palloc(NAMEDATALEN);
 		snprintf(result, NAMEDATALEN, "%u", collationid);
 	}

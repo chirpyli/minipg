@@ -26,6 +26,5 @@ extern void DropDatabase(ParseState *pstate, DropdbStmt *stmt);
 extern Oid	get_database_oid(const char *dbname, bool missing_ok);
 extern char *get_database_name(Oid dbid);
 
-extern void check_encoding_locale_matches(int encoding, const char *collate, const char *ctype);
 
 #endif							/* DBCOMMANDS_H */

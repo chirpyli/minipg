@@ -757,14 +757,10 @@ AddNewAttributeTuples(Oid new_rel_oid,
 						 tupdesc->attrs[i].atttypid);
 		recordDependencyOn(&myself, &referenced, DEPENDENCY_NORMAL);
 
-		/* The default collation is pinned, so don't bother recording it */
-		if (OidIsValid(DEFAULT_COLLATION_OID) &&
-			DEFAULT_COLLATION_OID != DEFAULT_COLLATION_OID)
-		{
-			ObjectAddressSet(referenced, CollationRelationId,
-							 DEFAULT_COLLATION_OID);
-			recordDependencyOn(&myself, &referenced, DEPENDENCY_NORMAL);
-		}
+		/*
+		 * minipg 只有默认排序规则（C）且它已被 pin，不需要记录依赖，
+		 * pg_collation 系统表也已移除。
+		 */
 	}
 
 	/*

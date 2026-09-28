@@ -830,32 +830,13 @@ comparison_ops_are_compatible(Oid opno1, Oid opno2)
  * Note: this is equality compatibility only.  Do NOT use this to reason
  * about ordering.
  *
- * An InvalidOid on either side denotes the absence of a collation -- that
- * side's operation is not collation-sensitive (e.g. a non-collatable column
- * type).  Absence of a collation cannot conflict with the other side's
- * collation, so we treat such pairs as agreeing on equality.  This generalizes
- * the asymmetric treatment in IndexCollMatchesExprColl().
- *
- * Otherwise the collations have equivalent equality if they match, or if both
- * are deterministic: by definition a deterministic collation treats two
- * strings as equal iff they are byte-wise equal (see CREATE COLLATION), so any
- * two deterministic collations share the same equality relation.  A mismatch
- * involving a nondeterministic collation, however, may mean the two equality
- * relations disagree, and the proof is unsound.
+ * minipg 只有 C 排序规则且全部是确定性的（见 pg_locale.c）：确定性排序
+ * 规则下两个串相等当且仅当字节相同，因此任意两个 collation 的等值关系
+ * 都一致，恒返回 true。
  */
 bool
 collations_agree_on_equality(Oid coll1, Oid coll2)
 {
-	if (!OidIsValid(coll1) || !OidIsValid(coll2))
-		return true;
-
-	if (coll1 == coll2)
-		return true;
-
-	if (!get_collation_isdeterministic(coll1) ||
-		!get_collation_isdeterministic(coll2))
-		return false;
-
 	return true;
 }
 
@@ -1098,46 +1079,27 @@ get_cast_oid(Oid sourcetypeid, Oid targettypeid, bool missing_ok)
 
 /*
  * get_collation_name
- *		Returns the name of a given pg_collation entry.
+ *		Returns the name of a given collation.
+ *
+ * minipg 只有内置的 default/C/POSIX 三个 collation，pg_collation 系统表
+ * 已移除，因此这里直接按 OID 映射名字。
  *
  * Returns a palloc'd copy of the string, or NULL if no such collation.
- *
- * NOTE: since collation name is not unique, be wary of code that uses this
- * for anything except preparing error messages.
  */
 char *
 get_collation_name(Oid colloid)
 {
-	HeapTuple	tp;
-
-	tp = SearchSysCache1(COLLOID, ObjectIdGetDatum(colloid));
-	if (HeapTupleIsValid(tp))
+	switch (colloid)
 	{
-		Form_pg_collation colltup = (Form_pg_collation) GETSTRUCT(tp);
-		char	   *result;
-
-		result = pstrdup(NameStr(colltup->collname));
-		ReleaseSysCache(tp);
-		return result;
+		case DEFAULT_COLLATION_OID:
+			return pstrdup("default");
+		case C_COLLATION_OID:
+			return pstrdup("C");
+		case POSIX_COLLATION_OID:
+			return pstrdup("POSIX");
+		default:
+			return NULL;
 	}
-	else
-		return NULL;
-}
-
-bool
-get_collation_isdeterministic(Oid colloid)
-{
-	HeapTuple	tp;
-	Form_pg_collation colltup;
-	bool		result;
-
-	tp = SearchSysCache1(COLLOID, ObjectIdGetDatum(colloid));
-	if (!HeapTupleIsValid(tp))
-		elog(ERROR, "cache lookup failed for collation %u", colloid);
-	colltup = (Form_pg_collation) GETSTRUCT(tp);
-	result = colltup->collisdeterministic;
-	ReleaseSysCache(tp);
-	return result;
 }
 
 /*				---------- CONSTRAINT CACHE ----------					 */

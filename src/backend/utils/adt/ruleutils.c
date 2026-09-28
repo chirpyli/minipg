@@ -7096,28 +7096,16 @@ generate_operator_name(Oid operid, Oid arg1, Oid arg2)
 char *
 generate_collation_name(Oid collid)
 {
-	HeapTuple	tp;
-	Form_pg_collation colltup;
-	char	   *collname;
-	char	   *nspname;
-	char	   *result;
+	char	   *collname = get_collation_name(collid);
 
-	tp = SearchSysCache1(COLLOID, ObjectIdGetDatum(collid));
-	if (!HeapTupleIsValid(tp))
+	if (collname == NULL)
 		elog(ERROR, "cache lookup failed for collation %u", collid);
-	colltup = (Form_pg_collation) GETSTRUCT(tp);
-	collname = NameStr(colltup->collname);
 
-	if (!CollationIsVisible(collid))
-		nspname = get_namespace_name(colltup->collnamespace);
-	else
-		nspname = NULL;
-
-	result = quote_qualified_identifier(nspname, collname);
-
-	ReleaseSysCache(tp);
-
-	return result;
+	/*
+	 * minipg 的内置 collation 都属于 pg_catalog，可见时即无需 schema 前缀。
+	 */
+	return quote_qualified_identifier(CollationIsVisible(collid) ? NULL : "pg_catalog",
+									 collname);
 }
 
 /*

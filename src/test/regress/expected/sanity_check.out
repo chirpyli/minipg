@@ -48,7 +48,6 @@ pg_amproc|t
 pg_attribute|t
 pg_cast|t
 pg_class|t
-pg_collation|t
 pg_constraint|t
 pg_database|t
 pg_depend|t

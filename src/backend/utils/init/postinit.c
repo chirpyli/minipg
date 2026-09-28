@@ -182,8 +182,6 @@ CheckMyDatabase(const char *name, bool am_superuser, bool override_allow_connect
 {
 	HeapTuple	tup;
 	Form_pg_database dbform;
-	char	   *collate;
-	char	   *ctype;
 
 	/* Fetch our pg_database row normally, via syscache */
 	tup = SearchSysCache1(DATABASEOID, ObjectIdGetDatum(MyDatabaseId));
@@ -266,27 +264,10 @@ CheckMyDatabase(const char *name, bool am_superuser, bool override_allow_connect
 	SetConfigOption("client_encoding", GetDatabaseEncodingName(),
 					PGC_BACKEND, PGC_S_DYNAMIC_DEFAULT);
 
-	/* assign locale variables */
-	collate = NameStr(dbform->datcollate);
-	ctype = NameStr(dbform->datctype);
-
-	if (pg_perm_setlocale(LC_COLLATE, collate) == NULL)
-		ereport(FATAL,
-				(errmsg("database locale is incompatible with operating system"),
-				 errdetail("The database was initialized with LC_COLLATE \"%s\", "
-						   " which is not recognized by setlocale().", collate),
-				 errhint("Recreate the database with another locale or install the missing locale.")));
-
-	if (pg_perm_setlocale(LC_CTYPE, ctype) == NULL)
-		ereport(FATAL,
-				(errmsg("database locale is incompatible with operating system"),
-				 errdetail("The database was initialized with LC_CTYPE \"%s\", "
-						   " which is not recognized by setlocale().", ctype),
-				 errhint("Recreate the database with another locale or install the missing locale.")));
-
-	/* Make the locale settings visible as GUC variables, too */
-	SetConfigOption("lc_collate", collate, PGC_INTERNAL, PGC_S_OVERRIDE);
-	SetConfigOption("lc_ctype", ctype, PGC_INTERNAL, PGC_S_OVERRIDE);
+	/*
+	 * minipg 已裁剪 locale 机制：pg_database 不再保存 datcollate/datctype，
+	 * 进程也不再调整 locale，恒为 C locale（详见 pg_locale.c 头部说明）。
+	 */
 
 	ReleaseSysCache(tup);
 }

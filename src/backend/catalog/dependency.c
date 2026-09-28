@@ -136,7 +136,7 @@ static const Oid object_classes[] = {
 	ProcedureRelationId,		/* OCLASS_PROC */
 	TypeRelationId,				/* OCLASS_TYPE */
 	CastRelationId,				/* OCLASS_CAST */
-	CollationRelationId,		/* OCLASS_COLLATION */
+	InvalidOid,					/* OCLASS_COLLATION: pg_collation 已移除 */
 	ConstraintRelationId,		/* OCLASS_CONSTRAINT */
 	OperatorRelationId,			/* OCLASS_OPERATOR */
 	OperatorClassRelationId,	/* OCLASS_OPCLASS */
@@ -1586,8 +1586,10 @@ find_expr_references_walker(Node *node,
 					break;
 				case REGCOLLATIONOID:
 					objoid = DatumGetObjectId(con->constvalue);
-					if (SearchSysCacheExists1(COLLOID,
-											  ObjectIdGetDatum(objoid)))
+					/* minipg 只有内置的 default/C/POSIX，pg_collation 已移除 */
+					if (objoid == DEFAULT_COLLATION_OID ||
+						objoid == C_COLLATION_OID ||
+						objoid == POSIX_COLLATION_OID)
 						add_object_address(OCLASS_COLLATION, objoid, 0,
 										   context->addrs);
 					break;
@@ -2325,9 +2327,6 @@ getObjectClass(const ObjectAddress *object)
 
 		case CastRelationId:
 			return OCLASS_CAST;
-
-		case CollationRelationId:
-			return OCLASS_COLLATION;
 
 		case ConstraintRelationId:
 			return OCLASS_CONSTRAINT;

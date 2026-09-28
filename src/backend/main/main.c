@@ -29,7 +29,6 @@
 #include "storage/spin.h"
 #include "tcop/tcopprot.h"
 #include "utils/memutils.h"
-#include "utils/pg_locale.h"
 #include "utils/ps_status.h"
 
 
@@ -37,7 +36,6 @@ const char *progname;
 
 
 static void startup_hacks(const char *progname);
-static void init_locale(const char *categoryname, int category, const char *locale);
 static void help(const char *progname);
 
 /*
@@ -81,41 +79,12 @@ main(int argc, char *argv[])
 	MemoryContextInit();
 
 	/*
-	 * Set up locale information
+	 * Set up the application-specific service directory (PGSYSCONFDIR).
+	 *
+	 * minipg 已裁剪 locale 与 collation 概念：进程不再吸收环境 locale，
+	 * 一律使用 C locale，因此这里只保留服务目录的设置。
 	 */
 	set_pglocale_pgservice(argv[0], PG_TEXTDOMAIN("postgres"));
-
-	/*
-	 * In the postmaster, absorb the environment values for LC_COLLATE and
-	 * LC_CTYPE.  Individual backends will change these later to settings
-	 * taken from pg_database, but the postmaster cannot do that.  If we leave
-	 * these set to "C" then message localization might not work well in the
-	 * postmaster.
-	 */
-	init_locale("LC_COLLATE", LC_COLLATE, "");
-	init_locale("LC_CTYPE", LC_CTYPE, "");
-
-	/*
-	 * LC_MESSAGES will get set later during GUC option processing, but we set
-	 * it here to allow startup error messages to be localized.
-	 */
-#ifdef LC_MESSAGES
-	init_locale("LC_MESSAGES", LC_MESSAGES, "");
-#endif
-
-	/*
-	 * We keep LC_NUMERIC set to "C" always, so that numeric input parsing
-	 * uses "." as the decimal point regardless of the environment locale.
-	 * (Monetary formatting was removed; see pg_locale.c for background.)
-	 */
-	init_locale("LC_NUMERIC", LC_NUMERIC, "C");
-
-	/*
-	 * Now that we have absorbed as much as we wish to from the locale
-	 * environment, remove any LC_ALL setting, so that the environment
-	 * variables installed by pg_perm_setlocale have force.
-	 */
-	unsetenv("LC_ALL");
 
 	/*
 	 * Catch standard options before doing much else, in particular before we
@@ -171,24 +140,6 @@ startup_hacks(const char *progname)
 	 */
 	SpinLockInit(&dummy_spinlock);
 }
-
-
-/*
- * Make the initial permanent setting for a locale category.  If that fails,
- * perhaps due to LC_foo=invalid in the environment, use locale C.  If even
- * that fails, perhaps due to out-of-memory, the entire startup fails with it.
- * When this returns, we are guaranteed to have a setting for the given
- * category's environment variable.
- */
-static void
-init_locale(const char *categoryname, int category, const char *locale)
-{
-	if (pg_perm_setlocale(category, locale) == NULL &&
-		pg_perm_setlocale(category, "C") == NULL)
-		elog(FATAL, "could not adopt \"%s\" locale nor C locale for %s",
-			 locale, categoryname);
-}
-
 
 
 /*

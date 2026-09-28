@@ -71,7 +71,7 @@ public|psql_test|table
 DROP TABLE psql_test;
 -- list databases
 \l
-postgres|SQL_ASCII|C|C
-regression|SQL_ASCII|C|C
-template0|SQL_ASCII|C|C
-template1|SQL_ASCII|C|C
+postgres|SQL_ASCII
+regression|SQL_ASCII
+template0|SQL_ASCII
+template1|SQL_ASCII

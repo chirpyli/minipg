@@ -532,15 +532,9 @@ GenerateTypeDependencies(HeapTuple typeTuple,
 	}
 
 	/*
-	 * Normal dependency from a type to its collation.  We know the default
-	 * collation is pinned, so don't bother recording it.
+	 * minipg 只有默认排序规则（C），且 pg_type 已不再记录 typcollation，
+	 * 因此类型对排序规则的依赖无需记录。
 	 */
-	if (OidIsValid(InvalidOid) &&
-		InvalidOid != DEFAULT_COLLATION_OID)
-	{
-		ObjectAddressSet(referenced, CollationRelationId, InvalidOid);
-		add_exact_object_address(&referenced, addrs_normal);
-	}
 
 	record_object_address_dependencies(&myself, addrs_normal, DEPENDENCY_NORMAL);
 	free_object_addresses(addrs_normal);

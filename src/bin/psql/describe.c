@@ -66,15 +66,9 @@ listAllDbs(const char *pattern, bool verbose)
 
 	printfPQExpBuffer(&buf,
 					  "SELECT d.datname as \"%s\",\n"
-					  "       pg_catalog.pg_encoding_to_char(d.encoding) as \"%s\",\n",
+					  "       pg_catalog.pg_encoding_to_char(d.encoding) as \"%s\"\n",
 					  gettext_noop("Name"),
 					  gettext_noop("Encoding"));
-	if (pset.sversion >= 80400)
-		appendPQExpBuffer(&buf,
-						  "       d.datcollate as \"%s\",\n"
-						  "       d.datctype as \"%s\"\n",
-						  gettext_noop("Collate"),
-						  gettext_noop("Ctype"));
 	appendPQExpBufferStr(&buf, "       ");
 	if (verbose && pset.sversion >= 80200)
 	{

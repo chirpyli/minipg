@@ -240,7 +240,6 @@ extern int	pg_get_client_encoding(void);
 extern void SetDatabaseEncoding(int encoding);
 extern int	GetDatabaseEncoding(void);
 extern const char *GetDatabaseEncodingName(void);
-extern void SetMessageEncoding(int encoding);
 
 extern unsigned char *pg_do_encoding_conversion(unsigned char *src, int len,
 												int src_encoding,

@@ -101,7 +101,6 @@ extern bool OpclassIsVisible(Oid opcid);
 extern Oid	OpfamilynameGetOpfid(Oid amid, const char *opfname);
 extern bool OpfamilyIsVisible(Oid opfid);
 
-extern Oid	CollationGetCollid(const char *collname);
 extern bool CollationIsVisible(Oid collid);
 
 
