@@ -26,7 +26,6 @@
 #include "postgres.h"
 
 #include "miscadmin.h"
-#include "pg_trace.h"
 #include "utils/backend_status.h"
 #include "storage/lmgr.h"
 #include "storage/proc.h"
@@ -231,8 +230,6 @@ DeadLockCheck(PGPROC *proc)
 		 * deadlockDetails[] for the basic state with no rearrangements.
 		 */
 		int			nSoftEdges;
-
-		TRACE_POSTGRESQL_DEADLOCK_FOUND();
 
 		nWaitOrders = 0;
 		if (!FindLockCycle(proc, possibleConstraints, &nSoftEdges))

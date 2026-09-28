@@ -43,7 +43,6 @@
 #include "executor/instrument.h"
 #include "lib/binaryheap.h"
 #include "miscadmin.h"
-#include "pg_trace.h"
 #include "utils/wait_event.h"
 #include "postmaster/bgwriter.h"
 #include "storage/buf_internals.h"
@@ -799,13 +798,6 @@ ReadBuffer_common(SMgrRelation smgr, char relpersistence, ForkNumber forkNum,
 
 	isExtend = (blockNum == P_NEW);
 
-	TRACE_POSTGRESQL_BUFFER_READ_START(forkNum, blockNum,
-									   smgr->smgr_rnode.node.spcNode,
-									   smgr->smgr_rnode.node.dbNode,
-									   smgr->smgr_rnode.node.relNode,
-									   smgr->smgr_rnode.backend,
-									   isExtend);
-
 	/* Substitute proper block number if caller asked for P_NEW */
 	if (isExtend)
 	{
@@ -860,14 +852,6 @@ ReadBuffer_common(SMgrRelation smgr, char relpersistence, ForkNumber forkNum,
 
 			if (VacuumCostActive)
 				VacuumCostBalance += VacuumCostPageHit;
-
-			TRACE_POSTGRESQL_BUFFER_READ_DONE(forkNum, blockNum,
-											  smgr->smgr_rnode.node.spcNode,
-											  smgr->smgr_rnode.node.dbNode,
-											  smgr->smgr_rnode.node.relNode,
-											  smgr->smgr_rnode.backend,
-											  isExtend,
-											  found);
 
 			/*
 			 * In RBM_ZERO_AND_LOCK mode the caller expects the page to be
@@ -1028,14 +1012,6 @@ ReadBuffer_common(SMgrRelation smgr, char relpersistence, ForkNumber forkNum,
 	VacuumPageMiss++;
 	if (VacuumCostActive)
 		VacuumCostBalance += VacuumCostPageMiss;
-
-	TRACE_POSTGRESQL_BUFFER_READ_DONE(forkNum, blockNum,
-									  smgr->smgr_rnode.node.spcNode,
-									  smgr->smgr_rnode.node.dbNode,
-									  smgr->smgr_rnode.node.relNode,
-									  smgr->smgr_rnode.backend,
-									  isExtend,
-									  found);
 
 	return BufferDescriptorGetBuffer(bufHdr);
 }
@@ -1208,21 +1184,11 @@ BufferAlloc(SMgrRelation smgr, char relpersistence, ForkNumber forkNum,
 				}
 
 				/* OK, do the I/O */
-				TRACE_POSTGRESQL_BUFFER_WRITE_DIRTY_START(forkNum, blockNum,
-														  smgr->smgr_rnode.node.spcNode,
-														  smgr->smgr_rnode.node.dbNode,
-														  smgr->smgr_rnode.node.relNode);
-
 				FlushBuffer(buf, NULL);
 				LWLockRelease(BufferDescriptorGetContentLock(buf));
 
 				ScheduleBufferTagForWriteback(&BackendWritebackContext,
 											  &buf->tag);
-
-				TRACE_POSTGRESQL_BUFFER_WRITE_DIRTY_DONE(forkNum, blockNum,
-														 smgr->smgr_rnode.node.spcNode,
-														 smgr->smgr_rnode.node.dbNode,
-														 smgr->smgr_rnode.node.relNode);
 			}
 			else
 			{
@@ -1972,8 +1938,6 @@ BufferSync(int flags)
 
 	WritebackContextInit(&wb_context, &checkpoint_flush_after);
 
-	TRACE_POSTGRESQL_BUFFER_SYNC_START(NBuffers, num_to_scan);
-
 	/*
 	 * Sort buffers that need to be written to reduce the likelihood of random
 	 * IO. The sorting is also important for the implementation of balancing
@@ -2107,7 +2071,6 @@ BufferSync(int flags)
 		{
 			if (SyncOneBuffer(buf_id, false, &wb_context) & BUF_WRITTEN)
 			{
-				TRACE_POSTGRESQL_BUFFER_SYNC_WRITTEN(buf_id);
 				num_written++;
 			}
 		}
@@ -2151,8 +2114,6 @@ BufferSync(int flags)
 	 * buffers written by other backends or bgwriter scan.
 	 */
 	CheckpointStats.ckpt_bufs_written += num_written;
-
-	TRACE_POSTGRESQL_BUFFER_SYNC_DONE(NBuffers, num_written, num_to_scan);
 }
 
 /*
@@ -2861,12 +2822,6 @@ FlushBuffer(BufferDesc *buf, SMgrRelation reln)
 	if (reln == NULL)
 		reln = smgropen(buf->tag.rnode, InvalidBackendId);
 
-	TRACE_POSTGRESQL_BUFFER_FLUSH_START(buf->tag.forkNum,
-										buf->tag.blockNum,
-										reln->smgr_rnode.node.spcNode,
-										reln->smgr_rnode.node.dbNode,
-										reln->smgr_rnode.node.relNode);
-
 	buf_state = LockBufHdr(buf);
 
 	/*
@@ -2931,12 +2886,6 @@ FlushBuffer(BufferDesc *buf, SMgrRelation reln)
 	 * end the BM_IO_IN_PROGRESS state.
 	 */
 	TerminateBufferIO(buf, true, 0);
-
-	TRACE_POSTGRESQL_BUFFER_FLUSH_DONE(buf->tag.forkNum,
-									   buf->tag.blockNum,
-									   reln->smgr_rnode.node.spcNode,
-									   reln->smgr_rnode.node.dbNode,
-									   reln->smgr_rnode.node.relNode);
 
 	/* Pop the error context stack */
 	error_context_stack = errcallback.previous;

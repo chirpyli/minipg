@@ -27,7 +27,6 @@
 #include "common/pg_lzcompress.h"
 #include "executor/instrument.h"
 #include "miscadmin.h"
-#include "pg_trace.h"
 #include "storage/bufmgr.h"
 #include "storage/proc.h"
 #include "utils/memutils.h"
@@ -434,8 +433,6 @@ XLogInsert(RmgrId rmid, uint8 info)
 				  XLR_SPECIAL_REL_UPDATE |
 				  XLR_CHECK_CONSISTENCY)) != 0)
 		elog(PANIC, "invalid xlog info mask %02X", info);
-
-	TRACE_POSTGRESQL_WAL_INSERT(rmid, info);
 
 	/*
 	 * In bootstrap mode, we don't actually log anything but XLOG resources;

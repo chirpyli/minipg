@@ -31,7 +31,6 @@
 #include "access/slru.h"
 #include "access/subtrans.h"
 #include "access/transam.h"
-#include "pg_trace.h"
 #include "utils/snapmgr.h"
 
 
@@ -290,9 +289,7 @@ CheckPointSUBTRANS(void)
 	 * it merely to improve the odds that writing of dirty pages is done by
 	 * the checkpoint process and not by backends.
 	 */
-	TRACE_POSTGRESQL_SUBTRANS_CHECKPOINT_START(true);
 	SimpleLruWriteAll(SubTransCtl, true);
-	TRACE_POSTGRESQL_SUBTRANS_CHECKPOINT_DONE(true);
 }
 
 

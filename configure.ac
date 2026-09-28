@@ -181,18 +181,6 @@ fi])
 AC_SUBST(enable_coverage)
 
 #
-# DTrace
-#
-PGAC_ARG_BOOL(enable, dtrace, no,
-              [build with DTrace support],
-[PGAC_PATH_PROGS(DTRACE, dtrace)
-if test -z "$DTRACE"; then
-  AC_MSG_ERROR([dtrace not found])
-fi
-AC_SUBST(DTRACEFLAGS)])
-AC_SUBST(enable_dtrace)
-
-#
 # TAP tests
 #
 PGAC_ARG_BOOL(enable, tap-tests, no,

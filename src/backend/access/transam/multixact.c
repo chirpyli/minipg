@@ -79,7 +79,6 @@
 #include "funcapi.h"
 #include "lib/ilist.h"
 #include "miscadmin.h"
-#include "pg_trace.h"
 
 #include "storage/lmgr.h"
 #include "storage/pmsignal.h"
@@ -2157,7 +2156,6 @@ MultiXactGetCheckptMulti(bool is_shutdown,
 void
 CheckPointMultiXact(void)
 {
-	TRACE_POSTGRESQL_MULTIXACT_CHECKPOINT_START(true);
 
 	/*
 	 * Write dirty MultiXact pages to disk.  This may result in sync requests
@@ -2166,8 +2164,6 @@ CheckPointMultiXact(void)
 	 */
 	SimpleLruWriteAll(MultiXactOffsetCtl, true);
 	SimpleLruWriteAll(MultiXactMemberCtl, true);
-
-	TRACE_POSTGRESQL_MULTIXACT_CHECKPOINT_DONE(true);
 }
 
 /*

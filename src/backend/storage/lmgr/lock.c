@@ -37,7 +37,6 @@
 #include "access/xact.h"
 #include "access/xlog.h"
 #include "miscadmin.h"
-#include "pg_trace.h"
 #include "storage/proc.h"
 #include "storage/procarray.h"
 #include "storage/sinvaladt.h"
@@ -1069,21 +1068,7 @@ LockAcquireExtended(const LOCKTAG *locktag,
 		 * Sleep till someone wakes me up.
 		 */
 
-		TRACE_POSTGRESQL_LOCK_WAIT_START(locktag->locktag_field1,
-										 locktag->locktag_field2,
-										 locktag->locktag_field3,
-										 locktag->locktag_field4,
-										 locktag->locktag_type,
-										 lockmode);
-
 		WaitOnLock(locallock, owner);
-
-		TRACE_POSTGRESQL_LOCK_WAIT_DONE(locktag->locktag_field1,
-										locktag->locktag_field2,
-										locktag->locktag_field3,
-										locktag->locktag_field4,
-										locktag->locktag_type,
-										lockmode);
 
 		/*
 		 * NOTE: do not do any material change of state between here and

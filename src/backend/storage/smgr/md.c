@@ -29,7 +29,6 @@
 #include "access/xlogutils.h"
 #include "commands/tablespace.h"
 #include "miscadmin.h"
-#include "pg_trace.h"
 #include "utils/wait_event.h"
 #include "postmaster/bgwriter.h"
 #include "storage/bufmgr.h"
@@ -640,12 +639,6 @@ mdread(SMgrRelation reln, ForkNumber forknum, BlockNumber blocknum,
 	int			nbytes;
 	MdfdVec    *v;
 
-	TRACE_POSTGRESQL_SMGR_MD_READ_START(forknum, blocknum,
-										reln->smgr_rnode.node.spcNode,
-										reln->smgr_rnode.node.dbNode,
-										reln->smgr_rnode.node.relNode,
-										reln->smgr_rnode.backend);
-
 	v = _mdfd_getseg(reln, forknum, blocknum, false,
 					 EXTENSION_FAIL | EXTENSION_CREATE_RECOVERY);
 
@@ -654,14 +647,6 @@ mdread(SMgrRelation reln, ForkNumber forknum, BlockNumber blocknum,
 	Assert(seekpos < (off_t) BLCKSZ * RELSEG_SIZE);
 
 	nbytes = FileRead(v->mdfd_vfd, buffer, BLCKSZ, seekpos, WAIT_EVENT_DATA_FILE_READ);
-
-	TRACE_POSTGRESQL_SMGR_MD_READ_DONE(forknum, blocknum,
-									   reln->smgr_rnode.node.spcNode,
-									   reln->smgr_rnode.node.dbNode,
-									   reln->smgr_rnode.node.relNode,
-									   reln->smgr_rnode.backend,
-									   nbytes,
-									   BLCKSZ);
 
 	if (nbytes != BLCKSZ)
 	{
@@ -710,12 +695,6 @@ mdwrite(SMgrRelation reln, ForkNumber forknum, BlockNumber blocknum,
 	Assert(blocknum < mdnblocks(reln, forknum));
 #endif
 
-	TRACE_POSTGRESQL_SMGR_MD_WRITE_START(forknum, blocknum,
-										 reln->smgr_rnode.node.spcNode,
-										 reln->smgr_rnode.node.dbNode,
-										 reln->smgr_rnode.node.relNode,
-										 reln->smgr_rnode.backend);
-
 	v = _mdfd_getseg(reln, forknum, blocknum, skipFsync,
 					 EXTENSION_FAIL | EXTENSION_CREATE_RECOVERY);
 
@@ -724,14 +703,6 @@ mdwrite(SMgrRelation reln, ForkNumber forknum, BlockNumber blocknum,
 	Assert(seekpos < (off_t) BLCKSZ * RELSEG_SIZE);
 
 	nbytes = FileWrite(v->mdfd_vfd, buffer, BLCKSZ, seekpos, WAIT_EVENT_DATA_FILE_WRITE);
-
-	TRACE_POSTGRESQL_SMGR_MD_WRITE_DONE(forknum, blocknum,
-										reln->smgr_rnode.node.spcNode,
-										reln->smgr_rnode.node.dbNode,
-										reln->smgr_rnode.node.relNode,
-										reln->smgr_rnode.backend,
-										nbytes,
-										BLCKSZ);
 
 	if (nbytes != BLCKSZ)
 	{

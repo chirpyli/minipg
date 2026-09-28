@@ -185,7 +185,6 @@ with_uuid	= @with_uuid@
 with_zlib	= @with_zlib@
 enable_rpath	= @enable_rpath@
 enable_debug	= @enable_debug@
-enable_dtrace	= @enable_dtrace@
 enable_coverage	= @enable_coverage@
 enable_tap_tests	= @enable_tap_tests@
 enable_thread_safety	= @enable_thread_safety@
@@ -247,8 +246,6 @@ BISON = @BISON@
 BISONFLAGS = @BISONFLAGS@ $(YFLAGS)
 FLEX = @FLEX@
 FLEXFLAGS = @FLEXFLAGS@ $(LFLAGS)
-DTRACE = @DTRACE@
-DTRACEFLAGS = @DTRACEFLAGS@
 
 # Linking
 

@@ -99,7 +99,6 @@
 #include "catalog/pg_am.h"
 #include "executor/executor.h"
 #include "miscadmin.h"
-#include "pg_trace.h"
 #include "utils/datum.h"
 #include "utils/logtape.h"
 #include "utils/lsyscache.h"
@@ -814,13 +813,6 @@ tuplesort_begin_heap(TupleDesc tupDesc,
 
 	state->nKeys = nkeys;
 
-	TRACE_POSTGRESQL_SORT_START(HEAP_SORT,
-								false,	/* no unique check */
-								nkeys,
-								workMem,
-								randomAccess,
-								0);		/* 0 = serial sort */
-
 	state->comparetup = comparetup_heap;
 	state->copytup = copytup_heap;
 	state->writetup = writetup_heap;
@@ -888,13 +880,6 @@ tuplesort_begin_cluster(TupleDesc tupDesc,
 #endif
 
 	state->nKeys = IndexRelationGetNumberOfKeyAttributes(indexRel);
-
-	TRACE_POSTGRESQL_SORT_START(CLUSTER_SORT,
-								false,	/* no unique check */
-								state->nKeys,
-								workMem,
-								randomAccess,
-								0);		/* 0 = serial sort */
 
 	state->comparetup = comparetup_cluster;
 	state->copytup = copytup_cluster;
@@ -982,13 +967,6 @@ tuplesort_begin_index_btree(Relation heapRel,
 #endif
 
 	state->nKeys = IndexRelationGetNumberOfKeyAttributes(indexRel);
-
-	TRACE_POSTGRESQL_SORT_START(INDEX_SORT,
-								enforceUnique,
-								state->nKeys,
-								workMem,
-								randomAccess,
-								0);		/* 0 = serial sort */
 
 	state->comparetup = comparetup_index_btree;
 	state->copytup = copytup_index;
@@ -1100,13 +1078,6 @@ tuplesort_begin_datum(Oid datumType, Oid sortOperator, Oid sortCollation,
 #endif
 
 	state->nKeys = 1;			/* always a one-column sort */
-
-	TRACE_POSTGRESQL_SORT_START(DATUM_SORT,
-								false,	/* no unique check */
-								1,
-								workMem,
-								randomAccess,
-								0);		/* 0 = serial sort */
 
 	state->comparetup = comparetup_datum;
 	state->copytup = copytup_datum;
@@ -1251,15 +1222,6 @@ tuplesort_free(Tuplesortstate *state)
 			elog(LOG, "internal sort ended, %ld KB used: %s",
 				 spaceUsed, pg_rusage_show(&state->ru_start));
 	}
-
-	TRACE_POSTGRESQL_SORT_DONE(state->tapeset != NULL, spaceUsed);
-#else
-
-	/*
-	 * If you disabled TRACE_SORT, you can still probe sort__done, but you
-	 * ain't getting space-used stats.
-	 */
-	TRACE_POSTGRESQL_SORT_DONE(state->tapeset != NULL, 0L);
 #endif
 
 	/* Free any execution state created for CLUSTER case */

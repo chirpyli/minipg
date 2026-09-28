@@ -44,7 +44,6 @@
 #include "common/file_utils.h"
 #include "executor/instrument.h"
 #include "miscadmin.h"
-#include "pg_trace.h"
 #include "utils/wait_event.h"
 #include "port/atomics.h"
 #include "port/pg_iovec.h"
@@ -1088,7 +1087,6 @@ XLogInsertRecord(XLogRecData *rdata,
 	 */
 	if (isLogSwitch)
 	{
-		TRACE_POSTGRESQL_WAL_SWITCH();
 		XLogFlush(EndPos);
 
 		/*
@@ -2104,12 +2102,10 @@ AdvanceXLInsertBuffer(XLogRecPtr upto, bool opportunistic)
 				else
 				{
 					/* Have to write it ourselves */
-					TRACE_POSTGRESQL_WAL_BUFFER_WRITE_DIRTY_START();
 					WriteRqst.Write = OldPageRqstPtr;
 					WriteRqst.Flush = 0;
 					XLogWrite(WriteRqst, false);
 					LWLockRelease(WALWriteLock);
-					TRACE_POSTGRESQL_WAL_BUFFER_WRITE_DIRTY_DONE();
 				}
 				/* Re-acquire WALBufMappingLock and retry */
 				LWLockAcquire(WALBufMappingLock, LW_EXCLUSIVE);
@@ -6753,8 +6749,6 @@ CreateCheckPoint(int flags)
 	/* Update the process title */
 	update_checkpoint_display(flags, false, false);
 
-	TRACE_POSTGRESQL_CHECKPOINT_START(flags);
-
 	/*
 	 * Get the other info we need for the checkpoint record.
 	 *
@@ -6970,12 +6964,6 @@ CreateCheckPoint(int flags)
 
 	/* Reset the process title */
 	update_checkpoint_display(flags, false, true);
-
-	TRACE_POSTGRESQL_CHECKPOINT_DONE(CheckpointStats.ckpt_bufs_written,
-									 NBuffers,
-									 CheckpointStats.ckpt_segs_added,
-									 CheckpointStats.ckpt_segs_removed,
-									 CheckpointStats.ckpt_segs_recycled);
 }
 
 /*
@@ -7037,7 +7025,6 @@ CheckPointGuts(XLogRecPtr checkPointRedo, int flags)
 	CheckPointRelationMap();
 
 	/* Write out all dirty data in SLRUs and the main buffer pool */
-	TRACE_POSTGRESQL_BUFFER_CHECKPOINT_START(flags);
 	CheckpointStats.ckpt_write_t = GetCurrentTimestamp();
 	CheckPointCLOG();
 	CheckPointSUBTRANS();
@@ -7046,11 +7033,9 @@ CheckPointGuts(XLogRecPtr checkPointRedo, int flags)
 	CheckPointBuffers(flags);
 
 	/* Perform all queued up fsyncs */
-	TRACE_POSTGRESQL_BUFFER_CHECKPOINT_SYNC_START();
 	CheckpointStats.ckpt_sync_t = GetCurrentTimestamp();
 	ProcessSyncRequests();
 	CheckpointStats.ckpt_sync_end_t = GetCurrentTimestamp();
-	TRACE_POSTGRESQL_BUFFER_CHECKPOINT_DONE();
 }
 
 /*

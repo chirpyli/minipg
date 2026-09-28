@@ -33,7 +33,6 @@
 #include "commands/tablecmds.h"
 #include "libpq/pqsignal.h"
 #include "miscadmin.h"
-#include "pg_trace.h"
 #include "storage/condition_variable.h"
 #include "storage/fd.h"
 #include "storage/lmgr.h"
@@ -1621,8 +1620,6 @@ StartTransaction(void)
 	Assert(MyProc->backendId == vxid.backendId);
 	MyProc->lxid = vxid.localTransactionId;
 
-	TRACE_POSTGRESQL_TRANSACTION_START(vxid.localTransactionId);
-
 	/*
 	 * set transaction_timestamp() (a/k/a now()).  We want this to be the same
 	 * as the first command's statement_timestamp(), so don't do a fresh
@@ -1715,8 +1712,6 @@ CommitTransaction(void)
 	 * durably commit.
 	 */
 	latestXid = RecordTransactionCommit();
-
-	TRACE_POSTGRESQL_TRANSACTION_COMMIT(MyProc->lxid);
 
 	/*
 	 * Let others know about no transaction in progress by me. Note that this
@@ -1921,8 +1916,6 @@ AbortTransaction(void)
 	 * far as assigning an XID to advertise).
 	 */
 	latestXid = RecordTransactionAbort(false);
-
-	TRACE_POSTGRESQL_TRANSACTION_ABORT(MyProc->lxid);
 
 	/*
 	 * Let others know about no transaction in progress by me. Note that this

@@ -24,18 +24,6 @@ SUBDIRS = access bootstrap catalog parser commands executor lib libpq \
 
 include $(srcdir)/common.mk
 
-# As of 1/2010:
-# The probes.o file is necessary for dtrace support on Solaris, and on recent
-# versions of systemtap.  (Older systemtap releases just produce an empty
-# file, but that's okay.)  However, macOS's dtrace doesn't use it and doesn't
-# even recognize the -G option.  So, build probes.o except on macOS.
-# This might need adjustment as other platforms add dtrace support.
-ifneq ($(PORTNAME), darwin)
-ifeq ($(enable_dtrace), yes)
-LOCALOBJS += utils/probes.o
-endif
-endif
-
 OBJS = \
 	$(LOCALOBJS) \
 	$(SUBDIROBJS) \
@@ -167,9 +155,6 @@ $(top_builddir)/src/include/storage/lwlocknames.h: storage/lmgr/lwlocknames.h
 	prereqdir=`cd '$(dir $<)' >/dev/null && pwd` && \
 	  cd '$(dir $@)' && rm -f $(notdir $@) && \
 	  $(LN_S) "$$prereqdir/$(notdir $<)" .
-
-utils/probes.o: utils/probes.d $(SUBDIROBJS)
-	$(DTRACE) $(DTRACEFLAGS) -C -G -s $(call expand_subsys,$^) -o $@
 
 
 ##########################################################################

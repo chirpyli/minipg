@@ -39,7 +39,6 @@
 #include "access/xloginsert.h"
 #include "access/xlogutils.h"
 #include "miscadmin.h"
-#include "pg_trace.h"
 #include "utils/wait_event.h"
 #include "storage/proc.h"
 #include "storage/sync.h"
@@ -823,9 +822,7 @@ CheckPointCLOG(void)
 	 * queued for later handling by ProcessSyncRequests(), as part of the
 	 * checkpoint.
 	 */
-	TRACE_POSTGRESQL_CLOG_CHECKPOINT_START(true);
 	SimpleLruWriteAll(XactCtl, true);
-	TRACE_POSTGRESQL_CLOG_CHECKPOINT_DONE(true);
 }
 
 

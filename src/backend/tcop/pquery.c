@@ -21,7 +21,6 @@
 #include "executor/executor.h"
 #include "executor/tstoreReceiver.h"
 #include "miscadmin.h"
-#include "pg_trace.h"
 #include "tcop/pquery.h"
 #include "tcop/utility.h"
 #include "utils/memutils.h"
@@ -596,8 +595,6 @@ PortalRun(Portal portal, long count, bool isTopLevel,
 
 	AssertArg(PortalIsValid(portal));
 
-	TRACE_POSTGRESQL_QUERY_EXECUTE_START();
-
 	/* Initialize empty completion data */
 	if (qc)
 		InitializeQueryCompletion(qc);
@@ -724,9 +721,6 @@ PortalRun(Portal portal, long count, bool isTopLevel,
 	else
 		CurrentResourceOwner = saveResourceOwner;
 	PortalContext = savePortalContext;
-
-
-	TRACE_POSTGRESQL_QUERY_EXECUTE_DONE();
 
 	return result;
 }
@@ -1035,9 +1029,6 @@ PortalRunMulti(Portal portal,
 			/*
 			 * process a plannable query.
 			 */
-			TRACE_POSTGRESQL_QUERY_EXECUTE_START();
-
-
 			/*
 			 * Must always have a snapshot for plannable queries.  First time
 			 * through, take a new snapshot; for subsequent queries in the
@@ -1092,9 +1083,6 @@ PortalRunMulti(Portal portal,
 							 portal->portalParams,
 							 altdest, NULL);
 			}
-
-
-			TRACE_POSTGRESQL_QUERY_EXECUTE_DONE();
 		}
 		else
 		{

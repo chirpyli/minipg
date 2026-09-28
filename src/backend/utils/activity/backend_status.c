@@ -15,7 +15,6 @@
 #include "libpq/libpq.h"
 #include "mb/pg_wchar.h"			/* for pg_mbcliplen */
 #include "miscadmin.h"
-#include "pg_trace.h"
 #include "port/atomics.h"		/* for memory barriers */
 #include "storage/ipc.h"
 #include "storage/proc.h"		/* for MyProc */
@@ -375,8 +374,6 @@ pgstat_report_activity(BackendState state, const char *cmd_str)
 	TimestampTz start_timestamp;
 	TimestampTz current_timestamp;
 	int			len = 0;
-
-	TRACE_POSTGRESQL_STATEMENT_STATUS(cmd_str);
 
 	if (!beentry)
 		return;
