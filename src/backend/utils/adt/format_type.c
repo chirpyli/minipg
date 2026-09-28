@@ -227,29 +227,6 @@ format_type_extended(Oid type_oid, int32 typemod, bits16 flags)
 
 
 
-		case TIMEOID:
-			if (with_typemod)
-				buf = printTypmod("time", typemod, typeform->typmodout);
-			else
-				buf = pstrdup("time without time zone");
-			break;
-
-		case TIMESTAMPOID:
-			if (with_typemod)
-				buf = printTypmod("timestamp", typemod, typeform->typmodout);
-			else
-				buf = pstrdup("timestamp without time zone");
-			break;
-
-		case TIMESTAMPTZOID:
-			if (with_typemod)
-				buf = printTypmod("timestamp", typemod, typeform->typmodout);
-			else
-				buf = pstrdup("timestamp with time zone");
-			break;
-
-
-
 		case VARCHAROID:
 			if (with_typemod)
 				buf = printTypmod("character varying", typemod, typeform->typmodout);

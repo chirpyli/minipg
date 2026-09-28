@@ -3252,11 +3252,6 @@ cost_qual_eval_walker(Node *node, cost_qual_eval_context *context)
 			context->total.per_tuple += perelemcost.per_tuple *
 				estimate_array_length((Node *) acoerce->arg);
 	}
-	else if (IsA(node, SQLValueFunction))
-	{
-		/* Treat all these as having cost 1 */
-		context->total.per_tuple += cpu_operator_cost;
-	}
 	else if (IsA(node, SubLink))
 	{
 		/* This routine should not be applied to un-planned expressions */

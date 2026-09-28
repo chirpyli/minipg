@@ -152,9 +152,6 @@ exprType(const Node *expr)
 		case T_CoalesceExpr:
 			type = ((const CoalesceExpr *) expr)->coalescetype;
 			break;
-		case T_SQLValueFunction:
-			type = ((const SQLValueFunction *) expr)->type;
-			break;
 		case T_NullTest:
 			type = BOOLOID;
 			break;
@@ -349,8 +346,6 @@ exprTypmod(const Node *expr)
 				return typmod;
 			}
 			break;
-		case T_SQLValueFunction:
-			return ((const SQLValueFunction *) expr)->typmod;
 		case T_PlaceHolderVar:
 			return exprTypmod((Node *) ((const PlaceHolderVar *) expr)->phexpr);
 		default:
@@ -741,13 +736,6 @@ exprCollation(const Node *expr)
 		case T_CoalesceExpr:
 			coll = ((const CoalesceExpr *) expr)->coalescecollid;
 			break;
-		case T_SQLValueFunction:
-			/* Returns either NAME or a non-collatable type */
-			if (((const SQLValueFunction *) expr)->type == NAMEOID)
-				coll = C_COLLATION_OID;
-			else
-				coll = InvalidOid;
-			break;
 		case T_NullTest:
 			/* NullTest's result is boolean ... */
 			coll = InvalidOid;	/* ... so it has no collation */
@@ -903,11 +891,6 @@ exprSetCollation(Node *expr, Oid collation)
 			break;
 		case T_CoalesceExpr:
 			((CoalesceExpr *) expr)->coalescecollid = collation;
-			break;
-		case T_SQLValueFunction:
-			Assert((((SQLValueFunction *) expr)->type == NAMEOID) ?
-				   (collation == C_COLLATION_OID) :
-				   (collation == InvalidOid));
 			break;
 		case T_NullTest:
 			/* NullTest's result is boolean ... */
@@ -1133,10 +1116,6 @@ exprLocation(const Node *expr)
 			/* COALESCE keyword should always be the first thing */
 			loc = ((const CoalesceExpr *) expr)->location;
 			break;
-		case T_SQLValueFunction:
-			/* function keyword should always be the first thing */
-			loc = ((const SQLValueFunction *) expr)->location;
-			break;
 		case T_NullTest:
 			{
 				const NullTest *nexpr = (const NullTest *) expr;
@@ -1336,10 +1315,9 @@ set_sa_opfuncid(ScalarArrayOpExpr *opexpr)
  * for themselves, in case additional checks should be made, or because they
  * have special rules about which parts of the tree need to be visited.
  *
- * Note: we ignore SQLValueFunction,
- * and NextValueExpr nodes, because they do not contain SQL function OIDs.
- * However, they can invoke SQL-visible functions, so callers should take
- * thought about how to treat them.
+ * Note: we ignore NextValueExpr nodes, because they do not contain SQL
+ * function OIDs.  However, they can invoke SQL-visible functions, so callers
+ * should take thought about how to treat them.
  */
 bool
 check_functions_in_node(Node *node, check_function_callback checker,
@@ -1520,7 +1498,6 @@ expression_tree_walker(Node *node,
 		case T_Const:
 		case T_Param:
 		case T_CaseTestExpr:
-		case T_SQLValueFunction:
 		case T_RangeTblRef:
 		case T_SortGroupClause:
 			/* primitive node types with no expression subnodes */
@@ -1988,7 +1965,6 @@ expression_tree_mutator(Node *node,
 			break;
 		case T_Param:
 		case T_CaseTestExpr:
-		case T_SQLValueFunction:
 		case T_RangeTblRef:
 		case T_SortGroupClause:
 			return (Node *) copyObject(node);
@@ -2550,7 +2526,6 @@ raw_expression_tree_walker(Node *node,
 
 	switch (nodeTag(node))
 	{
-		case T_SQLValueFunction:
 		case T_Integer:
 		case T_Float:
 		case T_String:

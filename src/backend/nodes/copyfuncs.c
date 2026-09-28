@@ -1299,22 +1299,6 @@ _copyCoalesceExpr(const CoalesceExpr *from)
 }
 
 /*
- * _copySQLValueFunction
- */
-static SQLValueFunction *
-_copySQLValueFunction(const SQLValueFunction *from)
-{
-	SQLValueFunction *newnode = makeNode(SQLValueFunction);
-
-	COPY_SCALAR_FIELD(op);
-	COPY_SCALAR_FIELD(type);
-	COPY_SCALAR_FIELD(typmod);
-	COPY_LOCATION_FIELD(location);
-
-	return newnode;
-}
-
-/*
  * _copyNullTest
  */
 static NullTest *
@@ -2431,9 +2415,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_CoalesceExpr:
 			retval = _copyCoalesceExpr(from);
-			break;
-		case T_SQLValueFunction:
-			retval = _copySQLValueFunction(from);
 			break;
 		case T_NullTest:
 			retval = _copyNullTest(from);

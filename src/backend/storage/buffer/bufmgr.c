@@ -55,7 +55,7 @@
 #include "utils/ps_status.h"
 #include "utils/rel.h"
 #include "utils/resowner_private.h"
-#include "utils/timestamp.h"
+#include "utils/timestamp_core.h"
 
 
 /* Note: these two macros only work on shared buffers, not local ones! */

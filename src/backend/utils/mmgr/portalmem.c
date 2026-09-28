@@ -26,7 +26,7 @@
 #include "utils/builtins.h"
 #include "utils/memutils.h"
 #include "utils/snapmgr.h"
-#include "utils/timestamp.h"
+#include "utils/timestamp_core.h"
 
 /*
  * Estimate of the maximum number of open portals a user would have,

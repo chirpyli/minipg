@@ -101,8 +101,6 @@ bool		IsBinaryUpgrade = false;
 
 bool		ExitOnAnyError = false;
 
-int			DateStyle = USE_ISO_DATES;
-int			DateOrder = DATEORDER_MDY;
 int			IntervalStyle = INTSTYLE_POSTGRES;
 
 bool		enableFsync = true;

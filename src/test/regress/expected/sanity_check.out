@@ -23,7 +23,6 @@ bt_txt_heap|t
 char_tbl|f
 city|f
 concur_reindex_tab|t
-date_tbl|f
 dept|f
 equipment_r|f
 fast_emp4000|f
@@ -68,10 +67,6 @@ tenk1|t
 tenk2|t
 testjsonb|f
 text_tbl|f
-time_tbl|f
-timestamp_tbl|f
-timestamptz_tbl|f
-tmptz|t
 varchar_tbl|f
 -- restore normal output mode
 \a\t

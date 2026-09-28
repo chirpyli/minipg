@@ -21,15 +21,14 @@ test: boolean char varchar text int2 int4 int8 oid float4 float8 pg_lsn name
 # numerology depends on int2, int4, int8, float4, float8
 # multirangetypes 已随 range/multirange 具体类型裁剪而移除
 # ----------
-test: strings numerology date time timestamp timestamptz 
+test: strings numerology
 
 # ----------
 # Another group of parallel tests
-# horology depends on interval, timestamp, timestamptz
-test: horology misc_sanity comments xid mvcc euc_kr case
+# ----------
+test: misc_sanity comments xid mvcc euc_kr case
 
 # ----------
-# 依赖 date 建立的 date_tbl
 # ----------
 test: expressions
 

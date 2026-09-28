@@ -405,7 +405,6 @@ WHERE p1.atttypid = p2.oid AND
 -- pg_snapshot、information_schema.*、planets、insenum 均已裁剪，
 -- tab_core_types 只保留仍然存在的核心类型
 CREATE TABLE tab_core_types (
-  c1 date, c2 time, c3 timestamp, c5 timestamptz,
   c7 text, c8 text, c9 text, c10 int2, c11 int4, c12 int8, c13 float4,
   c14 float8, c16 "char", c17 bpchar, c18 varchar, c19 name,
   c20 text, c21 bool, c22 bytea,
@@ -413,10 +412,6 @@ CREATE TABLE tab_core_types (
   c31 regtype, c33 oid, c34 tid, c35 xid, c36 cid, c39 pg_lsn
 );
 INSERT INTO tab_core_types SELECT
-  'today'::date,
-  'now'::time,
-  'now'::timestamp,
-  'now'::timestamptz,
   '{"reason":"because"}'::text,
   '{"when":"now"}'::text,
   '$.a[*] ? (@ > 2)'::text,

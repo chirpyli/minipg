@@ -58,8 +58,6 @@
 #include "parser/gramparse.h"
 #include "parser/parser.h"
 #include "storage/lmgr.h"
-#include "utils/date.h"
-#include "utils/datetime.h"
 
 
 /*
@@ -139,8 +137,6 @@ static Node *makeAndExpr(Node *lexpr, Node *rexpr, int location);
 static Node *makeOrExpr(Node *lexpr, Node *rexpr, int location);
 static Node *makeNotExpr(Node *expr, int location);
 static Node *makeAArrayExpr(List *elements, int location);
-static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
-								  int location);
 %}
 
 %pure-parser
@@ -304,9 +300,8 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 				GenericType Numeric
 				Character ConstCharacter
 				CharacterWithLength CharacterWithoutLength
-				ConstDatetime
 %type <str>		character
-%type <boolean> opt_varying opt_timezone
+%type <boolean> opt_varying
 
 %type <ival>	Iconst SignedIconst
 %type <str>		Sconst
@@ -316,7 +311,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 %type <str>		NonReservedWord NonReservedWord_or_Sconst
 %type <str>		var_name type_function_name param_name
 %type <str>		createdb_opt_name
-%type <node>	var_value zone_value
+%type <node>	var_value
 
 %type <keyword> unreserved_keyword type_func_name_keyword
 %type <keyword> col_name_keyword reserved_keyword
@@ -361,8 +356,6 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 	COMMITTED CONCURRENTLY
 	CONNECTION CONSTRAINT
 	CREATE CROSS CURRENT_P
-	CURRENT_DATE
-	CURRENT_TIMESTAMP
 
 	DATA_P DATABASE DEFAULT
 	DEFERRABLE DELETE_P DESC
@@ -409,7 +402,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 	START STATISTICS STORAGE
 
 	TABLE TEMPLATE THEN
-	TIME TIMESTAMP TO TRANSACTION
+	TO TRANSACTION
 	TRUE_P
 	TRUNCATE TYPE_P
 
@@ -419,9 +412,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 	VACUUM VALUES VARCHAR VARYING
 	VERBOSE
 
-	WHEN WHERE WITH WITHOUT WORK WRITE
-
-	ZONE
+	WHEN WHERE WITH WORK WRITE
 
 /*
  * The grammar thinks these are keywords, but they are not in the kwlist.h
@@ -431,9 +422,9 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
  * NOT_LA exists so that productions such as NOT IN can be given the same
  * precedence as IN_P; otherwise they'd effectively have the same precedence
  * as NOT, at least with respect to their left-hand subexpression.
- * NULLS_LA and WITH_LA are needed to make the grammar LALR(1).
+ * NULLS_LA is needed to make the grammar LALR(1).
  */
-%token		NOT_LA NULLS_LA WITH_LA
+%token		NOT_LA NULLS_LA
 
 /*
  * The grammar likewise thinks these tokens are keywords, but they are never
@@ -633,8 +624,6 @@ schema_stmt:
  *
  * Set PG internal variable
  *	  SET name TO 'var_value'
- * Include SQL syntax (thomas 1997-10-22):
- *	  SET TIME ZONE 'var_value'
  *
  *****************************************************************************/
 
@@ -721,18 +710,6 @@ set_rest_more:	/* Generic SET syntaxes: */
 					n->name = $1;
 					$$ = n;
 				}
-			/* Special syntaxes mandated by SQL standard: */
-			| TIME ZONE zone_value
-				{
-					VariableSetStmt *n = makeNode(VariableSetStmt);
-					n->kind = VAR_SET_VALUE;
-					n->name = "timezone";
-					if ($3 != NULL)
-						n->args = list_make1($3);
-					else
-						n->kind = VAR_SET_DEFAULT;
-					$$ = n;
-				}
 			/* Special syntaxes invented by PostgreSQL: */
 			| TRANSACTION SNAPSHOT Sconst
 				{
@@ -777,28 +754,6 @@ opt_boolean_or_string:
 			| NonReservedWord_or_Sconst				{ $$ = $1; }
 		;
 
-/* Timezone values can be:
- * - a string such as 'pst8pdt'
- * - an identifier such as "pst8pdt"
- * - an integer or floating point number
- * - a time interval per SQL99
- * ColId gives reduce/reduce errors against ConstInterval and LOCAL,
- * so use IDENT (meaning we reject anything that is a key word).
- */
-zone_value:
-			Sconst
-				{
-					$$ = makeStringConst($1, @1);
-				}
-			| IDENT
-				{
-					$$ = makeStringConst($1, @1);
-				}
-			| NumericOnly							{ $$ = makeAConst($1, @1); }
-			| DEFAULT								{ $$ = NULL; }
-			| LOCAL									{ $$ = NULL; }
-		;
-
 NonReservedWord_or_Sconst:
 			NonReservedWord							{ $$ = $1; }
 			| Sconst								{ $$ = $1; }
@@ -810,13 +765,6 @@ VariableResetStmt:
 
 reset_rest:
 			generic_reset							{ $$ = $1; }
-			| TIME ZONE
-				{
-					VariableSetStmt *n = makeNode(VariableSetStmt);
-					n->kind = VAR_RESET;
-					n->name = "timezone";
-					$$ = n;
-				}
 			| TRANSACTION ISOLATION LEVEL
 				{
 					VariableSetStmt *n = makeNode(VariableSetStmt);
@@ -848,12 +796,6 @@ VariableShowStmt:
 				{
 					VariableShowStmt *n = makeNode(VariableShowStmt);
 					n->name = $2;
-					$$ = (Node *) n;
-				}
-			| SHOW TIME ZONE
-				{
-					VariableShowStmt *n = makeNode(VariableShowStmt);
-					n->name = "timezone";
 					$$ = (Node *) n;
 				}
 			| SHOW TRANSACTION ISOLATION LEVEL
@@ -2772,7 +2714,6 @@ SimpleTypename:
 			GenericType								{ $$ = $1; }
 			| Numeric								{ $$ = $1; }
 			| Character								{ $$ = $1; }
-			| ConstDatetime							{ $$ = $1; }
 		;
 
 /* We have a separate ConstTypename to allow defaulting fixed-length
@@ -2789,7 +2730,6 @@ SimpleTypename:
 ConstTypename:
 			Numeric									{ $$ = $1; }
 			| ConstCharacter						{ $$ = $1; }
-			| ConstDatetime							{ $$ = $1; }
 		;
 
 /*
@@ -2924,59 +2864,6 @@ opt_varying:
 			VARYING									{ $$ = true; }
 			| /*EMPTY*/								{ $$ = false; }
 		;
-
-/*
- * SQL date/time types
- */
-ConstDatetime:
-			TIMESTAMP '(' Iconst ')' opt_timezone
-				{
-					if ($5)
-						$$ = SystemTypeName("timestamptz");
-					else
-						$$ = SystemTypeName("timestamp");
-					$$->typmods = list_make1(makeIntConst($3, @3));
-					$$->location = @1;
-				}
-			| TIMESTAMP opt_timezone
-				{
-					if ($2)
-						$$ = SystemTypeName("timestamptz");
-					else
-						$$ = SystemTypeName("timestamp");
-					$$->location = @1;
-				}
-			| TIME '(' Iconst ')' WITHOUT TIME ZONE
-				{
-					$$ = SystemTypeName("time");
-					$$->typmods = list_make1(makeIntConst($3, @3));
-					$$->location = @1;
-				}
-			| TIME '(' Iconst ')'
-				{
-					$$ = SystemTypeName("time");
-					$$->typmods = list_make1(makeIntConst($3, @3));
-					$$->location = @1;
-				}
-			| TIME WITHOUT TIME ZONE
-				{
-					$$ = SystemTypeName("time");
-					$$->location = @1;
-				}
-			| TIME
-				{
-					$$ = SystemTypeName("time");
-					$$->location = @1;
-				}
-		;
-
-
-opt_timezone:
-			WITH_LA TIME ZONE						{ $$ = true; }
-			| WITHOUT TIME ZONE						{ $$ = false; }
-			| /*EMPTY*/								{ $$ = false; }
-		;
-
 
 
 
@@ -3266,19 +3153,7 @@ func_expr_windowless:
  * Special expressions that are considered to be functions.
  */
 func_expr_common_subexpr:
-			CURRENT_DATE
-				{
-					$$ = makeSQLValueFunction(SVFOP_CURRENT_DATE, -1, @1);
-				}
-			| CURRENT_TIMESTAMP
-				{
-					$$ = makeSQLValueFunction(SVFOP_CURRENT_TIMESTAMP, -1, @1);
-				}
-			| CURRENT_TIMESTAMP '(' Iconst ')'
-				{
-					$$ = makeSQLValueFunction(SVFOP_CURRENT_TIMESTAMP_N, $3, @1);
-				}
-			| CAST '(' a_expr AS Typename ')'
+			CAST '(' a_expr AS Typename ')'
 				{ $$ = makeTypeCast($3, $5, @1); }
 			| NULLIF '(' a_expr ',' a_expr ')'
 				{
@@ -3834,10 +3709,8 @@ unreserved_keyword:
 			| UPDATE
 			| VACUUM
 			| VARYING
-			| WITHOUT
 			| WORK
 			| WRITE
-			| ZONE
 		;
 
 /* Column identifier --- keywords that can be column, table, etc names.
@@ -3865,8 +3738,6 @@ col_name_keyword:
 			| PRECISION
 			| REAL
 			| SMALLINT
-			| TIME
-			| TIMESTAMP
 			| VALUES
 			| VARCHAR
 		;
@@ -3913,8 +3784,6 @@ reserved_keyword:
 			| COLUMN
 			| CONSTRAINT
 			| CREATE
-			| CURRENT_DATE
-			| CURRENT_TIMESTAMP
 			| DEFAULT
 			| DEFERRABLE
 			| DESC
@@ -3983,8 +3852,6 @@ bare_label_keyword:
 			| CONSTRAINT
 			| CROSS
 			| CURRENT_P
-			| CURRENT_DATE
-			| CURRENT_TIMESTAMP
 			| DATA_P
 			| DATABASE
 			| DEFAULT
@@ -4058,8 +3925,6 @@ bare_label_keyword:
 
 			| TEMPLATE
 			| THEN
-			| TIME
-			| TIMESTAMP
 			| TRANSACTION
 			| TRUE_P
 			| TRUNCATE
@@ -4075,11 +3940,9 @@ bare_label_keyword:
 			| WHEN
 			| WORK
 			| WRITE
-			| ZONE
 		;
 
 opt_with:	WITH
-			| WITH_LA
 			| /*EMPTY*/
 		;
 
@@ -4497,19 +4360,6 @@ makeAArrayExpr(List *elements, int location)
 	n->location = location;
 	return (Node *) n;
 }
-
-static Node *
-makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod, int location)
-{
-	SQLValueFunction *svf = makeNode(SQLValueFunction);
-
-	svf->op = op;
-	/* svf->type will be filled during parse analysis */
-	svf->typmod = typmod;
-	svf->location = location;
-	return (Node *) svf;
-}
-
 
 /* parser_init()
  * Initialize to parse one query string

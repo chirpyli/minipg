@@ -221,52 +221,6 @@ WHERE  hashbpchar(v)::int8 != hashbpcharextended(v, 0)::int8
  yi3nm0d73   |  1880619975 |  4632767081301408711 | -3227811903240167559
 (5 rows)
 
-SELECT v as value, time_hash(v)::int8 as standard,
-       time_hash_extended(v, 0)::int8 as extended0,
-       time_hash_extended(v, 1)::int8 as extended1
-FROM   (VALUES (NULL::time), ('11:09:59'), ('1:09:59'), ('11:59:59'),
-        ('7:9:59'), ('5:15:59')) x(v)
-WHERE  time_hash(v)::int8 != time_hash_extended(v, 0)::int8
-       OR time_hash(v)::int8 = time_hash_extended(v, 1)::int8;
-  value   |  standard  |      extended0       |      extended1       
-----------+------------+----------------------+----------------------
- 11:09:59 | 1740227977 |  6564483993255396745 | -4195280914249155905
- 01:09:59 |  356014008 | -5368148179735259208 | -2046741307632344162
- 11:59:59 | 1153183566 | -1946402611012030642 | -4025026224423916732
- 07:09:59 | 1025469285 | -6508852593364604059 |  1092668065412787603
- 05:15:59 |  119788729 |   850546358160184505 |  1760393635597191227
-(5 rows)
-
-SELECT v as value, interval_hash(v)::int8 as standard,
-       interval_hash_extended(v, 0)::int8 as extended0,
-       interval_hash_extended(v, 1)::int8 as extended1
-FROM   (VALUES (NULL::interval),
-        ('5 month 7 day 46 minutes'), ('1 year 7 day 46 minutes'),
-        ('1 year 7 month 20 day 46 minutes'), ('5 month'),
-        ('17 year 11 month 7 day 9 hours 46 minutes 5 seconds')) x(v)
-WHERE  interval_hash(v)::int8 != interval_hash_extended(v, 0)::int8
-       OR interval_hash(v)::int8 = interval_hash_extended(v, 1)::int8;
-ERROR:  type "interval" does not exist
-LINE 4: FROM   (VALUES (NULL::interval),
-                              ^
-SELECT v as value, timestamp_hash(v)::int8 as standard,
-       timestamp_hash_extended(v, 0)::int8 as extended0,
-       timestamp_hash_extended(v, 1)::int8 as extended1
-FROM   (VALUES (NULL::timestamp), ('2017-08-22 00:09:59.518762'),
-        ('2015-08-20 00:11:52.51762-08'),
-        ('2017-05-22 00:11:52.62-01'),
-        ('2013-08-22 00:11:52.62+01'), ('2013-08-22 11:59:59+04')) x(v)
-WHERE  timestamp_hash(v)::int8 != timestamp_hash_extended(v, 0)::int8
-       OR timestamp_hash(v)::int8 = timestamp_hash_extended(v, 1)::int8;
-              value              |  standard   |      extended0       |      extended1       
----------------------------------+-------------+----------------------+----------------------
- Tue Aug 22 00:09:59.518762 2017 | -1951806412 |  7278392942403374132 |   752475669196389666
- Thu Aug 20 00:11:52.51762 2015  |  -753461281 |  1439783954396157919 | -8499892273580723126
- Mon May 22 00:11:52.62 2017     |  -858287878 | -7815280934003437318 |  9086995893915210118
- Thu Aug 22 00:11:52.62 2013     |  -245073051 |  4303234162906921829 |  3090899049055242995
- Thu Aug 22 11:59:59 2013        |  2142759115 |  6663281100598012107 |  5596100192673380224
-(5 rows)
-
 SELECT v as value, pg_lsn_hash(v)::int8 as standard,
        pg_lsn_hash_extended(v, 0)::int8 as extended0,
        pg_lsn_hash_extended(v, 1)::int8 as extended1

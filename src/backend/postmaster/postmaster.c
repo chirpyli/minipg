@@ -101,13 +101,12 @@
 #include "storage/proc.h"
 #include "tcop/tcopprot.h"
 #include "utils/builtins.h"
-#include "utils/datetime.h"
 #include "utils/memutils.h"
 #include "utils/pidfile.h"
 #include "utils/ps_status.h"
 #include "utils/queryjumble.h"
 #include "utils/timeout.h"
-#include "utils/timestamp.h"
+#include "utils/timestamp_core.h"
 #include "utils/varlena.h"
 
 
@@ -638,15 +637,6 @@ PostmasterMain(int argc, char *argv[])
 	/* And switch working directory into it */
 	ChangeToDataDir();
 
-	/*
-	 * Other one-time internal sanity checks can go here, if they are fast.
-	 * (Put any slow processing further down, after postmaster.pid creation.)
-	 */
-	if (!CheckDateTokenTables())
-	{
-		write_stderr("%s: invalid datetoken tables, please fix\n", progname);
-		ExitPostmaster(1);
-	}
 
 	/*
 	 * Now that we are done processing the postmaster arguments, reset

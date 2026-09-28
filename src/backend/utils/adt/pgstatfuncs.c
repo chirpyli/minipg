@@ -23,7 +23,7 @@
 #include "storage/procarray.h"
 #include "utils/backend_status.h"
 #include "utils/builtins.h"
-#include "utils/timestamp.h"
+#include "utils/timestamp_core.h"
 #include "utils/wait_event.h"
 
 #define UINT32_ACCESS_ONCE(var)		 ((uint32)(*((volatile uint32 *)&(var))))
@@ -267,22 +267,22 @@ pg_stat_get_activity(PG_FUNCTION_ARGS)
 				nulls[7] = true;
 
 			if (beentry->st_xact_start_timestamp != 0)
-				values[8] = TimestampTzGetDatum(beentry->st_xact_start_timestamp);
+				values[8] = Int64GetDatum(beentry->st_xact_start_timestamp);
 			else
 				nulls[8] = true;
 
 			if (beentry->st_activity_start_timestamp != 0)
-				values[9] = TimestampTzGetDatum(beentry->st_activity_start_timestamp);
+				values[9] = Int64GetDatum(beentry->st_activity_start_timestamp);
 			else
 				nulls[9] = true;
 
 			if (beentry->st_proc_start_timestamp != 0)
-				values[10] = TimestampTzGetDatum(beentry->st_proc_start_timestamp);
+				values[10] = Int64GetDatum(beentry->st_proc_start_timestamp);
 			else
 				nulls[10] = true;
 
 			if (beentry->st_state_start_timestamp != 0)
-				values[11] = TimestampTzGetDatum(beentry->st_state_start_timestamp);
+				values[11] = Int64GetDatum(beentry->st_state_start_timestamp);
 			else
 				nulls[11] = true;
 
@@ -533,7 +533,7 @@ pg_stat_get_backend_activity_start(PG_FUNCTION_ARGS)
 	if (result == 0)
 		PG_RETURN_NULL();
 
-	PG_RETURN_TIMESTAMPTZ(result);
+	PG_RETURN_INT64(result);
 }
 
 
@@ -555,7 +555,7 @@ pg_stat_get_backend_xact_start(PG_FUNCTION_ARGS)
 	if (result == 0)			/* not in a transaction */
 		PG_RETURN_NULL();
 
-	PG_RETURN_TIMESTAMPTZ(result);
+	PG_RETURN_INT64(result);
 }
 
 
@@ -577,7 +577,7 @@ pg_stat_get_backend_start(PG_FUNCTION_ARGS)
 	if (result == 0)			/* probably can't happen? */
 		PG_RETURN_NULL();
 
-	PG_RETURN_TIMESTAMPTZ(result);
+	PG_RETURN_INT64(result);
 }
 
 

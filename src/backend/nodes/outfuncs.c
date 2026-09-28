@@ -1081,18 +1081,6 @@ _outCoalesceExpr(StringInfo str, const CoalesceExpr *node)
 }
 
 static void
-_outSQLValueFunction(StringInfo str, const SQLValueFunction *node)
-{
-	WRITE_NODE_TYPE("SQLVALUEFUNCTION");
-
-	WRITE_ENUM_FIELD(op, SQLValueFunctionOp);
-	WRITE_OID_FIELD(type);
-	WRITE_INT_FIELD(typmod);
-	WRITE_LOCATION_FIELD(location);
-}
-
-
-static void
 _outNullTest(StringInfo str, const NullTest *node)
 {
 	WRITE_NODE_TYPE("NULLTEST");
@@ -2488,9 +2476,6 @@ outNode(StringInfo str, const void *obj)
 				break;
 			case T_CoalesceExpr:
 				_outCoalesceExpr(str, obj);
-				break;
-			case T_SQLValueFunction:
-				_outSQLValueFunction(str, obj);
 				break;
 			case T_NullTest:
 				_outNullTest(str, obj);

@@ -1683,19 +1683,6 @@ FigureColnameInternal(Node *node, char **name)
 			/* make coalesce() act like a regular function */
 			*name = "coalesce";
 			return 2;
-		case T_SQLValueFunction:
-			/* make these act like a function or variable */
-			switch (((SQLValueFunction *) node)->op)
-			{
-				case SVFOP_CURRENT_DATE:
-					*name = "current_date";
-					return 2;
-				case SVFOP_CURRENT_TIMESTAMP:
-				case SVFOP_CURRENT_TIMESTAMP_N:
-					*name = "current_timestamp";
-					return 2;
-				}
-				break;
 		default:
 			break;
 	}

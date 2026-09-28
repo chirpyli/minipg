@@ -317,16 +317,11 @@ check_hash_func_signature(Oid funcid, int16 amprocnum, Oid argtype)
 		 * INTERNAL and allowing any such function seems too scary.
 		 */
 		if ((funcid == F_HASHINT4 || funcid == F_HASHINT4EXTENDED) &&
-			(argtype == DATEOID ||
-			 argtype == XIDOID || argtype == CIDOID))
+			(argtype == XIDOID || argtype == CIDOID))
 			 /* okay, allowed use of hashint4() */ ;
 		else if ((funcid == F_HASHINT8 || funcid == F_HASHINT8EXTENDED) &&
 				 (argtype == XID8OID))
 			 /* okay, allowed use of hashint8() */ ;
-		else if ((funcid == F_TIMESTAMP_HASH ||
-				  funcid == F_TIMESTAMP_HASH_EXTENDED) &&
-				 argtype == TIMESTAMPTZOID)
-			 /* okay, allowed use of timestamp_hash() */ ;
 		else if ((funcid == F_HASHCHAR || funcid == F_HASHCHAREXTENDED) &&
 				 argtype == BOOLOID)
 			 /* okay, allowed use of hashchar() */ ;

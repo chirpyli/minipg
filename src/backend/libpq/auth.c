@@ -32,7 +32,7 @@
 #include "storage/ipc.h"
 #include "utils/guc.h"
 #include "utils/memutils.h"
-#include "utils/timestamp.h"
+#include "utils/timestamp_core.h"
 
 /*----------------------------------------------------------------
  * Global authentication functions

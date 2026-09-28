@@ -69,7 +69,7 @@
 #include "utils/relmapper.h"
 #include "utils/pg_rusage.h"
 #include "utils/snapmgr.h"
-#include "utils/timestamp.h"
+#include "utils/timestamp_core.h"
 
 /* Unsupported old recovery command file names (relative to $PGDATA) */
 #define RECOVERY_COMMAND_FILE	"recovery.conf"

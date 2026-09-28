@@ -32,9 +32,8 @@
 #include "parser/parse_target.h"
 #include "parser/parse_type.h"
 #include "utils/builtins.h"
-#include "utils/date.h"
 #include "utils/lsyscache.h"
-#include "utils/timestamp.h"
+#include "utils/timestamp_core.h"
 
 /* GUC parameters */
 bool		Transform_null_equals = false;
@@ -54,8 +53,6 @@ static Node *transformSubLink(ParseState *pstate, SubLink *sublink);
 static Node *transformArrayExpr(ParseState *pstate, A_ArrayExpr *a,
 								Oid array_type, Oid element_type, int32 typmod);
 static Node *transformCoalesceExpr(ParseState *pstate, CoalesceExpr *c);
-static Node *transformSQLValueFunction(ParseState *pstate,
-									   SQLValueFunction *svf);
 static Node *transformColumnRef(ParseState *pstate, ColumnRef *cref);
 static Node *transformWholeRowRef(ParseState *pstate,
 								  ParseNamespaceItem *nsitem,
@@ -188,10 +185,6 @@ transformExprRecurse(ParseState *pstate, Node *expr)
 			result = transformCoalesceExpr(pstate, (CoalesceExpr *) expr);
 			break;
 
-		case T_SQLValueFunction:
-			result = transformSQLValueFunction(pstate,
-											   (SQLValueFunction *) expr);
-			break;
 		case T_NullTest:
 			{
 				NullTest   *n = (NullTest *) expr;
@@ -1561,31 +1554,6 @@ transformCoalesceExpr(ParseState *pstate, CoalesceExpr *c)
 	newc->location = c->location;
 	return (Node *) newc;
 }
-
-static Node *
-transformSQLValueFunction(ParseState *pstate, SQLValueFunction *svf)
-{
-	/*
-	 * All we need to do is insert the correct result type and (where needed)
-	 * validate the typmod, so we just modify the node in-place.
-	 */
-	switch (svf->op)
-	{
-		case SVFOP_CURRENT_DATE:
-			svf->type = DATEOID;
-			break;
-		case SVFOP_CURRENT_TIMESTAMP:
-			svf->type = TIMESTAMPTZOID;
-			break;
-		case SVFOP_CURRENT_TIMESTAMP_N:
-			svf->type = TIMESTAMPTZOID;
-			svf->typmod = anytimestamp_typmod_check(true, svf->typmod);
-			break;
-	}
-
-	return (Node *) svf;
-}
-
 
 /*
  * Construct a whole-row reference to represent the notation "relation.*".

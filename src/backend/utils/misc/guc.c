@@ -76,7 +76,6 @@
 #include "utils/ps_status.h"
 #include "utils/queryjumble.h"
 #include "utils/snapmgr.h"
-#include "utils/tzparser.h"
 #include "utils/inval.h"
 #include "utils/varlena.h"
 
@@ -132,9 +131,6 @@ static void assign_wal_consistency_checking(const char *newval, void *extra);
 
 static bool check_temp_buffers(int *newval, void **extra, GucSource source);
 static bool check_canonical_path(char **newval, void **extra, GucSource source);
-static bool check_timezone_abbreviations(char **newval, void **extra, GucSource source);
-static void assign_timezone_abbreviations(const char *newval, void *extra);
-static void pg_timezone_abbrev_initialize(void);
 static void assign_tcp_keepalives_idle(int newval, void *extra);
 static void assign_tcp_keepalives_interval(int newval, void *extra);
 static void assign_tcp_keepalives_count(int newval, void *extra);
@@ -399,13 +395,11 @@ int			huge_page_size;
  */
 static double phony_random_seed;
 static char *client_encoding_string;
-static char *datestyle_string;
 static char *server_encoding_string;
 static char *server_version_string;
 static int	server_version_num;
 static char *timezone_string;
 static char *log_timezone_string;
-static char *timezone_abbreviations_string;
 static char *data_directory;
 static int	max_function_args;
 static int	max_index_keys;
@@ -2389,18 +2383,6 @@ static struct config_string ConfigureNamesString[] =
 	},
 
 	{
-		{"DateStyle", PGC_USERSET, CLIENT_CONN_LOCALE,
-			gettext_noop("Sets the display format for date and time values."),
-			gettext_noop("Also controls interpretation of ambiguous "
-						 "date inputs."),
-			GUC_LIST_INPUT | GUC_REPORT
-		},
-		&datestyle_string,
-		"ISO, MDY",
-		check_datestyle, assign_datestyle, NULL
-	},
-
-	{
 		{"default_table_access_method", PGC_USERSET, CLIENT_CONN_STATEMENT,
 			gettext_noop("Sets the default table access method for new tables."),
 			NULL,
@@ -2488,16 +2470,6 @@ static struct config_string ConfigureNamesString[] =
 		"GMT",
 		check_timezone, assign_timezone, show_timezone
 	},
-	{
-		{"timezone_abbreviations", PGC_USERSET, CLIENT_CONN_LOCALE,
-			gettext_noop("Selects a file of time zone abbreviations."),
-			NULL
-		},
-		&timezone_abbreviations_string,
-		NULL,
-		check_timezone_abbreviations, assign_timezone_abbreviations, NULL
-	},
-
 	{
 		{"listen_addresses", PGC_POSTMASTER, CONN_AUTH_SETTINGS,
 			gettext_noop("Sets the host name or IP address(es) to listen to."),
@@ -3454,9 +3426,6 @@ InitializeGUCOptionsFromEnvironment(void)
 	if (env != NULL)
 		SetConfigOption("port", env, PGC_POSTMASTER, PGC_S_ENV_VAR);
 
-	env = getenv("PGDATESTYLE");
-	if (env != NULL)
-		SetConfigOption("datestyle", env, PGC_POSTMASTER, PGC_S_ENV_VAR);
 
 	env = getenv("PGCLIENTENCODING");
 	if (env != NULL)
@@ -3706,15 +3675,6 @@ SelectConfigFiles(const char *userDoption, const char *progname)
 	 * Reflect the final DataDir value back into the data_directory GUC var.
 	 */
 	SetConfigOption("data_directory", DataDir, PGC_POSTMASTER, PGC_S_OVERRIDE);
-
-	/*
-	 * If timezone_abbreviations wasn't set in the configuration file, install
-	 * the default value.  We do it this way because we can't safely install a
-	 * "real" value until my_exec_path is set, which may not have happened
-	 * when InitializeGUCOptions runs, so the bootstrap default value cannot
-	 * be the real desired default.
-	 */
-	pg_timezone_abbrev_initialize();
 
 	/*
 	 * minipg: pg_hba.conf / pg_ident.conf 已移除，不再定位这些配置文件的路径。
@@ -7797,63 +7757,6 @@ check_canonical_path(char **newval, void **extra, GucSource source)
 	if (*newval)
 		canonicalize_path(*newval);
 	return true;
-}
-
-static bool
-check_timezone_abbreviations(char **newval, void **extra, GucSource source)
-{
-	/*
-	 * The boot_val given above for timezone_abbreviations is NULL. When we
-	 * see this we just do nothing.  If this value isn't overridden from the
-	 * config file then pg_timezone_abbrev_initialize() will eventually
-	 * replace it with "Default".  This hack has two purposes: to avoid
-	 * wasting cycles loading values that might soon be overridden from the
-	 * config file, and to avoid trying to read the timezone abbrev files
-	 * during InitializeGUCOptions().  The latter doesn't work during
-	 * InitializeGUCOptions() because my_exec_path hasn't been set yet and so
-	 * we can't locate PGSHAREDIR.
-	 */
-	if (*newval == NULL)
-	{
-		Assert(source == PGC_S_DEFAULT);
-		return true;
-	}
-
-	/* OK, load the file and produce a malloc'd TimeZoneAbbrevTable */
-	*extra = load_tzoffsets(*newval);
-
-	/* tzparser.c returns NULL on failure, reporting via GUC_check_errmsg */
-	if (!*extra)
-		return false;
-
-	return true;
-}
-
-static void
-assign_timezone_abbreviations(const char *newval, void *extra)
-{
-	/* Do nothing for the boot_val default of NULL */
-	if (!extra)
-		return;
-
-	InstallTimeZoneAbbrevs((TimeZoneAbbrevTable *) extra);
-}
-
-/*
- * pg_timezone_abbrev_initialize --- set default value if not done already
- *
- * This is called after initial loading of postgresql.conf.  If no
- * timezone_abbreviations setting was found therein, select default.
- * If a non-default value is already installed, nothing will happen.
- *
- * This can also be called from ProcessConfigFile to establish the default
- * value after a postgresql.conf entry for it is removed.
- */
-static void
-pg_timezone_abbrev_initialize(void)
-{
-	SetConfigOption("timezone_abbreviations", "Default",
-					PGC_POSTMASTER, PGC_S_DYNAMIC_DEFAULT);
 }
 
 static void

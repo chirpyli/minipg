@@ -111,34 +111,6 @@ FROM   (VALUES (NULL), ('PostgreSQL'), ('eIpUEtqmY89'), ('AXKEJBTK'),
 WHERE  hashbpchar(v)::int8 != hashbpcharextended(v, 0)::int8
        OR hashbpchar(v)::int8 = hashbpcharextended(v, 1)::int8;
 
-SELECT v as value, time_hash(v)::int8 as standard,
-       time_hash_extended(v, 0)::int8 as extended0,
-       time_hash_extended(v, 1)::int8 as extended1
-FROM   (VALUES (NULL::time), ('11:09:59'), ('1:09:59'), ('11:59:59'),
-        ('7:9:59'), ('5:15:59')) x(v)
-WHERE  time_hash(v)::int8 != time_hash_extended(v, 0)::int8
-       OR time_hash(v)::int8 = time_hash_extended(v, 1)::int8;
-
-SELECT v as value, interval_hash(v)::int8 as standard,
-       interval_hash_extended(v, 0)::int8 as extended0,
-       interval_hash_extended(v, 1)::int8 as extended1
-FROM   (VALUES (NULL::interval),
-        ('5 month 7 day 46 minutes'), ('1 year 7 day 46 minutes'),
-        ('1 year 7 month 20 day 46 minutes'), ('5 month'),
-        ('17 year 11 month 7 day 9 hours 46 minutes 5 seconds')) x(v)
-WHERE  interval_hash(v)::int8 != interval_hash_extended(v, 0)::int8
-       OR interval_hash(v)::int8 = interval_hash_extended(v, 1)::int8;
-
-SELECT v as value, timestamp_hash(v)::int8 as standard,
-       timestamp_hash_extended(v, 0)::int8 as extended0,
-       timestamp_hash_extended(v, 1)::int8 as extended1
-FROM   (VALUES (NULL::timestamp), ('2017-08-22 00:09:59.518762'),
-        ('2015-08-20 00:11:52.51762-08'),
-        ('2017-05-22 00:11:52.62-01'),
-        ('2013-08-22 00:11:52.62+01'), ('2013-08-22 11:59:59+04')) x(v)
-WHERE  timestamp_hash(v)::int8 != timestamp_hash_extended(v, 0)::int8
-       OR timestamp_hash(v)::int8 = timestamp_hash_extended(v, 1)::int8;
-
 SELECT v as value, pg_lsn_hash(v)::int8 as standard,
        pg_lsn_hash_extended(v, 0)::int8 as extended0,
        pg_lsn_hash_extended(v, 1)::int8 as extended1

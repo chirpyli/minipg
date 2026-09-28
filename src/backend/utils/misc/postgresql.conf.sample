@@ -379,16 +379,8 @@
 
 # - Locale and Formatting -
 
-#datestyle = 'iso, mdy'
 #intervalstyle = 'postgres'
 #timezone = 'GMT'
-#timezone_abbreviations = 'Default'     # Select the set of available time zone
-					# abbreviations.  Currently, there are
-					#   Default
-					#   Australia (historical usage)
-					#   India
-					# You can create your own file in
-					# share/timezonesets/.
 #extra_float_digits = 1			# min -15, max 3; any value >0 actually
 					# selects precise output mode
 #client_encoding = sql_ascii		# actually, defaults to database
@@ -396,8 +388,6 @@
 
 # These settings are initialized by initdb, but they can be changed.
 
-# default configuration for text search
-#default_text_search_config = 'pg_catalog.simple'
 
 
 #------------------------------------------------------------------------------

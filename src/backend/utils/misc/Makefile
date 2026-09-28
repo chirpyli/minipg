@@ -23,7 +23,7 @@ OBJS = \
 	queryjumble.o \
 	sampling.o \
 	timeout.o \
-	tzparser.o
+	timestamp_core.o
 
 include $(top_srcdir)/src/backend/common.mk
 

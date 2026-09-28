@@ -34,7 +34,7 @@ INSERT INTO arrtest (a, b, c, d, e, f, g)
 INSERT INTO arrtest (a, b, c, d)
    VALUES ('{}', '{3,4}', '{foo,bar}', '{bar,foo}');
 
-INSERT INTO arrtest (b[2]) VALUES(now());  -- error, type mismatch
+INSERT INTO arrtest (b[2]) VALUES('x');  -- error, type mismatch
 
 SELECT * FROM arrtest;
 
@@ -85,7 +85,7 @@ UPDATE arrtest
   SET c[NULL] = '{"can''t assign"}'
   WHERE array_dims(c) is not null;
 -- Un-subscriptable type
-SELECT (now())[1];
+SELECT ('x'::text)[1];
 
 -- test slices with empty lower and/or upper index
 CREATE TABLE arrtest_s (
@@ -125,13 +125,12 @@ select * from arrtest1;
 --
 
 -- table creation and INSERTs
-CREATE TABLE arrtest2 (i integer ARRAY[4], f float8[], n int8[], t text[], d timestamp[]);
+CREATE TABLE arrtest2 (i integer ARRAY[4], f float8[], n int8[], t text[]);
 INSERT INTO arrtest2 VALUES(
   ARRAY[[[113,142],[1,147]]],
   ARRAY[1.1,1.2,1.3]::float8[],
   ARRAY[1.1,1.2,1.3],
-  ARRAY[[['aaa','aab'],['aba','abb'],['aca','acb']],[['baa','bab'],['bba','bbb'],['bca','bcb']]],
-  ARRAY['19620326','19931223','19970117']::timestamp[]
+  ARRAY[[['aaa','aab'],['aba','abb'],['aca','acb']],[['baa','bab'],['bba','bbb'],['bca','bcb']]]
 );
 
 -- some more test data
@@ -332,13 +331,8 @@ select array[];
 -- all of the following should be accepted
 select '{}'::text[];
 select '{{{1,2,3,4},{2,3,4,5}},{{3,4,5,6},{4,5,6,7}}}'::text[];
-select '{0 second  ,0 second}'::interval[];
 select '{ { "," } , { 3 } }'::text[];
 select '  {   {  "  0 second  "   ,  0 second  }   }'::text[];
-select '{
-           0 second,
-           @ 1 hour @ 42 minutes @ 20 seconds
-         }'::interval[];
 select array[]::text[];
 select '[0:1]={1.1,2.2}'::float8[];
 -- all of the above should be accepted
@@ -538,9 +532,6 @@ SELECT
     op,
     width_bucket(op, ARRAY[1, 3, 5, 10]) AS wb_1
 FROM (SELECT generate_series(0,11) AS op) AS _gs;
-
-SELECT width_bucket(now(),
-                    array['yesterday', 'today', 'tomorrow']::timestamptz[]);
 
 -- corner cases
 SELECT width_bucket(5, ARRAY[3]);

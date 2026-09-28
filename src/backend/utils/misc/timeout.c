@@ -19,7 +19,7 @@
 #include "miscadmin.h"
 #include "storage/proc.h"
 #include "utils/timeout.h"
-#include "utils/timestamp.h"
+#include "utils/timestamp_core.h"
 
 
 /* Data about any one timeout reason */

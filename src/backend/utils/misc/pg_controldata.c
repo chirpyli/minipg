@@ -27,7 +27,7 @@
 #include "storage/lwlock.h"
 #include "utils/builtins.h"
 #include "utils/pg_lsn.h"
-#include "utils/timestamp.h"
+#include "utils/timestamp_core.h"
 
 Datum
 pg_control_system(PG_FUNCTION_ARGS)
@@ -51,7 +51,7 @@ pg_control_system(PG_FUNCTION_ARGS)
 	TupleDescInitEntry(tupdesc, (AttrNumber) 3, "system_identifier",
 					   INT8OID, -1, 0);
 	TupleDescInitEntry(tupdesc, (AttrNumber) 4, "pg_control_last_modified",
-					   TIMESTAMPTZOID, -1, 0);
+					   INT8OID, -1, 0);
 	tupdesc = BlessTupleDesc(tupdesc);
 
 	/* read the control file */
@@ -71,7 +71,7 @@ pg_control_system(PG_FUNCTION_ARGS)
 	values[2] = Int64GetDatum(ControlFile->system_identifier);
 	nulls[2] = false;
 
-	values[3] = TimestampTzGetDatum(time_t_to_timestamptz(ControlFile->time));
+	values[3] = Int64GetDatum(time_t_to_timestamptz(ControlFile->time));
 	nulls[3] = false;
 
 	htup = heap_form_tuple(tupdesc, values, nulls);
@@ -127,7 +127,7 @@ pg_control_checkpoint(PG_FUNCTION_ARGS)
 	TupleDescInitEntry(tupdesc, (AttrNumber) 15, "oldest_multi_dbid",
 					   OIDOID, -1, 0);
 	TupleDescInitEntry(tupdesc, (AttrNumber) 16, "checkpoint_time",
-					   TIMESTAMPTZOID, -1, 0);
+					   INT8OID, -1, 0);
 	tupdesc = BlessTupleDesc(tupdesc);
 
 	/* Read the control file. */
@@ -194,7 +194,7 @@ pg_control_checkpoint(PG_FUNCTION_ARGS)
 	values[14] = ObjectIdGetDatum(ControlFile->checkPointCopy.oldestMultiDB);
 	nulls[14] = false;
 
-	values[15] = TimestampTzGetDatum(time_t_to_timestamptz(ControlFile->checkPointCopy.time));
+	values[15] = Int64GetDatum(time_t_to_timestamptz(ControlFile->checkPointCopy.time));
 	nulls[15] = false;
 
 	htup = heap_form_tuple(tupdesc, values, nulls);

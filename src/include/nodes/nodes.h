@@ -136,7 +136,6 @@ typedef enum NodeTag
 	T_ArrayExpr,
 	T_RowExpr,
 	T_CoalesceExpr,
-	T_SQLValueFunction,
 	T_NullTest,
 	T_BooleanTest,
 	T_TargetEntry,

@@ -26,7 +26,6 @@
   castcontext => 'i', castmethod => 'f' },
 { castsource => 'int8', casttarget => 'float8', castfunc => 'float8(int8)',
   castcontext => 'i', castmethod => 'f' },
-  castcontext => 'i', castmethod => 'f' },
 { castsource => 'int2', casttarget => 'int8', castfunc => 'int8(int2)',
   castcontext => 'i', castmethod => 'f' },
 { castsource => 'int2', casttarget => 'int4', castfunc => 'int4(int2)',
@@ -34,7 +33,6 @@
 { castsource => 'int2', casttarget => 'float4', castfunc => 'float4(int2)',
   castcontext => 'i', castmethod => 'f' },
 { castsource => 'int2', casttarget => 'float8', castfunc => 'float8(int2)',
-  castcontext => 'i', castmethod => 'f' },
   castcontext => 'i', castmethod => 'f' },
 { castsource => 'int4', casttarget => 'int8', castfunc => 'int8(int4)',
   castcontext => 'i', castmethod => 'f' },
@@ -44,7 +42,6 @@
   castcontext => 'i', castmethod => 'f' },
 { castsource => 'int4', casttarget => 'float8', castfunc => 'float8(int4)',
   castcontext => 'i', castmethod => 'f' },
-  castcontext => 'i', castmethod => 'f' },
 { castsource => 'float4', casttarget => 'int8', castfunc => 'int8(float4)',
   castcontext => 'a', castmethod => 'f' },
 { castsource => 'float4', casttarget => 'int2', castfunc => 'int2(float4)',
@@ -53,7 +50,6 @@
   castcontext => 'a', castmethod => 'f' },
 { castsource => 'float4', casttarget => 'float8', castfunc => 'float8(float4)',
   castcontext => 'i', castmethod => 'f' },
-  castfunc => 'numeric(float4)', castcontext => 'a', castmethod => 'f' },
 { castsource => 'float8', casttarget => 'int8', castfunc => 'int8(float8)',
   castcontext => 'a', castmethod => 'f' },
 { castsource => 'float8', casttarget => 'int2', castfunc => 'int2(float8)',
@@ -62,12 +58,6 @@
   castcontext => 'a', castmethod => 'f' },
 { castsource => 'float8', casttarget => 'float4', castfunc => 'float4(float8)',
   castcontext => 'a', castmethod => 'f' },
-  castfunc => 'numeric(float8)', castcontext => 'a', castmethod => 'f' },
-  castcontext => 'a', castmethod => 'f' },
-  castcontext => 'a', castmethod => 'f' },
-  castcontext => 'a', castmethod => 'f' },
-  castfunc => 'float4(numeric)', castcontext => 'i', castmethod => 'f' },
-  castfunc => 'float8(numeric)', castcontext => 'i', castmethod => 'f' },
 
 # Allow explicit coercions between int4 and bool
 { castsource => 'int4', casttarget => 'bool', castfunc => 'bool(int4)',
@@ -204,19 +194,13 @@
 { castsource => 'regtype', casttarget => 'int4', castfunc => '0',
   castcontext => 'a', castmethod => 'b' },
 
-  castcontext => 'i', castmethod => 'b' },
 
 
 
-  castcontext => 'a', castmethod => 'f' },
-  castcontext => 'a', castmethod => 'b' },
-
-  castcontext => 'i', castmethod => 'b' },
 
 
 
-  castcontext => 'a', castmethod => 'f' },
-  castcontext => 'a', castmethod => 'b' },
+
 { castsource => 'text', casttarget => 'regclass', castfunc => 'regclass',
   castcontext => 'i', castmethod => 'f' },
 { castsource => 'varchar', casttarget => 'regclass', castfunc => 'regclass',
@@ -284,26 +268,6 @@
 { castsource => 'pg_node_tree', casttarget => 'text', castfunc => '0',
   castcontext => 'i', castmethod => 'b' },
 
-# Datetime category
-{ castsource => 'date', casttarget => 'timestamp',
-  castfunc => 'timestamp(date)', castcontext => 'i', castmethod => 'f' },
-{ castsource => 'date', casttarget => 'timestamptz',
-  castfunc => 'timestamptz(date)', castcontext => 'i', castmethod => 'f' },
-  castcontext => 'i', castmethod => 'f' },
-{ castsource => 'timestamp', casttarget => 'date',
-  castfunc => 'date(timestamp)', castcontext => 'a', castmethod => 'f' },
-{ castsource => 'timestamp', casttarget => 'time',
-  castfunc => 'time(timestamp)', castcontext => 'a', castmethod => 'f' },
-{ castsource => 'timestamp', casttarget => 'timestamptz',
-  castfunc => 'timestamptz(timestamp)', castcontext => 'i', castmethod => 'f' },
-{ castsource => 'timestamptz', casttarget => 'date',
-  castfunc => 'date(timestamptz)', castcontext => 'a', castmethod => 'f' },
-{ castsource => 'timestamptz', casttarget => 'time',
-  castfunc => 'time(timestamptz)', castcontext => 'a', castmethod => 'f' },
-{ castsource => 'timestamptz', casttarget => 'timestamp',
-  castfunc => 'timestamp(timestamptz)', castcontext => 'a', castmethod => 'f' },
-  castcontext => 'a', castmethod => 'f' },
-
 # Geometric category
 
 
@@ -365,16 +329,5 @@
 { castsource => 'varchar', casttarget => 'varchar',
   castfunc => 'varchar(varchar,int4,bool)', castcontext => 'i',
   castmethod => 'f' },
-{ castsource => 'time', casttarget => 'time', castfunc => 'time(time,int4)',
-  castcontext => 'i', castmethod => 'f' },
-{ castsource => 'timestamp', casttarget => 'timestamp',
-  castfunc => 'timestamp(timestamp,int4)', castcontext => 'i',
-  castmethod => 'f' },
-{ castsource => 'timestamptz', casttarget => 'timestamptz',
-  castfunc => 'timestamptz(timestamptz,int4)', castcontext => 'i',
-  castmethod => 'f' },
-  castmethod => 'f' },
-  castfunc => 'numeric(numeric,int4)', castcontext => 'i', castmethod => 'f' },
 
-  castcontext => 'e', castmethod => 'f' },
 ]

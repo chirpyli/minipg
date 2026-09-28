@@ -4273,7 +4273,6 @@ isSimpleNode(Node *node, Node *parentNode, int prettyFlags)
 		case T_ArrayExpr:
 		case T_RowExpr:
 		case T_CoalesceExpr:
-		case T_SQLValueFunction:
 		case T_NullIfExpr:
 		case T_FuncExpr:
 			/* function-like: name(..) or name[..] */
@@ -5131,31 +5130,6 @@ get_rule_expr(Node *node, deparse_context *context,
 			}
 			break;
 
-		case T_SQLValueFunction:
-			{
-				SQLValueFunction *svf = (SQLValueFunction *) node;
-
-				/*
-				 * Note: this code knows that typmod for time, timestamp, and
-				 * timestamptz just prints as integer.
-				 */
-				switch (svf->op)
-				{
-					case SVFOP_CURRENT_DATE:
-						appendStringInfoString(buf, "CURRENT_DATE");
-						break;
-					case SVFOP_CURRENT_TIMESTAMP:
-						appendStringInfoString(buf, "CURRENT_TIMESTAMP");
-						break;
-					case SVFOP_CURRENT_TIMESTAMP_N:
-						appendStringInfo(buf, "CURRENT_TIMESTAMP(%d)",
-										 svf->typmod);
-						break;
-				}
-			}
-			break;
-
-
 		case T_NullTest:
 			{
 				NullTest   *ntest = (NullTest *) node;
@@ -5329,7 +5303,6 @@ looks_like_function(Node *node)
 					((FuncExpr *) node)->funcformat == COERCE_SQL_SYNTAX);
 		case T_NullIfExpr:
 		case T_CoalesceExpr:
-		case T_SQLValueFunction:
 			/* these are all accepted by func_expr_common_subexpr */
 			return true;
 		default:
@@ -5489,37 +5462,6 @@ get_func_sql_syntax(FuncExpr *expr, deparse_context *context)
 
 	switch (funcoid)
 	{
-		case F_TIMEZONE_TEXT_TIMESTAMP:
-		case F_TIMEZONE_TEXT_TIMESTAMPTZ:
-			/* AT TIME ZONE ... note reversed argument order */
-			appendStringInfoChar(buf, '(');
-			get_rule_expr_paren((Node *) lsecond(expr->args), context, false,
-								(Node *) expr);
-			appendStringInfoString(buf, " AT TIME ZONE ");
-			get_rule_expr_paren((Node *) linitial(expr->args), context, false,
-								(Node *) expr);
-			appendStringInfoChar(buf, ')');
-			return true;
-
-		case F_EXTRACT_TEXT_DATE:
-		case F_EXTRACT_TEXT_TIME:
-		case F_EXTRACT_TEXT_TIMESTAMP:
-		case F_EXTRACT_TEXT_TIMESTAMPTZ:
-			/* EXTRACT (x FROM y) */
-			appendStringInfoString(buf, "EXTRACT(");
-			{
-				Const	   *con = (Const *) linitial(expr->args);
-
-				Assert(IsA(con, Const) &&
-					   con->consttype == TEXTOID &&
-					   !con->constisnull);
-				appendStringInfoString(buf, TextDatumGetCString(con->constvalue));
-			}
-			appendStringInfoString(buf, " FROM ");
-			get_rule_expr((Node *) lsecond(expr->args), context, false);
-			appendStringInfoChar(buf, ')');
-			return true;
-
 		case F_OVERLAY_BYTEA_BYTEA_INT4:
 		case F_OVERLAY_BYTEA_BYTEA_INT4_INT4:
 		case F_OVERLAY_TEXT_TEXT_INT4:

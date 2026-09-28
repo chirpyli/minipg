@@ -49,7 +49,7 @@
 #include "tcop/tcopprot.h"
 #include "utils/guc.h"
 #include "utils/ps_status.h"
-#include "utils/timestamp.h"
+#include "utils/timestamp_core.h"
 
 /*
  * We read() into a temp buffer twice as big as a chunk, so that any fragment

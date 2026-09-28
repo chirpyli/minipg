@@ -34,7 +34,7 @@
 #include "utils/guc.h"
 #include "utils/memutils.h"
 #include "utils/pg_lsn.h"
-#include "utils/timestamp.h"
+#include "utils/timestamp_core.h"
 #include "utils/tuplestore.h"
 
 
@@ -254,7 +254,7 @@ pg_last_xact_replay_timestamp(PG_FUNCTION_ARGS)
 	if (xtime == 0)
 		PG_RETURN_NULL();
 
-	PG_RETURN_TIMESTAMPTZ(xtime);
+	PG_RETURN_INT64(xtime);
 }
 
 /*

@@ -194,43 +194,6 @@ extern PGDLLIMPORT Oid MyDatabaseId;
 extern PGDLLIMPORT Oid MyDatabaseTableSpace;
 
 /*
- * Date/Time Configuration
- *
- * DateStyle defines the output formatting choice for date/time types:
- *	USE_POSTGRES_DATES specifies traditional Postgres format
- *	USE_ISO_DATES specifies ISO-compliant format
- *	USE_SQL_DATES specifies Oracle/Ingres-compliant format
- *	USE_GERMAN_DATES specifies German-style dd.mm/yyyy
- *
- * DateOrder defines the field order to be assumed when reading an
- * ambiguous date (anything not in YYYY-MM-DD format, with a four-digit
- * year field first, is taken to be ambiguous):
- *	DATEORDER_YMD specifies field order yy-mm-dd
- *	DATEORDER_DMY specifies field order dd-mm-yy ("European" convention)
- *	DATEORDER_MDY specifies field order mm-dd-yy ("US" convention)
- *
- * In the Postgres and SQL DateStyles, DateOrder also selects output field
- * order: day comes before month in DMY style, else month comes before day.
- *
- * The user-visible "DateStyle" run-time parameter subsumes both of these.
- */
-
-/* valid DateStyle values */
-#define USE_POSTGRES_DATES		0
-#define USE_ISO_DATES			1
-#define USE_SQL_DATES			2
-#define USE_GERMAN_DATES		3
-#define USE_XSD_DATES			4
-
-/* valid DateOrder values */
-#define DATEORDER_YMD			0
-#define DATEORDER_DMY			1
-#define DATEORDER_MDY			2
-
-extern PGDLLIMPORT int DateStyle;
-extern PGDLLIMPORT int DateOrder;
-
-/*
  * IntervalStyles
  *	 INTSTYLE_POSTGRES			   Like Postgres < 8.4 when DateStyle = 'iso'
  *	 INTSTYLE_POSTGRES_VERBOSE	   Like Postgres < 8.4 when DateStyle != 'iso'

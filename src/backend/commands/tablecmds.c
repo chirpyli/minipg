@@ -84,7 +84,7 @@
 #include "utils/ruleutils.h"
 #include "utils/snapmgr.h"
 #include "utils/syscache.h"
-#include "utils/timestamp.h"
+#include "utils/timestamp_core.h"
 #include "utils/typcache.h"
 
 /*
@@ -3515,7 +3515,6 @@ ATPrepAlterColumnType(AlteredTableInfo *tab, Relation rel,
  * rewrite in these cases:
  *
  * - the old type is binary coercible to the new type
- * - {NEW,OLD} or {OLD,NEW} is {timestamptz,timestamp} and the timezone is UTC
  */
 static bool
 ATColumnChangeRequiresRewrite(Node *expr, AttrNumber varattno)
@@ -3529,23 +3528,6 @@ ATColumnChangeRequiresRewrite(Node *expr, AttrNumber varattno)
 			return false;
 		else if (IsA(expr, RelabelType))
 			expr = (Node *) ((RelabelType *) expr)->arg;
-		else if (IsA(expr, FuncExpr))
-		{
-			FuncExpr   *f = (FuncExpr *) expr;
-
-			switch (f->funcid)
-			{
-				case F_TIMESTAMPTZ_TIMESTAMP:
-				case F_TIMESTAMP_TIMESTAMPTZ:
-					if (TimestampTimestampTzRequiresRewrite())
-						return true;
-					else
-						expr = linitial(f->args);
-					break;
-				default:
-					return true;
-			}
-		}
 		else
 			return true;
 	}

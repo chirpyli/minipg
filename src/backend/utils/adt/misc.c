@@ -36,7 +36,7 @@
 #include "utils/fmgroids.h"
 #include "utils/lsyscache.h"
 #include "utils/ruleutils.h"
-#include "utils/timestamp.h"
+#include "utils/timestamp_core.h"
 
 /*
  * Common subroutine for num_nulls() and num_nonnulls().

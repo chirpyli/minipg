@@ -49,7 +49,7 @@
 #include "storage/procsignal.h"
 #include "storage/spin.h"
 #include "utils/timeout.h"
-#include "utils/timestamp.h"
+#include "utils/timestamp_core.h"
 
 /* GUC variables */
 int			DeadlockTimeout = 1000;

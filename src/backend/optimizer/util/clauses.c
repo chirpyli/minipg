@@ -242,12 +242,6 @@ contain_mutable_functions_walker(Node *node, void *context)
 								context))
 		return true;
 
-	if (IsA(node, SQLValueFunction))
-	{
-		/* all variants of SQLValueFunction are stable */
-		return true;
-	}
-
 	/* Recurse to check arguments */
 	if (IsA(node, Query))
 	{
@@ -404,10 +398,6 @@ contain_volatile_functions_walker(Node *node, void *context)
 			return hasvolatile;
 		}
 	}
-
-	/*
-	 * SQLValueFunction is stable, so it is not of interest here.
-	 */
 
 	/* Recurse to check arguments */
 	if (IsA(node, Query))
@@ -743,7 +733,6 @@ contain_leaked_vars_walker(Node *node, void *context)
 		case T_CaseExpr:
 		case T_CaseTestExpr:
 		case T_RowExpr:
-		case T_SQLValueFunction:
 		case T_NullTest:
 		case T_BooleanTest:
 		case T_List:
@@ -2427,23 +2416,6 @@ eval_const_expressions_mutator(Node *node,
 				newcoalesce->args = newargs;
 				newcoalesce->location = coalesceexpr->location;
 				return (Node *) newcoalesce;
-			}
-		case T_SQLValueFunction:
-			{
-				/*
-				 * All variants of SQLValueFunction are stable, so if we are
-				 * estimating the expression's value, we should evaluate the
-				 * current function value.  Otherwise just copy.
-				 */
-				SQLValueFunction *svf = (SQLValueFunction *) node;
-
-				if (context->estimate)
-					return (Node *) evaluate_expr((Expr *) svf,
-												  svf->type,
-												  svf->typmod,
-												  InvalidOid);
-				else
-					return copyObject((Node *) svf);
 			}
 		case T_FieldSelect:
 			{

@@ -176,7 +176,6 @@ static void trapsig(int signum);
 static void check_ok(void);
 static char *escape_quotes(const char *src);
 static char *escape_quotes_bki(const char *src);
-static int	locale_date_order(const char *locale);
 static void check_locale_name(int category, const char *locale,
 							  char **canonname);
 static bool check_locale_encoding(const char *locale, int encoding);
@@ -761,20 +760,6 @@ setup_config(void)
 			 pretty_wal_size(DEFAULT_MAX_WAL_SEGS));
 	conflines = replace_token(conflines, "#max_wal_size = 1GB", repltok);
 
-	switch (locale_date_order(lc_time))
-	{
-		case DATEORDER_YMD:
-			strcpy(repltok, "datestyle = 'iso, ymd'");
-			break;
-		case DATEORDER_DMY:
-			strcpy(repltok, "datestyle = 'iso, dmy'");
-			break;
-		case DATEORDER_MDY:
-		default:
-			strcpy(repltok, "datestyle = 'iso, mdy'");
-			break;
-	}
-	conflines = replace_token(conflines, "#datestyle = 'iso, mdy'", repltok);
 
 	/*
 	 * The timezone and log_timezone settings are left at their bootstrap
@@ -1131,67 +1116,6 @@ check_ok(void)
 		printf(_("ok\n"));
 		fflush(stdout);
 	}
-}
-
-/* Hack to suppress a warning about %x from some versions of gcc */
-static inline size_t
-my_strftime(char *s, size_t max, const char *fmt, const struct tm *tm)
-{
-	return strftime(s, max, fmt, tm);
-}
-
-/*
- * Determine likely date order from locale
- */
-static int
-locale_date_order(const char *locale)
-{
-	struct tm	testtime;
-	char		buf[128];
-	char	   *posD;
-	char	   *posM;
-	char	   *posY;
-	char	   *save;
-	size_t		res;
-	int			result;
-
-	result = DATEORDER_MDY;		/* default */
-
-	save = setlocale(LC_TIME, NULL);
-	if (!save)
-		return result;
-	save = pg_strdup(save);
-
-	setlocale(LC_TIME, locale);
-
-	memset(&testtime, 0, sizeof(testtime));
-	testtime.tm_mday = 22;
-	testtime.tm_mon = 10;		/* November, should come out as "11" */
-	testtime.tm_year = 133;		/* 2033 */
-
-	res = my_strftime(buf, sizeof(buf), "%x", &testtime);
-
-	setlocale(LC_TIME, save);
-	free(save);
-
-	if (res == 0)
-		return result;
-
-	posM = strstr(buf, "11");
-	posD = strstr(buf, "22");
-	posY = strstr(buf, "33");
-
-	if (!posM || !posD || !posY)
-		return result;
-
-	if (posY < posM && posM < posD)
-		result = DATEORDER_YMD;
-	else if (posD < posM)
-		result = DATEORDER_DMY;
-	else
-		result = DATEORDER_MDY;
-
-	return result;
 }
 
 /*

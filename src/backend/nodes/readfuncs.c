@@ -760,22 +760,6 @@ _readCoalesceExpr(void)
 	READ_DONE();
 }
 
-/*
- * _readSQLValueFunction
- */
-static SQLValueFunction *
-_readSQLValueFunction(void)
-{
-	READ_LOCALS(SQLValueFunction);
-
-	READ_ENUM_FIELD(op, SQLValueFunctionOp);
-	READ_OID_FIELD(type);
-	READ_INT_FIELD(typmod);
-	READ_LOCATION_FIELD(location);
-
-	READ_DONE();
-}
-
 
 /*
  * _readNullTest
@@ -1664,8 +1648,6 @@ parseNodeString(void)
 		return_value = _readRowExpr();
 	else if (MATCH("COALESCE", 8))
 		return_value = _readCoalesceExpr();
-	else if (MATCH("SQLVALUEFUNCTION", 16))
-		return_value = _readSQLValueFunction();
 	else if (MATCH("NULLTEST", 8))
 		return_value = _readNullTest();
 	else if (MATCH("BOOLEANTEST", 11))

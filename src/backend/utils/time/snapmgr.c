@@ -66,7 +66,7 @@
 #include "utils/resowner_private.h"
 #include "utils/snapmgr.h"
 #include "utils/syscache.h"
-#include "utils/timestamp.h"
+#include "utils/timestamp_core.h"
 
 
 /*

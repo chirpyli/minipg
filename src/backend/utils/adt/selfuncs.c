@@ -116,7 +116,6 @@
 #include "parser/parsetree.h"
 #include "storage/bufmgr.h"
 #include "utils/builtins.h"
-#include "utils/date.h"
 #include "utils/datum.h"
 #include "utils/fmgroids.h"
 #include "utils/index_selfuncs.h"
@@ -127,7 +126,7 @@
 #include "utils/selfuncs.h"
 #include "utils/snapmgr.h"
 #include "utils/syscache.h"
-#include "utils/timestamp.h"
+#include "utils/timestamp_core.h"
 #include "utils/typcache.h"
 
 
@@ -174,8 +173,6 @@ static double convert_one_bytea_to_scalar(unsigned char *value, int valuelen,
 										  int rangelo, int rangehi);
 static char *convert_string_datum(Datum value, Oid typid, Oid collid,
 								  bool *failure);
-static double convert_timevalue_to_scalar(Datum value, Oid typid,
-										  bool *failure);
 static void examine_simple_variable(PlannerInfo *root, Var *var,
 									VariableStatData *vardata);
 static bool get_variable_range(PlannerInfo *root, VariableStatData *vardata,
@@ -3762,15 +3759,6 @@ estimate_hash_bucket_stats(PlannerInfo *root, Node *hashkey, double nbuckets,
  *
  * The bytea datatype is just enough different from strings that it has
  * to be treated separately.
- *
- * The several datatypes representing absolute times are all converted
- * to Timestamp, which is actually an int64, and then we promote that to
- * a double.  Note this will give correct results even for the "special"
- * values of Timestamp, since those are chosen to compare correctly;
- * see timestamp_cmp.
- *
- * The several datatypes representing relative times (intervals) are all
- * converted to measurements expressed in seconds.
  */
 static bool
 convert_to_scalar(Datum value, Oid valuetypid, Oid collid, double *scaledvalue,
@@ -3872,20 +3860,6 @@ convert_to_scalar(Datum value, Oid valuetypid, Oid collid, double *scaledvalue,
 				return true;
 			}
 
-			/*
-			 * Built-in time types
-			 */
-		case TIMESTAMPOID:
-		case TIMESTAMPTZOID:
-		case DATEOID:
-		case TIMEOID:
-			*scaledvalue = convert_timevalue_to_scalar(value, valuetypid,
-													   &failure);
-			*scaledlobound = convert_timevalue_to_scalar(lobound, boundstypid,
-														 &failure);
-			*scaledhibound = convert_timevalue_to_scalar(hibound, boundstypid,
-														 &failure);
-			return !failure;
 	}
 	/* Don't know how to convert */
 	*scaledvalue = *scaledlobound = *scaledhibound = 0;
@@ -4238,32 +4212,6 @@ convert_one_bytea_to_scalar(unsigned char *value, int valuelen,
 
 	return num;
 }
-
-/*
- * Do convert_to_scalar()'s work for any timevalue data type.
- *
- * On failure (e.g., unsupported typid), set *failure to true;
- * otherwise, that variable is not changed.
- */
-static double
-convert_timevalue_to_scalar(Datum value, Oid typid, bool *failure)
-{
-	switch (typid)
-	{
-		case TIMESTAMPOID:
-			return DatumGetTimestamp(value);
-		case TIMESTAMPTZOID:
-			return DatumGetTimestampTz(value);
-		case DATEOID:
-			return date2timestamp_no_overflow(DatumGetDateADT(value));
-		case TIMEOID:
-			return DatumGetTimeADT(value);
-	}
-
-	*failure = true;
-	return 0;
-}
-
 
 /*
  * get_restriction_variable

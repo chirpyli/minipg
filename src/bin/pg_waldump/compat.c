@@ -20,7 +20,7 @@
 
 #include <time.h>
 
-#include "utils/datetime.h"
+#include "utils/timestamp_core.h"
 
 /* copied from timestamp.c */
 pg_time_t

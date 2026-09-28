@@ -66,11 +66,10 @@
 #include "parser/parsetree.h"
 #include "utils/array.h"
 #include "utils/builtins.h"
-#include "utils/date.h"
 #include "utils/datum.h"
 #include "utils/lsyscache.h"
 #include "utils/memutils.h"
-#include "utils/timestamp.h"
+#include "utils/timestamp_core.h"
 #include "utils/typcache.h"
 
 /*
@@ -443,7 +442,6 @@ ExecInterpExpr(ExprState *state, ExprContext *econtext, bool *isnull)
 		&&CASE_EEOP_IOCOERCE,
 		&&CASE_EEOP_NOT_DISTINCT,
 		&&CASE_EEOP_NULLIF,
-		&&CASE_EEOP_SQLVALUEFUNCTION,
 		&&CASE_EEOP_ARRAYEXPR,
 		&&CASE_EEOP_ARRAYCOERCE,
 		&&CASE_EEOP_ROW,
@@ -1220,17 +1218,6 @@ ExecInterpExpr(ExprState *state, ExprContext *econtext, bool *isnull)
 			EEO_NEXT();
 		}
 
-		EEO_CASE(EEOP_SQLVALUEFUNCTION)
-		{
-			/*
-			 * Doesn't seem worthwhile to have an inline implementation
-			 * efficiency-wise.
-			 */
-			ExecEvalSQLValueFunction(state, op);
-
-			EEO_NEXT();
-		}
-
 		EEO_CASE(EEOP_ARRAYEXPR)
 		{
 			/* too complex for an inline implementation */
@@ -1999,28 +1986,6 @@ ExecEvalParamExtern(ExprState *state, ExprEvalStep *op, ExprContext *econtext)
 	ereport(ERROR,
 			(errcode(ERRCODE_UNDEFINED_OBJECT),
 			 errmsg("no value found for parameter %d", paramId)));
-}
-
-/*
- * Evaluate a SQLValueFunction expression.
- */
-void
-ExecEvalSQLValueFunction(ExprState *state, ExprEvalStep *op)
-{
-	SQLValueFunction *svf = op->d.sqlvaluefunction.svf;
-
-	*op->resnull = false;
-
-	switch (svf->op)
-	{
-		case SVFOP_CURRENT_DATE:
-			*op->resvalue = DateADTGetDatum(GetSQLCurrentDate());
-			break;
-		case SVFOP_CURRENT_TIMESTAMP:
-		case SVFOP_CURRENT_TIMESTAMP_N:
-			*op->resvalue = TimestampTzGetDatum(GetSQLCurrentTimestamp(svf->typmod));
-			break;
-	}
 }
 
 /*

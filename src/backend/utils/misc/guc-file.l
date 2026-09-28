@@ -352,7 +352,6 @@ ProcessConfigFileInternal(GucContext context, bool applySettings, int elevel)
 	if (context == PGC_SIGHUP && applySettings)
 	{
 		InitializeGUCOptionsFromEnvironment();
-		pg_timezone_abbrev_initialize();
 		/* this selects SQL_ASCII in processes not connected to a database */
 		SetConfigOption("client_encoding", GetDatabaseEncodingName(),
 						PGC_BACKEND, PGC_S_DYNAMIC_DEFAULT);

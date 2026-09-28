@@ -488,15 +488,6 @@ JumbleExpr(JumbleState *jstate, Node *node)
 		case T_CoalesceExpr:
 			JumbleExpr(jstate, (Node *) ((CoalesceExpr *) node)->args);
 			break;
-		case T_SQLValueFunction:
-			{
-				SQLValueFunction *svf = (SQLValueFunction *) node;
-
-				APP_JUMB(svf->op);
-				/* type is fully determined by op */
-				APP_JUMB(svf->typmod);
-			}
-			break;
 		case T_NullTest:
 			{
 				NullTest   *nt = (NullTest *) node;

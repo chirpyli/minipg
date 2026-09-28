@@ -9,7 +9,7 @@
 
 SELECT regoper('||/');
 SELECT regoperator('+(int4,int4)');
-SELECT regproc('now');
+SELECT regproc('pg_backend_pid');
 SELECT regprocedure('abs(float8)');
 SELECT regclass('pg_class');
 SELECT regtype('int4');
@@ -17,7 +17,7 @@ SELECT regcollation('"POSIX"');
 
 SELECT to_regoper('||/');
 SELECT to_regoperator('+(int4,int4)');
-SELECT to_regproc('now');
+SELECT to_regproc('pg_backend_pid');
 SELECT to_regprocedure('abs(float8)');
 SELECT to_regclass('pg_class');
 SELECT to_regtype('int4');
@@ -27,14 +27,14 @@ SELECT to_regcollation('"POSIX"');
 
 SELECT regoper('pg_catalog.||/');
 SELECT regoperator('pg_catalog.+(int4,int4)');
-SELECT regproc('pg_catalog.now');
+SELECT regproc('pg_catalog.pg_backend_pid');
 SELECT regprocedure('pg_catalog.abs(float8)');
 SELECT regclass('pg_catalog.pg_class');
 SELECT regtype('pg_catalog.int4');
 SELECT regcollation('pg_catalog."POSIX"');
 
 SELECT to_regoper('pg_catalog.||/');
-SELECT to_regproc('pg_catalog.now');
+SELECT to_regproc('pg_catalog.pg_backend_pid');
 SELECT to_regprocedure('pg_catalog.abs(float8)');
 SELECT to_regclass('pg_catalog.pg_class');
 SELECT to_regtype('pg_catalog.int4');

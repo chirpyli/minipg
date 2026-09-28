@@ -19,7 +19,7 @@
 #include "access/xlog_internal.h"
 #include "catalog/pg_control.h"
 #include "utils/guc.h"
-#include "utils/timestamp.h"
+#include "utils/timestamp_core.h"
 
 /*
  * GUC support

@@ -55,7 +55,7 @@
 #include "utils/lsyscache.h"
 #include "utils/memutils.h"
 #include "utils/pg_rusage.h"
-#include "utils/timestamp.h"
+#include "utils/timestamp_core.h"
 
 
 /*

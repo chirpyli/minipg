@@ -60,10 +60,10 @@ select concat('one');
  one
 (1 row)
 
-select concat(1,2,3,'hello',true, false, '20100309'::date);
-        concat        
-----------------------
- 123hellotf03-09-2010
+select concat(1,2,3,'hello',true, false, '20100309');
+       concat       
+--------------------
+ 123hellotf20100309
 (1 row)
 
 select concat_ws('#','one');
@@ -72,10 +72,10 @@ select concat_ws('#','one');
  one
 (1 row)
 
-select concat_ws('#',1,2,3,'hello',true, false, '20100309'::date);
-         concat_ws          
-----------------------------
- 1#2#3#hello#t#f#03-09-2010
+select concat_ws('#',1,2,3,'hello',true, false, '20100309');
+        concat_ws         
+--------------------------
+ 1#2#3#hello#t#f#20100309
 (1 row)
 
 select concat_ws(',',10,20,null,30);

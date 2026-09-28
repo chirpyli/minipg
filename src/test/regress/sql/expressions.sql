@@ -2,21 +2,6 @@
 -- expression evaluation tests that don't fit into a more specific file
 --
 
---
--- Tests for SQLVAlueFunction
---
-
-
--- current_date  (always matches because of transactional behaviour)
-SELECT date(now())::text = current_date::text;
-
-
--- current_timestamp (always matches because of transactional behaviour)
-SELECT current_timestamp = NOW();
--- precision
-SELECT length(current_timestamp::text) >= length(current_timestamp(0)::text);
-
--- current_role/user/user is tested in rolenames.sql
 
 
 --

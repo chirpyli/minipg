@@ -15,10 +15,10 @@ SELECT regoperator('+(int4,int4)');
  +(integer,integer)
 (1 row)
 
-SELECT regproc('now');
- regproc 
----------
- now
+SELECT regproc('pg_backend_pid');
+    regproc     
+----------------
+ pg_backend_pid
 (1 row)
 
 SELECT regprocedure('abs(float8)');
@@ -57,10 +57,10 @@ SELECT to_regoperator('+(int4,int4)');
  +(integer,integer)
 (1 row)
 
-SELECT to_regproc('now');
- to_regproc 
-------------
- now
+SELECT to_regproc('pg_backend_pid');
+   to_regproc   
+----------------
+ pg_backend_pid
 (1 row)
 
 SELECT to_regprocedure('abs(float8)');
@@ -100,10 +100,10 @@ SELECT regoperator('pg_catalog.+(int4,int4)');
  +(integer,integer)
 (1 row)
 
-SELECT regproc('pg_catalog.now');
- regproc 
----------
- now
+SELECT regproc('pg_catalog.pg_backend_pid');
+    regproc     
+----------------
+ pg_backend_pid
 (1 row)
 
 SELECT regprocedure('pg_catalog.abs(float8)');
@@ -136,10 +136,10 @@ SELECT to_regoper('pg_catalog.||/');
  ||/
 (1 row)
 
-SELECT to_regproc('pg_catalog.now');
- to_regproc 
-------------
- now
+SELECT to_regproc('pg_catalog.pg_backend_pid');
+   to_regproc   
+----------------
+ pg_backend_pid
 (1 row)
 
 SELECT to_regprocedure('pg_catalog.abs(float8)');

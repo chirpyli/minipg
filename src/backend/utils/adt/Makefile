@@ -21,8 +21,6 @@ OBJS = \
 	ascii.o \
 	bool.o \
 	char.o \
-	date.o \
-	datetime.o \
 	datum.o \
 	dbsize.o \
 	encode.o \
@@ -49,7 +47,6 @@ OBJS = \
 	ruleutils.o \
 	selfuncs.o \
 	tid.o \
-	timestamp.o \
 	varchar.o \
 	varlena.o \
 	version.o \

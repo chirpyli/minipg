@@ -669,12 +669,11 @@ initialize_environment(void)
 		unsetenv("PGCLIENTENCODING");
 
 	/*
-	 * Set timezone and datestyle for datetime-related tests.
+	 * Set timezone for datetime-related tests.
 	 * minipg ships only UTC and the fixed-offset Etc/GMT* zones, so the
 	 * regression default is UTC (deterministic and always present).
 	 */
 	setenv("PGTZ", "UTC", 1);
-	setenv("PGDATESTYLE", "Postgres, MDY", 1);
 
 	/*
 	 * Likewise set intervalstyle to ensure consistent results.  This is a bit
@@ -1682,8 +1681,7 @@ create_database(const char *dbname)
 	else
 		psql_command("postgres", "CREATE DATABASE \"%s\" TEMPLATE=template0", dbname);
 	psql_command(dbname,
-				 "SET bytea_output TO 'hex';"
-				 "SET timezone_abbreviations TO 'Default';");
+				 "SET bytea_output TO 'hex';");
 }
 
 static void

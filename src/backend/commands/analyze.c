@@ -64,7 +64,7 @@ typedef int (*AcquireSampleRowsFunc) (Relation onerel, int elevel,
 #include "utils/sampling.h"
 #include "utils/sortsupport.h"
 #include "utils/syscache.h"
-#include "utils/timestamp.h"
+#include "utils/timestamp_core.h"
 
 
 /* Per-index data for ANALYZE */

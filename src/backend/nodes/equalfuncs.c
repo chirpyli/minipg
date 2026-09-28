@@ -500,18 +500,6 @@ _equalCoalesceExpr(const CoalesceExpr *a, const CoalesceExpr *b)
 }
 
 static bool
-_equalSQLValueFunction(const SQLValueFunction *a, const SQLValueFunction *b)
-{
-	COMPARE_SCALAR_FIELD(op);
-	COMPARE_SCALAR_FIELD(type);
-	COMPARE_SCALAR_FIELD(typmod);
-	COMPARE_LOCATION_FIELD(location);
-
-	return true;
-}
-
-
-static bool
 _equalNullTest(const NullTest *a, const NullTest *b)
 {
 	COMPARE_NODE_FIELD(arg);
@@ -1413,9 +1401,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_CoalesceExpr:
 			retval = _equalCoalesceExpr(a, b);
-			break;
-		case T_SQLValueFunction:
-			retval = _equalSQLValueFunction(a, b);
 			break;
 			break;
 		case T_NullTest:

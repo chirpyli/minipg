@@ -13,8 +13,7 @@
 #include "utils/guc.h"
 
 
-extern bool check_datestyle(char **newval, void **extra, GucSource source);
-extern void assign_datestyle(const char *newval, void *extra);
+
 extern bool check_timezone(char **newval, void **extra, GucSource source);
 extern void assign_timezone(const char *newval, void *extra);
 extern const char *show_timezone(void);

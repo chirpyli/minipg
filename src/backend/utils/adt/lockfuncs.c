@@ -142,7 +142,7 @@ pg_lock_status(PG_FUNCTION_ARGS)
 		TupleDescInitEntry(tupdesc, (AttrNumber) 15, "fastpath",
 						   BOOLOID, -1, 0);
 		TupleDescInitEntry(tupdesc, (AttrNumber) 16, "waitstart",
-						   TIMESTAMPTZOID, -1, 0);
+						   INT8OID, -1, 0);
 
 		funcctx->tuple_desc = BlessTupleDesc(tupdesc);
 
@@ -338,7 +338,7 @@ pg_lock_status(PG_FUNCTION_ARGS)
 		values[13] = BoolGetDatum(granted);
 		values[14] = BoolGetDatum(instance->fastpath);
 		if (!granted && instance->waitStart != 0)
-			values[15] = TimestampTzGetDatum(instance->waitStart);
+			values[15] = Int64GetDatum(instance->waitStart);
 		else
 			nulls[15] = true;
 
