@@ -5,4 +5,7 @@ fi
 
 make maintainer-clean
 
-./configure --prefix=/home/postgres/minipg --enable-debug --enable-cassert
+# 清掉上一次 configure 残留，避免 config.status --recheck 复用旧选项
+rm -f config.status config.cache config.log
+
+./configure --prefix=/home/postgres/minipg --enable-debug --enable-cassert CFLAGS="-DLOCK_DEBUG"
