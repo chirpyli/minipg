@@ -5,4 +5,4 @@ fi
 
 make maintainer-clean
 
-./configure --prefix=/home/postgres/minipg --enable-debug 
+./configure --prefix=/home/postgres/minipg --enable-debug --enable-cassert

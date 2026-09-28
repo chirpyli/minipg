@@ -595,16 +595,14 @@ InNoForceRLSOperation(void)
 }
 
 /*
- * Initialize user identity during special backend startup
+ * 初始化会话用户身份。
+ *
+ * minipg 没有用户体系，所有后端（包括单用户模式和后端进程）都直接使用
+ * 引导超级用户身份，因此这里不再限制只能在单用户模式下调用。
  */
 void
 InitializeSessionUserIdStandalone(void)
 {
-	/*
-	 * This function should only be called in single-user mode.
-	 */
-	AssertState(!IsUnderPostmaster);
-
 	/* call only once */
 	AssertState(!OidIsValid(AuthenticatedUserId));
 
