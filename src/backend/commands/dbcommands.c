@@ -82,8 +82,6 @@ static int	errdetail_busy_db(int notherbackends);
 Oid
 createdb(ParseState *pstate, const CreatedbStmt *stmt)
 {
-	TableScanDesc scan;
-	Relation	rel;
 	Oid			src_dboid;
 	Oid			src_owner;
 	int			src_encoding = -1;
@@ -394,38 +392,27 @@ createdb(ParseState *pstate, const CreatedbStmt *stmt)
 	PG_ENSURE_ERROR_CLEANUP(createdb_failure_callback,
 							PointerGetDatum(&fparms));
 	{
+		char	   *srcpath;
+		char	   *dstpath;
+		struct stat st;
+
 		/*
-		 * Iterate through all tablespaces of the template database, and copy
-		 * each one to the new database.
+		 * Copy the template database's directory to the new database.
+		 *
+		 * minipg：用户表空间已裁剪，库文件只可能位于 pg_default
+		 * （$PGDATA/base），因此只有一份目录需要复制。
 		 */
-		rel = table_open(TableSpaceRelationId, AccessShareLock);
-		scan = table_beginscan_catalog(rel, 0, NULL);
-		while ((tuple = heap_getnext(scan, ForwardScanDirection)) != NULL)
+		srcpath = GetDatabasePath(src_dboid, DEFAULTTABLESPACE_OID);
+
+		if (stat(srcpath, &st) < 0 || !S_ISDIR(st.st_mode) ||
+			directory_is_empty(srcpath))
 		{
-			Form_pg_tablespace spaceform = (Form_pg_tablespace) GETSTRUCT(tuple);
-			Oid			srctablespace = spaceform->oid;
-			Oid			dsttablespace;
-			char	   *srcpath;
-			char	   *dstpath;
-			struct stat st;
-
-			/* No need to copy global tablespace */
-			if (srctablespace == GLOBALTABLESPACE_OID)
-				continue;
-
-			srcpath = GetDatabasePath(src_dboid, srctablespace);
-
-			if (stat(srcpath, &st) < 0 || !S_ISDIR(st.st_mode) ||
-				directory_is_empty(srcpath))
-			{
-				/* Assume we can ignore it */
-				pfree(srcpath);
-				continue;
-			}
-
-			dsttablespace = srctablespace;
-
-			dstpath = GetDatabasePath(dboid, dsttablespace);
+			/* Assume we can ignore it */
+			pfree(srcpath);
+		}
+		else
+		{
+			dstpath = GetDatabasePath(dboid, DEFAULTTABLESPACE_OID);
 
 			/*
 			 * Copy this subdirectory to the new location
@@ -434,14 +421,17 @@ createdb(ParseState *pstate, const CreatedbStmt *stmt)
 			 */
 			copydir(srcpath, dstpath, false);
 
+			pfree(srcpath);
+			pfree(dstpath);
+
 			/* Record the filesystem change in XLOG */
 			{
 				xl_dbase_create_rec xlrec;
 
 				xlrec.db_id = dboid;
-				xlrec.tablespace_id = dsttablespace;
+				xlrec.tablespace_id = DEFAULTTABLESPACE_OID;
 				xlrec.src_db_id = src_dboid;
-				xlrec.src_tablespace_id = srctablespace;
+				xlrec.src_tablespace_id = DEFAULTTABLESPACE_OID;
 
 				XLogBeginInsert();
 				XLogRegisterData((char *) &xlrec, sizeof(xl_dbase_create_rec));
@@ -450,8 +440,6 @@ createdb(ParseState *pstate, const CreatedbStmt *stmt)
 								  XLOG_DBASE_CREATE | XLR_SPECIAL_REL_UPDATE);
 			}
 		}
-		table_endscan(scan);
-		table_close(rel, AccessShareLock);
 
 		/*
 		 * We force a checkpoint before committing.  This effectively means
@@ -830,137 +818,85 @@ get_db_info(const char *name, LOCKMODE lockmode,
 }
 
 /*
- * Remove tablespace directories
+ * Remove the database directory
  *
- * We don't know what tablespaces db_id is using, so iterate through all
- * tablespaces removing <tablespace>/db_id
+ * minipg：用户表空间已裁剪，数据库文件只可能存放在 pg_default
+ * （$PGDATA/base/<db_id>），直接删除即可。
  */
 static void
 remove_dbtablespaces(Oid db_id)
 {
-	Relation	rel;
-	TableScanDesc scan;
-	HeapTuple	tuple;
-	List	   *ltblspc = NIL;
-	ListCell   *cell;
-	int			ntblspc;
-	int			i;
+	char	   *dstpath;
+	struct stat st;
 	Oid		   *tablespace_ids;
 
-	rel = table_open(TableSpaceRelationId, AccessShareLock);
-	scan = table_beginscan_catalog(rel, 0, NULL);
-	while ((tuple = heap_getnext(scan, ForwardScanDirection)) != NULL)
+	dstpath = GetDatabasePath(db_id, DEFAULTTABLESPACE_OID);
+
+	if (lstat(dstpath, &st) < 0 || !S_ISDIR(st.st_mode))
 	{
-		Form_pg_tablespace spcform = (Form_pg_tablespace) GETSTRUCT(tuple);
-		Oid			dsttablespace = spcform->oid;
-		char	   *dstpath;
-		struct stat st;
-
-		/* Don't mess with the global tablespace */
-		if (dsttablespace == GLOBALTABLESPACE_OID)
-			continue;
-
-		dstpath = GetDatabasePath(db_id, dsttablespace);
-
-		if (lstat(dstpath, &st) < 0 || !S_ISDIR(st.st_mode))
-		{
-			/* Assume we can ignore it */
-			pfree(dstpath);
-			continue;
-		}
-
-		if (!rmtree(dstpath, true))
-			ereport(WARNING,
-					(errmsg("some useless files may be left behind in old database directory \"%s\"",
-							dstpath)));
-
-		ltblspc = lappend_oid(ltblspc, dsttablespace);
+		/* Assume we can ignore it */
 		pfree(dstpath);
-	}
-
-	ntblspc = list_length(ltblspc);
-	if (ntblspc == 0)
-	{
-		table_endscan(scan);
-		table_close(rel, AccessShareLock);
 		return;
 	}
 
-	tablespace_ids = (Oid *) palloc(ntblspc * sizeof(Oid));
-	i = 0;
-	foreach(cell, ltblspc)
-		tablespace_ids[i++] = lfirst_oid(cell);
+	if (!rmtree(dstpath, true))
+		ereport(WARNING,
+				(errmsg("some useless files may be left behind in old database directory \"%s\"",
+						dstpath)));
+
+	pfree(dstpath);
+
+	tablespace_ids = (Oid *) palloc(sizeof(Oid));
+	tablespace_ids[0] = DEFAULTTABLESPACE_OID;
 
 	/* Record the filesystem change in XLOG */
 	{
 		xl_dbase_drop_rec xlrec;
 
 		xlrec.db_id = db_id;
-		xlrec.ntablespaces = ntblspc;
+		xlrec.ntablespaces = 1;
 
 		XLogBeginInsert();
 		XLogRegisterData((char *) &xlrec, MinSizeOfDbaseDropRec);
-		XLogRegisterData((char *) tablespace_ids, ntblspc * sizeof(Oid));
+		XLogRegisterData((char *) tablespace_ids, sizeof(Oid));
 
 		(void) XLogInsert(RM_DBASE_ID,
 						  XLOG_DBASE_DROP | XLR_SPECIAL_REL_UPDATE);
 	}
 
-	list_free(ltblspc);
 	pfree(tablespace_ids);
-
-	table_endscan(scan);
-	table_close(rel, AccessShareLock);
 }
 
 /*
- * Check for existing files that conflict with a proposed new DB OID;
- * return true if there are any
+ * Check for an existing file that conflicts with a proposed new DB OID;
+ * return true if there is one
  *
- * If there were a subdirectory in any tablespace matching the proposed new
- * OID, we'd get a create failure due to the duplicate name ... and then we'd
- * try to remove that already-existing subdirectory during the cleanup in
- * remove_dbtablespaces.  Nuking existing files seems like a bad idea, so
- * instead we make this extra check before settling on the OID of the new
- * database.  This exactly parallels what GetNewRelFileNode() does for table
- * relfilenode values.
+ * If there were a subdirectory in the default tablespace matching the
+ * proposed new OID, we'd get a create failure due to the duplicate name ...
+ * and then we'd try to remove that already-existing subdirectory during the
+ * cleanup in remove_dbtablespaces.  Nuking existing files seems like a bad
+ * idea, so instead we make this extra check before settling on the OID of the
+ * new database.  This exactly parallels what GetNewRelFileNode() does for
+ * table relfilenode values.
+ *
+ * minipg：用户表空间已裁剪，只需检查 pg_default 下的 base/<db_id>。
  */
 static bool
 check_db_file_conflict(Oid db_id)
 {
+	char	   *dstpath;
+	struct stat st;
 	bool		result = false;
-	Relation	rel;
-	TableScanDesc scan;
-	HeapTuple	tuple;
 
-	rel = table_open(TableSpaceRelationId, AccessShareLock);
-	scan = table_beginscan_catalog(rel, 0, NULL);
-	while ((tuple = heap_getnext(scan, ForwardScanDirection)) != NULL)
+	dstpath = GetDatabasePath(db_id, DEFAULTTABLESPACE_OID);
+
+	if (lstat(dstpath, &st) == 0)
 	{
-		Form_pg_tablespace spcform = (Form_pg_tablespace) GETSTRUCT(tuple);
-		Oid			dsttablespace = spcform->oid;
-		char	   *dstpath;
-		struct stat st;
-
-		/* Don't mess with the global tablespace */
-		if (dsttablespace == GLOBALTABLESPACE_OID)
-			continue;
-
-		dstpath = GetDatabasePath(db_id, dsttablespace);
-
-		if (lstat(dstpath, &st) == 0)
-		{
-			/* Found a conflicting file (or directory, whatever) */
-			pfree(dstpath);
-			result = true;
-			break;
-		}
-
-		pfree(dstpath);
+		/* Found a conflicting file (or directory, whatever) */
+		result = true;
 	}
 
-	table_endscan(scan);
-	table_close(rel, AccessShareLock);
+	pfree(dstpath);
 
 	return result;
 }
@@ -1090,17 +1026,16 @@ database_is_invalid_oid(Oid dboid)
  * recovery_create_dbdir()
  *
  * During recovery, there's a case where we validly need to recover a missing
- * tablespace directory so that recovery can continue.  This happens when
- * recovery wants to create a database but the holding tablespace has been
+ * database directory so that recovery can continue.  This happens when
+ * recovery wants to create a database but the source directory has been
  * removed before the server stopped.  Since we expect that the directory will
- * be gone before reaching recovery consistency, and we have no knowledge about
- * the tablespace other than its OID here, we create a real directory under
- * pg_tblspc here instead of restoring the symlink.
+ * be gone before reaching recovery consistency, we create a real directory
+ * where the missing one should be.
  *
- * If only_tblspc is true, then the requested directory must be in pg_tblspc/
+ * minipg：用户表空间已裁剪，数据库目录只可能在 $PGDATA/base 下。
  */
 static void
-recovery_create_dbdir(char *path, bool only_tblspc)
+recovery_create_dbdir(char *path)
 {
 	struct stat st;
 
@@ -1108,9 +1043,6 @@ recovery_create_dbdir(char *path, bool only_tblspc)
 
 	if (stat(path, &st) == 0)
 		return;
-
-	if (only_tblspc && strstr(path, "pg_tblspc/") == NULL)
-		elog(PANIC, "requested to created invalid directory: %s", path);
 
 	if (reachedConsistency)
 		ereport(PANIC,
@@ -1141,7 +1073,6 @@ dbase_redo(XLogReaderState *record)
 		xl_dbase_create_rec *xlrec = (xl_dbase_create_rec *) XLogRecGetData(record);
 		char	   *src_path;
 		char	   *dst_path;
-		char	   *parent_path;
 		struct stat st;
 
 		src_path = GetDatabasePath(xlrec->src_db_id, xlrec->src_tablespace_id);
@@ -1162,32 +1093,13 @@ dbase_redo(XLogReaderState *record)
 		}
 
 		/*
-		 * If the parent of the target path doesn't exist, create it now. This
-		 * enables us to create the target underneath later.  Note that if
-		 * the database dir is not in a tablespace, the parent will always
-		 * exist, so this never runs in that case.
-		 */
-		parent_path = pstrdup(dst_path);
-		get_parent_directory(parent_path);
-		if (stat(parent_path, &st) < 0)
-		{
-			if (errno != ENOENT)
-				ereport(FATAL,
-						errmsg("could not stat directory \"%s\": %m",
-							   dst_path));
-
-			recovery_create_dbdir(parent_path, true);
-		}
-		pfree(parent_path);
-
-		/*
 		 * There's a case where the copy source directory is missing for the
 		 * same reason above.  Create the emtpy source directory so that
 		 * copydir below doesn't fail.  The directory will be dropped soon by
 		 * recovery.
 		 */
 		if (stat(src_path, &st) < 0 && errno == ENOENT)
-			recovery_create_dbdir(src_path, false);
+			recovery_create_dbdir(src_path);
 
 		/*
 		 * Force dirty buffers out to disk, to ensure source database is

@@ -54,9 +54,9 @@ static void walkdir(const char *path,
  * Issue fsync recursively on PGDATA and all its contents.
  *
  * We fsync regular files and directories wherever they are, but we follow
- * symlinks only for pg_wal (or pg_xlog) and immediately under pg_tblspc.
- * Other symlinks are presumed to point at files we're not responsible for
- * fsyncing, and might not have privileges to write at all.
+ * symlinks only for pg_wal (or pg_xlog).  Other symlinks are presumed to
+ * point at files we're not responsible for fsyncing, and might not have
+ * privileges to write at all.
  *
  * serverVersion indicates the version of the server to be fsync'd.
  */
@@ -66,12 +66,10 @@ fsync_pgdata(const char *pg_data,
 {
 	bool		xlog_is_symlink;
 	char		pg_wal[MAXPGPATH];
-	char		pg_tblspc[MAXPGPATH];
 
 	/* handle renaming of pg_xlog to pg_wal in post-10 clusters */
 	snprintf(pg_wal, MAXPGPATH, "%s/%s", pg_data,
 			 serverVersion < MINIMUM_VERSION_FOR_PG_WAL ? "pg_xlog" : "pg_wal");
-	snprintf(pg_tblspc, MAXPGPATH, "%s/pg_tblspc", pg_data);
 
 	/*
 	 * If pg_wal is a symlink, we'll need to recurse into it separately,
@@ -96,22 +94,17 @@ fsync_pgdata(const char *pg_data,
 	walkdir(pg_data, pre_sync_fname, false);
 	if (xlog_is_symlink)
 		walkdir(pg_wal, pre_sync_fname, false);
-	walkdir(pg_tblspc, pre_sync_fname, true);
 #endif
 
 	/*
 	 * Now we do the fsync()s in the same order.
 	 *
-	 * The main call ignores symlinks, so in addition to specially processing
-	 * pg_wal if it's a symlink, pg_tblspc has to be visited separately with
-	 * process_symlinks = true.  Note that if there are any plain directories
-	 * in pg_tblspc, they'll get fsync'd twice.  That's not an expected case
-	 * so we don't worry about optimizing it.
+	 * The main call ignores symlinks, so we have to specially process pg_wal
+	 * if it's a symlink.
 	 */
 	walkdir(pg_data, fsync_fname, false);
 	if (xlog_is_symlink)
 		walkdir(pg_wal, fsync_fname, false);
-	walkdir(pg_tblspc, fsync_fname, true);
 }
 
 /*

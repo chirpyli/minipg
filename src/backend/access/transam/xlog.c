@@ -39,7 +39,6 @@
 #include "catalog/catversion.h"
 #include "catalog/pg_control.h"
 #include "catalog/pg_database.h"
-#include "commands/tablespace.h"
 #include "common/controldata_utils.h"
 #include "common/file_utils.h"
 #include "executor/instrument.h"
@@ -170,18 +169,6 @@ static XLogRecPtr LastRec;
 
 /* Local copy of WalRcv->flushedUpto (used by recovery) */
 static XLogRecPtr flushedUpto = 0;
-
-/*
- * Information about a single tablespace, used while restoring a tablespace
- * map during recovery (keeps the on-disk symlink layout consistent).
- */
-typedef struct tablespaceinfo
-{
-	char	   *oid;
-	char	   *path;
-	char	   *rpath;			/* relative path to tablespace location */
-	uint64		size;			/* for file size accounting */
-} tablespaceinfo;
 
 /*
  * abortedRecPtr is the start pointer of a broken record at end of WAL when
@@ -5126,11 +5113,7 @@ StartupXLOG(void)
 	 * being out of sync with database reality.  In theory we could leave them
 	 * in place if the database had been cleanly shut down, but it seems
 	 * safest to just remove them always and let them be rebuilt during the
-	 * first backend startup.  These files needs to be removed from all
-	 * directories including pg_tblspc, however the symlinks are created only
-	 * after reading tablespace_map file in case of archive recovery from
-	 * backup, so needs to clear old relcache files here after creating
-	 * symlinks.
+	 * first backend startup.
 	 */
 	RelationCacheInitFileRemove();
 
@@ -8127,29 +8110,18 @@ issue_xlog_fsync(int fd, XLogSegNo segno)
  *
  * There are two kind of backups: exclusive and non-exclusive. An exclusive
  * backup is started with pg_start_backup(), and there can be only one active
- * at a time. The backup and tablespace map files of an exclusive backup are
- * written to $PGDATA/backup_label and $PGDATA/tablespace_map, and they are
- * removed by pg_stop_backup().
+ * at a time. The backup label file of an exclusive backup is written to
+ * $PGDATA/backup_label, and it is removed by pg_stop_backup().
  *
- * A non-exclusive backup is used for the streaming base backups (see
- * src/backend/replication/basebackup.c). The difference to exclusive backups
- * is that the backup label and tablespace map files are not written to disk.
- * Instead, their would-be contents are returned in *labelfile and *tblspcmapfile,
+ * A non-exclusive backup is used for the streaming base backups. The
+ * difference to exclusive backups is that the backup label file is not
+ * written to disk.  Instead, its would-be contents are returned in *labelfile,
  * and the caller is responsible for including them in the backup archive as
- * 'backup_label' and 'tablespace_map'. There can be many non-exclusive backups
- * active at the same time, and they don't conflict with an exclusive backup
- * either.
+ * 'backup_label'. There can be many non-exclusive backups active at the same
+ * time, and they don't conflict with an exclusive backup either.
  *
- * labelfile and tblspcmapfile must be passed as NULL when starting an
- * exclusive backup, and as initially-empty StringInfos for a non-exclusive
- * backup.
- *
- * If "tablespaces" isn't NULL, it receives a list of tablespaceinfo structs
- * describing the cluster's tablespaces.
- *
- * tblspcmapfile is required mainly for tar format in windows as native windows
- * utilities are not able to create symlinks while extracting files from tar.
- * However for consistency, the same is used for all platforms.
+ * labelfile must be passed as NULL when starting an exclusive backup, and as
+ * an initially-empty StringInfo for a non-exclusive backup.
  *
  * Returns the minimum WAL location that must be present to restore from this
  * backup, and the corresponding timeline ID in *starttli_p.
@@ -8162,8 +8134,7 @@ issue_xlog_fsync(int fd, XLogSegNo segno)
  */
 XLogRecPtr
 do_pg_start_backup(const char *backupidstr, bool fast, TimeLineID *starttli_p,
-				   StringInfo labelfile, List **tablespaces,
-				   StringInfo tblspcmapfile)
+				   StringInfo labelfile)
 {
 	bool		exclusive = (labelfile == NULL);
 	bool		backup_started_in_recovery = false;
@@ -8252,10 +8223,6 @@ do_pg_start_backup(const char *backupidstr, bool fast, TimeLineID *starttli_p,
 	PG_ENSURE_ERROR_CLEANUP(pg_start_backup_callback, (Datum) BoolGetDatum(exclusive));
 	{
 		bool		gotUniqueStartpoint = false;
-		DIR		   *tblspcdir;
-		struct dirent *de;
-		tablespaceinfo *ti;
-		int			datadirpathlen;
 
 		/*
 		 * Force an XLOG file switch before the checkpoint, to ensure that the
@@ -8376,106 +8343,6 @@ do_pg_start_backup(const char *backupidstr, bool fast, TimeLineID *starttli_p,
 		XLogFileName(xlogfilename, starttli, _logSegNo, wal_segment_size);
 
 		/*
-		 * Construct tablespace_map file.  If caller isn't interested in this,
-		 * we make a local StringInfo.
-		 */
-		if (tblspcmapfile == NULL)
-			tblspcmapfile = makeStringInfo();
-
-		datadirpathlen = strlen(DataDir);
-
-		/* Collect information about all tablespaces */
-		tblspcdir = AllocateDir("pg_tblspc");
-		while ((de = ReadDir(tblspcdir, "pg_tblspc")) != NULL)
-		{
-			char		fullpath[MAXPGPATH + 10];
-			char		linkpath[MAXPGPATH];
-			char	   *relpath = NULL;
-			int			rllen;
-			StringInfoData escapedpath;
-			char	   *s;
-
-			/* Skip anything that doesn't look like a tablespace */
-			if (strspn(de->d_name, "0123456789") != strlen(de->d_name))
-				continue;
-
-			snprintf(fullpath, sizeof(fullpath), "pg_tblspc/%s", de->d_name);
-
-			/*
-			 * Skip anything that isn't a symlink/junction, which would fail
-			 * below.
-			 */
-			if (get_dirent_type(fullpath, de, false, ERROR) != PGFILETYPE_LNK)
-				continue;
-
-#ifdef HAVE_READLINK
-			rllen = readlink(fullpath, linkpath, sizeof(linkpath));
-			if (rllen < 0)
-			{
-				ereport(WARNING,
-						(errmsg("could not read symbolic link \"%s\": %m",
-								fullpath)));
-				continue;
-			}
-			else if (rllen >= sizeof(linkpath))
-			{
-				ereport(WARNING,
-						(errmsg("symbolic link \"%s\" target is too long",
-								fullpath)));
-				continue;
-			}
-			linkpath[rllen] = '\0';
-
-			/*
-			 * Build a backslash-escaped version of the link path to include
-			 * in the tablespace map file.
-			 */
-			initStringInfo(&escapedpath);
-			for (s = linkpath; *s; s++)
-			{
-				if (*s == '\n' || *s == '\r' || *s == '\\')
-					appendStringInfoChar(&escapedpath, '\\');
-				appendStringInfoChar(&escapedpath, *s);
-			}
-
-			/*
-			 * Relpath holds the relative path of the tablespace directory
-			 * when it's located within PGDATA, or NULL if it's located
-			 * elsewhere.
-			 */
-			if (rllen > datadirpathlen &&
-				strncmp(linkpath, DataDir, datadirpathlen) == 0 &&
-				IS_DIR_SEP(linkpath[datadirpathlen]))
-				relpath = linkpath + datadirpathlen + 1;
-
-			ti = palloc(sizeof(tablespaceinfo));
-			ti->oid = pstrdup(de->d_name);
-			ti->path = pstrdup(linkpath);
-			ti->rpath = relpath ? pstrdup(relpath) : NULL;
-			ti->size = -1;
-
-			if (tablespaces)
-				*tablespaces = lappend(*tablespaces, ti);
-
-			appendStringInfo(tblspcmapfile, "%s %s\n",
-							 ti->oid, escapedpath.data);
-
-			pfree(escapedpath.data);
-#else
-
-			/*
-			 * If the platform does not have symbolic links, it should not be
-			 * possible to have tablespaces - clearly somebody else created
-			 * them. Warn about it and ignore.
-			 */
-			ereport(WARNING,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("tablespaces are not supported on this platform")));
-#endif
-		}
-		FreeDir(tblspcdir);
-
-		/*
 		 * Construct backup label file.  If caller isn't interested in this,
 		 * we make a local StringInfo.
 		 */
@@ -8545,45 +8412,6 @@ do_pg_start_backup(const char *backupidstr, bool fast, TimeLineID *starttli_p,
 			pfree(labelfile->data);
 			pfree(labelfile);
 
-			/* Write backup tablespace_map file. */
-			if (tblspcmapfile->len > 0)
-			{
-				if (stat(TABLESPACE_MAP, &stat_buf) != 0)
-				{
-					if (errno != ENOENT)
-						ereport(ERROR,
-								(errcode_for_file_access(),
-								 errmsg("could not stat file \"%s\": %m",
-										TABLESPACE_MAP)));
-				}
-				else
-					ereport(ERROR,
-							(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-							 errmsg("a backup is already in progress"),
-							 errhint("If you're sure there is no backup in progress, remove file \"%s\" and try again.",
-									 TABLESPACE_MAP)));
-
-				fp = AllocateFile(TABLESPACE_MAP, "w");
-
-				if (!fp)
-					ereport(ERROR,
-							(errcode_for_file_access(),
-							 errmsg("could not create file \"%s\": %m",
-									TABLESPACE_MAP)));
-				if (fwrite(tblspcmapfile->data, tblspcmapfile->len, 1, fp) != 1 ||
-					fflush(fp) != 0 ||
-					pg_fsync(fileno(fp)) != 0 ||
-					ferror(fp) ||
-					FreeFile(fp))
-					ereport(ERROR,
-							(errcode_for_file_access(),
-							 errmsg("could not write file \"%s\": %m",
-									TABLESPACE_MAP)));
-			}
-
-			/* Allocated locally for exclusive backups, so free separately */
-			pfree(tblspcmapfile->data);
-			pfree(tblspcmapfile);
 		}
 	}
 	PG_END_ENSURE_ERROR_CLEANUP(pg_start_backup_callback, (Datum) BoolGetDatum(exclusive));
@@ -8794,11 +8622,6 @@ do_pg_stop_backup(char *labelfile, bool waitforarchive, TimeLineID *stoptli_p)
 								BACKUP_LABEL_FILE)));
 			durable_unlink(BACKUP_LABEL_FILE, ERROR);
 
-			/*
-			 * Remove tablespace_map file if present, it is created only if
-			 * there are tablespaces.
-			 */
-			durable_unlink(TABLESPACE_MAP, DEBUG1);
 		}
 		PG_END_ENSURE_ERROR_CLEANUP(pg_stop_backup_callback, (Datum) BoolGetDatum(exclusive));
 	}
@@ -9193,12 +9016,9 @@ BackupInProgress(void)
 }
 
 /*
- * CancelBackup: rename the "backup_label" and "tablespace_map"
- *				 files to cancel backup mode
+ * CancelBackup: rename the "backup_label" file to cancel backup mode
  *
  * If the "backup_label" file exists, it will be renamed to "backup_label.old".
- * Similarly, if the "tablespace_map" file exists, it will be renamed to
- * "tablespace_map.old".
  *
  * Note that this will render an online backup in progress
  * useless. To correctly finish an online backup, pg_stop_backup must be
@@ -9226,38 +9046,10 @@ CancelBackup(void)
 		return;
 	}
 
-	/* if the tablespace_map file is not there, return */
-	if (stat(TABLESPACE_MAP, &stat_buf) < 0)
-	{
-		ereport(LOG,
-				(errmsg("online backup mode canceled"),
-				 errdetail("File \"%s\" was renamed to \"%s\".",
-						   BACKUP_LABEL_FILE, BACKUP_LABEL_OLD)));
-		return;
-	}
-
-	/* remove leftover file from previously canceled backup if it exists */
-	unlink(TABLESPACE_MAP_OLD);
-
-	if (durable_rename(TABLESPACE_MAP, TABLESPACE_MAP_OLD, DEBUG1) == 0)
-	{
-		ereport(LOG,
-				(errmsg("online backup mode canceled"),
-				 errdetail("Files \"%s\" and \"%s\" were renamed to "
-						   "\"%s\" and \"%s\", respectively.",
-						   BACKUP_LABEL_FILE, TABLESPACE_MAP,
-						   BACKUP_LABEL_OLD, TABLESPACE_MAP_OLD)));
-	}
-	else
-	{
-		ereport(WARNING,
-				(errcode_for_file_access(),
-				 errmsg("online backup mode canceled"),
-				 errdetail("File \"%s\" was renamed to \"%s\", but "
-						   "file \"%s\" could not be renamed to \"%s\": %m.",
-						   BACKUP_LABEL_FILE, BACKUP_LABEL_OLD,
-						   TABLESPACE_MAP, TABLESPACE_MAP_OLD)));
-	}
+	ereport(LOG,
+			(errmsg("online backup mode canceled"),
+			 errdetail("File \"%s\" was renamed to \"%s\".",
+					   BACKUP_LABEL_FILE, BACKUP_LABEL_OLD)));
 }
 
 /*

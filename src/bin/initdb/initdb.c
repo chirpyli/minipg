@@ -144,7 +144,6 @@ static const char *const subdirs[] = {
 	"pg_multixact/offsets",
 	"base",
 	"base/1",
-	"pg_tblspc",
 	"pg_xact"
 };
 
@@ -959,8 +958,7 @@ setup_depend(FILE *cmdfd)
 		 * pinned.
 		 *
 		 * pg_tablespace: tablespaces don't participate in the dependency
-		 * code, and DropTableSpace() explicitly protects the built-in
-		 * tablespaces.
+		 * code.  （minipg：DROP TABLESPACE 已裁剪，内建表空间无需再作保护。）
 		 *
 		 * First delete any already-made entries; PINs override all else, and
 		 * must be the only entries for their objects.

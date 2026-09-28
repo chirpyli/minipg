@@ -13,18 +13,6 @@
 #ifndef RELPATH_H
 #define RELPATH_H
 
-/*
- *	'pgrminclude ignore' needed here because CppAsString2() does not throw
- *	an error if the symbol is not defined.
- */
-#include "catalog/catversion.h" /* pgrminclude ignore */
-
-
-/*
- * Name of major-version-specific tablespace subdirectories
- */
-#define TABLESPACE_VERSION_DIRECTORY	"PG_" PG_MAJORVERSION "_" \
-									CppAsString2(CATALOG_VERSION_NO)
 
 /* Characters to allow for an OID in a relation path */
 #define OIDCHARS		10		/* max chars printed by %u */

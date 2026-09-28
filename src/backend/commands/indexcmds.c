@@ -580,15 +580,10 @@ DefineIndex(Oid relationId,
 
 	/*
 	 * Force shared indexes into the pg_global tablespace.  This is a bit of a
-	 * hack but seems simpler than marking them in the BKI commands.  On the
-	 * other hand, if it's not shared, don't allow it to be placed there.
+	 * hack but seems simpler than marking them in the BKI commands.
 	 */
 	if (rel->rd_rel->relisshared)
 		tablespaceId = GLOBALTABLESPACE_OID;
-	else if (tablespaceId == GLOBALTABLESPACE_OID)
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				 errmsg("only shared relations can be placed in pg_global tablespace")));
 
 	/*
 	 * Choose the index column names.

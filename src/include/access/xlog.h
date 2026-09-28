@@ -276,8 +276,7 @@ typedef enum SessionBackupState
 } SessionBackupState;
 
 extern XLogRecPtr do_pg_start_backup(const char *backupidstr, bool fast,
-									 TimeLineID *starttli_p, StringInfo labelfile,
-									 List **tablespaces, StringInfo tblspcmapfile);
+									 TimeLineID *starttli_p, StringInfo labelfile);
 extern XLogRecPtr do_pg_stop_backup(char *labelfile, bool waitforarchive,
 									TimeLineID *stoptli_p);
 extern void do_pg_abort_backup(int code, Datum arg);
@@ -289,8 +288,5 @@ extern SessionBackupState get_backup_status(void);
 #define STANDBY_SIGNAL_FILE		"standby.signal"
 #define BACKUP_LABEL_FILE		"backup_label"
 #define BACKUP_LABEL_OLD		"backup_label.old"
-
-#define TABLESPACE_MAP			"tablespace_map"
-#define TABLESPACE_MAP_OLD		"tablespace_map.old"
 
 #endif							/* XLOG_H */

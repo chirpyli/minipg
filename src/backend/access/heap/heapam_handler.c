@@ -543,8 +543,8 @@ heapam_relation_set_new_filenode(Relation rel,
 	 * even if the page has been logged, because the write did not go through
 	 * shared_buffers and therefore a concurrent checkpoint may have moved the
 	 * redo pointer past our xlog record.  Recovery may as well remove it
-	 * while replaying, for example, XLOG_DBASE_CREATE or XLOG_TBLSPC_CREATE
-	 * record. Therefore, logging is necessary even if wal_level=minimal.
+	 * while replaying, for example, a database creation record.  Therefore,
+	 * logging is necessary even if wal_level=minimal.
 	 */
 	smgrclose(srel);
 }

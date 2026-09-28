@@ -313,7 +313,6 @@ static int	decompile_column_index_array(Datum column_index_array, Oid relId,
 										 StringInfo buf);
 static char *pg_get_indexdef_worker(Oid indexrelid, int colno,
 									bool attrsOnly, bool keysOnly,
-									bool showTblSpc,
 									int prettyFlags, bool missing_ok);
 static char *pg_get_constraintdef_worker(Oid constraintId, bool fullCommand,
 										 int prettyFlags, bool missing_ok);
@@ -436,9 +435,8 @@ static text *string_to_text(char *str);
  *	if colno == 0, we want a complete index definition.
  *	if colno > 0, we only want the Nth index key's variable or expression.
  *
- * Note that the SQL-function versions of this omit any info about the
- * index tablespace; this is intentional because pg_dump wants it that way.
- * However pg_get_indexdef_string() includes the index tablespace.
+ * minipg：索引表空间子句已随表空间裁剪移除，所有版本的反解析结果都不再
+ * 包含表空间信息。
  * ----------
  */
 Datum
@@ -452,7 +450,6 @@ pg_get_indexdef(PG_FUNCTION_ARGS)
 
 	res = pg_get_indexdef_worker(indexrelid, 0,
 								 false, false,
-								 false,
 								 prettyFlags, true);
 
 	if (res == NULL)
@@ -474,7 +471,6 @@ pg_get_indexdef_ext(PG_FUNCTION_ARGS)
 
 	res = pg_get_indexdef_worker(indexrelid, colno,
 								 colno != 0, false,
-								 false,
 								 prettyFlags, true);
 
 	if (res == NULL)
@@ -485,7 +481,6 @@ pg_get_indexdef_ext(PG_FUNCTION_ARGS)
 
 /*
  * Internal version for use by ALTER TABLE.
- * Includes a tablespace clause in the result.
  * Returns a palloc'd C string; no pretty-printing.
  */
 char *
@@ -493,7 +488,6 @@ pg_get_indexdef_string(Oid indexrelid)
 {
 	return pg_get_indexdef_worker(indexrelid, 0,
 								  false, false,
-								  true,
 								  0, false);
 }
 
@@ -507,7 +501,6 @@ pg_get_indexdef_columns(Oid indexrelid, bool pretty)
 
 	return pg_get_indexdef_worker(indexrelid, 0,
 								  true, true,
-								  false,
 								  prettyFlags, false);
 }
 
@@ -518,7 +511,6 @@ pg_get_indexdef_columns(Oid indexrelid, bool pretty)
 static char *
 pg_get_indexdef_worker(Oid indexrelid, int colno,
 					   bool attrsOnly, bool keysOnly,
-					   bool showTblSpc,
 					   int prettyFlags, bool missing_ok)
 {
 	HeapTuple	ht_idx;
@@ -743,21 +735,6 @@ pg_get_indexdef_worker(Oid indexrelid, int colno,
 		appendStringInfoChar(&buf, ')');
 
 		/*
-		 * Print tablespace, but only if requested
-		 */
-		if (showTblSpc)
-		{
-			Oid			tblspc;
-
-			tblspc = get_rel_tablespace(indexrelid);
-			if (OidIsValid(tblspc))
-			{
-				appendStringInfo(&buf, " TABLESPACE %s",
-								 quote_identifier(get_tablespace_name(tblspc)));
-			}
-		}
-
-		/*
 		 * If it's a partial index, decompile and append the predicate
 		 */
 		if (!heap_attisnull(ht_idx, Anum_pg_index_indpred, NULL))
@@ -969,23 +946,6 @@ pg_get_constraintdef_worker(Oid constraintId, bool fullCommand,
 					appendStringInfoChar(&buf, ')');
 				}
 				ReleaseSysCache(indtup);
-
-				/* XXX why do we only print these bits if fullCommand? */
-				if (fullCommand && OidIsValid(indexId))
-				{
-					Oid			tblspc;
-
-					/*
-					 * Print the tablespace, unless it's the database default.
-					 * This is to help ALTER TABLE usage of this facility,
-					 * which needs this behavior to recreate exact catalog
-					 * state.
-					 */
-					tblspc = get_rel_tablespace(indexId);
-					if (OidIsValid(tblspc))
-						appendStringInfo(&buf, " USING INDEX TABLESPACE %s",
-										 quote_identifier(get_tablespace_name(tblspc)));
-				}
 
 				break;
 			}

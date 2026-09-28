@@ -115,17 +115,13 @@ GetDatabasePath(Oid dbNode, Oid spcNode)
 		Assert(dbNode == 0);
 		return pstrdup("global");
 	}
-	else if (spcNode == DEFAULTTABLESPACE_OID)
-	{
-		/* The default tablespace is {datadir}/base */
-		return psprintf("base/%u", dbNode);
-	}
-	else
-	{
-		/* All other tablespaces are accessed via symlinks */
-		return psprintf("pg_tblspc/%u/%s/%u",
-						spcNode, TABLESPACE_VERSION_DIRECTORY, dbNode);
-	}
+
+	/*
+	 * minipg：用户表空间已裁剪，数据库目录只能是 {datadir}/base，不再存在
+	 * pg_tblspc 符号链接目录。
+	 */
+	Assert(spcNode == DEFAULTTABLESPACE_OID);
+	return psprintf("base/%u", dbNode);
 }
 
 /*
@@ -149,34 +145,23 @@ GetRelationPath(Oid dbNode, Oid spcNode, Oid relNode,
 		Assert(dbNode == 0);
 		Assert(backendId == InvalidBackendId);
 		if (forkNumber != MAIN_FORKNUM)
-			path = psprintf("global/%u_%s",
+			return psprintf("global/%u_%s",
 							relNode, forkNames[forkNumber]);
 		else
-			path = psprintf("global/%u", relNode);
+			return psprintf("global/%u", relNode);
 	}
-	else if (spcNode == DEFAULTTABLESPACE_OID)
-	{
-		/* The default tablespace is {datadir}/base */
-		if (forkNumber != MAIN_FORKNUM)
-			path = psprintf("base/%u/%u_%s",
-							dbNode, relNode,
-							forkNames[forkNumber]);
-		else
-			path = psprintf("base/%u/%u",
-							dbNode, relNode);
-	}
+
+	/*
+	 * minipg：用户表空间已裁剪，非共享关系一律位于 {datadir}/base，不再存在
+	 * pg_tblspc 符号链接目录。
+	 */
+	Assert(spcNode == DEFAULTTABLESPACE_OID);
+	if (forkNumber != MAIN_FORKNUM)
+		path = psprintf("base/%u/%u_%s",
+						dbNode, relNode,
+						forkNames[forkNumber]);
 	else
-	{
-		/* All other tablespaces are accessed via symlinks */
-		if (forkNumber != MAIN_FORKNUM)
-			path = psprintf("pg_tblspc/%u/%s/%u/%u_%s",
-							spcNode, TABLESPACE_VERSION_DIRECTORY,
-							dbNode, relNode,
-							forkNames[forkNumber]);
-		else
-			path = psprintf("pg_tblspc/%u/%s/%u/%u",
-							spcNode, TABLESPACE_VERSION_DIRECTORY,
-							dbNode, relNode);
-	}
+		path = psprintf("base/%u/%u",
+						dbNode, relNode);
 	return path;
 }

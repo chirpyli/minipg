@@ -352,17 +352,6 @@ static const struct cachedesc cacheinfo[] = {
 		},
 		128
 	},
-	{TableSpaceRelationId,		/* TABLESPACEOID */
-		TablespaceOidIndexId,
-		1,
-		{
-			Anum_pg_tablespace_oid,
-			0,
-			0,
-			0,
-		},
-		4
-	},
 	{TypeRelationId,			/* TYPENAMENSP */
 		TypeNameNspIndexId,
 		2,

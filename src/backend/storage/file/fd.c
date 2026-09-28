@@ -310,7 +310,6 @@ static File AllocateVfd(void);
 static void FreeVfd(File file);
 
 static int	FileAccess(File file);
-static File OpenTemporaryFileInTablespace(Oid tblspcOid, bool rejectError);
 static bool reserveAllocatedDesc(void);
 static int	FreeDesc(AllocateDesc *desc);
 
@@ -1512,6 +1511,8 @@ File
 OpenTemporaryFile(bool interXact)
 {
 	File		file;
+	char		tempdirpath[MAXPGPATH];
+	char		tempfilepath[MAXPGPATH];
 
 	/*
 	 * Make sure the current resource owner has space for this File before we
@@ -1521,60 +1522,9 @@ OpenTemporaryFile(bool interXact)
 		ResourceOwnerEnlargeFiles(CurrentResourceOwner);
 
 	/*
-	 * 临时文件一律创建在当前数据库的默认表空间中。MyDatabaseTableSpace 通常
-	 * 在此之前已经设置好，若尚未设置则回退到 pg_default 表空间。
+	 * minipg：用户表空间已裁剪，临时文件一律放在 $PGDATA/base/pgsql_tmp。
 	 */
-	file = OpenTemporaryFileInTablespace(MyDatabaseTableSpace ?
-										 MyDatabaseTableSpace :
-										 DEFAULTTABLESPACE_OID,
-										 true);
-
-	/* Mark it for deletion at close and temporary file size limit */
-	VfdCache[file].fdstate |= FD_DELETE_AT_CLOSE | FD_TEMP_FILE_LIMIT;
-
-	/* Register it with the current resource owner */
-	if (!interXact)
-		RegisterTemporaryFile(file);
-
-	return file;
-}
-
-/*
- * Return the path of the temp directory in a given tablespace.
- */
-void
-TempTablespacePath(char *path, Oid tablespace)
-{
-	/*
-	 * Identify the tempfile directory for this tablespace.
-	 *
-	 * If someone tries to specify pg_global, use pg_default instead.
-	 */
-	if (tablespace == InvalidOid ||
-		tablespace == DEFAULTTABLESPACE_OID ||
-		tablespace == GLOBALTABLESPACE_OID)
-		snprintf(path, MAXPGPATH, "base/%s", PG_TEMP_FILES_DIR);
-	else
-	{
-		/* All other tablespaces are accessed via symlinks */
-		snprintf(path, MAXPGPATH, "pg_tblspc/%u/%s/%s",
-				 tablespace, TABLESPACE_VERSION_DIRECTORY,
-				 PG_TEMP_FILES_DIR);
-	}
-}
-
-/*
- * Open a temporary file in a specific tablespace.
- * Subroutine for OpenTemporaryFile, which see for details.
- */
-static File
-OpenTemporaryFileInTablespace(Oid tblspcOid, bool rejectError)
-{
-	char		tempdirpath[MAXPGPATH];
-	char		tempfilepath[MAXPGPATH];
-	File		file;
-
-	TempTablespacePath(tempdirpath, tblspcOid);
+	snprintf(tempdirpath, sizeof(tempdirpath), "base/%s", PG_TEMP_FILES_DIR);
 
 	/*
 	 * Generate a tempfile name that should be unique within the current
@@ -1592,8 +1542,8 @@ OpenTemporaryFileInTablespace(Oid tblspcOid, bool rejectError)
 	if (file <= 0)
 	{
 		/*
-		 * We might need to create the tablespace's tempfile directory, if no
-		 * one has yet done so.
+		 * We might need to create the tempfile directory, if no one has yet
+		 * done so.
 		 *
 		 * Don't check for an error from MakePGDirectory; it could fail if
 		 * someone else just did the same thing.  If it doesn't work then
@@ -1603,10 +1553,17 @@ OpenTemporaryFileInTablespace(Oid tblspcOid, bool rejectError)
 
 		file = PathNameOpenFile(tempfilepath,
 								O_RDWR | O_CREAT | O_TRUNC | PG_BINARY);
-		if (file <= 0 && rejectError)
+		if (file <= 0)
 			elog(ERROR, "could not create temporary file \"%s\": %m",
 				 tempfilepath);
 	}
+
+	/* Mark it for deletion at close and temporary file size limit */
+	VfdCache[file].fdstate |= FD_DELETE_AT_CLOSE | FD_TEMP_FILE_LIMIT;
+
+	/* Register it with the current resource owner */
+	if (!interXact)
+		RegisterTemporaryFile(file);
 
 	return file;
 }
@@ -2644,33 +2601,14 @@ CleanupTempFiles(bool isCommit, bool isProcExit)
 void
 RemovePgTempFiles(void)
 {
-	char		temp_path[MAXPGPATH + 10 + sizeof(TABLESPACE_VERSION_DIRECTORY) + sizeof(PG_TEMP_FILES_DIR)];
-	DIR		   *spc_dir;
-	struct dirent *spc_de;
+	char		temp_path[MAXPGPATH];
 
 	/*
-	 * First process temp files in pg_default ($PGDATA/base)
+	 * Process temp files in pg_default ($PGDATA/base).  minipg：用户表空间
+	 * 已裁剪，不再有其他表空间的临时目录需要清理。
 	 */
 	snprintf(temp_path, sizeof(temp_path), "base/%s", PG_TEMP_FILES_DIR);
 	RemovePgTempFilesInDir(temp_path, true, false);
-
-	/*
-	 * Cycle through temp directories for all non-default tablespaces.
-	 */
-	spc_dir = AllocateDir("pg_tblspc");
-
-	while ((spc_de = ReadDirExtended(spc_dir, "pg_tblspc", LOG)) != NULL)
-	{
-		if (strcmp(spc_de->d_name, ".") == 0 ||
-			strcmp(spc_de->d_name, "..") == 0)
-			continue;
-
-		snprintf(temp_path, sizeof(temp_path), "pg_tblspc/%s/%s/%s",
-				 spc_de->d_name, TABLESPACE_VERSION_DIRECTORY, PG_TEMP_FILES_DIR);
-		RemovePgTempFilesInDir(temp_path, true, false);
-	}
-
-	FreeDir(spc_dir);
 
 	/*
 	 * The pgsql_tmp directory at the top level of DataDir is *not* cleaned
@@ -2787,9 +2725,9 @@ do_syncfs(const char *path)
  * all potential filesystem, depending on recovery_init_sync_method setting.
  *
  * We fsync regular files and directories wherever they are, but we
- * follow symlinks only for pg_wal and immediately under pg_tblspc.
- * Other symlinks are presumed to point at files we're not responsible
- * for fsyncing, and might not have privileges to write at all.
+ * follow symlinks only for pg_wal.  Other symlinks are presumed to
+ * point at files we're not responsible for fsyncing, and might not
+ * have privileges to write at all.
  *
  * Errors are logged but not considered fatal; that's because this is used
  * only during database startup, to deal with the possibility that there are
@@ -2834,32 +2772,15 @@ SyncDataDirectory(void)
 #ifdef HAVE_SYNCFS
 	if (recovery_init_sync_method == RECOVERY_INIT_SYNC_METHOD_SYNCFS)
 	{
-		DIR		   *dir;
-		struct dirent *de;
-
 		/*
 		 * On Linux, we don't have to open every single file one by one.  We
 		 * can use syncfs() to sync whole filesystems.  We only expect
 		 * filesystem boundaries to exist where we tolerate symlinks, namely
-		 * pg_wal and the tablespaces, so we call syncfs() for each of those
-		 * directories.
+		 * pg_wal, so we call syncfs() for that directory if it is one.
 		 */
 
 		/* Sync the top level pgdata directory. */
 		do_syncfs(".");
-		/* If any tablespaces are configured, sync each of those. */
-		dir = AllocateDir("pg_tblspc");
-		while ((de = ReadDirExtended(dir, "pg_tblspc", LOG)))
-		{
-			char		path[MAXPGPATH];
-
-			if (strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0)
-				continue;
-
-			snprintf(path, MAXPGPATH, "pg_tblspc/%s", de->d_name);
-			do_syncfs(path);
-		}
-		FreeDir(dir);
 		/* If pg_wal is a symlink, process that too. */
 		if (xlog_is_symlink)
 			do_syncfs("pg_wal");
@@ -2876,22 +2797,17 @@ SyncDataDirectory(void)
 	walkdir(".", pre_sync_fname, false, DEBUG1);
 	if (xlog_is_symlink)
 		walkdir("pg_wal", pre_sync_fname, false, DEBUG1);
-	walkdir("pg_tblspc", pre_sync_fname, true, DEBUG1);
 #endif
 
 	/*
 	 * Now we do the fsync()s in the same order.
 	 *
-	 * The main call ignores symlinks, so in addition to specially processing
-	 * pg_wal if it's a symlink, pg_tblspc has to be visited separately with
-	 * process_symlinks = true.  Note that if there are any plain directories
-	 * in pg_tblspc, they'll get fsync'd twice.  That's not an expected case
-	 * so we don't worry about optimizing it.
+	 * The main call ignores symlinks, so we have to specially process pg_wal
+	 * if it's a symlink.
 	 */
 	walkdir(".", datadir_fsync_fname, false, LOG);
 	if (xlog_is_symlink)
 		walkdir("pg_wal", datadir_fsync_fname, false, LOG);
-	walkdir("pg_tblspc", datadir_fsync_fname, true, LOG);
 }
 
 /*

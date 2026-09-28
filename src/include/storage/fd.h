@@ -95,9 +95,6 @@ extern char *FilePathName(File file);
 extern int	FileGetRawFlags(File file);
 extern mode_t FileGetRawMode(File file);
 
-/* Operations used for sharing named temporary files */
-extern void TempTablespacePath(char *path, Oid tablespace);
-
 /* Operations that allow use of regular stdio --- USE WITH CAUTION */
 extern FILE *AllocateFile(const char *name, const char *mode);
 extern int	FreeFile(FILE *file);

@@ -4871,33 +4871,17 @@ RelationCacheInitFilePostInvalidate(void)
 void
 RelationCacheInitFileRemove(void)
 {
-	const char *tblspcdir = "pg_tblspc";
-	DIR		   *dir;
-	struct dirent *de;
-	char		path[MAXPGPATH + 10 + sizeof(TABLESPACE_VERSION_DIRECTORY)];
+	char		path[MAXPGPATH];
 
 	snprintf(path, sizeof(path), "global/%s",
 			 RELCACHE_INIT_FILENAME);
 	unlink_initfile(path, LOG);
 
-	/* Scan everything in the default tablespace */
+	/*
+	 * Scan everything in the default tablespace.  minipg：用户表空间已裁剪，
+	 * 不再需要扫描 pg_tblspc 下的其它表空间目录。
+	 */
 	RelationCacheInitFileRemoveInDir("base");
-
-	/* Scan the tablespace link directory to find non-default tablespaces */
-	dir = AllocateDir(tblspcdir);
-
-	while ((de = ReadDirExtended(dir, tblspcdir, LOG)) != NULL)
-	{
-		if (strspn(de->d_name, "0123456789") == strlen(de->d_name))
-		{
-			/* Scan the tablespace dir for per-database dirs */
-			snprintf(path, sizeof(path), "%s/%s/%s",
-					 tblspcdir, de->d_name, TABLESPACE_VERSION_DIRECTORY);
-			RelationCacheInitFileRemoveInDir(path);
-		}
-	}
-
-	FreeDir(dir);
 }
 
 /* Process one per-tablespace directory for RelationCacheInitFileRemove */

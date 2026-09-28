@@ -31,8 +31,6 @@ static bool describeOneTableDetails(const char *schemaname,
 									const char *relationname,
 									const char *oid,
 									bool verbose);
-static void add_tablespace_footer(printTableContent *const cont, char relkind,
-								  Oid tablespace, const bool newline);
 static bool validateSQLNamePattern(PQExpBuffer buf, const char *pattern,
 								   bool have_where,
 								   const char *schemavar, const char *namevar,
@@ -236,7 +234,6 @@ describeOneTableDetails(const char *schemaname,
 		char		relkind;
 		bool		hasindex;
 		bool		hasoids;
-		Oid			tablespace;
 		char	   *reloptions;
 		char		relpersistence;
 		char	   *relam;
@@ -256,7 +253,7 @@ describeOneTableDetails(const char *schemaname,
 		printfPQExpBuffer(&buf,
 						  "SELECT c.relkind, c.relhasindex, "
 						  "false AS relrowsecurity, false AS relforcerowsecurity, "
-						  "false AS relhasoids, %s, c.reltablespace, "
+						  "false AS relhasoids, %s, "
 						  "c.relpersistence, am.amname\n"
 						  "FROM pg_catalog.pg_class c\n "
 						  "LEFT JOIN pg_catalog.pg_class tc ON (c.reltoastrelid = tc.oid)\n"
@@ -272,7 +269,7 @@ describeOneTableDetails(const char *schemaname,
 		printfPQExpBuffer(&buf,
 						  "SELECT c.relkind, c.relhasindex, "
 						  "false AS relrowsecurity, false AS relforcerowsecurity, "
-						  "false AS relhasoids, %s, c.reltablespace, "
+						  "false AS relhasoids, %s, "
 						  "c.relpersistence\n"
 						  "FROM pg_catalog.pg_class c\n "
 						  "LEFT JOIN pg_catalog.pg_class tc ON (c.reltoastrelid = tc.oid)\n"
@@ -287,7 +284,7 @@ describeOneTableDetails(const char *schemaname,
 		printfPQExpBuffer(&buf,
 						  "SELECT c.relkind, c.relhasindex, "
 						  "false AS relrowsecurity, false AS relforcerowsecurity, "
-						  "false AS relhasoids, %s, c.reltablespace, "
+						  "false AS relhasoids, %s, "
 						  "c.relpersistence\n"
 						  "FROM pg_catalog.pg_class c\n "
 						  "LEFT JOIN pg_catalog.pg_class tc ON (c.reltoastrelid = tc.oid)\n"
@@ -302,7 +299,7 @@ describeOneTableDetails(const char *schemaname,
 		printfPQExpBuffer(&buf,
 						  "SELECT c.relkind, c.relhasindex, "
 						  ""
-						  "%s, c.reltablespace, "
+						  "%s, "
 						  "c.relpersistence\n"
 						  "FROM pg_catalog.pg_class c\n "
 						  "LEFT JOIN pg_catalog.pg_class tc ON (c.reltoastrelid = tc.oid)\n"
@@ -317,7 +314,7 @@ describeOneTableDetails(const char *schemaname,
 		printfPQExpBuffer(&buf,
 						  "SELECT c.relkind, c.relhasindex, "
 						  ""
-						  "%s, c.reltablespace, "
+						  "%s, "
 						  "c.relpersistence\n"
 						  "FROM pg_catalog.pg_class c\n "
 						  "LEFT JOIN pg_catalog.pg_class tc ON (c.reltoastrelid = tc.oid)\n"
@@ -332,7 +329,7 @@ describeOneTableDetails(const char *schemaname,
 		printfPQExpBuffer(&buf,
 						  "SELECT c.relkind, c.relhasindex, "
 						  ""
-						  "%s, c.reltablespace, "
+						  "%s, "
 						  "FROM pg_catalog.pg_class c\n "
 						  "LEFT JOIN pg_catalog.pg_class tc ON (c.reltoastrelid = tc.oid)\n"
 						  "WHERE c.oid = '%s';",
@@ -346,7 +343,7 @@ describeOneTableDetails(const char *schemaname,
 		printfPQExpBuffer(&buf,
 						  "SELECT c.relkind, c.relhasindex, "
 						  ""
-						  "%s, c.reltablespace\n"
+						  "%s\n"
 						  "FROM pg_catalog.pg_class c\n "
 						  "LEFT JOIN pg_catalog.pg_class tc ON (c.reltoastrelid = tc.oid)\n"
 						  "WHERE c.oid = '%s';",
@@ -360,7 +357,7 @@ describeOneTableDetails(const char *schemaname,
 		printfPQExpBuffer(&buf,
 						  "SELECT relkind, relhasindex, "
 						  "reltriggers <> 0, false, false, relhasoids, "
-						  "%s, reltablespace\n"
+						  "%s\n"
 						  "FROM pg_catalog.pg_class WHERE oid = '%s';",
 						  (verbose ?
 						   "pg_catalog.array_to_string(reloptions, E', ')" : "''"),
@@ -371,7 +368,7 @@ describeOneTableDetails(const char *schemaname,
 		printfPQExpBuffer(&buf,
 						  "SELECT relkind, relhasindex, "
 						  "reltriggers <> 0, false, false, relhasoids, "
-						  "'', reltablespace\n"
+						  "''\n"
 						  "FROM pg_catalog.pg_class WHERE oid = '%s';",
 						  oid);
 	}
@@ -402,13 +399,11 @@ describeOneTableDetails(const char *schemaname,
 	tableinfo.hasoids = strcmp(PQgetvalue(res, 0, 4), "t") == 0;
 	tableinfo.reloptions = (pset.sversion >= 80200) ?
 		pg_strdup(PQgetvalue(res, 0, 5)) : NULL;
-	tableinfo.tablespace = (pset.sversion >= 80000) ?
-		atooid(PQgetvalue(res, 0, 6)) : 0;
 	tableinfo.relpersistence = (pset.sversion >= 90100) ?
-		*(PQgetvalue(res, 0, 7)) : 0;
+		*(PQgetvalue(res, 0, 6)) : 0;
 	if (pset.sversion >= 120000)
-		tableinfo.relam = PQgetisnull(res, 0, 8) ?
-			(char *) NULL : pg_strdup(PQgetvalue(res, 0, 8));
+		tableinfo.relam = PQgetisnull(res, 0, 7) ?
+			(char *) NULL : pg_strdup(PQgetvalue(res, 0, 7));
 	else
 		tableinfo.relam = NULL;
 	PQclear(res);
@@ -653,8 +648,6 @@ describeOneTableDetails(const char *schemaname,
 
 			printTableAddFooter(&cont, tmpbuf.data);
 
-			add_tablespace_footer(&cont, tableinfo.relkind,
-								  tableinfo.tablespace, true);
 		}
 
 		PQclear(result);
@@ -684,8 +677,6 @@ describeOneTableDetails(const char *schemaname,
 			else
 				appendPQExpBufferStr(&buf,
 									 "null AS constraintdef, null AS contype");
-			if (pset.sversion >= 80000)
-				appendPQExpBufferStr(&buf, ", c2.reltablespace");
 			appendPQExpBufferStr(&buf,
 								 "\nFROM pg_catalog.pg_class c, pg_catalog.pg_class c2, pg_catalog.pg_index i\n");
 			if (pset.sversion >= 90000)
@@ -746,11 +737,6 @@ describeOneTableDetails(const char *schemaname,
 
 					printTableAddFooter(&cont, buf.data);
 
-					/* Print tablespace of the index on the same line */
-					if (pset.sversion >= 80000)
-						add_tablespace_footer(&cont, RELKIND_INDEX,
-											  atooid(PQgetvalue(result, i, 8)),
-											  false);
 				}
 			}
 			PQclear(result);
@@ -862,10 +848,6 @@ describeOneTableDetails(const char *schemaname,
 		if (verbose && tableinfo.hasoids)
 			printTableAddFooter(&cont, _("Has OIDs: yes"));
 
-		/* Tablespace info */
-		add_tablespace_footer(&cont, tableinfo.relkind, tableinfo.tablespace,
-							  true);
-
 		/* Access method info */
 		if (verbose && tableinfo.relam != NULL && !pset.hide_tableam)
 		{
@@ -901,69 +883,6 @@ error_return:
 		PQclear(res);
 
 	return retval;
-}
-
-/*
- * Add a tablespace description to a footer.  If 'newline' is true, it is added
- * in a new line; otherwise it's appended to the current value of the last
- * footer.
- */
-static void
-add_tablespace_footer(printTableContent *const cont, char relkind,
-					  Oid tablespace, const bool newline)
-{
-	/* relkinds for which we support tablespaces */
-	if (relkind == RELKIND_RELATION ||
-		relkind == RELKIND_INDEX ||
-		relkind == RELKIND_TOASTVALUE)
-	{
-		/*
-		 * We ignore the database default tablespace so that users not using
-		 * tablespaces don't need to know about them.  This case also covers
-		 * pre-8.0 servers, for which tablespace will always be 0.
-		 */
-		if (tablespace != 0)
-		{
-			PGresult   *result = NULL;
-			PQExpBufferData buf;
-
-			initPQExpBuffer(&buf);
-			printfPQExpBuffer(&buf,
-							  "SELECT spcname FROM pg_catalog.pg_tablespace\n"
-							  "WHERE oid = '%u';", tablespace);
-			result = PSQLexec(buf.data);
-			if (!result)
-			{
-				termPQExpBuffer(&buf);
-				return;
-			}
-			/* Should always be the case, but.... */
-			if (PQntuples(result) > 0)
-			{
-				if (newline)
-				{
-					/* Add the tablespace as a new footer */
-					printfPQExpBuffer(&buf, _("Tablespace: \"%s\""),
-									  PQgetvalue(result, 0, 0));
-					printTableAddFooter(cont, buf.data);
-				}
-				else
-				{
-					/* Append the tablespace to the latest footer */
-					printfPQExpBuffer(&buf, "%s", cont->footer->data);
-
-					/*-------
-					   translator: before this string there's an index description like
-					   '"foo_pkey" PRIMARY KEY, btree (a)' */
-					appendPQExpBuffer(&buf, _(", tablespace \"%s\""),
-									  PQgetvalue(result, 0, 0));
-					printTableSetFooter(cont, buf.data);
-				}
-			}
-			PQclear(result);
-			termPQExpBuffer(&buf);
-		}
-	}
 }
 
 /*

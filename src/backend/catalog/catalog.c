@@ -266,10 +266,6 @@ IsSharedRelation(Oid relationId)
 		relationId == TablespaceOidIndexId ||
 		relationId == TablespaceNameIndexId)
 		return true;
-	/* These are their toast tables and toast indexes */
-	if (relationId == PgTablespaceToastTable ||
-		relationId == PgTablespaceToastIndex)
-		return true;
 	return false;
 }
 

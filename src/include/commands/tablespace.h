@@ -18,9 +18,6 @@
 
 extern void TablespaceCreateDbspace(Oid spcNode, Oid dbNode, bool isRedo);
 
-extern char *get_tablespace_name(Oid spc_oid);
-
 extern bool directory_is_empty(const char *path);
-extern void remove_tablespace_symlink(const char *linkloc);
 
 #endif							/* TABLESPACE_H */

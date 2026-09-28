@@ -24,7 +24,6 @@ MultiXactMemberSLRULock				15
 RelCacheInitLock					16
 CheckpointerCommLock				17
 # 18 was TwoPhaseStateLock
-TablespaceCreateLock				19
 BtreeVacuumLock						20
 AddinShmemInitLock					21
 SyncScanLock						24
