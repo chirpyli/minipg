@@ -13,10 +13,6 @@ top_builddir = ../../..
 include $(top_builddir)/src/Makefile.global
 
 OBJS = \
-	rewriteDefine.o \
-	rewriteHandler.o \
-	rewriteManip.o \
-	rewriteRemove.o \
-	rewriteSupport.o
+	rewriteManip.o
 
 include $(top_srcdir)/src/backend/common.mk

@@ -24,11 +24,7 @@
  *		values plus row-locating info for UPDATE cases, or just the
  *		row-locating info for DELETE cases.
  *
- *		The relation to modify can be an ordinary table or a view having an
- *		INSTEAD OF trigger.  Earlier processing already
- *		pointed ModifyTable to the underlying relations of any automatically
- *		updatable view not using an INSTEAD OF trigger, so code here can
- *		assume it won't have one as a modification target. 
+ *		The relation to modify is always an ordinary table.
  *
  *		We just loop within the node until all the work is done, then
  *		return NULL.  This avoids useless call/return overhead.
@@ -46,7 +42,6 @@
 #include "miscadmin.h"
 #include "nodes/nodeFuncs.h"
 #include "optimizer/optimizer.h"
-#include "rewrite/rewriteHandler.h"
 #include "storage/bufmgr.h"
 #include "storage/lmgr.h"
 #include "utils/builtins.h"
@@ -400,17 +395,13 @@ ExecInsert(ModifyTableState *mtstate,
  *		DELETE is like UPDATE, except that we delete the tuple and no
  *		index modifications are needed.
  *
- *		When deleting from a table, tupleid identifies the tuple to
- *		delete and oldtuple is NULL.  When deleting through a view
- *		INSTEAD OF trigger, oldtuple is passed to the triggers and identifies
- *		what to delete, and tupleid is invalid.
+ *		tupleid identifies the tuple to delete.
  * ----------------------------------------------------------------
  */
 static void
 ExecDelete(ModifyTableState *mtstate,
 		   ResultRelInfo *resultRelInfo,
 		   ItemPointer tupleid,
-		   HeapTuple oldtuple,
 		   EPQState *epqstate,
 		   EState *estate,
 		   bool canSetTag)
@@ -600,10 +591,7 @@ ldelete:;
  *		is, we don't want to get stuck in an infinite loop
  *		which corrupts your database..
  *
- *		When updating a table, tupleid identifies the tuple to
- *		update and oldtuple is NULL.  When updating through a view INSTEAD OF
- *		trigger, oldtuple is passed to the triggers and identifies what to
- *		update, and tupleid is invalid.
+ *		tupleid identifies the tuple to update.
  *
  *		slot contains the new tuple value to be stored.
  *		planSlot is the output of the ModifyTable's subplan; we use it
@@ -614,7 +602,6 @@ static void
 ExecUpdate(ModifyTableState *mtstate,
 		   ResultRelInfo *resultRelInfo,
 		   ItemPointer tupleid,
-		   HeapTuple oldtuple,
 		   TupleTableSlot *slot,
 		   TupleTableSlot *planSlot,
 		   EPQState *epqstate,
@@ -855,8 +842,6 @@ ExecModifyTable(PlanState *pstate)
 	TupleTableSlot *oldSlot;
 	ItemPointer tupleid;
 	ItemPointerData tuple_ctid;
-	HeapTupleData oldtupdata;
-	HeapTuple	oldtuple;
 	bool		tuplock;
 
 	CHECK_FOR_INTERRUPTS();
@@ -941,80 +926,36 @@ ExecModifyTable(PlanState *pstate)
 		slot = planSlot;
 
 		tupleid = NULL;
-		oldtuple = NULL;
 
 		/*
 		 * For UPDATE/DELETE, fetch the row identity info for the tuple to be
-		 * updated/deleted.  For a heap relation, that's a TID; otherwise we
-		 * may have a wholerow junk attr that carries the old tuple in toto.
-		 * Keep this in step with the part of ExecInitModifyTable that sets up
-		 * ri_RowIdAttNo.
+		 * updated/deleted.  The target relation is always a plain table, so
+		 * that's a TID.  Keep this in step with the part of
+		 * ExecInitModifyTable that sets up ri_RowIdAttNo.
 		 */
 		if (operation == CMD_UPDATE || operation == CMD_DELETE)
 		{
-			char		relkind;
 			Datum		datum;
 			bool		isNull;
 
-			relkind = resultRelInfo->ri_RelationDesc->rd_rel->relkind;
-			if (relkind == RELKIND_RELATION)
-			{
-				/*
-				 * ri_RowIdAttNo refers to a ctid attribute.  See the comment
-				 * in ExecInitModifyTable().
-				 */
-				Assert(AttributeNumberIsValid(resultRelInfo->ri_RowIdAttNo));
-				datum = ExecGetJunkAttribute(slot,
-											 resultRelInfo->ri_RowIdAttNo,
-											 &isNull);
-				/* shouldn't ever get a null result... */
-				if (isNull)
-					elog(ERROR, "ctid is NULL");
-
-				tupleid = (ItemPointer) DatumGetPointer(datum);
-				tuple_ctid = *tupleid;	/* be sure we don't free ctid!! */
-				tupleid = &tuple_ctid;
-			}
+			Assert(resultRelInfo->ri_RelationDesc->rd_rel->relkind ==
+				   RELKIND_RELATION);
 
 			/*
-			 * Use the wholerow attribute, when available, to reconstruct the
-			 * old relation tuple.  The old tuple serves one or both of two
-			 * purposes: 1) it serves as the OLD tuple for row triggers, 2) it
-			 * provides values for any unchanged columns for the NEW tuple of
-			 * an UPDATE, because the subplan does not produce all the columns
-			 * of the target table.
-			 *
-			 * Note that the wholerow attribute does not carry system columns,
-			 * so we know enough here to set t_tableOid.
-			 *
-			 * Other relevant relkinds, currently limited to views having
-			 * INSTEAD OF triggers, always have a wholerow attribute.
+			 * ri_RowIdAttNo refers to a ctid attribute.  See the comment
+			 * in ExecInitModifyTable().
 			 */
-			else if (AttributeNumberIsValid(resultRelInfo->ri_RowIdAttNo))
-			{
-				datum = ExecGetJunkAttribute(slot,
-											 resultRelInfo->ri_RowIdAttNo,
-											 &isNull);
-				/* shouldn't ever get a null result... */
-				if (isNull)
-					elog(ERROR, "wholerow is NULL");
+			Assert(AttributeNumberIsValid(resultRelInfo->ri_RowIdAttNo));
+			datum = ExecGetJunkAttribute(slot,
+										 resultRelInfo->ri_RowIdAttNo,
+										 &isNull);
+			/* shouldn't ever get a null result... */
+			if (isNull)
+				elog(ERROR, "ctid is NULL");
 
-				oldtupdata.t_data = DatumGetHeapTupleHeader(datum);
-				oldtupdata.t_len =
-					HeapTupleHeaderGetDatumLength(oldtupdata.t_data);
-				ItemPointerSetInvalid(&(oldtupdata.t_self));
-				/* Historically, view triggers see invalid t_tableOid. */
-				oldtupdata.t_tableOid =
-					(relkind == RELKIND_VIEW) ? InvalidOid :
-					RelationGetRelid(resultRelInfo->ri_RelationDesc);
-
-				oldtuple = &oldtupdata;
-			}
-			else
-			{
-				/* A row-ID attr is required for all supported relkinds */
-				Assert(AttributeNumberIsValid(resultRelInfo->ri_RowIdAttNo));
-			}
+			tupleid = (ItemPointer) DatumGetPointer(datum);
+			tuple_ctid = *tupleid;	/* be sure we don't free ctid!! */
+			tupleid = &tuple_ctid;
 		}
 
 		switch (operation)
@@ -1039,15 +980,9 @@ ExecModifyTable(PlanState *pstate)
 				 * the old tuple being updated.
 				 */
 				oldSlot = resultRelInfo->ri_oldTupleSlot;
-				if (oldtuple != NULL)
+
+				/* Fetch the most recent version of old tuple. */
 				{
-					Assert(!resultRelInfo->ri_needLockTagTuple);
-					/* Use the wholerow junk attr as the old tuple. */
-					ExecForceStoreHeapTuple(oldtuple, oldSlot, false);
-				}
-				else
-				{
-					/* Fetch the most recent version of old tuple. */
 					Relation	relation = resultRelInfo->ri_RelationDesc;
 
 					Assert(tupleid != NULL);
@@ -1065,7 +1000,7 @@ ExecModifyTable(PlanState *pstate)
 											 oldSlot);
 
 				/* Now apply the update. */
-				ExecUpdate(node, resultRelInfo, tupleid, oldtuple, slot,
+				ExecUpdate(node, resultRelInfo, tupleid, slot,
 						   planSlot, &node->mt_epqstate, estate,
 						   node->canSetTag);
 				if (tuplock)
@@ -1073,7 +1008,7 @@ ExecModifyTable(PlanState *pstate)
 								InplaceUpdateTupleLock);
 				break;
 			case CMD_DELETE:
-				ExecDelete(node, resultRelInfo, tupleid, oldtuple,
+				ExecDelete(node, resultRelInfo, tupleid,
 						   &node->mt_epqstate, estate,
 						   node->canSetTag);
 				break;
@@ -1261,29 +1196,18 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
 		 */
 		if (operation == CMD_UPDATE || operation == CMD_DELETE)
 		{
-			char		relkind;
+			/*
+			 * The target relation of UPDATE/DELETE is always a plain table,
+			 * so a ctid junk attribute must be present.
+			 */
+			Assert(resultRelInfo->ri_RelationDesc->rd_rel->relkind ==
+				   RELKIND_RELATION);
 
-			relkind = resultRelInfo->ri_RelationDesc->rd_rel->relkind;
-			if (relkind == RELKIND_RELATION)
-			{
-				resultRelInfo->ri_RowIdAttNo =
-					ExecFindJunkAttributeInTlist(subplan->targetlist, "ctid");
+			resultRelInfo->ri_RowIdAttNo =
+				ExecFindJunkAttributeInTlist(subplan->targetlist, "ctid");
 
-				/*
-				 * For heap relations, a ctid junk attribute must be present.
-				 */
-				if (!AttributeNumberIsValid(resultRelInfo->ri_RowIdAttNo))
-					elog(ERROR, "could not find junk ctid column");
-			}
-		else
-		{
-				/* Other valid target relkinds must provide wholerow */
-				resultRelInfo->ri_RowIdAttNo =
-					ExecFindJunkAttributeInTlist(subplan->targetlist,
-												 "wholerow");
-				if (!AttributeNumberIsValid(resultRelInfo->ri_RowIdAttNo))
-					elog(ERROR, "could not find junk wholerow column");
-			}
+			if (!AttributeNumberIsValid(resultRelInfo->ri_RowIdAttNo))
+				elog(ERROR, "could not find junk ctid column");
 		}
 
 	}

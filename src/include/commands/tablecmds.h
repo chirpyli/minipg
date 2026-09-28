@@ -37,8 +37,6 @@ extern void AlterTable(AlterTableStmt *stmt, LOCKMODE lockmode,
 extern LOCKMODE AlterTableGetLockLevel(List *cmds);
 
 
-extern void AlterTableInternal(Oid relid, List *cmds, bool recurse);
-
 extern ObjectAddress AlterTableNamespace(AlterObjectSchemaStmt *stmt,
 										 Oid *oldschema);
 
@@ -59,7 +57,6 @@ extern void ExecuteTruncateGuts(List *explicit_rels,
 								DropBehavior behavior);
 
 extern void RenameRelationInternal(Oid myrelid, const char *newrelname, bool is_internal, bool is_index);
-extern void ResetRelRewrite(Oid myrelid);
 
 extern void find_composite_type_dependencies(Oid typeOid,
 											 Relation origRelation,

@@ -166,16 +166,15 @@ typedef struct PageHeaderData
 typedef PageHeaderData *PageHeader;
 
 /*
- * pd_flags contains the following flag bits.  Undefined bits are initialized
- * to zero and may be used in the future.
+ * pd_flags 包含下列标志位。未定义的位初始化为零，将来可能会用到。
  *
- * PD_HAS_FREE_LINES is set if there are any LP_UNUSED line pointers before
- * pd_lower.  This should be considered a hint rather than the truth, since
- * changes to it are not WAL-logged.
+ * 若在 pd_lower 之前存在任何 LP_UNUSED 的行指针，则置位
+ * PD_HAS_FREE_LINES。这应当被视为一种提示而非确凿事实，因为对它的
+ * 修改并不会记入 WAL 日志。
  *
- * PD_PAGE_FULL is set if an UPDATE doesn't find enough free space in the
- * page for its new tuple version; this suggests that a prune is needed.
- * Again, this is just a hint.
+ * 如果一次 UPDATE 在页面中找不到足够的空闲空间来存放新版本的元组，
+ * 则置位 PD_PAGE_FULL；这表明该页面需要进行一次剪枝（prune）。
+ * 同样，这也仅仅是个提示。
  */
 #define PD_HAS_FREE_LINES	0x0001	/* are there any unused line pointers? */
 #define PD_PAGE_FULL		0x0002	/* not enough free space for new tuple? */
@@ -185,16 +184,15 @@ typedef PageHeaderData *PageHeader;
 #define PD_VALID_FLAG_BITS	0x0007	/* OR of all valid pd_flags bits */
 
 /*
- * Page layout version number 0 is for pre-7.3 Postgres releases.
- * Releases 7.3 and 7.4 use 1, denoting a new HeapTupleHeader layout.
- * Release 8.0 uses 2; it changed the HeapTupleHeader layout again.
- * Release 8.1 uses 3; it redefined HeapTupleHeader infomask bits.
- * Release 8.3 uses 4; it changed the HeapTupleHeader layout again, and
- *		added the pd_flags field (by stealing some bits from pd_tli),
- *		as well as adding the pd_prune_xid field (which enlarges the header).
+ * 页面布局版本号 0 对应 7.3 之前的 Postgres 版本。
+ * 7.3 和 7.4 版本使用 1，表示采用了新的 HeapTupleHeader 布局。
+ * 8.0 版本使用 2；它再次改变了 HeapTupleHeader 的布局。
+ * 8.1 版本使用 3；它重新定义了 HeapTupleHeader 的 infomask 位。
+ * 8.3 版本使用 4；它再次改变了 HeapTupleHeader 的布局，并且
+ *		新增了 pd_flags 字段（从 pd_tli 中"偷"了一些位出来），
+ *		同时新增了 pd_prune_xid 字段（会使页面头变大）。
  *
- * As of Release 9.3, the checksum version must also be considered when
- * handling pages.
+ * 从 9.3 版本起，在处理页面时还必须考虑校验和（checksum）的版本。
  */
 #define PG_PAGE_LAYOUT_VERSION		4
 

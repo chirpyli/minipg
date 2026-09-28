@@ -334,7 +334,8 @@ INSERT INTO orderstest VALUES (77, 1, false);
 INSERT INTO orderstest VALUES (1, 1, false);
 INSERT INTO orderstest VALUES (66, 1, false);
 INSERT INTO orderstest VALUES (1, 1, false);
-CREATE VIEW orders_view AS
+-- minipg: 视图已裁剪，原 orders_view 改为内联子查询
+SELECT * FROM (
 SELECT *,
 (SELECT CASE
    WHEN ord.approver_ref=1 THEN '---' ELSE 'Approved'
@@ -369,8 +370,7 @@ END) AS "Status",
 		ELSE 'PO'
 	END)
 END) AS "Status_OK"
-FROM orderstest ord;
-SELECT * FROM orders_view;
+FROM orderstest ord) AS orders_view;
  approver_ref | po_ref | ordercanceled | Approved |  Status  | Status_OK 
 --------------+--------+---------------+----------+----------+-----------
             1 |      1 | f             | ---      | ---      | ---
@@ -387,7 +387,6 @@ SELECT * FROM orders_view;
 (11 rows)
 
 DROP TABLE orderstest cascade;
-NOTICE:  drop cascades to view orders_view
 select f1, ss1 as relabel from
     (select *, (select b.f1 from int4_tbl b where b.f1 = a.f1) as ss1
      from int4_tbl a) ss;
@@ -454,26 +453,26 @@ select distinct f1, f2, fs from
 --
 CREATE TABLE table_a(id integer);
 insert into table_a values (42);
-CREATE VIEW view_a as select * from table_a;
-select view_a from view_a;
+-- minipg: 视图已裁剪，原 view_a 改为内联子查询
+select view_a from (select * from table_a) view_a;
  view_a 
 --------
  (42)
 (1 row)
 
-select (select view_a) from view_a;
+select (select view_a) from (select * from table_a) view_a;
  view_a 
 --------
  (42)
 (1 row)
 
-select (select (select view_a)) from view_a;
+select (select (select view_a)) from (select * from table_a) view_a;
  view_a 
 --------
  (42)
 (1 row)
 
-select (select (a.*)::text) from view_a a;
+select (select (a.*)::text) from (select * from table_a) a;
   a   
 ------
  (42)

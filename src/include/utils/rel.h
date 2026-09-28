@@ -19,7 +19,6 @@
 #include "catalog/pg_class.h"
 #include "catalog/pg_index.h"
 #include "nodes/bitmapset.h"
-#include "rewrite/prs2lock.h"
 #include "storage/block.h"
 #include "storage/relfilenode.h"
 #include "storage/smgr.h"
@@ -111,8 +110,6 @@ typedef struct RelationData
 	TupleDesc	rd_att;			/* tuple descriptor */
 	Oid			rd_id;			/* relation's object id */
 	LockInfoData rd_lockInfo;	/* lock mgr's info for locking relation */
-	RuleLock   *rd_rules;		/* rewrite rules */
-	MemoryContext rd_rulescxt;	/* private memory cxt for rd_rules, if any */
 
 	/* data managed by RelationGetIndexList: */
 	List	   *rd_indexlist;	/* list of OIDs of indexes on relation */

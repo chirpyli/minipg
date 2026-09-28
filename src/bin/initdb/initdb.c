@@ -103,7 +103,6 @@ static int	encodingid;
 static char *bki_file;
 static char *conf_file;
 static char *system_constraints_file;
-static char *system_views_file;
 static bool success = false;
 static bool made_new_pgdata = false;
 static bool found_existing_pgdata = false;
@@ -991,8 +990,6 @@ setup_depend(FILE *cmdfd)
 		" FROM pg_amop;\n\n",
 		"INSERT INTO pg_depend SELECT 0,0,0, tableoid,oid,0, 'p' "
 		" FROM pg_amproc;\n\n",
-		"INSERT INTO pg_depend SELECT 0,0,0, tableoid,oid,0, 'p' "
-		" FROM pg_rewrite;\n\n",
 
 		/*
 		 * restriction here to avoid pinning the public namespace
@@ -1531,7 +1528,6 @@ setup_data_file_paths(void)
 	set_input(&bki_file, "postgres.bki");
 	set_input(&conf_file, "postgresql.conf.sample");
 	set_input(&system_constraints_file, "system_constraints.sql");
-	set_input(&system_views_file, "system_views.sql");
 
 	if (show_setting || debug)
 	{
@@ -1551,7 +1547,6 @@ setup_data_file_paths(void)
 	check_input(bki_file);
 	check_input(conf_file);
 	check_input(system_constraints_file);
-	check_input(system_views_file);
 }
 
 
@@ -1859,8 +1854,6 @@ initialize_data_directory(void)
 	 * Note that no objects created after setup_depend() will be "pinned".
 	 * They are all droppable at the whim of the DBA.
 	 */
-
-	setup_run_file(cmdfd, system_views_file);
 
 	vacuum_db(cmdfd);
 

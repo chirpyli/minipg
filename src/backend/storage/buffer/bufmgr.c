@@ -2922,7 +2922,6 @@ RelationGetNumberOfBlocksInFork(Relation relation, ForkNumber forkNum)
 
 				return (szbytes + (BLCKSZ - 1)) / BLCKSZ;
 			}
-		case RELKIND_VIEW:
 		case RELKIND_COMPOSITE_TYPE:
 		default:
 			Assert(false);

@@ -41,7 +41,6 @@
 #include "parser/analyze.h"
 #include "parser/parse_coerce.h"
 #include "parser/parse_func.h"
-#include "rewrite/rewriteHandler.h"
 #include "rewrite/rewriteManip.h"
 #include "tcop/tcopprot.h"
 #include "utils/builtins.h"
@@ -1666,9 +1665,9 @@ convert_saop_to_hashed_saop_walker(Node *node, void *context)
  *
  * Currently the extra steps that are taken in this mode are:
  * 1. Substitute values for Params, where a bound Param value has been made
- *	  available by the caller of planner(), even if the Param isn't marked
- *	  constant.  This effectively means that we plan using the first supplied
- *	  value of the Param.
+ *	  available by the caller of standard_planner(), even if the Param isn't
+ *	  marked constant.  This effectively means that we plan using the first
+ *	  supplied value of the Param.
  * 2. Fold stable, as well as immutable, functions to constants.
  * 3. Reduce PlaceHolderVar nodes to their contained expressions.
  *--------------------

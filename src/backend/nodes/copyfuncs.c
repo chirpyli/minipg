@@ -2107,19 +2107,6 @@ _copyTransactionStmt(const TransactionStmt *from)
 }
 
 
-static ViewStmt *
-_copyViewStmt(const ViewStmt *from)
-{
-	ViewStmt   *newnode = makeNode(ViewStmt);
-
-	COPY_NODE_FIELD(view);
-	COPY_NODE_FIELD(aliases);
-	COPY_NODE_FIELD(query);
-	COPY_SCALAR_FIELD(replace);
-
-	return newnode;
-}
-
 static CreatedbStmt *
 _copyCreatedbStmt(const CreatedbStmt *from)
 {
@@ -2560,9 +2547,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_TransactionStmt:
 			retval = _copyTransactionStmt(from);
-			break;
-		case T_ViewStmt:
-			retval = _copyViewStmt(from);
 			break;
 		case T_CreatedbStmt:
 			retval = _copyCreatedbStmt(from);

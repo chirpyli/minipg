@@ -20,20 +20,10 @@
 #include <math.h>
 #include <limits.h>
 
-#include "access/heapam.h"
-#include "access/sysattr.h"
-#include "access/tableam.h"
-#include "catalog/namespace.h"
 #include "catalog/pg_type.h"
 #include "common/hashfn.h"
 #include "libpq/pqformat.h"
-#include "miscadmin.h"
-#include "parser/parsetree.h"
 #include "utils/builtins.h"
-#include "utils/lsyscache.h"
-#include "utils/rel.h"
-#include "utils/snapmgr.h"
-#include "utils/varlena.h"
 
 
 #define DatumGetItemPointer(X)	 ((ItemPointer) DatumGetPointer(X))
@@ -46,7 +36,6 @@
 #define DELIM			','
 #define NTIDARGS		2
 
-static ItemPointer currtid_for_view(Relation viewrel, ItemPointer tid);
 
 /* ----------------------------------------------------------------
  *		tidin
@@ -270,139 +259,3 @@ hashtidextended(PG_FUNCTION_ARGS)
 }
 
 
-/*
- *	Functions to get latest tid of a specified tuple.
- *
- *	Maybe these implementations should be moved to another place
- */
-
-/*
- * Utility wrapper for current CTID functions.
- *		Returns the latest version of a tuple pointing at "tid" for
- *		relation "rel".
- */
-static ItemPointer
-currtid_internal(Relation rel, ItemPointer tid)
-{
-	ItemPointer result;
-	Snapshot	snapshot;
-	TableScanDesc scan;
-
-	result = (ItemPointer) palloc(sizeof(ItemPointerData));
-
-
-	if (rel->rd_rel->relkind == RELKIND_VIEW)
-		return currtid_for_view(rel, tid);
-
-	if (!RELKIND_HAS_STORAGE(rel->rd_rel->relkind))
-		elog(ERROR, "cannot look at latest visible tid for relation \"%s.%s\"",
-			 get_namespace_name(RelationGetNamespace(rel)),
-			 RelationGetRelationName(rel));
-
-	ItemPointerCopy(tid, result);
-
-	snapshot = RegisterSnapshot(GetLatestSnapshot());
-	scan = table_beginscan_tid(rel, snapshot);
-	table_tuple_get_latest_tid(scan, result);
-	table_endscan(scan);
-	UnregisterSnapshot(snapshot);
-
-	return result;
-}
-
-/*
- *	Handle CTIDs of views.
- *		CTID should be defined in the view and it must
- *		correspond to the CTID of a base relation.
- */
-static ItemPointer
-currtid_for_view(Relation viewrel, ItemPointer tid)
-{
-	TupleDesc	att = RelationGetDescr(viewrel);
-	RuleLock   *rulelock;
-	RewriteRule *rewrite;
-	int			i,
-				natts = att->natts,
-				tididx = -1;
-
-	for (i = 0; i < natts; i++)
-	{
-		Form_pg_attribute attr = TupleDescAttr(att, i);
-
-		if (strcmp(NameStr(attr->attname), "ctid") == 0)
-		{
-			if (attr->atttypid != TIDOID)
-				elog(ERROR, "ctid isn't of type TID");
-			tididx = i;
-			break;
-		}
-	}
-	if (tididx < 0)
-		elog(ERROR, "currtid cannot handle views with no CTID");
-	rulelock = viewrel->rd_rules;
-	if (!rulelock)
-		elog(ERROR, "the view has no rules");
-	for (i = 0; i < rulelock->numLocks; i++)
-	{
-		rewrite = rulelock->rules[i];
-		if (rewrite->event == CMD_SELECT)
-		{
-			Query	   *query;
-			TargetEntry *tle;
-
-			if (list_length(rewrite->actions) != 1)
-				elog(ERROR, "only one select rule is allowed in views");
-			query = (Query *) linitial(rewrite->actions);
-			tle = get_tle_by_resno(query->targetList, tididx + 1);
-			if (tle && tle->expr && IsA(tle->expr, Var))
-			{
-				Var		   *var = (Var *) tle->expr;
-				RangeTblEntry *rte;
-
-				if (!IS_SPECIAL_VARNO(var->varno) &&
-					var->varattno == SelfItemPointerAttributeNumber)
-				{
-					rte = rt_fetch(var->varno, query->rtable);
-					if (rte)
-					{
-						ItemPointer result;
-						Relation	rel;
-
-						rel = table_open(rte->relid, AccessShareLock);
-						result = currtid_internal(rel, tid);
-						table_close(rel, AccessShareLock);
-						return result;
-					}
-				}
-			}
-			break;
-		}
-	}
-	elog(ERROR, "currtid cannot handle this view");
-	return NULL;
-}
-
-/*
- * currtid_byrelname
- *		Get the latest tuple version of the tuple pointing at a CTID, for a
- *		given relation name.
- */
-Datum
-currtid_byrelname(PG_FUNCTION_ARGS)
-{
-	text	   *relname = PG_GETARG_TEXT_PP(0);
-	ItemPointer tid = PG_GETARG_ITEMPOINTER(1);
-	ItemPointer result;
-	RangeVar   *relrv;
-	Relation	rel;
-
-	relrv = makeRangeVarFromNameList(textToQualifiedNameList(relname));
-	rel = table_openrv(relrv, AccessShareLock);
-
-	/* grab the latest tuple version associated to this CTID */
-	result = currtid_internal(rel, tid);
-
-	table_close(rel, AccessShareLock);
-
-	PG_RETURN_ITEMPOINTER(result);
-}

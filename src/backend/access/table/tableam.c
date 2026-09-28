@@ -50,12 +50,12 @@ table_slot_callbacks(Relation relation)
 	else
 	{
 		/*
-		 * These need to be supported, as some parts of the code (like COPY)
-		 * need to create slots for such relations too. It seems better to
-		 * centralize the knowledge that a heap slot is the right thing in
+		 * These need to be supported, as some parts of the code need to
+		 * create slots for such relations too. It seems better to
+		 * centralize the knowledge that a virtual slot is the right thing in
 		 * that case here.
 		 */
-		Assert(relation->rd_rel->relkind == RELKIND_VIEW);
+		Assert(relation->rd_rel->relkind == RELKIND_COMPOSITE_TYPE);
 		tts_cb = &TTSOpsVirtual;
 	}
 

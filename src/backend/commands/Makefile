@@ -30,7 +30,6 @@ OBJS = \
 	tablespace.o \
 	typecmds.o \
 	vacuum.o \
-	variable.o \
-	view.o
+	variable.o
 
 include $(top_srcdir)/src/backend/common.mk

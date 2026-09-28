@@ -100,9 +100,9 @@ DROP TABLE tbl;
  */
 CREATE TABLE tbl (c1 int,c2 int, c3 int, c4 int);
 CREATE UNIQUE INDEX tbl_idx ON tbl using btree(c1, c2, c3, c4);
-SELECT indexdef FROM pg_indexes WHERE tablename = 'tbl' ORDER BY indexname;
+SELECT pg_get_indexdef(I.oid) AS indexdef FROM pg_index X JOIN pg_class C ON C.oid = X.indrelid JOIN pg_class I ON I.oid = X.indexrelid WHERE C.relname = 'tbl' AND C.relkind IN ('r') AND I.relkind IN ('i','I') ORDER BY I.relname;
 ALTER TABLE tbl DROP COLUMN c3;
-SELECT indexdef FROM pg_indexes WHERE tablename = 'tbl' ORDER BY indexname;
+SELECT pg_get_indexdef(I.oid) AS indexdef FROM pg_index X JOIN pg_class C ON C.oid = X.indrelid JOIN pg_class I ON I.oid = X.indexrelid WHERE C.relname = 'tbl' AND C.relkind IN ('r') AND I.relkind IN ('i','I') ORDER BY I.relname;
 DROP TABLE tbl;
 
 /*
@@ -112,9 +112,9 @@ DROP TABLE tbl;
  */
 CREATE TABLE tbl (c1 int,c2 int, c3 int, c4 box);
 CREATE UNIQUE INDEX tbl_idx ON tbl using btree(c1, c2) INCLUDE(c3,c4);
-SELECT indexdef FROM pg_indexes WHERE tablename = 'tbl' ORDER BY indexname;
+SELECT pg_get_indexdef(I.oid) AS indexdef FROM pg_index X JOIN pg_class C ON C.oid = X.indrelid JOIN pg_class I ON I.oid = X.indexrelid WHERE C.relname = 'tbl' AND C.relkind IN ('r') AND I.relkind IN ('i','I') ORDER BY I.relname;
 ALTER TABLE tbl DROP COLUMN c3;
-SELECT indexdef FROM pg_indexes WHERE tablename = 'tbl' ORDER BY indexname;
+SELECT pg_get_indexdef(I.oid) AS indexdef FROM pg_index X JOIN pg_class C ON C.oid = X.indrelid JOIN pg_class I ON I.oid = X.indexrelid WHERE C.relname = 'tbl' AND C.relkind IN ('r') AND I.relkind IN ('i','I') ORDER BY I.relname;
 DROP TABLE tbl;
 
 /*
@@ -123,11 +123,11 @@ DROP TABLE tbl;
  * AS well AS key columns deletion. It's explained in documentation.
  */
 CREATE TABLE tbl (c1 int,c2 int, c3 int, c4 box, UNIQUE(c1, c2) INCLUDE(c3,c4));
-SELECT indexdef FROM pg_indexes WHERE tablename = 'tbl' ORDER BY indexname;
+SELECT pg_get_indexdef(I.oid) AS indexdef FROM pg_index X JOIN pg_class C ON C.oid = X.indrelid JOIN pg_class I ON I.oid = X.indexrelid WHERE C.relname = 'tbl' AND C.relkind IN ('r') AND I.relkind IN ('i','I') ORDER BY I.relname;
 ALTER TABLE tbl DROP COLUMN c3;
-SELECT indexdef FROM pg_indexes WHERE tablename = 'tbl' ORDER BY indexname;
+SELECT pg_get_indexdef(I.oid) AS indexdef FROM pg_index X JOIN pg_class C ON C.oid = X.indrelid JOIN pg_class I ON I.oid = X.indexrelid WHERE C.relname = 'tbl' AND C.relkind IN ('r') AND I.relkind IN ('i','I') ORDER BY I.relname;
 ALTER TABLE tbl DROP COLUMN c1;
-SELECT indexdef FROM pg_indexes WHERE tablename = 'tbl' ORDER BY indexname;
+SELECT pg_get_indexdef(I.oid) AS indexdef FROM pg_index X JOIN pg_class C ON C.oid = X.indrelid JOIN pg_class I ON I.oid = X.indexrelid WHERE C.relname = 'tbl' AND C.relkind IN ('r') AND I.relkind IN ('i','I') ORDER BY I.relname;
 DROP TABLE tbl;
 
 /*
@@ -147,19 +147,19 @@ DROP TABLE tbl;
 CREATE TABLE tbl (c1 int,c2 int, c3 int, c4 box, UNIQUE(c1, c2) INCLUDE(c3,c4));
 INSERT INTO tbl SELECT x, 2*x, 3*x, box('4,4,4,4') FROM (SELECT generate_series(1,1000) AS x) AS _gs;
 CREATE UNIQUE INDEX CONCURRENTLY on tbl (c1, c2) INCLUDE (c3, c4);
-SELECT indexdef FROM pg_indexes WHERE tablename = 'tbl' ORDER BY indexname;
+SELECT pg_get_indexdef(I.oid) AS indexdef FROM pg_index X JOIN pg_class C ON C.oid = X.indrelid JOIN pg_class I ON I.oid = X.indexrelid WHERE C.relname = 'tbl' AND C.relkind IN ('r') AND I.relkind IN ('i','I') ORDER BY I.relname;
 DROP TABLE tbl;
 
 
 /*
  */
 CREATE TABLE tbl (c1 int,c2 int, c3 int, c4 box, UNIQUE(c1, c2) INCLUDE(c3,c4));
-SELECT indexdef FROM pg_indexes WHERE tablename = 'tbl' ORDER BY indexname;
+SELECT pg_get_indexdef(I.oid) AS indexdef FROM pg_index X JOIN pg_class C ON C.oid = X.indrelid JOIN pg_class I ON I.oid = X.indexrelid WHERE C.relname = 'tbl' AND C.relkind IN ('r') AND I.relkind IN ('i','I') ORDER BY I.relname;
 ALTER TABLE tbl DROP COLUMN c3;
-SELECT indexdef FROM pg_indexes WHERE tablename = 'tbl' ORDER BY indexname;
-SELECT indexdef FROM pg_indexes WHERE tablename = 'tbl' ORDER BY indexname;
+SELECT pg_get_indexdef(I.oid) AS indexdef FROM pg_index X JOIN pg_class C ON C.oid = X.indrelid JOIN pg_class I ON I.oid = X.indexrelid WHERE C.relname = 'tbl' AND C.relkind IN ('r') AND I.relkind IN ('i','I') ORDER BY I.relname;
+SELECT pg_get_indexdef(I.oid) AS indexdef FROM pg_index X JOIN pg_class C ON C.oid = X.indrelid JOIN pg_class I ON I.oid = X.indexrelid WHERE C.relname = 'tbl' AND C.relkind IN ('r') AND I.relkind IN ('i','I') ORDER BY I.relname;
 ALTER TABLE tbl DROP COLUMN c1;
-SELECT indexdef FROM pg_indexes WHERE tablename = 'tbl' ORDER BY indexname;
+SELECT pg_get_indexdef(I.oid) AS indexdef FROM pg_index X JOIN pg_class C ON C.oid = X.indrelid JOIN pg_class I ON I.oid = X.indexrelid WHERE C.relname = 'tbl' AND C.relkind IN ('r') AND I.relkind IN ('i','I') ORDER BY I.relname;
 DROP TABLE tbl;
 
 /*

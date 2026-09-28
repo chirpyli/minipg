@@ -22,10 +22,6 @@
 #include "nodes/plannodes.h"
 
 
-extern PlannedStmt *standard_planner(Query *parse, const char *query_string,
-									 int cursorOptions,
-									 ParamListInfo boundParams);
-
 extern PlannerInfo *subquery_planner(PlannerGlobal *glob, Query *parse,
 									 PlannerInfo *parent_root,
 									 bool hasRecursion, double tuple_fraction);

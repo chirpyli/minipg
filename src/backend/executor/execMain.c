@@ -691,17 +691,6 @@ CheckValidResultRelNew(ResultRelInfo *resultRelInfo, CmdType operation)
 					 errmsg("cannot change TOAST relation \"%s\"",
 							RelationGetRelationName(resultRel))));
 			break;
-		case RELKIND_VIEW:
-
-			/*
-			 * Views are not updatable in minipg: INSTEAD OF triggers and
-			 * rewrite rules have been removed.
-			 */
-			ereport(ERROR,
-					(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-					 errmsg("cannot change view \"%s\"",
-							RelationGetRelationName(resultRel))));
-			break;
 		default:
 			ereport(ERROR,
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
@@ -740,13 +729,6 @@ CheckValidRowMarkRel(Relation rel)
 			ereport(ERROR,
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 					 errmsg("cannot lock rows in TOAST relation \"%s\"",
-							RelationGetRelationName(rel))));
-			break;
-		case RELKIND_VIEW:
-			/* Should not get here; planner should have expanded the view */
-			ereport(ERROR,
-					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-					 errmsg("cannot lock rows in view \"%s\"",
 							RelationGetRelationName(rel))));
 			break;
 		default:

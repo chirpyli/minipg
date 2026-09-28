@@ -73,7 +73,7 @@ RESET enable_hashjoin;
 BEGIN ISOLATION LEVEL SERIALIZABLE;
 SELECT * FROM tidscan WHERE ctid = '(0,1)';
 -- locktype should be 'tuple'
-SELECT locktype, mode FROM pg_locks WHERE pid = pg_backend_pid() AND mode = 'SIReadLock';
+SELECT locktype, mode FROM (SELECT (pg_lock_status()).*) AS l WHERE pid = pg_backend_pid() AND mode = 'SIReadLock';
 ROLLBACK;
 
 DROP TABLE tidscan;

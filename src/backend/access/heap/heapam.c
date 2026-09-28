@@ -409,24 +409,21 @@ heapgetpage(TableScanDesc sscan, BlockNumber page)
 	ntup = 0;
 
 	/*
-	 * If the all-visible flag indicates that all tuples on the page are
-	 * visible to everyone, we can skip the per-tuple visibility tests.
+	 * 如果 all-visible 标志表明页面上的所有元组对所有人都可见，我们就可以
+	 * 跳过逐元组的可见性判断。
 	 *
-	 * Note: In hot standby, a tuple that's already visible to all
-	 * transactions on the primary might still be invisible to a read-only
-	 * transaction in the standby. We partly handle this problem by tracking
-	 * the minimum xmin of visible tuples as the cut-off XID while marking a
-	 * page all-visible on the primary and WAL log that along with the
-	 * visibility map SET operation. In hot standby, we wait for (or abort)
-	 * all transactions that can potentially may not see one or more tuples on
-	 * the page. That's how index-only scans work fine in hot standby. A
-	 * crucial difference between index-only scans and heap scans is that the
-	 * index-only scan completely relies on the visibility map where as heap
-	 * scan looks at the page-level PD_ALL_VISIBLE flag. We are not sure if
-	 * the page-level flag can be trusted in the same way, because it might
-	 * get propagated somehow without being explicitly WAL-logged, e.g. via a
-	 * full page write. Until we can prove that beyond doubt, let's check each
-	 * tuple for visibility the hard way.
+	 * 注意：在 hot standby 中，一条在主库上已经对所有事务都可见的元组，
+	 * 在备库上仍可能对某个只读事务不可见。我们对此问题做了部分处理：在
+	 * 主库上将某页面标记为 all-visible 的同时，会把可见元组的最小 xmin
+	 * 作为 cut-off XID 一并跟踪，并随可见性映射（visibility map）的 SET
+	 * 操作一起写入 WAL 日志。在 hot standby 中，我们会等待（或中止）那些
+	 * 可能看不到该页面上一个或多个元组的事务。这正是 index-only scan
+	 * 在 hot standby 中仍能正常工作的原因。index-only scan 与 heap scan
+	 * 的一个关键区别在于：index-only scan 完全依赖可见性映射，而 heap
+	 * scan 看的是页面级的 PD_ALL_VISIBLE 标志。我们不敢完全信任页面级
+	 * 标志，因为它有可能在未经显式 WAL 记录的情况下就被传播出去，例如
+	 * 通过整页写（full page write）。在能彻底证明这一点之前，我们还是
+	 * 用最稳妥的方式逐个检查每个元组的可见性。
 	 */
 	all_visible = PageIsAllVisible(dp) && !snapshot->takenDuringRecovery;
 

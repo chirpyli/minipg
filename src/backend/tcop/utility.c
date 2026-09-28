@@ -35,11 +35,9 @@
 #include "commands/tablespace.h"
 #include "commands/typecmds.h"
 #include "commands/vacuum.h"
-#include "commands/view.h"
 #include "miscadmin.h"
 #include "parser/parse_utilcmd.h"
 #include "postmaster/bgwriter.h"
-#include "rewrite/rewriteRemove.h"
 #include "storage/fd.h"
 #include "tcop/pquery.h"
 #include "tcop/utility.h"
@@ -114,7 +112,6 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 		case T_DropdbStmt:
 		case T_IndexStmt:
 		case T_TruncateStmt:
-		case T_ViewStmt:
 			{
 				/* DDL is not read-only, and neither is TRUNCATE. */
 				return COMMAND_IS_NOT_READ_ONLY;
@@ -684,12 +681,6 @@ ProcessUtilitySlow(ParseState *pstate,
 				}
 				break;
 
-			case T_ViewStmt:	/* CREATE VIEW */
-				address = DefineView((ViewStmt *) parsetree, queryString,
-									pstmt->stmt_location, pstmt->stmt_len);
-				break;
-
-
 			case T_DropStmt:
 				ExecDropStmt((DropStmt *) parsetree, isTopLevel);
 				break;
@@ -758,7 +749,6 @@ ExecDropStmt(DropStmt *stmt, bool isTopLevel)
 			/* fall through */
 
 		case OBJECT_TABLE:
-		case OBJECT_VIEW:
 			RemoveRelations(stmt);
 			break;
 		default:
@@ -879,9 +869,6 @@ AlterObjectTypeCommandTag(ObjectType objtype)
 		case OBJECT_TABCONSTRAINT:
 			tag = CMDTAG_ALTER_TABLE;
 			break;
-		case OBJECT_VIEW:
-			tag = CMDTAG_UNKNOWN;
-			break;
 		default:
 			tag = CMDTAG_UNKNOWN;
 			break;
@@ -981,9 +968,6 @@ CreateCommandTag(Node *parsetree)
 				case OBJECT_TABLE:
 					tag = CMDTAG_DROP_TABLE;
 					break;
-				case OBJECT_VIEW:
-					tag = CMDTAG_DROP_VIEW;
-					break;
 				case OBJECT_INDEX:
 					tag = CMDTAG_DROP_INDEX;
 					break;
@@ -1006,11 +990,6 @@ CreateCommandTag(Node *parsetree)
 		case T_AlterTableStmt:
 			tag = AlterObjectTypeCommandTag(((AlterTableStmt *) parsetree)->objtype);
 			break;
-
-		case T_ViewStmt:
-			tag = CMDTAG_CREATE_VIEW;
-			break;
-
 
 		case T_IndexStmt:
 			tag = CMDTAG_CREATE_INDEX;

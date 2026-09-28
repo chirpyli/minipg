@@ -165,7 +165,8 @@ INSERT INTO orderstest VALUES (1, 1, false);
 INSERT INTO orderstest VALUES (66, 1, false);
 INSERT INTO orderstest VALUES (1, 1, false);
 
-CREATE VIEW orders_view AS
+-- minipg: 视图已裁剪，原 orders_view 改为内联子查询
+SELECT * FROM (
 SELECT *,
 (SELECT CASE
    WHEN ord.approver_ref=1 THEN '---' ELSE 'Approved'
@@ -200,9 +201,7 @@ END) AS "Status",
 		ELSE 'PO'
 	END)
 END) AS "Status_OK"
-FROM orderstest ord;
-
-SELECT * FROM orders_view;
+FROM orderstest ord) AS orders_view;
 
 DROP TABLE orderstest cascade;
 
@@ -270,12 +269,11 @@ select distinct f1, f2, fs from
 CREATE TABLE table_a(id integer);
 insert into table_a values (42);
 
-CREATE VIEW view_a as select * from table_a;
-
-select view_a from view_a;
-select (select view_a) from view_a;
-select (select (select view_a)) from view_a;
-select (select (a.*)::text) from view_a a;
+-- minipg: 视图已裁剪，原 view_a 改为内联子查询
+select view_a from (select * from table_a) view_a;
+select (select view_a) from (select * from table_a) view_a;
+select (select (select view_a)) from (select * from table_a) view_a;
+select (select (a.*)::text) from (select * from table_a) a;
 
 --
 -- Check that whole-row Vars reading the result of a subselect don't include

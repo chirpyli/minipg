@@ -294,7 +294,6 @@ heap_create(const char *relname,
 	/* Handle reltablespace for specific relkinds. */
 	switch (relkind)
 	{
-		case RELKIND_VIEW:
 		case RELKIND_COMPOSITE_TYPE:
 
 			/*
@@ -359,7 +358,6 @@ heap_create(const char *relname,
 	{
 		switch (rel->rd_rel->relkind)
 		{
-			case RELKIND_VIEW:
 			case RELKIND_COMPOSITE_TYPE:
 				Assert(false);
 				break;
@@ -438,10 +436,10 @@ CheckAttributeNamesTypes(TupleDesc tupdesc, char relkind,
 	/*
 	 * first check for collision with system attribute names
 	 *
-	 * Skip this for a view or type relation, since those don't have system
+	 * Skip this for a type relation, since those don't have system
 	 * attributes.
 	 */
-	if (relkind != RELKIND_VIEW && relkind != RELKIND_COMPOSITE_TYPE)
+	if (relkind != RELKIND_COMPOSITE_TYPE)
 	{
 		for (i = 0; i < natts; i++)
 		{
@@ -765,10 +763,10 @@ AddNewAttributeTuples(Oid new_rel_oid,
 
 	/*
 	 * Next we add the system attributes.  Skip OID if rel has no OIDs. Skip
-	 * all for a view or type relation.  We don't bother with making datatype
+	 * all for a type relation.  We don't bother with making datatype
 	 * dependencies here, since presumably all these types are pinned.
 	 */
-	if (relkind != RELKIND_VIEW && relkind != RELKIND_COMPOSITE_TYPE)
+	if (relkind != RELKIND_COMPOSITE_TYPE)
 	{
 		TupleDesc	td;
 
@@ -828,8 +826,6 @@ InsertPgClassTuple(Relation pg_class_desc,
 	values[Anum_pg_class_relpersistence - 1] = CharGetDatum(rd_rel->relpersistence);
 	values[Anum_pg_class_relkind - 1] = CharGetDatum(rd_rel->relkind);
 	values[Anum_pg_class_relnatts - 1] = Int16GetDatum(rd_rel->relnatts);
-	values[Anum_pg_class_relhasrules - 1] = BoolGetDatum(rd_rel->relhasrules);
-	values[Anum_pg_class_relrewrite - 1] = ObjectIdGetDatum(rd_rel->relrewrite);
 	values[Anum_pg_class_relfrozenxid - 1] = TransactionIdGetDatum(rd_rel->relfrozenxid);
 	values[Anum_pg_class_relminmxid - 1] = MultiXactIdGetDatum(rd_rel->relminmxid);
 	nulls[Anum_pg_class_reloptions - 1] = true;
@@ -985,7 +981,6 @@ heap_create_with_catalog(const char *relname,
 						 bool mapped_relation,
 						 bool allow_system_table_mods,
 						 bool is_internal,
-						 Oid relrewrite,
 						 ObjectAddress *typaddress)
 {
 	Relation	pg_class_desc;
@@ -1087,8 +1082,6 @@ heap_create_with_catalog(const char *relname,
 							   &relminmxid);
 
 	Assert(relid == RelationGetRelid(new_rel_desc));
-
-	new_rel_desc->rd_rel->relrewrite = relrewrite;
 
 	/*
 	 * Decide whether to create a pg_type entry for the relation's rowtype.

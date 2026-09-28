@@ -83,7 +83,6 @@ typedef struct
 {
 	const char *schemaname;		/* name of schema */
 	List	   *tables;			/* CREATE TABLE items */
-	List	   *views;			/* CREATE VIEW items */
 	List	   *indexes;		/* CREATE INDEX items */
 } CreateSchemaStmtContext;
 
@@ -1422,7 +1421,6 @@ transformCreateSchemaStmtElements(List *schemaElts, const char *schemaName)
 
 	cxt.schemaname = schemaName;
 	cxt.tables = NIL;
-	cxt.views = NIL;
 	cxt.indexes = NIL;
 
 	/*
@@ -1448,19 +1446,6 @@ transformCreateSchemaStmtElements(List *schemaElts, const char *schemaName)
 				}
 				break;
 
-			case T_ViewStmt:
-				{
-					ViewStmt   *elp = (ViewStmt *) element;
-
-					setSchemaName(cxt.schemaname, &elp->view->schemaname);
-
-					/*
-					 * XXX todo: deal with references between views
-					 */
-					cxt.views = lappend(cxt.views, element);
-				}
-				break;
-
 			case T_IndexStmt:
 				{
 					IndexStmt  *elp = (IndexStmt *) element;
@@ -1478,7 +1463,6 @@ transformCreateSchemaStmtElements(List *schemaElts, const char *schemaName)
 
 	result = NIL;
 	result = list_concat(result, cxt.tables);
-	result = list_concat(result, cxt.views);
 	result = list_concat(result, cxt.indexes);
 
 	return result;

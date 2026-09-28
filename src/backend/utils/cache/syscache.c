@@ -34,7 +34,6 @@
 #include "catalog/pg_operator.h"
 #include "catalog/pg_opfamily.h"
 #include "catalog/pg_proc.h"
-#include "catalog/pg_rewrite.h"
 #include "catalog/pg_statistic.h"
 #include "catalog/pg_tablespace.h"
 #include "catalog/pg_type.h"
@@ -342,17 +341,6 @@ static const struct cachedesc cacheinfo[] = {
 			0
 		},
 		128
-	},
-	{RewriteRelationId,			/* RULERELNAME */
-		RewriteRelRulenameIndexId,
-		2,
-		{
-			Anum_pg_rewrite_ev_class,
-			Anum_pg_rewrite_rulename,
-			0,
-			0
-		},
-		8
 	},
 	{StatisticRelationId,		/* STATRELATTINH */
 		StatisticRelidAttnumInhIndexId,

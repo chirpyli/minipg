@@ -49,7 +49,6 @@
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_opclass.h"
 #include "catalog/pg_proc.h"
-#include "catalog/pg_rewrite.h"
 #include "catalog/pg_tablespace.h"
 #include "catalog/pg_type.h"
 #include "catalog/schemapg.h"
@@ -58,7 +57,6 @@
 #include "nodes/makefuncs.h"
 #include "nodes/nodeFuncs.h"
 #include "optimizer/optimizer.h"
-#include "rewrite/rewriteDefine.h"
 #include "storage/lmgr.h"
 #include "storage/smgr.h"
 #include "utils/array.h"
@@ -528,205 +526,7 @@ RelationBuildTupleDesc(Relation relation)
 
 }
 
-/*
- *		RelationBuildRuleLock
- *
- *		Form the relation's rewrite rules from information in
- *		the pg_rewrite system catalog.
- *
- * Note: The rule parsetrees are potentially very complex node structures.
- * To allow these trees to be freed when the relcache entry is flushed,
- * we make a private memory context to hold the RuleLock information for
- * each relcache entry that has associated rules.  The context is used
- * just for rule info, not for any other subsidiary data of the relcache
- * entry, because that keeps the update logic in RelationClearRelation()
- * manageable.  The other subsidiary data structures are simple enough
- * to be easy to free explicitly, anyway.
- */
-static void
-RelationBuildRuleLock(Relation relation)
-{
-	MemoryContext rulescxt;
-	MemoryContext oldcxt;
-	HeapTuple	rewrite_tuple;
-	Relation	rewrite_desc;
-	TupleDesc	rewrite_tupdesc;
-	SysScanDesc rewrite_scan;
-	ScanKeyData key;
-	RuleLock   *rulelock;
-	int			numlocks;
-	RewriteRule **rules;
-	int			maxlocks;
 
-	/*
-	 * Make the private context.  Assume it'll not contain much data.
-	 */
-	rulescxt = AllocSetContextCreate(CacheMemoryContext,
-									 "relation rules",
-									 ALLOCSET_SMALL_SIZES);
-	relation->rd_rulescxt = rulescxt;
-	MemoryContextCopyAndSetIdentifier(rulescxt,
-									  RelationGetRelationName(relation));
-
-	/*
-	 * allocate an array to hold the rewrite rules (the array is extended if
-	 * necessary)
-	 */
-	maxlocks = 4;
-	rules = (RewriteRule **)
-		MemoryContextAlloc(rulescxt, sizeof(RewriteRule *) * maxlocks);
-	numlocks = 0;
-
-	/*
-	 * form a scan key
-	 */
-	ScanKeyInit(&key,
-				Anum_pg_rewrite_ev_class,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(RelationGetRelid(relation)));
-
-	/*
-	 * open pg_rewrite and begin a scan
-	 *
-	 * Note: since we scan the rules using RewriteRelRulenameIndexId, we will
-	 * be reading the rules in name order, except possibly during
-	 * emergency-recovery operations (ie, IgnoreSystemIndexes). This in turn
-	 * ensures that rules will be fired in name order.
-	 */
-	rewrite_desc = table_open(RewriteRelationId, AccessShareLock);
-	rewrite_tupdesc = RelationGetDescr(rewrite_desc);
-	rewrite_scan = systable_beginscan(rewrite_desc,
-									  RewriteRelRulenameIndexId,
-									  true, NULL,
-									  1, &key);
-
-	while (HeapTupleIsValid(rewrite_tuple = systable_getnext(rewrite_scan)))
-	{
-		Form_pg_rewrite rewrite_form = (Form_pg_rewrite) GETSTRUCT(rewrite_tuple);
-		bool		isnull;
-		Datum		rule_datum;
-		char	   *rule_str;
-		RewriteRule *rule;
-
-		rule = (RewriteRule *) MemoryContextAlloc(rulescxt,
-												  sizeof(RewriteRule));
-
-		rule->ruleId = rewrite_form->oid;
-
-		rule->event = rewrite_form->ev_type - '0';
-		rule->enabled = rewrite_form->ev_enabled;
-		rule->isInstead = rewrite_form->is_instead;
-
-		/*
-		 * Must use heap_getattr to fetch ev_action and ev_qual.  Also, the
-		 * rule strings are often large enough to be toasted.  To avoid
-		 * leaking memory in the caller's context, do the detoasting here so
-		 * we can free the detoasted version.
-		 */
-		rule_datum = heap_getattr(rewrite_tuple,
-								  Anum_pg_rewrite_ev_action,
-								  rewrite_tupdesc,
-								  &isnull);
-		Assert(!isnull);
-		rule_str = TextDatumGetCString(rule_datum);
-		oldcxt = MemoryContextSwitchTo(rulescxt);
-		rule->actions = (List *) stringToNode(rule_str);
-		MemoryContextSwitchTo(oldcxt);
-		pfree(rule_str);
-
-		rule_datum = heap_getattr(rewrite_tuple,
-								  Anum_pg_rewrite_ev_qual,
-								  rewrite_tupdesc,
-								  &isnull);
-		Assert(!isnull);
-		rule_str = TextDatumGetCString(rule_datum);
-		oldcxt = MemoryContextSwitchTo(rulescxt);
-		rule->qual = (Node *) stringToNode(rule_str);
-		MemoryContextSwitchTo(oldcxt);
-		pfree(rule_str);
-
-		if (numlocks >= maxlocks)
-		{
-			maxlocks *= 2;
-			rules = (RewriteRule **)
-				repalloc(rules, sizeof(RewriteRule *) * maxlocks);
-		}
-		rules[numlocks++] = rule;
-	}
-
-	/*
-	 * end the scan and close the attribute relation
-	 */
-	systable_endscan(rewrite_scan);
-	table_close(rewrite_desc, AccessShareLock);
-
-	/*
-	 * there might not be any rules (if relhasrules is out-of-date)
-	 */
-	if (numlocks == 0)
-	{
-		relation->rd_rules = NULL;
-		relation->rd_rulescxt = NULL;
-		MemoryContextDelete(rulescxt);
-		return;
-	}
-
-	/*
-	 * form a RuleLock and insert into relation
-	 */
-	rulelock = (RuleLock *) MemoryContextAlloc(rulescxt, sizeof(RuleLock));
-	rulelock->numLocks = numlocks;
-	rulelock->rules = rules;
-
-	relation->rd_rules = rulelock;
-}
-
-/*
- *		equalRuleLocks
- *
- *		Determine whether two RuleLocks are equivalent
- *
- *		Probably this should be in the rules code someplace...
- */
-static bool
-equalRuleLocks(RuleLock *rlock1, RuleLock *rlock2)
-{
-	int			i;
-
-	/*
-	 * As of 7.3 we assume the rule ordering is repeatable, because
-	 * RelationBuildRuleLock should read 'em in a consistent order.  So just
-	 * compare corresponding slots.
-	 */
-	if (rlock1 != NULL)
-	{
-		if (rlock2 == NULL)
-			return false;
-		if (rlock1->numLocks != rlock2->numLocks)
-			return false;
-		for (i = 0; i < rlock1->numLocks; i++)
-		{
-			RewriteRule *rule1 = rlock1->rules[i];
-			RewriteRule *rule2 = rlock2->rules[i];
-
-			if (rule1->ruleId != rule2->ruleId)
-				return false;
-			if (rule1->event != rule2->event)
-				return false;
-			if (rule1->enabled != rule2->enabled)
-				return false;
-			if (rule1->isInstead != rule2->isInstead)
-				return false;
-			if (!equal(rule1->qual, rule2->qual))
-				return false;
-			if (!equal(rule1->actions, rule2->actions))
-				return false;
-		}
-	}
-	else if (rlock2 != NULL)
-		return false;
-	return true;
-}
 
 /*
  *		RelationBuildDesc
@@ -861,17 +661,6 @@ retry:
 	RelationBuildTupleDesc(relation);
 
 	/*
-	 * Fetch rules that affect this relation
-	 */
-	if (relation->rd_rel->relhasrules)
-		RelationBuildRuleLock(relation);
-	else
-	{
-		relation->rd_rules = NULL;
-		relation->rd_rulescxt = NULL;
-	}
-
-	/*
 	 * initialize access method information
 	 */
 	switch (relation->rd_rel->relkind)
@@ -885,7 +674,6 @@ retry:
 			Assert(relation->rd_rel->relam != InvalidOid);
 			RelationInitTableAccessMethod(relation);
 			break;
-		case RELKIND_VIEW:
 		case RELKIND_COMPOSITE_TYPE:
 			Assert(relation->rd_rel->relam == InvalidOid);
 			break;
@@ -1997,8 +1785,6 @@ RelationDestroyRelation(Relation relation, bool remember_tupdesc)
 		pfree(relation->rd_amcache);
 	if (relation->rd_indexcxt)
 		MemoryContextDelete(relation->rd_indexcxt);
-	if (relation->rd_rulescxt)
-		MemoryContextDelete(relation->rd_rulescxt);
 	pfree(relation);
 }
 
@@ -2153,7 +1939,6 @@ RelationClearRelation(Relation relation, bool rebuild)
 		Relation	newrel;
 		Oid			save_relid = RelationGetRelid(relation);
 		bool		keep_tupdesc;
-		bool		keep_rules;
 
 		/* Build temporary entry, but don't link it into hashtable */
 		newrel = RelationBuildDesc(save_relid, false);
@@ -2178,7 +1963,6 @@ RelationClearRelation(Relation relation, bool rebuild)
 		}
 
 		keep_tupdesc = equalTupleDescs(relation->rd_att, newrel->rd_att);
-		keep_rules = equalRuleLocks(relation->rd_rules, newrel->rd_rules);
 
 		/*
 		 * Perform swapping of the relcache entry contents.  Within this
@@ -2221,15 +2005,10 @@ RelationClearRelation(Relation relation, bool rebuild)
 		SWAPFIELD(Form_pg_class, rd_rel);
 		/* ... but actually, we don't have to update newrel->rd_rel */
 		memcpy(relation->rd_rel, newrel->rd_rel, CLASS_TUPLE_SIZE);
-		/* preserve old tupledesc, rules, policies if no logical change */
+		/* preserve old tupledesc if no logical change */
 		if (keep_tupdesc)
 			SWAPFIELD(TupleDesc, rd_att);
-		if (keep_rules)
-		{
-		SWAPFIELD(RuleLock *, rd_rules);
-		SWAPFIELD(MemoryContext, rd_rulescxt);
-	}
-	/* toast OID override must be preserved */
+		/* toast OID override must be preserved */
 		SWAPFIELD(Oid, rd_toastoid);
 
 		#undef SWAPFIELD
@@ -3444,12 +3223,6 @@ RelationCacheInitializePhase3(void)
 	 * true.  (NOTE: perhaps it would be possible to reload them by
 	 * temporarily setting criticalRelcachesBuilt to false again.  For now,
 	 * though, we just nail 'em in.)
-	 *
-	 * RewriteRelRulenameIndexId is not critical in the same way as the
-	 * others, because the critical catalogs don't (currently) have any rules,
-	 * and so this index can be rebuilt without inducing recursion.  However
-	 * it is used during relcache load when a rel does have rules, so we
-	 * choose to nail it for performance reasons.
 	 */
 	if (!criticalRelcachesBuilt)
 	{
@@ -3463,10 +3236,8 @@ RelationCacheInitializePhase3(void)
 							OperatorClassRelationId);
 		load_critical_index(AccessMethodProcedureIndexId,
 							AccessMethodProcedureRelationId);
-		load_critical_index(RewriteRelRulenameIndexId,
-							RewriteRelationId);
 
-#define NUM_CRITICAL_LOCAL_INDEXES	6	/* fix if you change list above */
+#define NUM_CRITICAL_LOCAL_INDEXES	5	/* fix if you change list above */
 
 		criticalRelcachesBuilt = true;
 	}
@@ -3556,22 +3327,6 @@ RelationCacheInitializePhase3(void)
 			/* Real data is now loaded; clear the fake-entry flag. */
 			relation->rd_fakeentry = false;
 
-			restart = true;
-		}
-
-		/*
-		 * Fix data that isn't saved in relcache cache file.
-		 *
-		 * relhasrules could possibly be wrong or out of
-		 * date.  If we don't actually find any rules, clear the
-		 * local copy of the flag so that we don't get into an infinite loop
-		 * here.  We don't make any attempt to fix the pg_class entry, though.
-		 */
-		if (relation->rd_rel->relhasrules && relation->rd_rules == NULL)
-		{
-			RelationBuildRuleLock(relation);
-			if (relation->rd_rules == NULL)
-				relation->rd_rel->relhasrules = false;
 			restart = true;
 		}
 
@@ -4707,15 +4462,10 @@ load_relcache_init_file(bool shared)
 		}
 
 		/*
-		 * Rules are not saved (mainly because the internal format is complex
-		 * and subject to change).  They must be rebuilt if needed by
-		 * RelationCacheInitializePhase3.  This is not expected to be a big
-		 * performance hit since few system catalogs have such. Ditto for RLS
-		 * policy data, index expressions, predicates,
-		 * exclusion info.
+		 * Index expressions and predicates are not saved (mainly because
+		 * the internal format is complex and subject to change).  They must
+		 * be rebuilt if needed by RelationCacheInitializePhase3.
 		 */
-		rel->rd_rules = NULL;
-		rel->rd_rulescxt = NULL;
 		rel->rd_indexprs = NIL;
 		rel->rd_indpred = NIL;
 

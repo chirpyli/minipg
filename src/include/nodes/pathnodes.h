@@ -70,7 +70,8 @@ typedef struct PlannerGlobal
 {
 	NodeTag		type;
 
-	ParamListInfo boundParams;	/* Param values provided to planner() */
+	/* Param values provided to standard_planner() */
+	ParamListInfo boundParams;
 
 	List	   *subplans;		/* Plans for SubPlan nodes */
 

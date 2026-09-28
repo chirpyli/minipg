@@ -884,17 +884,6 @@ _equalTransactionStmt(const TransactionStmt *a, const TransactionStmt *b)
 }
 
 static bool
-_equalViewStmt(const ViewStmt *a, const ViewStmt *b)
-{
-	COMPARE_NODE_FIELD(view);
-	COMPARE_NODE_FIELD(aliases);
-	COMPARE_NODE_FIELD(query);
-	COMPARE_SCALAR_FIELD(replace);
-
-	return true;
-}
-
-static bool
 _equalCreatedbStmt(const CreatedbStmt *a, const CreatedbStmt *b)
 {
 	COMPARE_STRING_FIELD(dbname);
@@ -1528,9 +1517,6 @@ equal(const void *a, const void *b)
 			break;
 		case T_TransactionStmt:
 			retval = _equalTransactionStmt(a, b);
-			break;
-		case T_ViewStmt:
-			retval = _equalViewStmt(a, b);
 			break;
 		case T_CreatedbStmt:
 			retval = _equalCreatedbStmt(a, b);

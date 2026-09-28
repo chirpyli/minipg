@@ -34,7 +34,6 @@
 #include "catalog/pg_operator.h"
 #include "catalog/pg_opfamily.h"
 #include "catalog/pg_proc.h"
-#include "catalog/pg_rewrite.h"
 #include "catalog/pg_tablespace.h"
 #include "catalog/pg_type.h"
 #include "commands/defrem.h"
@@ -42,7 +41,6 @@
 #include "miscadmin.h"
 #include "nodes/nodeFuncs.h"
 #include "parser/parsetree.h"
-#include "rewrite/rewriteRemove.h"
 #include "storage/lmgr.h"
 #include "utils/fmgroids.h"
 #include "utils/guc.h"
@@ -144,7 +142,6 @@ static const Oid object_classes[] = {
 	AccessMethodRelationId,		/* OCLASS_AM */
 	AccessMethodOperatorRelationId, /* OCLASS_AMOP */
 	AccessMethodProcedureRelationId,	/* OCLASS_AMPROC */
-	RewriteRelationId,			/* OCLASS_REWRITE */
 	NamespaceRelationId,		/* OCLASS_SCHEMA */
 	DatabaseRelationId,			/* OCLASS_DATABASE */
 };
@@ -1233,10 +1230,6 @@ doDeletion(const ObjectAddress *object, int flags)
 
 		case OCLASS_OPERATOR:
 			RemoveOperatorById(object->objectId);
-			break;
-
-		case OCLASS_REWRITE:
-			RemoveRewriteRuleById(object->objectId);
 			break;
 
 		case OCLASS_CAST:
@@ -2348,9 +2341,6 @@ getObjectClass(const ObjectAddress *object)
 
 		case AccessMethodProcedureRelationId:
 			return OCLASS_AMPROC;
-
-		case RewriteRelationId:
-			return OCLASS_REWRITE;
 
 		case NamespaceRelationId:
 			return OCLASS_SCHEMA;

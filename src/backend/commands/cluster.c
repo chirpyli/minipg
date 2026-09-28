@@ -203,7 +203,6 @@ make_new_heap(Oid OIDOldHeap, Oid NewTableSpace, char relpersistence,
 	TupleDesc	OldHeapDesc;
 	char		NewHeapName[NAMEDATALEN];
 	Oid			OIDNewHeap;
-	Oid			toastid;
 	Relation	OldHeap;
 	Oid			namespaceid;
 
@@ -248,7 +247,6 @@ make_new_heap(Oid OIDOldHeap, Oid NewTableSpace, char relpersistence,
 										  RelationIsMapped(OldHeap),
 										  true,
 										  true,
-										  OIDOldHeap,
 										  NULL);
 	Assert(OIDNewHeap != InvalidOid);
 
@@ -269,12 +267,8 @@ make_new_heap(Oid OIDOldHeap, Oid NewTableSpace, char relpersistence,
 	 * Note that NewHeapCreateToastTable ends with CommandCounterIncrement, so
 	 * that the TOAST table will be visible for insertion.
 	 */
-	toastid = OldHeap->rd_rel->reltoastrelid;
-	if (OidIsValid(toastid))
-	{
-		/* keep the existing toast table's reloptions, if any */
-		NewHeapCreateToastTable(OIDNewHeap, lockmode, toastid);
-	}
+	if (OidIsValid(OldHeap->rd_rel->reltoastrelid))
+		NewHeapCreateToastTable(OIDNewHeap, lockmode);
 
 	table_close(OldHeap, NoLock);
 
@@ -1001,14 +995,6 @@ finish_heap_swap(Oid OIDOldHeap, Oid OIDNewHeap,
 
 			RenameRelationInternal(toastidx,
 								   NewToastName, true, true);
-
-			/*
-			 * Reset the relrewrite for the toast. The command-counter
-			 * increment is required here as we are about to update
-			 * the tuple that is updated as part of RenameRelationInternal.
-			 */
-			CommandCounterIncrement();
-			ResetRelRewrite(newrel->rd_rel->reltoastrelid);
 		}
 		relation_close(newrel, NoLock);
 	}

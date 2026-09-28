@@ -55,7 +55,6 @@
 
 #include "postmaster/interrupt.h"
 #include "postmaster/postmaster.h"
-#include "rewrite/rewriteHandler.h"
 #include "storage/bufmgr.h"
 #include "storage/ipc.h"
 #include "storage/pmsignal.h"
@@ -87,9 +86,6 @@ int			max_stack_depth = 100;
 
 /* wait N seconds to allow attach from a debugger */
 int			PostAuthDelay = 0;
-
-/* flags for non-system relation kinds to restrict use */
-int			restrict_nonsystem_relation_kind;
 
 /* ----------------
  *		private variables
@@ -493,10 +489,9 @@ pg_parse_query(const char *query_string)
 
 /*
  * Given a raw parsetree (gram.y output), and optionally information about
- * types of parameter symbols ($n), perform parse analysis and rule rewriting.
+ * types of parameter symbols ($n), perform parse analysis.
  *
- * A list of Query nodes is returned, since either the analyzer or the
- * rewriter might expand one query to several.
+ * A list containing the single resulting Query node is returned.
  *
  * NOTE: for reasons mentioned above, this must be separate from raw parsing.
  */
@@ -505,23 +500,25 @@ pg_analyze_and_rewrite(RawStmt *parsetree, const char *query_string,
 					   Oid *paramTypes, int numParams)
 {
 	Query	   *query;
-	List	   *querytree_list;
 
 	/*
-	 * (1) Perform parse analysis.
+	 * Perform parse analysis.
 	 */
 	query = parse_analyze(parsetree, query_string, paramTypes, numParams);
 
-	/*
-	 * (2) Rewrite the queries, as necessary
-	 */
-	querytree_list = pg_rewrite_query(query);
+	if (Debug_print_parse)
+		elog_node_display(LOG, "parse tree", query,
+						  Debug_pretty_print);
 
-	return querytree_list;
+	/*
+	 * minipg: the rule rewriter has been cropped, so one raw parsetree can
+	 * only produce one Query node.
+	 */
+	return list_make1(query);
 }
 
 /*
- * Do parse analysis and rewriting.  This is the same as pg_analyze_and_rewrite
+ * Do parse analysis.  This is the same as pg_analyze_and_rewrite
  * except that external-parameter resolution is determined by parser callback
  * hooks instead of a fixed list of parameter datatypes.
  */
@@ -533,12 +530,11 @@ pg_analyze_and_rewrite_params(RawStmt *parsetree,
 {
 	ParseState *pstate;
 	Query	   *query;
-	List	   *querytree_list;
 
 	Assert(query_string != NULL);	/* required as of 8.4 */
 
 	/*
-	 * (1) Perform parse analysis.
+	 * Perform parse analysis.
 	 */
 	pstate = make_parsestate(NULL);
 	pstate->p_sourcetext = query_string;
@@ -553,56 +549,22 @@ pg_analyze_and_rewrite_params(RawStmt *parsetree,
 
 	pgstat_report_query_id(query->queryId, false);
 
-	/*
-	 * (2) Rewrite the queries, as necessary
-	 */
-	querytree_list = pg_rewrite_query(query);
-
-	return querytree_list;
-}
-
-/*
- * Perform rewriting of a query produced by parse analysis.
- *
- * Note: query must just have come from the parser, because we do not do
- * AcquireRewriteLocks() on it.
- */
-List *
-pg_rewrite_query(Query *query)
-{
-	List	   *querytree_list;
-
 	if (Debug_print_parse)
 		elog_node_display(LOG, "parse tree", query,
 						  Debug_pretty_print);
 
-	if (query->commandType == CMD_UTILITY)
-	{
-		/* don't rewrite utilities, just dump 'em into result list */
-		querytree_list = list_make1(query);
-	}
-	else
-	{
-		/* rewrite regular queries */
-		querytree_list = QueryRewrite(query);
-	}
-
 	/*
-	 * We don't apply WRITE_READ_PARSE_PLAN_TREES to rewritten query trees,
-	 * because it breaks the hack of preserving relid for rewritten views.
+	 * minipg: the rule rewriter has been cropped, so one raw parsetree can
+	 * only produce one Query node.
 	 */
-
-	if (Debug_print_rewritten)
-		elog_node_display(LOG, "rewritten parse tree", querytree_list,
-						  Debug_pretty_print);
-
-	return querytree_list;
+	return list_make1(query);
 }
 
 
 /*
  * Generate a plan for a single already-rewritten query.
- * This is a thin wrapper around planner() and takes the same parameters.
+ * This is a thin wrapper around standard_planner() and takes the same
+ * parameters.
  */
 PlannedStmt *
 pg_plan_query(Query *querytree, const char *query_string, int cursorOptions,
@@ -618,7 +580,8 @@ pg_plan_query(Query *querytree, const char *query_string, int cursorOptions,
 	Assert(ActiveSnapshotSet());
 
 	/* call the optimizer */
-	plan = planner(querytree, query_string, cursorOptions, boundParams);
+	plan = standard_planner(querytree, query_string, cursorOptions,
+							boundParams);
 
 	/*
 	 * Print plan if debugging.
@@ -1541,70 +1504,6 @@ assign_max_stack_depth(int newval, void *extra)
 }
 
 /*
- * GUC check_hook for restrict_nonsystem_relation_kind
- */
-bool
-check_restrict_nonsystem_relation_kind(char **newval, void **extra, GucSource source)
-{
-	char	   *rawstring;
-	List	   *elemlist;
-	ListCell   *l;
-	int			flags = 0;
-
-	/* Need a modifiable copy of string */
-	rawstring = pstrdup(*newval);
-
-	if (!SplitIdentifierString(rawstring, ',', &elemlist))
-	{
-		/* syntax error in list */
-		GUC_check_errdetail("List syntax is invalid.");
-		pfree(rawstring);
-		list_free(elemlist);
-		return false;
-	}
-
-	foreach(l, elemlist)
-	{
-		char	   *tok = (char *) lfirst(l);
-
-		if (pg_strcasecmp(tok, "view") == 0)
-			flags |= RESTRICT_RELKIND_VIEW;
-		else
-		{
-			GUC_check_errdetail("Unrecognized key word: \"%s\".", tok);
-			pfree(rawstring);
-			list_free(elemlist);
-			return false;
-		}
-	}
-
-	pfree(rawstring);
-	list_free(elemlist);
-
-	/* Save the flags in *extra, for use by the assign function */
-	*extra = malloc(sizeof(int));
-	if (*extra == NULL)
-		ereport(ERROR,
-				(errcode(ERRCODE_OUT_OF_MEMORY),
-				 errmsg("out of memory")));
-
-	*((int *) *extra) = flags;
-
-	return true;
-}
-
-/*
- * GUC assign_hook for restrict_nonsystem_relation_kind
- */
-void
-assign_restrict_nonsystem_relation_kind(const char *newval, void *extra)
-{
-	int		   *flags = (int *) extra;
-
-	restrict_nonsystem_relation_kind = *flags;
-}
-
-/*
  * set_debug_options --- apply "-d N" command line option
  *
  * -d is not quite the same as setting log_min_messages because it enables
@@ -1627,8 +1526,6 @@ set_debug_options(int debug_flag, GucContext context, GucSource source)
 		SetConfigOption("debug_print_parse", "true", context, source);
 	if (debug_flag >= 4)
 		SetConfigOption("debug_print_plan", "true", context, source);
-	if (debug_flag >= 5)
-		SetConfigOption("debug_print_rewritten", "true", context, source);
 }
 
 

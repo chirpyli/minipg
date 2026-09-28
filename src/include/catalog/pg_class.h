@@ -87,12 +87,6 @@ CATALOG(pg_class,1259,RelationRelationId) BKI_BOOTSTRAP BKI_ROWTYPE_OID(83,Relat
 	 * contain entries with negative attnums for system attributes.
 	 */
 
-	/* has (or has had) any rules */
-	bool		relhasrules BKI_DEFAULT(f);
-
-	/* link to original rel during table rewrite; otherwise 0 */
-	Oid			relrewrite BKI_DEFAULT(0) BKI_LOOKUP_OPT(pg_class);
-
 	/* all Xids < this are frozen in this rel */
 	TransactionId relfrozenxid BKI_DEFAULT(3);	/* FirstNormalTransactionId */
 
@@ -129,7 +123,6 @@ DECLARE_INDEX(pg_class_tblspc_relfilenode_index, 3455, on pg_class using btree(r
 #define		  RELKIND_RELATION		  'r'	/* ordinary table */
 #define		  RELKIND_INDEX			  'i'	/* secondary index */
 #define		  RELKIND_TOASTVALUE	  't'	/* for out-of-line values */
-#define		  RELKIND_VIEW			  'v'	/* view */
 #define		  RELKIND_COMPOSITE_TYPE  'c'	/* composite type */
 
 #define		  RELPERSISTENCE_PERMANENT	'p' /* regular table */

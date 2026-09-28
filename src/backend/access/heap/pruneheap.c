@@ -91,16 +91,16 @@ static void heap_prune_record_unused(PruneState *prstate, OffsetNumber offnum);
 
 
 /*
- * Optionally prune and repair fragmentation in the specified page.
+ * 视情况对指定页面进行剪枝并修复碎片。
  *
- * This is an opportunistic function.  It will perform housekeeping
- * only if the page heuristically looks like a candidate for pruning and we
- * can acquire buffer cleanup lock without blocking.
+ * 这是一个"顺手而为"的函数。只有当该页面按启发式判断看起来像是
+ * 值得剪枝的候选者，并且我们能在不阻塞的情况下获取到 buffer 的
+ * cleanup 锁时，它才会执行相应的整理工作。
  *
- * Note: this is called quite often.  It's important that it fall out quickly
- * if there's not any use in pruning.
+ * 注意：本函数被调用的频率相当高。若当前没有任何剪枝价值，它必须
+ * 能够迅速退出。
  *
- * Caller must have pin on the buffer, and must *not* have a lock on it.
+ * 调用者必须先对 buffer 持有 pin，并且*不能*对其持有锁。
  */
 void
 heap_page_prune_opt(Relation relation, Buffer buffer)

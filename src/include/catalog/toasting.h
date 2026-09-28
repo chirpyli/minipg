@@ -20,8 +20,7 @@
  * toasting.c prototypes
  */
 extern void NewRelationCreateToastTable(Oid relOid);
-extern void NewHeapCreateToastTable(Oid relOid,
-									LOCKMODE lockmode, Oid OIDOldToast);
+extern void NewHeapCreateToastTable(Oid relOid, LOCKMODE lockmode);
 extern void AlterTableCreateToastTable(Oid relOid,
 									   LOCKMODE lockmode);
 extern void BootstrapToastTable(char *relName,

@@ -1,36 +1,35 @@
 --
--- Test assorted system views
+-- Test assorted system set-returning functions
 --
--- This test is mainly meant to provide some code coverage for the
--- set-returning functions that underlie certain system views.
--- The output of most of these functions is very environment-dependent,
--- so our ability to test with fixed expected output is pretty limited;
--- but even a trivial query against them will exercise the normal code path
--- through the SRF.
--- The entire output of pg_backend_memory_contexts is not stable,
+-- minipg: the system views that used to wrap these set-returning functions
+-- have been cropped, so we call the functions directly.  The output of most
+-- of these functions is very environment-dependent, so our ability to test
+-- with fixed expected output is pretty limited; but even a trivial query
+-- against them will exercise the normal code path through the SRF.
+-- The entire output of pg_get_backend_memory_contexts is not stable,
 -- we test only the existance and basic condition of TopMemoryContext.
 select name, ident, parent, level, total_bytes >= free_bytes
-  from pg_backend_memory_contexts where level = 0;
+  from (select (pg_get_backend_memory_contexts()).*) as b where level = 0;
        name       | ident | parent | level | ?column? 
 ------------------+-------+--------+-------+----------
  TopMemoryContext |       |        |     0 | t
 (1 row)
 
 -- At introduction, pg_config had 23 entries; it may grow
-select DISTINCT true as ok from pg_config;
+select DISTINCT true as ok from (select (pg_config()).*) as c;
  ok 
 ----
  t
 (1 row)
 
-select DISTINCT true as ok from pg_file_settings;
+select DISTINCT true as ok from (select (pg_show_all_file_settings()).*) as fs;
  ok 
 ----
  t
 (1 row)
 
 -- There will surely be at least one active lock
-select DISTINCT true as ok from pg_locks;
+select DISTINCT true as ok from (select (pg_lock_status()).*) as l;
  ok 
 ----
  t
@@ -38,7 +37,9 @@ select DISTINCT true as ok from pg_locks;
 
 -- This is to record the prevailing planner enable_foo settings during
 -- a regression test run.
-select name, setting from pg_settings where left(name, 6) = 'enable';
+select name, setting
+  from (select (pg_show_all_settings()).*) as s
+  where left(name, 6) = 'enable';
           name           | setting 
 -------------------------+---------
  enable_bitmapscan       | on
@@ -55,28 +56,3 @@ select name, setting from pg_settings where left(name, 6) = 'enable';
  enable_tidscan          | on
 (12 rows)
 
--- Test that the pg_timezone_names and pg_timezone_abbrevs views are
--- more-or-less working.  We can't test their contents in any great detail
--- without the outputs changing anytime IANA updates the underlying data,
--- but it seems reasonable to expect at least one entry per major meridian.
--- (At the time of writing, the actual counts are around 38 because of
--- zones using fractional GMT offsets, so this is a pretty loose test.)
-select DISTINCT true as ok from pg_timezone_names;
-ERROR:  relation "pg_timezone_names" does not exist
-LINE 1: select DISTINCT true as ok from pg_timezone_names;
-                                        ^
-select DISTINCT true as ok from pg_timezone_abbrevs;
-ERROR:  relation "pg_timezone_abbrevs" does not exist
-LINE 1: select DISTINCT true as ok from pg_timezone_abbrevs;
-                                        ^
--- Let's check the non-default timezone abbreviation sets, too
-set timezone_abbreviations = 'Australia';
-select DISTINCT true as ok from pg_timezone_abbrevs;
-ERROR:  relation "pg_timezone_abbrevs" does not exist
-LINE 1: select DISTINCT true as ok from pg_timezone_abbrevs;
-                                        ^
-set timezone_abbreviations = 'India';
-select DISTINCT true as ok from pg_timezone_abbrevs;
-ERROR:  relation "pg_timezone_abbrevs" does not exist
-LINE 1: select DISTINCT true as ok from pg_timezone_abbrevs;
-                                        ^

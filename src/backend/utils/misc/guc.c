@@ -353,7 +353,6 @@ extern const struct config_enum_entry sync_method_options[];
  */
 bool		Debug_print_plan = false;
 bool		Debug_print_parse = false;
-bool		Debug_print_rewritten = false;
 bool		Debug_pretty_print = true;
 
 
@@ -416,7 +415,6 @@ static int	segment_size;
 static int	wal_block_size;
 static bool integer_datetimes;
 static bool assert_enabled;
-static char *restrict_nonsystem_relation_kind_string;
 
 
 /*
@@ -990,15 +988,6 @@ static struct config_bool ConfigureNamesBool[] =
 			NULL
 		},
 		&Debug_print_parse,
-		false,
-		NULL, NULL, NULL
-	},
-	{
-		{"debug_print_rewritten", PGC_USERSET, LOGGING_WHAT,
-			gettext_noop("Logs each query's rewritten parse tree."),
-			NULL
-		},
-		&Debug_print_rewritten,
 		false,
 		NULL, NULL, NULL
 	},
@@ -2584,17 +2573,6 @@ static struct config_string ConfigureNamesString[] =
 		&backtrace_functions,
 		"",
 		check_backtrace_functions, assign_backtrace_functions, NULL
-	},
-
-	{
-		{"restrict_nonsystem_relation_kind", PGC_USERSET, CLIENT_CONN_STATEMENT,
-			gettext_noop("Prohibits access to non-system relations of specified kinds."),
-			NULL,
-			GUC_LIST_INPUT | GUC_NOT_IN_SAMPLE
-		},
-		&restrict_nonsystem_relation_kind_string,
-		"",
-		check_restrict_nonsystem_relation_kind, assign_restrict_nonsystem_relation_kind, NULL
 	},
 
 	/* End-of-list marker */

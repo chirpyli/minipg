@@ -1176,13 +1176,6 @@ vac_update_relstats(Relation relation,
 			pgcform->relhasindex = false;
 			dirty = true;
 		}
-
-		/* We also clear relhasrules if needed */
-		if (pgcform->relhasrules && relation->rd_rules == NULL)
-		{
-			pgcform->relhasrules = false;
-			dirty = true;
-		}
 	}
 
 	/*

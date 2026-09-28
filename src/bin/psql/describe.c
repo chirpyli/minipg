@@ -218,7 +218,6 @@ describeOneTableDetails(const char *schemaname,
 	printTableContent cont;
 	bool		printTableInitialized = false;
 	int			i;
-	char	   *view_def = NULL;
 	char	   *headers[12];
 	PQExpBufferData title;
 	PQExpBufferData tmpbuf;
@@ -236,7 +235,6 @@ describeOneTableDetails(const char *schemaname,
 		int16		checks;
 		char		relkind;
 		bool		hasindex;
-		bool		hasrules;
 		bool		hasoids;
 		Oid			tablespace;
 		char	   *reloptions;
@@ -256,7 +254,7 @@ describeOneTableDetails(const char *schemaname,
 	if (pset.sversion >= 120000)
 	{
 		printfPQExpBuffer(&buf,
-						  "SELECT c.relkind, c.relhasindex, c.relhasrules, "
+						  "SELECT c.relkind, c.relhasindex, "
 						  "false AS relrowsecurity, false AS relforcerowsecurity, "
 						  "false AS relhasoids, %s, c.reltablespace, "
 						  "c.relpersistence, am.amname\n"
@@ -272,7 +270,7 @@ describeOneTableDetails(const char *schemaname,
 	else if (pset.sversion >= 100000)
 	{
 		printfPQExpBuffer(&buf,
-						  "SELECT c.relkind, c.relhasindex, c.relhasrules, "
+						  "SELECT c.relkind, c.relhasindex, "
 						  "false AS relrowsecurity, false AS relforcerowsecurity, "
 						  "false AS relhasoids, %s, c.reltablespace, "
 						  "c.relpersistence\n"
@@ -287,7 +285,7 @@ describeOneTableDetails(const char *schemaname,
 	else if (pset.sversion >= 90500)
 	{
 		printfPQExpBuffer(&buf,
-						  "SELECT c.relkind, c.relhasindex, c.relhasrules, "
+						  "SELECT c.relkind, c.relhasindex, "
 						  "false AS relrowsecurity, false AS relforcerowsecurity, "
 						  "false AS relhasoids, %s, c.reltablespace, "
 						  "c.relpersistence\n"
@@ -302,7 +300,7 @@ describeOneTableDetails(const char *schemaname,
 	else if (pset.sversion >= 90400)
 	{
 		printfPQExpBuffer(&buf,
-						  "SELECT c.relkind, c.relhasindex, c.relhasrules, "
+						  "SELECT c.relkind, c.relhasindex, "
 						  ""
 						  "%s, c.reltablespace, "
 						  "c.relpersistence\n"
@@ -317,7 +315,7 @@ describeOneTableDetails(const char *schemaname,
 	else if (pset.sversion >= 90100)
 	{
 		printfPQExpBuffer(&buf,
-						  "SELECT c.relkind, c.relhasindex, c.relhasrules, "
+						  "SELECT c.relkind, c.relhasindex, "
 						  ""
 						  "%s, c.reltablespace, "
 						  "c.relpersistence\n"
@@ -332,7 +330,7 @@ describeOneTableDetails(const char *schemaname,
 	else if (pset.sversion >= 90000)
 	{
 		printfPQExpBuffer(&buf,
-						  "SELECT c.relkind, c.relhasindex, c.relhasrules, "
+						  "SELECT c.relkind, c.relhasindex, "
 						  ""
 						  "%s, c.reltablespace, "
 						  "FROM pg_catalog.pg_class c\n "
@@ -346,7 +344,7 @@ describeOneTableDetails(const char *schemaname,
 	else if (pset.sversion >= 80400)
 	{
 		printfPQExpBuffer(&buf,
-						  "SELECT c.relkind, c.relhasindex, c.relhasrules, "
+						  "SELECT c.relkind, c.relhasindex, "
 						  ""
 						  "%s, c.reltablespace\n"
 						  "FROM pg_catalog.pg_class c\n "
@@ -360,7 +358,7 @@ describeOneTableDetails(const char *schemaname,
 	else if (pset.sversion >= 80200)
 	{
 		printfPQExpBuffer(&buf,
-						  "SELECT relkind, relhasindex, relhasrules, "
+						  "SELECT relkind, relhasindex, "
 						  "reltriggers <> 0, false, false, relhasoids, "
 						  "%s, reltablespace\n"
 						  "FROM pg_catalog.pg_class WHERE oid = '%s';",
@@ -371,7 +369,7 @@ describeOneTableDetails(const char *schemaname,
 	else if (pset.sversion >= 80000)
 	{
 		printfPQExpBuffer(&buf,
-						  "SELECT relkind, relhasindex, relhasrules, "
+						  "SELECT relkind, relhasindex, "
 						  "reltriggers <> 0, false, false, relhasoids, "
 						  "'', reltablespace\n"
 						  "FROM pg_catalog.pg_class WHERE oid = '%s';",
@@ -380,7 +378,7 @@ describeOneTableDetails(const char *schemaname,
 	else
 	{
 		printfPQExpBuffer(&buf,
-						  "SELECT relkind, relhasindex, relhasrules, "
+						  "SELECT relkind, relhasindex, "
 						  "reltriggers <> 0, false, false, relhasoids, "
 						  "'', ''\n"
 						  "FROM pg_catalog.pg_class WHERE oid = '%s';",
@@ -401,17 +399,16 @@ describeOneTableDetails(const char *schemaname,
 
 	tableinfo.relkind = *(PQgetvalue(res, 0, 0));
 	tableinfo.hasindex = strcmp(PQgetvalue(res, 0, 1), "t") == 0;
-	tableinfo.hasrules = strcmp(PQgetvalue(res, 0, 2), "t") == 0;
-	tableinfo.hasoids = strcmp(PQgetvalue(res, 0, 5), "t") == 0;
+	tableinfo.hasoids = strcmp(PQgetvalue(res, 0, 4), "t") == 0;
 	tableinfo.reloptions = (pset.sversion >= 80200) ?
-		pg_strdup(PQgetvalue(res, 0, 6)) : NULL;
+		pg_strdup(PQgetvalue(res, 0, 5)) : NULL;
 	tableinfo.tablespace = (pset.sversion >= 80000) ?
-		atooid(PQgetvalue(res, 0, 7)) : 0;
+		atooid(PQgetvalue(res, 0, 6)) : 0;
 	tableinfo.relpersistence = (pset.sversion >= 90100) ?
-		*(PQgetvalue(res, 0, 8)) : 0;
+		*(PQgetvalue(res, 0, 7)) : 0;
 	if (pset.sversion >= 120000)
-		tableinfo.relam = PQgetisnull(res, 0, 9) ?
-			(char *) NULL : pg_strdup(PQgetvalue(res, 0, 9));
+		tableinfo.relam = PQgetisnull(res, 0, 8) ?
+			(char *) NULL : pg_strdup(PQgetvalue(res, 0, 8));
 	else
 		tableinfo.relam = NULL;
 	PQclear(res);
@@ -461,7 +458,6 @@ describeOneTableDetails(const char *schemaname,
 		 * minipg: COMMENTS 功能已裁剪，列注释查询（col_description）不再可用。
 		 */
 	if (tableinfo.relkind == RELKIND_RELATION ||
-		tableinfo.relkind == RELKIND_VIEW ||
 		tableinfo.relkind == RELKIND_COMPOSITE_TYPE)
 	{
 			appendPQExpBufferStr(&buf, ",\n  pg_catalog.col_description(a.attrelid, a.attnum)");
@@ -483,10 +479,6 @@ describeOneTableDetails(const char *schemaname,
 	{
 		case RELKIND_RELATION:
 			printfPQExpBuffer(&title, _("Table \"%s.%s\""),
-							  schemaname, relationname);
-			break;
-		case RELKIND_VIEW:
-			printfPQExpBuffer(&title, _("View \"%s.%s\""),
 							  schemaname, relationname);
 			break;
 		case RELKIND_INDEX:
@@ -765,32 +757,6 @@ describeOneTableDetails(const char *schemaname,
 		}
 	}
 
-	/* Get view_def if table is a view or materialized view */
-	if (tableinfo.relkind == RELKIND_VIEW && verbose)
-	{
-		PGresult   *result;
-
-		printfPQExpBuffer(&buf,
-						  "SELECT pg_catalog.pg_get_viewdef('%s'::pg_catalog.oid, true);",
-						  oid);
-		result = PSQLexec(buf.data);
-		if (!result)
-			goto error_return;
-
-		if (PQntuples(result) > 0)
-			view_def = pg_strdup(PQgetvalue(result, 0, 0));
-
-		PQclear(result);
-	}
-
-	if (view_def)
-	{
-		/* Footer information about a view */
-		printTableAddFooter(&cont, _("View definition:"));
-		printTableAddFooter(&cont, view_def);
-	}
-
-
 	/*
 	 * Finish printing the footer information about a table.
 	 */
@@ -931,9 +897,6 @@ error_return:
 	termPQExpBuffer(&title);
 	termPQExpBuffer(&tmpbuf);
 
-	if (view_def)
-		free(view_def);
-
 	if (res)
 		PQclear(res);
 
@@ -1011,7 +974,6 @@ add_tablespace_footer(printTableContent *const cont, char relkind,
  * tabtypes is an array of characters, specifying what info is desired:
  * t - tables
  * i - indexes
- * v - views
  * m - materialized views
  * (any order of the above is fine)
  */
@@ -1020,7 +982,6 @@ listTables(const char *tabtypes, const char *pattern, bool verbose, bool showSys
 {
 	bool		showTables = strchr(tabtypes, 't') != NULL;
 	bool		showIndexes = strchr(tabtypes, 'i') != NULL;
-	bool		showViews = strchr(tabtypes, 'v') != NULL;
 	bool		showMatViews = strchr(tabtypes, 'm') != NULL;
 	bool		showSeq = strchr(tabtypes, 's') != NULL;
 
@@ -1030,9 +991,9 @@ listTables(const char *tabtypes, const char *pattern, bool verbose, bool showSys
 	int			cols_so_far;
 	bool		translate_columns[] = {false, false, true, false, false, false, false, false, false};
 
-	/* If tabtypes is empty, we default to \dtvms (but see also command.c) */
-	if (!(showTables || showIndexes || showViews || showMatViews || showSeq))
-		showTables = showViews = showMatViews = showSeq = true;
+	/* If tabtypes is empty, we default to \dtms (but see also command.c) */
+	if (!(showTables || showIndexes || showMatViews || showSeq))
+		showTables = showMatViews = showSeq = true;
 
 	initPQExpBuffer(&buf);
 
@@ -1045,7 +1006,6 @@ listTables(const char *tabtypes, const char *pattern, bool verbose, bool showSys
 					  "  c.relname as \"%s\",\n"
 					  "  CASE c.relkind"
 					  " WHEN " CppAsString2(RELKIND_RELATION) " THEN '%s'"
-					  " WHEN " CppAsString2(RELKIND_VIEW) " THEN '%s'"
 					  " WHEN " CppAsString2(RELKIND_INDEX) " THEN '%s'"
 					  " WHEN 's' THEN '%s'"
 					  " WHEN " CppAsString2(RELKIND_TOASTVALUE) " THEN '%s'"
@@ -1053,7 +1013,6 @@ listTables(const char *tabtypes, const char *pattern, bool verbose, bool showSys
 					  gettext_noop("Schema"),
 					  gettext_noop("Name"),
 					  gettext_noop("table"),
-					  gettext_noop("view"),
 					  gettext_noop("index"),
 					  gettext_noop("special"),
 					  gettext_noop("TOAST table"),
@@ -1141,8 +1100,6 @@ listTables(const char *tabtypes, const char *pattern, bool verbose, bool showSys
 		if (showSystem || pattern)
 			appendPQExpBufferStr(&buf, CppAsString2(RELKIND_TOASTVALUE) ",");
 	}
-	if (showViews)
-		appendPQExpBufferStr(&buf, CppAsString2(RELKIND_VIEW) ",");
 	if (showIndexes)
 		appendPQExpBufferStr(&buf, CppAsString2(RELKIND_INDEX) ",");
 	if (showSystem || pattern)

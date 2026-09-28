@@ -109,22 +109,6 @@ LINE 1: drop index 314159;
 drop index nonesuch;
 ERROR:  index "nonesuch" does not exist
 --
--- minipg: DROP FUNCTION 已裁剪，改为 DROP VIEW 验证同类报错
--- DROP VIEW
--- missing view name
-drop view;
-ERROR:  syntax error at or near ";"
-LINE 1: drop view;
-                 ^
--- bad view name
-drop view 314159;
-ERROR:  syntax error at or near "314159"
-LINE 1: drop view 314159;
-                  ^
--- no such view
-drop view nonesuch;
-ERROR:  view "nonesuch" does not exist
---
 -- minipg: DROP TYPE 已裁剪，改为 DROP SCHEMA 验证同类报错
 -- DROP SCHEMA
 -- missing schema name

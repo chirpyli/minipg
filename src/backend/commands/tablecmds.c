@@ -61,8 +61,6 @@
 #include "parser/parse_type.h"
 #include "parser/parse_utilcmd.h"
 #include "parser/parser.h"
-#include "rewrite/rewriteDefine.h"
-#include "rewrite/rewriteHandler.h"
 #include "rewrite/rewriteManip.h"
 #include "storage/bufmgr.h"
 #include "storage/lmgr.h"
@@ -181,12 +179,6 @@ static const struct dropmsgstrings dropmsgstringarray[] = {
 		gettext_noop("table \"%s\" does not exist, skipping"),
 		gettext_noop("\"%s\" is not a table"),
 	gettext_noop("Use DROP TABLE to remove a table.")},
-	{RELKIND_VIEW,
-		ERRCODE_UNDEFINED_TABLE,
-		gettext_noop("view \"%s\" does not exist"),
-		gettext_noop("view \"%s\" does not exist, skipping"),
-		gettext_noop("\"%s\" is not a view"),
-	gettext_noop("Use DROP VIEW to remove a view.")},
 	{RELKIND_INDEX,
 		ERRCODE_UNDEFINED_OBJECT,
 		gettext_noop("index \"%s\" does not exist"),
@@ -217,7 +209,6 @@ struct DropRelationCallbackState
 
 /* Alter table target-type flags for ATSimplePermissions */
 #define		ATT_TABLE				0x0001
-#define		ATT_VIEW				0x0002
 #define		ATT_INDEX				0x0008
 #define		ATT_COMPOSITE_TYPE		0x0010
 #define		ATT_FOREIGN_TABLE		0x0020
@@ -231,8 +222,7 @@ static List *MergeAttributes(List *schema);
 static void AlterIndexNamespaces(Relation classRel, Relation rel,
 								 Oid oldNspOid, Oid newNspOid, ObjectAddresses *objsMoved);
 static void CheckAlterTableIsSafe(Relation rel);
-static void ATController(AlterTableStmt *parsetree,
-						 Relation rel, List *cmds, bool recurse, LOCKMODE lockmode,
+static void ATController(Relation rel, List *cmds, bool recurse, LOCKMODE lockmode,
 						 AlterTableUtilityContext *context);
 static void ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 					  bool recurse, LOCKMODE lockmode,
@@ -247,8 +237,7 @@ static AlterTableCmd *ATParseTransformCmd(List **wqueue, AlteredTableInfo *tab,
 										  bool recurse, LOCKMODE lockmode,
 										  int cur_pass,
 										  AlterTableUtilityContext *context);
-static void ATRewriteTables(AlterTableStmt *parsetree,
-							List **wqueue, LOCKMODE lockmode,
+static void ATRewriteTables(List **wqueue, LOCKMODE lockmode,
 							AlterTableUtilityContext *context);
 static void ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap, LOCKMODE lockmode);
 static AlteredTableInfo *ATGetQueueEntry(List **wqueue, Relation rel);
@@ -394,7 +383,6 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 										  false,
 										  allowSystemTableMods,
 										  false,
-										  InvalidOid,
 										  typaddress);
 
 	/*
@@ -546,10 +534,6 @@ RemoveRelations(DropStmt *drop)
 
 		case OBJECT_INDEX:
 			relkind = RELKIND_INDEX;
-			break;
-
-		case OBJECT_VIEW:
-			relkind = RELKIND_VIEW;
 			break;
 
 		default:
@@ -1159,37 +1143,6 @@ RenameRelationInternal(Oid myrelid, const char *newrelname, bool is_internal, bo
 }
 
 /*
- *		ResetRelRewrite - reset relrewrite
- */
-void
-ResetRelRewrite(Oid myrelid)
-{
-	Relation	relrelation;	/* for RELATION relation */
-	HeapTuple	reltup;
-	Form_pg_class relform;
-
-	/*
-	 * Find relation's pg_class tuple.
-	 */
-	relrelation = table_open(RelationRelationId, RowExclusiveLock);
-
-	reltup = SearchSysCacheCopy1(RELOID, ObjectIdGetDatum(myrelid));
-	if (!HeapTupleIsValid(reltup))	/* shouldn't happen */
-		elog(ERROR, "cache lookup failed for relation %u", myrelid);
-	relform = (Form_pg_class) GETSTRUCT(reltup);
-
-	/*
-	 * Update pg_class tuple.
-	 */
-	relform->relrewrite = InvalidOid;
-
-	CatalogTupleUpdate(relrelation, &reltup->t_self, reltup);
-
-	heap_freetuple(reltup);
-	table_close(relrelation, RowExclusiveLock);
-}
-
-/*
  * Disallow ALTER TABLE (and similar commands) when the current backend has
  * any open reference to the target table besides the one just acquired by
  * the calling command; this implies there's an open cursor or active plan.
@@ -1324,33 +1277,7 @@ AlterTable(AlterTableStmt *stmt, LOCKMODE lockmode,
 
 	CheckAlterTableIsSafe(rel);
 
-	ATController(stmt, rel, stmt->cmds, false, lockmode, context);
-}
-
-/*
- * AlterTableInternal
- *
- * ALTER TABLE with target specified by OID
- *
- * We do not reject if the relation is already open, because it's quite
- * likely that one or more layers of caller have it open.  That means it
- * is unsafe to use this entry point for alterations that could break
- * existing query plans.  On the assumption it's not used for such, we
- * don't have to reject pending AFTER triggers, either.
- *
- * Also, since we don't have an AlterTableUtilityContext, this cannot be
- * used for any subcommand types that require parse transformation or
- * could generate subcommands that have to be passed to ProcessUtility.
- */
-void
-AlterTableInternal(Oid relid, List *cmds, bool recurse)
-{
-	Relation	rel;
-	LOCKMODE	lockmode = AlterTableGetLockLevel(cmds);
-
-	rel = relation_open(relid, lockmode);
-
-	ATController(NULL, rel, cmds, recurse, lockmode, NULL);
+	ATController(rel, stmt->cmds, false, lockmode, context);
 }
 
 /*
@@ -1433,7 +1360,6 @@ AlterTableGetLockLevel(List *cmds)
 				 * Subcommands that may be visible to concurrent SELECTs
 				 */
 			case AT_DropColumn: /* change visible to SELECT */
-			case AT_AddColumnToView:	/* CREATE VIEW */
 				cmd_lockmode = AccessExclusiveLock;
 				break;
 
@@ -1521,13 +1447,9 @@ AlterTableGetLockLevel(List *cmds)
 
 /*
  * ATController provides top level control over the phases.
- *
- * parsetree is passed in to allow it to be passed to event triggers
- * when requested.
  */
 static void
-ATController(AlterTableStmt *parsetree,
-			 Relation rel, List *cmds, bool recurse, LOCKMODE lockmode,
+ATController(Relation rel, List *cmds, bool recurse, LOCKMODE lockmode,
 			 AlterTableUtilityContext *context)
 {
 	List	   *wqueue = NIL;
@@ -1548,7 +1470,7 @@ ATController(AlterTableStmt *parsetree,
 	ATRewriteCatalogs(&wqueue, lockmode, context);
 
 	/* Phase 3: scan/rewrite tables as needed, and run afterStmts */
-	ATRewriteTables(parsetree, &wqueue, lockmode, context);
+	ATRewriteTables(&wqueue, lockmode, context);
 }
 
 /*
@@ -1592,13 +1514,6 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			ATSimplePermissions(rel,
 								ATT_TABLE | ATT_COMPOSITE_TYPE | ATT_FOREIGN_TABLE);
 			ATPrepAddColumn(wqueue, rel, recurse, false, cmd,
-							lockmode, context);
-			/* Recursion occurs during execution phase */
-			pass = AT_PASS_ADD_COL;
-			break;
-		case AT_AddColumnToView:	/* add column via CREATE OR REPLACE VIEW */
-			ATSimplePermissions(rel, ATT_VIEW);
-			ATPrepAddColumn(wqueue, rel, recurse, true, cmd,
 							lockmode, context);
 			/* Recursion occurs during execution phase */
 			pass = AT_PASS_ADD_COL;
@@ -1756,7 +1671,6 @@ ATExecCmd(List **wqueue, AlteredTableInfo *tab,
 	switch (cmd->subtype)
 	{
 		case AT_AddColumn:		/* ADD COLUMN */
-		case AT_AddColumnToView:	/* add column via CREATE OR REPLACE VIEW */
 			ATExecAddColumn(wqueue, tab, rel, &cmd,
 									  false,
 									  lockmode, cur_pass, context);
@@ -1979,7 +1893,7 @@ ATParseTransformCmd(List **wqueue, AlteredTableInfo *tab, Relation rel,
  * ATRewriteTables: ALTER TABLE phase 3
  */
 static void
-ATRewriteTables(AlterTableStmt *parsetree, List **wqueue, LOCKMODE lockmode,
+ATRewriteTables(List **wqueue, LOCKMODE lockmode,
 				AlterTableUtilityContext *context)
 {
 	ListCell   *ltab;
@@ -2451,9 +2365,6 @@ ATSimplePermissions(Relation rel, int allowed_targets)
 		case RELKIND_RELATION:
 			actual_target = ATT_TABLE;
 			break;
-		case RELKIND_VIEW:
-			actual_target = ATT_VIEW;
-			break;
 		case RELKIND_INDEX:
 			actual_target = ATT_INDEX;
 			break;
@@ -2494,15 +2405,6 @@ ATWrongRelkindError(Relation rel, int allowed_targets)
 		case ATT_TABLE:
 			msg = _("\"%s\" is not a table");
 			break;
-		case ATT_TABLE | ATT_VIEW:
-			msg = _("\"%s\" is not a table or view");
-			break;
-		case ATT_TABLE | ATT_VIEW | ATT_FOREIGN_TABLE:
-			msg = _("\"%s\" is not a table, view, or foreign table");
-			break;
-		case ATT_TABLE | ATT_VIEW | ATT_INDEX:
-			msg = _("\"%s\" is not a table, view, or index");
-			break;
 		case ATT_TABLE | ATT_INDEX:
 			msg = _("\"%s\" is not a table or index");
 			break;
@@ -2511,9 +2413,6 @@ ATWrongRelkindError(Relation rel, int allowed_targets)
 			break;
 		case ATT_TABLE | ATT_COMPOSITE_TYPE | ATT_FOREIGN_TABLE:
 			msg = _("\"%s\" is not a table, composite type, or foreign table");
-			break;
-		case ATT_VIEW:
-			msg = _("\"%s\" is not a view");
 			break;
 		case ATT_FOREIGN_TABLE:
 			msg = _("\"%s\" is not a foreign table");
@@ -2753,18 +2652,11 @@ ATExecAddColumn(List **wqueue, AlteredTableInfo *tab, Relation rel,
 	 * transformation.  This can result in queueing up, or even immediately
 	 * executing, subsidiary operations (such as creation of unique indexes);
 	 * so we mustn't do it until we have made the if_not_exists check.
-	 *
-	 * If context isn't given we can't transform.  (That currently happens
-	 * only for AT_AddColumnToView; we expect that view.c passed us a
-	 * ColumnDef that doesn't need work.)
 	 */
-	if (context != NULL)
-	{
-		*cmd = ATParseTransformCmd(wqueue, tab, rel, *cmd, recurse, lockmode,
-								   cur_pass, context);
-		Assert(*cmd != NULL);
-		colDef = castNode(ColumnDef, (*cmd)->def);
-	}
+	*cmd = ATParseTransformCmd(wqueue, tab, rel, *cmd, recurse, lockmode,
+							   cur_pass, context);
+	Assert(*cmd != NULL);
+	colDef = castNode(ColumnDef, (*cmd)->def);
 
 	pgclass = table_open(RelationRelationId, RowExclusiveLock);
 
@@ -3679,7 +3571,6 @@ ATExecAlterColumnType(AlteredTableInfo *tab, Relation rel,
 	Form_pg_type tform;
 	Oid			targettype;
 	int32		targettypmod;
-	Oid			targetcollid;
 	Relation	attrelation;
 	Relation	depRel;
 	ScanKeyData key[3];
@@ -3722,8 +3613,6 @@ ATExecAlterColumnType(AlteredTableInfo *tab, Relation rel,
 	typeTuple = typenameType(NULL, typeName, &targettypmod);
 	tform = (Form_pg_type) GETSTRUCT(typeTuple);
 	targettype = tform->oid;
-	/* And the collation */
-	targetcollid = GetColumnDefCollation(targettype);
 
 	/*
 	 * Find everything that depends on the column (constraints, indexes, etc),
@@ -3802,20 +3691,6 @@ ATExecAlterColumnType(AlteredTableInfo *tab, Relation rel,
 				ereport(ERROR,
 						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 						 errmsg("cannot alter type of a column used by a function or procedure"),
-						 errdetail("%s depends on column \"%s\"",
-								   getObjectDescription(&foundObject, false),
-								   colName)));
-				break;
-
-			case OCLASS_REWRITE:
-
-				/*
-				 * View/rule bodies have pretty much the same issues as
-				 * function bodies.  FIXME someday.
-				 */
-				ereport(ERROR,
-						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-						 errmsg("cannot alter type of a column used by a view or rule"),
 						 errdetail("%s depends on column \"%s\"",
 								   getObjectDescription(&foundObject, false),
 								   colName)));
@@ -4602,11 +4477,6 @@ RangeVarCallbackForAlterRelation(const RangeVar *rv, Oid relid, Oid oldrelid,
 	 * otherwise.  Otherwise, the user must select the correct form of the
 	 * command for the relation at issue.
 	 */
-	if (reltype == OBJECT_VIEW && relkind != RELKIND_VIEW)
-		ereport(ERROR,
-				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-				 errmsg("\"%s\" is not a view", rv->relname)));
-
 	if (reltype == OBJECT_TYPE && relkind != RELKIND_COMPOSITE_TYPE)
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
@@ -4632,11 +4502,10 @@ RangeVarCallbackForAlterRelation(const RangeVar *rv, Oid relid, Oid oldrelid,
 	 * to a different schema, such as indexes and TOAST tables.
 	 */
 	if (IsA(stmt, AlterObjectSchemaStmt) &&
-		relkind != RELKIND_RELATION &&
-		relkind != RELKIND_VIEW)
+		relkind != RELKIND_RELATION)
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-				 errmsg("\"%s\" is not a table, view, materialized view, or foreign table",
+				 errmsg("\"%s\" is not a table",
 						rv->relname)));
 
 	ReleaseSysCache(tuple);

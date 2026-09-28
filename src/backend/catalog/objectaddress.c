@@ -34,7 +34,6 @@
 #include "catalog/pg_operator.h"
 #include "catalog/pg_opfamily.h"
 #include "catalog/pg_proc.h"
-#include "catalog/pg_rewrite.h"
 #include "catalog/pg_type.h"
 #include "commands/dbcommands.h"
 #include "commands/defrem.h"
@@ -44,7 +43,6 @@
 #include "parser/parse_func.h"
 #include "parser/parse_oper.h"
 #include "parser/parse_type.h"
-#include "rewrite/rewriteSupport.h"
 #include "storage/lmgr.h"
 #include "storage/sinval.h"
 #include "utils/builtins.h"
@@ -227,19 +225,6 @@ static const ObjectPropertyType ObjectProperty[] =
 		false
 	},
 	{
-		"rule",
-		RewriteRelationId,
-		RewriteOidIndexId,
-		InvalidOid,
-		InvalidOid,
-		Anum_pg_rewrite_oid,
-		Anum_pg_rewrite_rulename,
-		InvalidAttrNumber,
-		InvalidAttrNumber,
-		OBJECT_RULE,
-		false
-	},
-	{
 		"schema",
 		NamespaceRelationId,
 		NamespaceOidIndexId,
@@ -308,12 +293,6 @@ static const struct object_type_map
 		"toast table", -1
 	},							/* unmapped */
 	{
-		"view", OBJECT_VIEW
-	},
-	{
-		"view", OBJECT_VIEW
-	},
-	{
 		"composite type", -1
 	},							/* unmapped */
 	{
@@ -324,9 +303,6 @@ static const struct object_type_map
 	},							/* unmapped */
 	{
 		"toast table column", -1
-	},							/* unmapped */
-	{
-		"view column", -1
 	},							/* unmapped */
 	{
 		"materialized view column", -1
@@ -383,10 +359,6 @@ static const struct object_type_map
 	/* OCLASS_AMPROC */
 	{
 		"function of access method", OBJECT_AMPROC
-	},
-	/* OCLASS_REWRITE */
-	{
-		"rule", OBJECT_RULE
 	},
 	/* OCLASS_SCHEMA */
 	{
@@ -495,20 +467,18 @@ get_object_address(ObjectType objtype, Node *object,
 		switch (objtype)
 		{
 			case OBJECT_INDEX:
-		case OBJECT_TABLE:
-		case OBJECT_VIEW:
-			address =
-				get_relation_by_qualified_name(objtype, castNode(List, object),
-											   &relation, lockmode,
-											   missing_ok);
-			break;
+			case OBJECT_TABLE:
+				address =
+					get_relation_by_qualified_name(objtype, castNode(List, object),
+												   &relation, lockmode,
+												   missing_ok);
+				break;
 			case OBJECT_COLUMN:
 				address =
 					get_object_address_attribute(objtype, castNode(List, object),
 												&relation, lockmode,
 												missing_ok);
 				break;
-			case OBJECT_RULE:
 			case OBJECT_TABCONSTRAINT:
 				address = get_object_address_relobject(objtype, castNode(List, object),
 													   &relation, missing_ok);
@@ -720,13 +690,6 @@ get_relation_by_qualified_name(ObjectType objtype, List *object,
 						 errmsg("\"%s\" is not a table",
 								RelationGetRelationName(relation))));
 			break;
-		case OBJECT_VIEW:
-			if (relation->rd_rel->relkind != RELKIND_VIEW)
-				ereport(ERROR,
-						(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-						 errmsg("\"%s\" is not a view",
-								RelationGetRelationName(relation))));
-			break;
 	default:
 		elog(ERROR, "unrecognized objtype: %d", (int) objtype);
 		break;
@@ -777,12 +740,6 @@ get_object_address_relobject(ObjectType objtype, List *object,
 
 	switch (objtype)
 	{
-		case OBJECT_RULE:
-			address.classId = RewriteRelationId;
-			address.objectId = relation ?
-				get_rewrite_oid(reloid, depname, missing_ok) : InvalidOid;
-			address.objectSubId = 0;
-			break;
 		case OBJECT_TABCONSTRAINT:
 			address.classId = ConstraintRelationId;
 			address.objectId = relation ?
@@ -1211,7 +1168,6 @@ pg_get_object_address(PG_FUNCTION_ARGS)
 	switch (type)
 	{
 		case OBJECT_TABLE:
-		case OBJECT_VIEW:
 		case OBJECT_INDEX:
 		case OBJECT_COLUMN:
 		case OBJECT_ATTRIBUTE:
@@ -1868,52 +1824,6 @@ getObjectDescription(const ObjectAddress *object, bool missing_ok)
 				break;
 			}
 
-		case OCLASS_REWRITE:
-			{
-				Relation	ruleDesc;
-				ScanKeyData skey[1];
-				SysScanDesc rcscan;
-				HeapTuple	tup;
-				Form_pg_rewrite rule;
-				StringInfoData rel;
-
-				ruleDesc = table_open(RewriteRelationId, AccessShareLock);
-
-				ScanKeyInit(&skey[0],
-							Anum_pg_rewrite_oid,
-							BTEqualStrategyNumber, F_OIDEQ,
-							ObjectIdGetDatum(object->objectId));
-
-				rcscan = systable_beginscan(ruleDesc, RewriteOidIndexId, true,
-											NULL, 1, skey);
-
-				tup = systable_getnext(rcscan);
-
-				if (!HeapTupleIsValid(tup))
-				{
-					if (!missing_ok)
-						elog(ERROR, "could not find tuple for rule %u",
-							 object->objectId);
-
-					systable_endscan(rcscan);
-					table_close(ruleDesc, AccessShareLock);
-					break;
-				}
-
-				rule = (Form_pg_rewrite) GETSTRUCT(tup);
-
-				initStringInfo(&rel);
-				getRelationDescription(&rel, rule->ev_class, false);
-
-				/* translator: second %s is, e.g., "table %s" */
-				appendStringInfo(&buffer, _("rule %s on %s"),
-								 NameStr(rule->rulename), rel.data);
-				pfree(rel.data);
-				systable_endscan(rcscan);
-				table_close(ruleDesc, AccessShareLock);
-				break;
-			}
-
 		case OCLASS_SCHEMA:
 			{
 				char	   *nspname;
@@ -2007,10 +1917,6 @@ getRelationDescription(StringInfo buffer, Oid relid, bool missing_ok)
 			break;
 		case RELKIND_TOASTVALUE:
 			appendStringInfo(buffer, _("toast table %s"),
-							 relname);
-			break;
-		case RELKIND_VIEW:
-			appendStringInfo(buffer, _("view %s"),
 							 relname);
 			break;
 		case RELKIND_COMPOSITE_TYPE:
@@ -2365,10 +2271,6 @@ getObjectTypeDescription(const ObjectAddress *object, bool missing_ok)
 			appendStringInfoString(&buffer, "function of access method");
 			break;
 
-		case OCLASS_REWRITE:
-			appendStringInfoString(&buffer, "rule");
-			break;
-
 		case OCLASS_SCHEMA:
 			appendStringInfoString(&buffer, "schema");
 			break;
@@ -2422,9 +2324,6 @@ getRelationTypeDescription(StringInfo buffer, Oid relid, int32 objectSubId,
 			break;
 		case RELKIND_TOASTVALUE:
 			appendStringInfoString(buffer, "toast table");
-			break;
-		case RELKIND_VIEW:
-			appendStringInfoString(buffer, "view");
 			break;
 		case RELKIND_COMPOSITE_TYPE:
 			appendStringInfoString(buffer, "composite type");
@@ -2910,39 +2809,6 @@ getObjectIdentityParts(const ObjectAddress *object,
 				break;
 			}
 
-		case OCLASS_REWRITE:
-			{
-				Relation	ruleDesc;
-				HeapTuple	tup;
-				Form_pg_rewrite rule;
-
-				ruleDesc = table_open(RewriteRelationId, AccessShareLock);
-
-				tup = get_catalog_object_by_oid(ruleDesc, Anum_pg_rewrite_oid,
-												object->objectId);
-
-				if (!HeapTupleIsValid(tup))
-				{
-					if (!missing_ok)
-						elog(ERROR, "could not find tuple for rule %u",
-							 object->objectId);
-
-					table_close(ruleDesc, AccessShareLock);
-					break;
-				}
-
-				rule = (Form_pg_rewrite) GETSTRUCT(tup);
-
-				appendStringInfo(&buffer, "%s on ",
-								 quote_identifier(NameStr(rule->rulename)));
-				getRelationIdentity(&buffer, rule->ev_class, objname, false);
-				if (objname)
-					*objname = lappend(*objname, pstrdup(NameStr(rule->rulename)));
-
-				table_close(ruleDesc, AccessShareLock);
-				break;
-			}
-
 		case OCLASS_SCHEMA:
 			{
 				char	   *nspname;
@@ -3158,8 +3024,6 @@ get_relkind_objtype(char relkind)
 			return OBJECT_TABLE;
 		case RELKIND_INDEX:
 			return OBJECT_INDEX;
-		case RELKIND_VIEW:
-			return OBJECT_VIEW;
 		case RELKIND_TOASTVALUE:
 			return OBJECT_TABLE;
 		default:

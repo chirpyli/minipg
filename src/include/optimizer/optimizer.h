@@ -83,9 +83,10 @@ extern bool is_pseudo_constant_for_index(PlannerInfo *root, Node *expr,
 
 /* in plan/planner.c: */
 
-extern struct PlannedStmt *planner(Query *parse, const char *query_string,
-								   int cursorOptions,
-								   struct ParamListInfoData *boundParams);
+extern struct PlannedStmt *standard_planner(Query *parse,
+											const char *query_string,
+											int cursorOptions,
+											struct ParamListInfoData *boundParams);
 
 extern Expr *expression_planner(Expr *expr);
 extern Expr *expression_planner_with_deps(Expr *expr,

@@ -240,7 +240,6 @@ typedef enum NodeTag
 	T_TruncateStmt,
 	T_IndexStmt,
 	T_TransactionStmt,
-	T_ViewStmt,
 	T_CreatedbStmt,
 	T_DropdbStmt,
 	T_VacuumStmt,

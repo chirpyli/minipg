@@ -220,7 +220,6 @@ typedef enum
 /* GUC vars that are actually declared in guc.c, rather than elsewhere */
 extern bool Debug_print_plan;
 extern bool Debug_print_parse;
-extern bool Debug_print_rewritten;
 extern bool Debug_pretty_print;
 extern bool session_auth_is_superuser;
 

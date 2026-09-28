@@ -29,7 +29,6 @@
 #include "funcapi.h"
 #include "miscadmin.h"
 #include "parser/scansup.h"
-#include "rewrite/rewriteHandler.h"
 #include "storage/fd.h"
 #include "storage/latch.h"
 #include "tcop/tcopprot.h"

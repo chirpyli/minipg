@@ -506,7 +506,7 @@ LEFT JOIN pg_attribute AS p2 ON p2.attrelid = p1.oid AND p2.attnum = p1.relnatts
 WHERE p2.attnum IS NULL;
   oid  |  relname  
 -------+-----------
- 17047 | nocolumns
+ 17029 | nocolumns
 (1 row)
 
 -- Cross-check against pg_type entry

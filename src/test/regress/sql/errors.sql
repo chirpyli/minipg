@@ -98,20 +98,6 @@ drop index nonesuch;
 
 
 --
--- minipg: DROP FUNCTION 已裁剪，改为 DROP VIEW 验证同类报错
--- DROP VIEW
-
--- missing view name
-drop view;
-
--- bad view name
-drop view 314159;
-
--- no such view
-drop view nonesuch;
-
-
---
 -- minipg: DROP TYPE 已裁剪，改为 DROP SCHEMA 验证同类报错
 -- DROP SCHEMA
 

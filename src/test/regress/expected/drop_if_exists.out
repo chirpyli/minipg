@@ -7,15 +7,6 @@ ERROR:  table "test_exists" does not exist
 DROP TABLE IF EXISTS test_exists;
 NOTICE:  table "test_exists" does not exist, skipping
 CREATE TABLE test_exists (a int, b text);
--- view
-DROP VIEW test_view_exists;
-ERROR:  view "test_view_exists" does not exist
-DROP VIEW IF EXISTS test_view_exists;
-NOTICE:  view "test_view_exists" does not exist, skipping
-CREATE VIEW test_view_exists AS select * from test_exists;
-DROP VIEW IF EXISTS test_view_exists;
-DROP VIEW test_view_exists;
-ERROR:  view "test_view_exists" does not exist
 -- index
 DROP INDEX test_index_exists;
 ERROR:  index "test_index_exists" does not exist
@@ -46,8 +37,6 @@ ERROR:  table "test_exists" does not exist
 DROP INDEX IF EXISTS no_such_schema.foo;
 NOTICE:  schema "no_such_schema" does not exist, skipping
 DROP TABLE IF EXISTS no_such_schema.foo;
-NOTICE:  schema "no_such_schema" does not exist, skipping
-DROP VIEW IF EXISTS no_such_schema.foo;
 NOTICE:  schema "no_such_schema" does not exist, skipping
 -- minipg: 歧义函数名用例依赖 CREATE FUNCTION，已移除
 -- This test checks both the functionality of 'if exists' and the syntax

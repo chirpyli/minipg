@@ -8,26 +8,20 @@
 -- Cases where schema creation fails as objects are qualified with a schema
 -- that does not match with what's expected.
 -- This checks all the object types that include schema qualifications.
--- minipg: SEQUENCE / TRIGGER 已裁剪，相关 schema 元素用例移除；
+-- minipg: SEQUENCE / TRIGGER / VIEW 已裁剪，相关 schema 元素用例移除；
 -- CREATE SCHEMA AUTHORIZATION（角色）同样已裁剪。
 CREATE SCHEMA
   CREATE TABLE schema_not_existing.tab (id int);
-CREATE SCHEMA
-  CREATE VIEW schema_not_existing.view AS SELECT 1;
 CREATE SCHEMA
   CREATE INDEX ON schema_not_existing.tab (id);
 -- Again, without a schema name.
 CREATE SCHEMA
   CREATE TABLE schema_not_existing.tab (id int);
 CREATE SCHEMA
-  CREATE VIEW schema_not_existing.view AS SELECT 1;
-CREATE SCHEMA
   CREATE INDEX ON schema_not_existing.tab (id);
 -- Again, with a schema name.
 CREATE SCHEMA regress_schema_1
   CREATE TABLE schema_not_existing.tab (id int);
-CREATE SCHEMA regress_schema_1
-  CREATE VIEW schema_not_existing.view AS SELECT 1;
 CREATE SCHEMA regress_schema_1
   CREATE INDEX ON schema_not_existing.tab (id);
 

@@ -10,18 +10,6 @@ DROP TABLE IF EXISTS test_exists;
 
 CREATE TABLE test_exists (a int, b text);
 
--- view
-
-DROP VIEW test_view_exists;
-
-DROP VIEW IF EXISTS test_view_exists;
-
-CREATE VIEW test_view_exists AS select * from test_exists;
-
-DROP VIEW IF EXISTS test_view_exists;
-
-DROP VIEW test_view_exists;
-
 -- index
 
 DROP INDEX test_index_exists;
@@ -63,7 +51,6 @@ DROP TABLE test_exists;
 
 DROP INDEX IF EXISTS no_such_schema.foo;
 DROP TABLE IF EXISTS no_such_schema.foo;
-DROP VIEW IF EXISTS no_such_schema.foo;
 
 -- minipg: 歧义函数名用例依赖 CREATE FUNCTION，已移除
 

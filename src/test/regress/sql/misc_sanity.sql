@@ -31,9 +31,6 @@ WHERE refclassid = 0 OR refobjid = 0 OR
 -- whatever OID the test is complaining about must have been added later
 -- in initdb, where it intentionally isn't pinned.  Legitimate exceptions
 -- to that rule are listed in the comments in setup_depend().
--- Currently, pg_rewrite is also listed by this check, even though it is
--- covered by setup_depend().  That happens because there are no rules in
--- the pinned data, but initdb creates some intentionally-not-pinned views.
 
 -- minipg: PL/pgSQL removed. The original DO block scanned for unpinned
 -- initdb-created objects in system catalogs; that procedural checker is

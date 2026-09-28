@@ -849,12 +849,10 @@ typedef enum ObjectType
 	OBJECT_PUBLICATION,
 	OBJECT_PUBLICATION_REL,
 	OBJECT_ROUTINE,
-	OBJECT_RULE,
 	OBJECT_SCHEMA,
 	OBJECT_TABCONSTRAINT,
 	OBJECT_TABLE,
-	OBJECT_TYPE,
-	OBJECT_VIEW
+	OBJECT_TYPE
 } ObjectType;
 
 /* ----------------------
@@ -897,7 +895,6 @@ typedef enum AlterTableType
 {
 	AT_AddColumn,				/* add column */
 	AT_AddColumnRecurse,		/* internal to commands/tablecmds.c */
-	AT_AddColumnToView,			/* implicitly via CREATE OR REPLACE VIEW */
 	AT_SetStatistics,			/* alter column set statistics */
 	AT_SetStorage,				/* alter column set storage */
 	AT_DropColumn,				/* drop column */
@@ -1187,14 +1184,6 @@ typedef struct TransactionStmt
  *		Create View Statement
  * ----------------------
  */
-typedef struct ViewStmt
-{
-	NodeTag		type;
-	RangeVar   *view;			/* the view to be created */
-	List	   *aliases;		/* target column names */
-	Node	   *query;			/* the SELECT query (as a raw parse tree) */
-	bool		replace;		/* replace an existing view? */
-} ViewStmt;
 
 /* ----------------------
  *		Createdb Statement

@@ -142,9 +142,9 @@ test: select arrays
 
 test: subselect
 
-test: delete drop_if_exists create_view
+test: delete drop_if_exists
 
-test: create_schema tid transactions
+test: create_schema transactions
 
 # ----------
 # 系统表一致性检查

@@ -1,56 +1,50 @@
 /*-------------------------------------------------------------------------
  *
  * heapam_visibility.c
- *	  Tuple visibility rules for tuples stored in heap.
+ *	  堆中存储元组的可见性规则。
  *
- * NOTE: all the HeapTupleSatisfies routines will update the tuple's
- * "hint" status bits if we see that the inserting or deleting transaction
- * has now committed or aborted (and it is safe to set the hint bits).
- * If the hint bits are changed, MarkBufferDirtyHint is called on
- * the passed-in buffer.  The caller must hold not only a pin, but at least
- * shared buffer content lock on the buffer containing the tuple.
+ * 注意：所有 HeapTupleSatisfies 例程在发现插入或删除该元组的事务
+ * 已经提交或中止（并且设置 hint 位是安全的）时，都会更新该元组的
+ * "hint" 状态位。如果 hint 位发生了改变，会对传入的 buffer 调用
+ * MarkBufferDirtyHint。调用者不仅必须持有 pin，还必须至少持有包含
+ * 该元组的 buffer 的共享内容锁。
  *
- * NOTE: When using a non-MVCC snapshot, we must check
- * TransactionIdIsInProgress (which looks in the PGPROC array)
- * before TransactionIdDidCommit/TransactionIdDidAbort (which look in
- * pg_xact).  Otherwise we have a race condition: we might decide that a
- * just-committed transaction crashed, because none of the tests succeed.
- * xact.c is careful to record commit/abort in pg_xact before it unsets
- * MyProc->xid in the PGPROC array.  That fixes that problem, but it
- * also means there is a window where TransactionIdIsInProgress and
- * TransactionIdDidCommit will both return true.  If we check only
- * TransactionIdDidCommit, we could consider a tuple committed when a
- * later GetSnapshotData call will still think the originating transaction
- * is in progress, which leads to application-level inconsistency.  The
- * upshot is that we gotta check TransactionIdIsInProgress first in all
- * code paths, except for a few cases where we are looking at
- * subtransactions of our own main transaction and so there can't be any
- * race condition.
+ * 注意：使用非 MVCC 快照时，必须先检查 TransactionIdIsInProgress
+ *（它查询 PGPROC 数组），再检查 TransactionIdDidCommit/
+ * TransactionIdDidAbort（它们查询 pg_xact）。否则会产生竞态：由于
+ * 所有测试都不通过，我们可能误判一个刚刚提交的事务发生了崩溃。
+ * xact.c 会谨慎地先在 pg_xact 中记录提交/中止，再去清除 PGPROC
+ * 数组中的 MyProc->xid。这修复了上述问题，但也意味着存在一个窗口期，
+ * 在此期间 TransactionIdIsInProgress 和 TransactionIdDidCommit 都会
+ * 返回 true。如果只检查 TransactionIdDidCommit，我们可能会认为某元组
+ * 已提交，而稍后的 GetSnapshotData 调用却仍认为其来源事务处于进行中，
+ * 从而导致应用层的不一致。结论是：在所有代码路径中都必须先检查
+ * TransactionIdIsInProgress，只有少数情况例外——即当我们查看的是自己
+ * 主事务的子事务时，不可能存在竞态，因而可以不必如此。
  *
- * When using an MVCC snapshot, we rely on XidInMVCCSnapshot rather than
- * TransactionIdIsInProgress, but the logic is otherwise the same: do not
- * check pg_xact until after deciding that the xact is no longer in progress.
+ * 使用 MVCC 快照时，我们依赖 XidInMVCCSnapshot 而非
+ * TransactionIdIsInProgress，但其余逻辑相同：在判定该事务不再进行
+ * 之前，不要去查询 pg_xact。
  *
  *
- * Summary of visibility functions:
+ * 可见性函数一览：
  *
  *	 HeapTupleSatisfiesMVCC()
- *		  visible to supplied snapshot, excludes current command
+ *		  对提供的快照可见，排除当前命令
  *	 HeapTupleSatisfiesUpdate()
- *		  visible to instant snapshot, with user-supplied command
- *		  counter and more complex result
+ *		  对即时快照可见，带有用户提供的命令计数器和更复杂的结果
  *	 HeapTupleSatisfiesSelf()
- *		  visible to instant snapshot and current command
+ *		  对即时快照和当前命令均可见
  *	 HeapTupleSatisfiesDirty()
- *		  like HeapTupleSatisfiesSelf(), but includes open transactions
+ *		  类似 HeapTupleSatisfiesSelf()，但包含进行中的事务
  *	 HeapTupleSatisfiesVacuum()
- *		  visible to any running transaction, used by VACUUM
+ *		  对任何正在运行的事务都可见，由 VACUUM 使用
  *	 HeapTupleSatisfiesNonVacuumable()
- *		  Snapshot-style API for HeapTupleSatisfiesVacuum
+ *		  HeapTupleSatisfiesVacuum 的快照风格接口
  *	 HeapTupleSatisfiesToast()
- *		  visible unless part of interrupted vacuum, used for TOAST
+ *		  除非属于被中断的 vacuum，否则可见，用于 TOAST
  *	 HeapTupleSatisfiesAny()
- *		  all tuples are visible
+ *		  所有元组都可见
  *
  * Portions Copyright (c) 1996-2021, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
@@ -911,25 +905,22 @@ HeapTupleSatisfiesDirty(HeapTuple htup, Snapshot snapshot,
 
 /*
  * HeapTupleSatisfiesMVCC
- *		True iff heap tuple is valid for the given MVCC snapshot.
+ *	  当且仅当堆元组对给定的 MVCC 快照有效时返回真。
  *
- * See SNAPSHOT_MVCC's definition for the intended behaviour.
+ * 预期的行为请参阅 SNAPSHOT_MVCC 的定义。
  *
- * Notice that here, we will not update the tuple status hint bits if the
- * inserting/deleting transaction is still running according to our snapshot,
- * even if in reality it's committed or aborted by now.  This is intentional.
- * Checking the true transaction state would require access to high-traffic
- * shared data structures, creating contention we'd rather do without, and it
- * would not change the result of our visibility check anyway.  The hint bits
- * will be updated by the first visitor that has a snapshot new enough to see
- * the inserting/deleting transaction as done.  In the meantime, the cost of
- * leaving the hint bits unset is basically that each HeapTupleSatisfiesMVCC
- * call will need to run TransactionIdIsCurrentTransactionId in addition to
- * XidInMVCCSnapshot (but it would have to do the latter anyway).  In the old
- * coding where we tried to set the hint bits as soon as possible, we instead
- * did TransactionIdIsInProgress in each call --- to no avail, as long as the
- * inserting/deleting transaction was still running --- which was more cycles
- * and more contention on ProcArrayLock.
+ * 注意：在这里，如果根据我们的快照判断，插入/删除该元组的事务
+ * 仍在运行，那么即便它实际上此刻已经提交或中止，我们也不会去更新
+ * 元组的 hint 状态位。这是有意为之的。检查事务的真实状态需要访问
+ * 那些高并发访问的共享数据结构，从而带来我们本想避免的竞争；而且
+ * 无论如何这都不会改变我们可见性判断的结果。hint 位将由第一个持有
+ * 足够新、能看到该插入/删除事务已经结束的快照的访问者来更新。在此
+ * 期间，不设置 hint 位所带来的代价，本质上就是每次 HeapTupleSatisfiesMVCC
+ * 调用除了 XidInMVCCSnapshot 之外（后者本来也得调用），还要再执行一次
+ * TransactionIdIsCurrentTransactionId。在旧的实现中，我们曾试图尽快
+ * 设置 hint 位，于是在每次调用里都去执行 TransactionIdIsInProgress——
+ * 只要插入/删除事务还在运行，这么做就徒劳无功——这会带来更多的
+ * 计算开销以及更严重的 ProcArrayLock 竞争。
  */
 static bool
 HeapTupleSatisfiesMVCC(HeapTuple htup, Snapshot snapshot,

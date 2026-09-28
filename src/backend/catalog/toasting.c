@@ -37,11 +37,9 @@
 #include "utils/syscache.h"
 
 static void CheckAndCreateToastTable(Oid relOid,
-									 LOCKMODE lockmode, bool check,
-									 Oid OIDOldToast);
+									 LOCKMODE lockmode, bool check);
 static bool create_toast_table(Relation rel, Oid toastOid, Oid toastIndexOid,
-							   LOCKMODE lockmode, bool check,
-							   Oid OIDOldToast);
+							   LOCKMODE lockmode, bool check);
 static bool needs_toast_table(Relation rel);
 
 
@@ -60,34 +58,30 @@ static bool needs_toast_table(Relation rel);
 void
 AlterTableCreateToastTable(Oid relOid, LOCKMODE lockmode)
 {
-	CheckAndCreateToastTable(relOid, lockmode, true, InvalidOid);
+	CheckAndCreateToastTable(relOid, lockmode, true);
 }
 
 void
-NewHeapCreateToastTable(Oid relOid, LOCKMODE lockmode,
-						Oid OIDOldToast)
+NewHeapCreateToastTable(Oid relOid, LOCKMODE lockmode)
 {
-	CheckAndCreateToastTable(relOid, lockmode, false, OIDOldToast);
+	CheckAndCreateToastTable(relOid, lockmode, false);
 }
 
 void
 NewRelationCreateToastTable(Oid relOid)
 {
-	CheckAndCreateToastTable(relOid, AccessExclusiveLock, false,
-							 InvalidOid);
+	CheckAndCreateToastTable(relOid, AccessExclusiveLock, false);
 }
 
 static void
-CheckAndCreateToastTable(Oid relOid, LOCKMODE lockmode,
-						 bool check, Oid OIDOldToast)
+CheckAndCreateToastTable(Oid relOid, LOCKMODE lockmode, bool check)
 {
 	Relation	rel;
 
 	rel = table_open(relOid, lockmode);
 
 	/* create_toast_table does all the work */
-	(void) create_toast_table(rel, InvalidOid, InvalidOid, lockmode,
-							  check, OIDOldToast);
+	(void) create_toast_table(rel, InvalidOid, InvalidOid, lockmode, check);
 
 	table_close(rel, NoLock);
 }
@@ -113,7 +107,7 @@ BootstrapToastTable(char *relName, Oid toastOid, Oid toastIndexOid)
 
 	/* create_toast_table does all the work */
 	if (!create_toast_table(rel, toastOid, toastIndexOid,
-							AccessExclusiveLock, false, InvalidOid))
+							AccessExclusiveLock, false))
 		elog(ERROR, "\"%s\" does not require a toast table",
 			 relName);
 
@@ -130,8 +124,7 @@ BootstrapToastTable(char *relName, Oid toastOid, Oid toastIndexOid)
  */
 static bool
 create_toast_table(Relation rel, Oid toastOid, Oid toastIndexOid,
-				   LOCKMODE lockmode, bool check,
-				   Oid OIDOldToast)
+				   LOCKMODE lockmode, bool check)
 {
 	Oid			relOid = RelationGetRelid(rel);
 	HeapTuple	reltup;
@@ -228,7 +221,6 @@ create_toast_table(Relation rel, Oid toastOid, Oid toastIndexOid,
 										   mapped_relation,
 										   true,
 										   true,
-										   OIDOldToast,
 										   NULL);
 	Assert(toast_relid != InvalidOid);
 

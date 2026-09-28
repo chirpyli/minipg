@@ -32,7 +32,6 @@
 #include "catalog/pg_opclass.h"
 #include "catalog/pg_operator.h"
 #include "catalog/pg_proc.h"
-#include "catalog/pg_rewrite.h"
 #include "catalog/pg_type.h"
 #include "commands/defrem.h"
 #include "commands/tablespace.h"
@@ -50,8 +49,6 @@
 #include "parser/parse_relation.h"
 #include "parser/parser.h"
 #include "parser/parsetree.h"
-#include "rewrite/rewriteHandler.h"
-#include "rewrite/rewriteSupport.h"
 #include "utils/array.h"
 #include "utils/builtins.h"
 #include "utils/fmgroids.h"
@@ -312,8 +309,6 @@ bool		quote_all_identifiers = false;
 static char *deparse_expression_pretty(Node *expr, List *dpcontext,
 									   bool forceprefix, bool showimplicit,
 									   int prettyFlags, int startIndent);
-static char *pg_get_viewdef_worker(Oid viewoid,
-								   int prettyFlags, int wrapColumn);
 static int	decompile_column_index_array(Datum column_index_array, Oid relId,
 										 StringInfo buf);
 static char *pg_get_indexdef_worker(Oid indexrelid, int colno,
@@ -353,8 +348,6 @@ static void push_ancestor_plan(deparse_namespace *dpns, ListCell *ancestor_cell,
 							   deparse_namespace *save_dpns);
 static void pop_ancestor_plan(deparse_namespace *dpns,
 							  deparse_namespace *save_dpns);
-static void make_viewdef(StringInfo buf, HeapTuple ruletup, TupleDesc rulettc,
-						 int prettyFlags, int wrapColumn);
 static void get_query_def(Query *query, StringInfo buf, List *parentnamespace,
 						  TupleDesc resultDesc, bool colNamesVisible,
 						  int prettyFlags, int wrapColumn, int startIndent);
@@ -434,178 +427,6 @@ static char *generate_operator_name(Oid operid, Oid arg1, Oid arg2);
 static text *string_to_text(char *str);
 
 
-/* ----------
- * pg_get_viewdef		- Mainly the same thing, but we
- *				  only return the SELECT part of a view
- * ----------
- */
-Datum
-pg_get_viewdef(PG_FUNCTION_ARGS)
-{
-	/* By OID */
-	Oid			viewoid = PG_GETARG_OID(0);
-	int			prettyFlags;
-	char	   *res;
-
-	prettyFlags = PRETTYFLAG_INDENT;
-
-	res = pg_get_viewdef_worker(viewoid, prettyFlags, WRAP_COLUMN_DEFAULT);
-
-	if (res == NULL)
-		PG_RETURN_NULL();
-
-	PG_RETURN_TEXT_P(string_to_text(res));
-}
-
-
-Datum
-pg_get_viewdef_ext(PG_FUNCTION_ARGS)
-{
-	/* By OID */
-	Oid			viewoid = PG_GETARG_OID(0);
-	bool		pretty = PG_GETARG_BOOL(1);
-	int			prettyFlags;
-	char	   *res;
-
-	prettyFlags = pretty ? (PRETTYFLAG_PAREN | PRETTYFLAG_INDENT | PRETTYFLAG_SCHEMA) : PRETTYFLAG_INDENT;
-
-	res = pg_get_viewdef_worker(viewoid, prettyFlags, WRAP_COLUMN_DEFAULT);
-
-	if (res == NULL)
-		PG_RETURN_NULL();
-
-	PG_RETURN_TEXT_P(string_to_text(res));
-}
-
-Datum
-pg_get_viewdef_wrap(PG_FUNCTION_ARGS)
-{
-	/* By OID */
-	Oid			viewoid = PG_GETARG_OID(0);
-	int			wrap = PG_GETARG_INT32(1);
-	int			prettyFlags;
-	char	   *res;
-
-	/* calling this implies we want pretty printing */
-	prettyFlags = PRETTYFLAG_PAREN | PRETTYFLAG_INDENT | PRETTYFLAG_SCHEMA;
-
-	res = pg_get_viewdef_worker(viewoid, prettyFlags, wrap);
-
-	if (res == NULL)
-		PG_RETURN_NULL();
-
-	PG_RETURN_TEXT_P(string_to_text(res));
-}
-
-Datum
-pg_get_viewdef_name(PG_FUNCTION_ARGS)
-{
-	/* By qualified name */
-	text	   *viewname = PG_GETARG_TEXT_PP(0);
-	int			prettyFlags;
-	RangeVar   *viewrel;
-	Oid			viewoid;
-	char	   *res;
-
-	prettyFlags = PRETTYFLAG_INDENT;
-
-	/* Look up view name.  Can't lock it - we might not have privileges. */
-	viewrel = makeRangeVarFromNameList(textToQualifiedNameList(viewname));
-	viewoid = RangeVarGetRelid(viewrel, NoLock, false);
-
-	res = pg_get_viewdef_worker(viewoid, prettyFlags, WRAP_COLUMN_DEFAULT);
-
-	if (res == NULL)
-		PG_RETURN_NULL();
-
-	PG_RETURN_TEXT_P(string_to_text(res));
-}
-
-
-Datum
-pg_get_viewdef_name_ext(PG_FUNCTION_ARGS)
-{
-	/* By qualified name */
-	text	   *viewname = PG_GETARG_TEXT_PP(0);
-	bool		pretty = PG_GETARG_BOOL(1);
-	int			prettyFlags;
-	RangeVar   *viewrel;
-	Oid			viewoid;
-	char	   *res;
-
-	prettyFlags = pretty ? (PRETTYFLAG_PAREN | PRETTYFLAG_INDENT | PRETTYFLAG_SCHEMA) : PRETTYFLAG_INDENT;
-
-	/* Look up view name.  Can't lock it - we might not have privileges. */
-	viewrel = makeRangeVarFromNameList(textToQualifiedNameList(viewname));
-	viewoid = RangeVarGetRelid(viewrel, NoLock, false);
-
-	res = pg_get_viewdef_worker(viewoid, prettyFlags, WRAP_COLUMN_DEFAULT);
-
-	if (res == NULL)
-		PG_RETURN_NULL();
-
-	PG_RETURN_TEXT_P(string_to_text(res));
-}
-
-/*
- * Common code for by-OID and by-name variants of pg_get_viewdef
- *
- * minipg: this used to look up pg_rewrite over SPI (for read-access checking,
- * which no longer exists).  It now scans the catalog directly, same as
- * RelationBuildRuleLock() does.
- */
-static char *
-pg_get_viewdef_worker(Oid viewoid, int prettyFlags, int wrapColumn)
-{
-	HeapTuple	ruletup;
-	TupleDesc	rulettc;
-	StringInfoData buf;
-	Relation	rewrite_rel;
-	SysScanDesc scan;
-	ScanKeyData skey[2];
-	HeapTuple	tuple;
-
-	/* Do this first so that string survives until we return it. */
-	initStringInfo(&buf);
-
-	/*
-	 * Get the pg_rewrite tuple for the view's SELECT rule
-	 */
-	rewrite_rel = table_open(RewriteRelationId, AccessShareLock);
-
-	ScanKeyInit(&skey[0],
-				Anum_pg_rewrite_ev_class,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(viewoid));
-	ScanKeyInit(&skey[1],
-				Anum_pg_rewrite_rulename,
-				BTEqualStrategyNumber, F_NAMEEQ,
-				CStringGetDatum(ViewSelectRuleName));
-
-	scan = systable_beginscan(rewrite_rel, RewriteRelRulenameIndexId, true,
-							  NULL, 2, skey);
-
-	tuple = systable_getnext(scan);
-	if (HeapTupleIsValid(tuple))
-	{
-		/*
-		 * Copy the tuple into the current memory context: make_viewdef must
-		 * be able to rely on it staying valid for the duration.
-		 */
-		ruletup = heap_copytuple(tuple);
-		rulettc = RelationGetDescr(rewrite_rel);
-		make_viewdef(&buf, ruletup, rulettc, prettyFlags, wrapColumn);
-		heap_freetuple(ruletup);
-	}
-
-	systable_endscan(scan);
-	table_close(rewrite_rel, AccessShareLock);
-
-	if (buf.len == 0)
-		return NULL;
-
-	return buf.data;
-}
 
 
 /* ----------
@@ -2783,82 +2604,6 @@ pop_ancestor_plan(deparse_namespace *dpns, deparse_namespace *save_dpns)
 
 
 /* ----------
- * make_viewdef			- reconstruct the SELECT part of a
- *				  view rewrite rule
- * ----------
- */
-static void
-make_viewdef(StringInfo buf, HeapTuple ruletup, TupleDesc rulettc,
-			 int prettyFlags, int wrapColumn)
-{
-	Query	   *query;
-	char		ev_type;
-	Oid			ev_class;
-	bool		is_instead;
-	char	   *ev_qual;
-	char	   *ev_action;
-	List	   *actions;
-	Relation	ev_relation;
-	Datum		dat;
-	bool		isnull;
-
-	/*
-	 * Get the attribute values from the rules tuple
-	 */
-	dat = heap_getattr(ruletup, Anum_pg_rewrite_ev_type, rulettc, &isnull);
-	Assert(!isnull);
-	ev_type = DatumGetChar(dat);
-
-	dat = heap_getattr(ruletup, Anum_pg_rewrite_ev_class, rulettc, &isnull);
-	Assert(!isnull);
-	ev_class = DatumGetObjectId(dat);
-
-	dat = heap_getattr(ruletup, Anum_pg_rewrite_is_instead, rulettc, &isnull);
-	Assert(!isnull);
-	is_instead = DatumGetBool(dat);
-
-	dat = heap_getattr(ruletup, Anum_pg_rewrite_ev_qual, rulettc, &isnull);
-	Assert(!isnull);
-	ev_qual = TextDatumGetCString(dat);
-
-	dat = heap_getattr(ruletup, Anum_pg_rewrite_ev_action, rulettc, &isnull);
-	Assert(!isnull);
-	ev_action = TextDatumGetCString(dat);
-	actions = (List *) stringToNode(ev_action);
-
-	if (list_length(actions) != 1)
-	{
-		/* keep output buffer empty and leave */
-		pfree(ev_qual);
-		pfree(ev_action);
-		return;
-	}
-
-	query = (Query *) linitial(actions);
-
-	if (ev_type != '1' || !is_instead ||
-		strcmp(ev_qual, "<>") != 0 || query->commandType != CMD_SELECT)
-	{
-		/* keep output buffer empty and leave */
-		pfree(ev_qual);
-		pfree(ev_action);
-		return;
-	}
-
-	ev_relation = table_open(ev_class, AccessShareLock);
-
-	get_query_def(query, buf, NIL, RelationGetDescr(ev_relation), true,
-				  prettyFlags, wrapColumn, 0);
-	appendStringInfoChar(buf, ';');
-
-	table_close(ev_relation, AccessShareLock);
-
-	pfree(ev_qual);
-	pfree(ev_action);
-}
-
-
-/* ----------
  * get_query_def			- Parse back one query parsetree
  *
  * query: parsetree to be displayed
@@ -2888,15 +2633,11 @@ get_query_def(Query *query, StringInfo buf, List *parentnamespace,
 	check_stack_depth();
 
 	/*
-	 * Before we begin to examine the query, acquire locks on referenced
-	 * relations, and fix up deleted columns in JOIN RTEs.  This ensures
-	 * consistent results.  Note we assume it's OK to scribble on the passed
-	 * querytree!
-	 *
-	 * We are only deparsing the query (we are not about to execute it), so we
-	 * only need AccessShareLock on the relations it mentions.
+	 * minipg: the rule rewriter has been cropped, so there are no stored
+	 * rule query trees to fix up (dropped columns in JOIN RTEs) or to lock
+	 * here.  The queries reaching this point come from freshly parsed or
+	 * planned trees, whose relations are already locked by the caller.
 	 */
-	AcquireRewriteLocks(query, false);
 
 	context.buf = buf;
 	context.namespaces = lcons(&dpns, list_copy(parentnamespace));
@@ -3042,10 +2783,9 @@ get_simple_values_rte(Query *query, TupleDesc resultDesc)
 	 * We don't need to check the targetlist in any great detail, because
 	 * parser/analyze.c will never generate a "bare" VALUES RTE --- they only
 	 * appear inside auto-generated sub-queries with very restricted
-	 * structure.  However, DefineView might have modified the tlist by
-	 * injecting new column aliases, or we might have some other column
-	 * aliases forced by a resultDesc.  We can only simplify if the RTE's
-	 * column names match the names that get_target_list() would select.
+	 * structure.  However, we might have some column aliases forced by a
+	 * resultDesc.  We can only simplify if the RTE's column names match the
+	 * names that get_target_list() would select.
 	 */
 	if (result)
 	{

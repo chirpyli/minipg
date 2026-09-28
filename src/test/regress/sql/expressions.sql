@@ -31,15 +31,13 @@ begin;
 
 create table bpchar_tbl (f1 character(16) unique, f2 bpchar);
 
-create view bpchar_view as
+-- minipg: 视图已裁剪，原 bpchar_view 改为内联子查询
+explain (verbose, costs off)
+select * from (
   select
     f1, f1::character(14) as f114, f1::bpchar as f1n,
     f2, f2::character(14) as f214, f2::bpchar as f2n
-  from bpchar_tbl;
-
-\d+ bpchar_view
-
-explain (verbose, costs off) select * from bpchar_view
+  from bpchar_tbl) bpchar_view
   where f1::bpchar = 'foo';
 
 rollback;

@@ -22,7 +22,6 @@
 #include "nodes/nodeFuncs.h"
 #include "parser/analyze.h"
 #include "parser/parsetree.h"
-#include "rewrite/rewriteHandler.h"
 #include "storage/bufmgr.h"
 #include "tcop/tcopprot.h"
 #include "utils/builtins.h"
@@ -115,7 +114,6 @@ ExplainQuery(ParseState *pstate, ExplainStmt *stmt,
 	ExplainState *es = NewExplainState();
 	TupOutputState *tstate;
 	Query	   *query;
-	List	   *rewritten;
 	ListCell   *lc;
 	bool		timing_set = false;
 	bool		summary_set = false;
@@ -177,36 +175,10 @@ ExplainQuery(ParseState *pstate, ExplainStmt *stmt,
 		JumbleQuery(query, pstate->p_sourcetext);
 
 	/*
-	 * Parse analysis was done already, but we still have to run the rule
-	 * rewriter.  We do not do AcquireRewriteLocks: we assume the query either
-	 * came straight from the parser, or suitable locks were acquired by
-	 * the caller.
+	 * minipg: the rule rewriter has been cropped, so the query is explained
+	 * as-is.
 	 */
-	rewritten = QueryRewrite(castNode(Query, stmt->query));
-
-	if (rewritten == NIL)
-	{
-		/*
-		 * In the case of an INSTEAD NOTHING, tell at least that.
-		 */
-		appendStringInfoString(es->str, "Query rewrites to nothing\n");
-	}
-	else
-	{
-		ListCell   *l;
-
-		/* Explain every plan */
-		foreach(l, rewritten)
-		{
-			ExplainOneQuery(lfirst_node(Query, l),
-							0, es,
-							pstate->p_sourcetext, params);
-
-			/* Separate plans with a blank line */
-			if (lnext(rewritten, l) != NULL)
-				appendStringInfoChar(es->str, '\n');
-		}
-	}
+	ExplainOneQuery(query, 0, es, pstate->p_sourcetext, params);
 
 	Assert(es->indent == 0);
 

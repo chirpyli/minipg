@@ -90,27 +90,6 @@ static void apply_scanjoin_target_to_paths(PlannerInfo *root,
 										   bool tlist_same_exprs);
 
 
-/*****************************************************************************
- *
- *	   Query optimizer entry point
- *
- * To support loadable plugins that monitor or modify planner behavior,
- * we provide a hook variable that lets a plugin get control before and
- * after the standard planning process.  The plugin would normally call
- * standard_planner().
- *
- * Note to plugin authors: standard_planner() scribbles on its Query input,
- * so you'd better copy that data structure if you want to plan more than once.
- *
- *****************************************************************************/
-PlannedStmt *
-planner(Query *parse, const char *query_string, int cursorOptions,
-		ParamListInfo boundParams)
-{
-	PlannedStmt *result = standard_planner(parse, query_string, cursorOptions, boundParams);
-	return result;
-}
-
 PlannedStmt *
 standard_planner(Query *parse, const char *query_string, int cursorOptions,
 				 ParamListInfo boundParams)
@@ -227,30 +206,28 @@ standard_planner(Query *parse, const char *query_string, int cursorOptions,
 
 /*--------------------
  * subquery_planner
- *	  Invokes the planner on a subquery.  We recurse to here for each
- *	  sub-SELECT found in the query tree.
+ *	  对一条子查询调用规划器。查询树中每发现一个子 SELECT，
+ *	  都会递归地到这里来处理。
  *
- * glob is the global state for the current planner run.
- * parse is the querytree produced by the parser & rewriter.
- * parent_root is the immediate parent Query's info (NULL at the top level).
- * hasRecursion is true if this is a recursive WITH query.
- * tuple_fraction is the fraction of tuples we expect will be retrieved.
- * tuple_fraction is interpreted as explained for upper_planner, below.
+ * glob 是当前规划器运行的全局状态。
+ * parse 是由解析器与重写器生成的查询树。
+ * parent_root 是紧邻的父查询的 PlannerInfo（顶层时为 NULL）。
+ * hasRecursion 如果为真，表示这是一条递归 WITH 查询。
+ * tuple_fraction 是我们预期会被取回的元组所占的比例。
+ * tuple_fraction 的含义与下文 upper_planner 中的说明相同。
  *
- * Basically, this routine does the stuff that should only be done once
- * per Query object.  It then calls upper_planner.  At one time,
- * upper_planner could be invoked recursively on the same Query object;
- * that's not currently true, but we keep the separation between the two
- * routines anyway, in case we need it again someday.
+ * 基本上，本例程只做那些每个 Query 对象只需做一次的事情，
+ * 随后再调用 upper_planner。曾经，upper_planner 也能够在同一个
+ * Query 对象上被递归调用；现在已不是这样了，但出于以防万一
+ * 将来还要再用到的考虑，我们仍然保留这两个例程之间的分工。
  *
- * subquery_planner will be called recursively to handle sub-Query nodes
- * found within the query's expressions and rangetable.
+ * subquery_planner 会被递归调用，以处理查询的表达式与范围表中
+ * 发现的子 Query 节点。
  *
- * Returns the PlannerInfo struct ("root") that contains all data generated
- * while planning the subquery.  In particular, the Path(s) attached to
- * the (UPPERREL_FINAL, NULL) upperrel represent our conclusions about the
- * cheapest way(s) to implement the query.  The top level will select the
- * best Path and pass it through createplan.c to produce a finished Plan.
+ * 返回 PlannerInfo 结构体（"root"），其中包含了规划该子查询时
+ * 生成的所有数据。特别地，挂在 (UPPERREL_FINAL, NULL) 这个
+ * 上层关系上的 Path 体现了我们对实现该查询的最省代价方式的判断。
+ * 顶层会从中选出最优的 Path，并经 createplan.c 生成最终的 Plan。
  *--------------------
  */
 PlannerInfo *

@@ -195,7 +195,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 		SelectStmt TransactionStmt TransactionStmtLegacy TruncateStmt
 		UpdateStmt VacuumStmt
 		VariableResetStmt VariableSetStmt VariableShowStmt
-		ViewStmt CheckPointStmt
+		CheckPointStmt
 
 %type <node>	select_no_parens select_with_parens select_clause
 				simple_select values_clause
@@ -241,7 +241,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 %type <list>	parse_toplevel stmtmulti
 				OptTableElementList TableElementList definition
 				opt_definition
-				opt_column_list columnList opt_name_list
+				columnList opt_name_list
 				sort_clause sortby_list index_params
 				opt_include opt_c_include index_including_params
 				name_list from_clause from_list opt_array_bounds
@@ -417,7 +417,7 @@ static Node *makeSQLValueFunction(SQLValueFunctionOp op, int32 typmod,
 	UPDATE USING
 
 	VACUUM VALUES VARCHAR VARYING
-	VERBOSE VIEW
+	VERBOSE
 
 	WHEN WHERE WITH WITHOUT WORK WRITE
 
@@ -563,7 +563,6 @@ stmt:	AlterObjectSchemaStmt
 			| VariableResetStmt
 			| VariableSetStmt
 			| VariableShowStmt
-			| ViewStmt
 			| /*EMPTY*/
 				{ $$ = NULL; }
 		;
@@ -627,7 +626,6 @@ OptSchemaEltList:
 schema_stmt:
 			CreateStmt
 			| IndexStmt
-			| ViewStmt
 		;
 
 
@@ -930,24 +928,6 @@ AlterTableStmt:
 					n->missing_ok = true;
 					$$ = (Node *)n;
 					}
-		|	ALTER VIEW qualified_name alter_table_cmds
-				{
-					AlterTableStmt *n = makeNode(AlterTableStmt);
-					n->relation = $3;
-					n->cmds = $4;
-					n->objtype = OBJECT_VIEW;
-					n->missing_ok = false;
-					$$ = (Node *)n;
-				}
-		|	ALTER VIEW IF_P EXISTS qualified_name alter_table_cmds
-				{
-					AlterTableStmt *n = makeNode(AlterTableStmt);
-					n->relation = $5;
-					n->cmds = $6;
-					n->objtype = OBJECT_VIEW;
-					n->missing_ok = true;
-					$$ = (Node *)n;
-				}
 		;
 
 alter_table_cmds:
@@ -1273,11 +1253,6 @@ ConstraintElem:
 				}
 		;
 
-opt_column_list:
-			'(' columnList ')'						{ $$ = $2; }
-			| /*EMPTY*/								{ $$ = NIL; }
-		;
-
 columnList:
 			columnElem								{ $$ = list_make1($1); }
 			| columnList ',' columnElem				{ $$ = lappend($1, $3); }
@@ -1444,7 +1419,6 @@ DropStmt:	DROP object_type_any_name IF_P EXISTS any_name_list opt_drop_behavior
 /* object types taking any_name/any_name_list */
 object_type_any_name:
 			TABLE									{ $$ = OBJECT_TABLE; }
-			| VIEW									{ $$ = OBJECT_VIEW; }
 			| INDEX									{ $$ = OBJECT_INDEX; }
 		;
 
@@ -1702,24 +1676,6 @@ AlterObjectSchemaStmt:
 					n->missing_ok = true;
 					$$ = (Node *)n;
 				}
-				| ALTER VIEW qualified_name SET SCHEMA name
-				{
-					AlterObjectSchemaStmt *n = makeNode(AlterObjectSchemaStmt);
-					n->objectType = OBJECT_VIEW;
-					n->relation = $3;
-					n->newschema = $6;
-					n->missing_ok = false;
-					$$ = (Node *)n;
-				}
-			| ALTER VIEW IF_P EXISTS qualified_name SET SCHEMA name
-				{
-					AlterObjectSchemaStmt *n = makeNode(AlterObjectSchemaStmt);
-					n->objectType = OBJECT_VIEW;
-					n->relation = $5;
-					n->newschema = $8;
-					n->missing_ok = true;
-					$$ = (Node *)n;
-				}
 		;
 
 /*****************************************************************************
@@ -1869,38 +1825,6 @@ transaction_mode_list_or_empty:
 					{ $$ = NIL; }
 		;
 
-
-/*****************************************************************************
- *
- *	QUERY:
- *		CREATE [ OR REPLACE ] VIEW <viewname> '('target-list ')'
- *			AS <query>
- *
- *****************************************************************************/
-
-ViewStmt: CREATE VIEW qualified_name opt_column_list
-				AS SelectStmt
-				{
-					ViewStmt *n = makeNode(ViewStmt);
-					n->view = $3;
-					n->view->relpersistence = RELPERSISTENCE_PERMANENT;
-					n->aliases = $4;
-					n->query = $6;
-					n->replace = false;
-					$$ = (Node *) n;
-				}
-		| CREATE OR REPLACE VIEW qualified_name opt_column_list
-			AS SelectStmt
-			{
-				ViewStmt *n = makeNode(ViewStmt);
-				n->view = $5;
-				n->view->relpersistence = RELPERSISTENCE_PERMANENT;
-				n->aliases = $6;
-					n->query = $8;
-					n->replace = true;
-					$$ = (Node *) n;
-			}
-		;
 
 /*****************************************************************************
  *
@@ -3910,7 +3834,6 @@ unreserved_keyword:
 			| UPDATE
 			| VACUUM
 			| VARYING
-			| VIEW
 			| WITHOUT
 			| WORK
 			| WRITE
@@ -4149,7 +4072,6 @@ bare_label_keyword:
 			| VALUES
 			| VARCHAR
 			| VERBOSE
-			| VIEW
 			| WHEN
 			| WORK
 			| WRITE

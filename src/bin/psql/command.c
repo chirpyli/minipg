@@ -376,16 +376,15 @@ exec_command_d(PsqlScanState scan_state, bool active_branch, const char *cmd)
 					success = describeTableDetails(pattern, show_verbose, show_system);
 				else
 					/* standard listing of interesting things */
-					success = listTables("tvms", NULL, show_verbose, show_system);
+					success = listTables("tms", NULL, show_verbose, show_system);
 				break;
 			case 't':
-			case 'v':
 			case 'm':
 			case 'i':
 			case 's':
 				success = listTables(&cmd[1], pattern, show_verbose, show_system);
 				break;
-		default:
+			default:
 				status = PSQL_CMD_UNKNOWN;
 		}
 
