@@ -241,9 +241,6 @@ GetBackendTypeDesc(BackendType backendType)
 		case B_STARTUP:
 			backendDesc = "startup";
 			break;
-		case B_WAL_SENDER:
-			backendDesc = "walsender";
-			break;
 		case B_WAL_WRITER:
 			backendDesc = "walwriter";
 			break;
@@ -596,8 +593,6 @@ InNoForceRLSOperation(void)
 {
 	return (SecurityRestrictionContext & SECURITY_NOFORCE_RLS) != 0;
 }
-
-
 
 /*
  * Initialize user identity during special backend startup

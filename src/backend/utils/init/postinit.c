@@ -388,7 +388,7 @@ InitializeMaxBackends(void)
 {
 	Assert(MaxBackends == 0);
 
-	MaxBackends = MaxConnections + 1;
+	MaxBackends = MaxConnections;
 
 	/* internal error because the values were all checked previously */
 	if (MaxBackends > MAX_BACKENDS)

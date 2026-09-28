@@ -51,11 +51,6 @@
  * child processes at random, and postmaster.c is responsible for tracking
  * which one goes with which PID.
  *
- * Actually there is a fourth state, WALSENDER.  This is just like ACTIVE,
- * but carries the extra information that the child is a WAL sender.
- * WAL senders too start in ACTIVE state, but switch to WALSENDER once they
- * start streaming the WAL (and they never go back to ACTIVE after that).
- *
  * We also have a shared-memory field that is used for communication in
  * the opposite direction, from postmaster to children: it tells why the
  * postmaster has broadcasted SIGQUIT signals, if indeed it has done so.
@@ -64,7 +59,6 @@
 #define PM_CHILD_UNUSED		0	/* these values must fit in sig_atomic_t */
 #define PM_CHILD_ASSIGNED	1
 #define PM_CHILD_ACTIVE		2
-#define PM_CHILD_WALSENDER	3
 
 /* "typedef struct PMSignalData PMSignalData" appears in pmsignal.h */
 struct PMSignalData
@@ -299,22 +293,6 @@ ReleasePostmasterChildSlot(int slot)
 }
 
 /*
- * IsPostmasterChildWalSender - check if given slot is in use by a
- * walsender process.  This is called only by the postmaster.
- */
-bool
-IsPostmasterChildWalSender(int slot)
-{
-	Assert(slot > 0 && slot <= num_child_inuse);
-	slot--;
-
-	if (PMSignalState->PMChildFlags[slot] == PM_CHILD_WALSENDER)
-		return true;
-	else
-		return false;
-}
-
-/*
  * MarkPostmasterChildActive - mark a postmaster child as about to begin
  * actively using shared memory.  This is called in the child process.
  */
@@ -330,24 +308,6 @@ MarkPostmasterChildActive(void)
 }
 
 /*
- * MarkPostmasterChildWalSender - mark a postmaster child as a WAL sender
- * process.  This is called in the child process, sometime after marking the
- * child as active.
- */
-void
-MarkPostmasterChildWalSender(void)
-{
-	int			slot = MyPMChildSlot;
-
-	Assert(am_walsender);
-
-	Assert(slot > 0 && slot <= PMSignalState->num_child_flags);
-	slot--;
-	Assert(PMSignalState->PMChildFlags[slot] == PM_CHILD_ACTIVE);
-	PMSignalState->PMChildFlags[slot] = PM_CHILD_WALSENDER;
-}
-
-/*
  * MarkPostmasterChildInactive - mark a postmaster child as done using
  * shared memory.  This is called in the child process.
  */
@@ -358,8 +318,7 @@ MarkPostmasterChildInactive(void)
 
 	Assert(slot > 0 && slot <= PMSignalState->num_child_flags);
 	slot--;
-	Assert(PMSignalState->PMChildFlags[slot] == PM_CHILD_ACTIVE ||
-		   PMSignalState->PMChildFlags[slot] == PM_CHILD_WALSENDER);
+	Assert(PMSignalState->PMChildFlags[slot] == PM_CHILD_ACTIVE);
 	PMSignalState->PMChildFlags[slot] = PM_CHILD_ASSIGNED;
 }
 

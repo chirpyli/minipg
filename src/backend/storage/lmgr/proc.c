@@ -157,7 +157,6 @@ InitProcGlobal(void)
 	 */
 	ProcGlobal->spins_per_delay = DEFAULT_SPINS_PER_DELAY;
 	ProcGlobal->freeProcs = NULL;
-	ProcGlobal->walsenderFreeProcs = NULL;
 	ProcGlobal->startupProc = NULL;
 	ProcGlobal->startupProcPid = 0;
 	ProcGlobal->walwriterLatch = NULL;
@@ -167,9 +166,9 @@ InitProcGlobal(void)
 
 	/*
 	 * Create and initialize all the PGPROC structures we'll need.  There are
-	 * three separate consumers: (1) normal backends, (2) walsenders, and
-	 * (3) auxiliary processes.  Each PGPROC structure is dedicated to exactly
-	 * one of these purposes, and they do not move between groups.
+	 * two separate consumers: (1) normal backends and (2) auxiliary processes.
+	 * Each PGPROC structure is dedicated to exactly one of these purposes, and
+	 * they do not move between groups.
 	 */
 	procs = (PGPROC *) ShmemAlloc(TotalProcs * sizeof(PGPROC));
 	MemSet(procs, 0, TotalProcs * sizeof(PGPROC));
@@ -202,11 +201,10 @@ InitProcGlobal(void)
 		procs[i].pgprocno = i;
 
 		/*
-		 * Newly created PGPROCs for normal backends and walsenders must be
-		 * queued up on the appropriate free list.  Because there can only
-		 * ever be a small, fixed number of auxiliary processes, no free list
-		 * is used in that case; InitAuxiliaryProcess() instead uses a linear
-		 * search.
+		 * Newly created PGPROCs for normal backends must be queued up on the
+		 * free list.  Because there can only ever be a small, fixed number of
+		 * auxiliary processes, no free list is used in that case;
+		 * InitAuxiliaryProcess() instead uses a linear search.
 		 */
 		if (i < MaxConnections)
 		{
@@ -214,13 +212,6 @@ InitProcGlobal(void)
 			procs[i].links.next = (SHM_QUEUE *) ProcGlobal->freeProcs;
 			ProcGlobal->freeProcs = &procs[i];
 			procs[i].procgloballist = &ProcGlobal->freeProcs;
-		}
-		else if (i < MaxBackends)
-		{
-			/* PGPROC for walsender, add to walsenderFreeProcs list */
-			procs[i].links.next = (SHM_QUEUE *) ProcGlobal->walsenderFreeProcs;
-			ProcGlobal->walsenderFreeProcs = &procs[i];
-			procs[i].procgloballist = &ProcGlobal->walsenderFreeProcs;
 		}
 
 		/* Initialize myProcLocks[] shared memory queues. */

@@ -317,7 +317,6 @@ typedef enum BackendType
 	B_BG_WRITER,
 	B_CHECKPOINTER,
 	B_STARTUP,
-	B_WAL_SENDER,
 	B_WAL_WRITER,
 	B_LOGGER,
 } BackendType;

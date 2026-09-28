@@ -316,8 +316,6 @@ typedef struct PROC_HDR
 	uint32		allProcCount;
 	/* Head of list of free PGPROC structures */
 	PGPROC	   *freeProcs;
-	/* Head of list of walsender free PGPROC structures */
-	PGPROC	   *walsenderFreeProcs;
 	/* First pgproc waiting for group XID clear */
 	pg_atomic_uint32 procArrayGroupFirst;
 	/* First pgproc waiting for group transaction status update */
