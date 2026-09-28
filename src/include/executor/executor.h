@@ -47,9 +47,6 @@
  *
  * MARK indicates that the plan node must support Mark/Restore calls.
  * When this is not passed, no Mark/Restore will occur.
- *
- * SKIP_TRIGGERS is accepted for API compatibility but has no effect in this
- * trimmed build, since the AFTER-trigger machinery has been removed.
  */
 #define EXEC_FLAG_EXPLAIN_ONLY	0x0001	/* EXPLAIN, no ANALYZE */
 #define EXEC_FLAG_REWIND		0x0002	/* need efficient rescan */

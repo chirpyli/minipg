@@ -683,11 +683,6 @@ init_sql_fcache(FunctionCallInfo fcinfo, Oid collation, bool lazyEvalOK)
 	}
 
 	/*
-	 * Check that there are no statements we don't want to allow.
-	 */
-	check_sql_fn_statements(queryTree_list);
-
-	/*
 	 * Check that the function returns the type it claims to.  Although in
 	 * simple cases this was already done when the function was defined, we
 	 * have to recheck because database objects used in the function's queries
@@ -1468,35 +1463,6 @@ ShutdownSQLFunction(Datum arg)
 
 	/* execUtils will deregister the callback... */
 	fcache->shutdown_reg = false;
-}
-
-/*
- * check_sql_fn_statements
- *
- * Check statements in an SQL function.  Error out if there is anything that
- * is not acceptable.
- */
-void
-check_sql_fn_statements(List *queryTreeLists)
-{
-	ListCell   *lc;
-
-	/* We are given a list of sublists of Queries */
-	foreach(lc, queryTreeLists)
-	{
-		List	   *sublist = lfirst_node(List, lc);
-		ListCell   *lc2;
-
-		foreach(lc2, sublist)
-		{
-			Query	   *query = lfirst_node(Query, lc2);
-
-			/* no CALL statements can appear here (procedures are unsupported) */
-			Assert(!(query->commandType == CMD_UTILITY &&
-					 IsA(query->utilityStmt, CallStmt)));
-			(void) query;			/* keep compiler quiet when Assert() is empty */
-		}
-	}
 }
 
 /*

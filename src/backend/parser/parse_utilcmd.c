@@ -215,8 +215,6 @@ transformCreateStmt(CreateStmt *stmt, const char *queryString)
 	save_alist = cxt.alist;
 	cxt.alist = NIL;
 
-	Assert(stmt->constraints == NIL);
-
 	/*
 	 * Postprocess constraints that give rise to index definitions.
 	 */
