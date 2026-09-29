@@ -33,7 +33,6 @@ OBJS = \
 	nodeBitmapOr.o \
 	nodeHash.o \
 	nodeHashjoin.o \
-	nodeIncrementalSort.o \
 	nodeIndexonlyscan.o \
 	nodeIndexscan.o \
 	nodeMaterial.o \

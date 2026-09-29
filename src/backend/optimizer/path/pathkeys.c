@@ -1651,10 +1651,10 @@ right_merge_direction(PlannerInfo *root, PathKey *pathkey)
  *		Count the number of pathkeys that are useful for meeting the
  *		query's requested output ordering.
  *
- * Because we the have the possibility of incremental sort, a prefix list of
- * keys is potentially useful for improving the performance of the requested
- * ordering. Thus we return 0, if no valuable keys are found, or the number
- * of leading keys shared by the list and the requested ordering..
+ * A prefix list of keys is potentially useful for improving the performance
+ * of the requested ordering. Thus we return 0, if no valuable keys are found,
+ * or the number of leading keys shared by the list and the requested
+ * ordering..
  */
 static int
 pathkeys_useful_for_ordering(PlannerInfo *root, List *pathkeys)

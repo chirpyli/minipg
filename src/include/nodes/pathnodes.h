@@ -1298,18 +1298,6 @@ typedef struct SortPath
 } SortPath;
 
 /*
- * IncrementalSortPath represents an incremental sort step
- *
- * This is like a regular sort, except some leading key columns are assumed
- * to be ordered already.
- */
-typedef struct IncrementalSortPath
-{
-	SortPath	spath;
-	int			nPresortedCols; /* number of presorted columns */
-} IncrementalSortPath;
-
-/*
  * UpperUniquePath represents adjacent-duplicate removal (in presorted input)
  *
  * The columns to be compared are the first numkeys columns of the path's

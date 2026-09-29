@@ -49,7 +49,6 @@ extern PGDLLIMPORT bool enable_indexonlyscan;
 extern PGDLLIMPORT bool enable_bitmapscan;
 extern PGDLLIMPORT bool enable_tidscan;
 extern PGDLLIMPORT bool enable_sort;
-extern PGDLLIMPORT bool enable_incremental_sort;
 extern PGDLLIMPORT bool enable_nestloop;
 extern PGDLLIMPORT bool enable_material;
 extern PGDLLIMPORT bool enable_mergejoin;
@@ -83,10 +82,6 @@ extern void cost_resultscan(Path *path, PlannerInfo *root,
 extern void cost_sort(Path *path, PlannerInfo *root,
 					  List *pathkeys, Cost input_cost, double tuples, int width,
 					  Cost comparison_cost, int sort_mem);
-extern void cost_incremental_sort(Path *path,
-								  PlannerInfo *root, List *pathkeys, int presorted_keys,
-								  Cost input_startup_cost, Cost input_total_cost,
-								  double input_tuples, int width, Cost comparison_cost, int sort_mem);
 extern void cost_append(AppendPath *path);
 extern void cost_material(Path *path,
 						  Cost input_startup_cost, Cost input_total_cost,

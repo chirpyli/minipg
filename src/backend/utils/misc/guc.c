@@ -734,15 +734,6 @@ static struct config_bool ConfigureNamesBool[] =
 		NULL, NULL, NULL
 	},
 	{
-		{"enable_incremental_sort", PGC_USERSET, QUERY_TUNING_METHOD,
-			gettext_noop("Enables the planner's use of incremental sort steps."),
-			NULL
-		},
-		&enable_incremental_sort,
-		true,
-		NULL, NULL, NULL
-	},
-	{
 		{"enable_material", PGC_USERSET, QUERY_TUNING_METHOD,
 			gettext_noop("Enables the planner's use of materialization."),
 			NULL,

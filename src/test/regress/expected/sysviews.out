@@ -40,18 +40,17 @@ select DISTINCT true as ok from (select (pg_lock_status()).*) as l;
 select name, setting
   from (select (pg_show_all_settings()).*) as s
   where left(name, 6) = 'enable';
-          name           | setting 
--------------------------+---------
- enable_bitmapscan       | on
- enable_hashjoin         | on
- enable_incremental_sort | on
- enable_indexonlyscan    | on
- enable_indexscan        | on
- enable_material         | on
- enable_mergejoin        | on
- enable_nestloop         | on
- enable_seqscan          | on
- enable_sort             | on
- enable_tidscan          | on
-(11 rows)
+         name         | setting 
+----------------------+---------
+ enable_bitmapscan    | on
+ enable_hashjoin      | on
+ enable_indexonlyscan | on
+ enable_indexscan     | on
+ enable_material      | on
+ enable_mergejoin     | on
+ enable_nestloop      | on
+ enable_seqscan       | on
+ enable_sort          | on
+ enable_tidscan       | on
+(10 rows)
 

@@ -135,11 +135,6 @@ extern SortPath *create_sort_path(PlannerInfo *root,
 								  RelOptInfo *rel,
 								  Path *subpath,
 								  List *pathkeys);
-extern IncrementalSortPath *create_incremental_sort_path(PlannerInfo *root,
-														 RelOptInfo *rel,
-														 Path *subpath,
-														 List *pathkeys,
-														 int presorted_keys);
 extern UpperUniquePath *create_upper_unique_path(PlannerInfo *root,
 												 RelOptInfo *rel,
 												 Path *subpath,

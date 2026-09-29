@@ -1634,10 +1634,9 @@ create_ordered_paths(PlannerInfo *root,
 		Path	   *input_path = (Path *) lfirst(lc);
 		Path	   *sorted_path = input_path;
 		bool		is_sorted;
-		int			presorted_keys;
 
-		is_sorted = pathkeys_count_contained_in(root->sort_pathkeys,
-												input_path->pathkeys, &presorted_keys);
+		is_sorted = pathkeys_contained_in(root->sort_pathkeys,
+										  input_path->pathkeys);
 
 		if (is_sorted)
 		{
@@ -1671,34 +1670,6 @@ create_ordered_paths(PlannerInfo *root,
 
 				add_path(ordered_rel, sorted_path);
 			}
-
-			/*
-			 * If incremental sort is enabled, then try it as well. Unlike
-			 * with regular sorts, we can't just look at the cheapest path,
-			 * because the cost of incremental sort depends on how well
-			 * presorted the path is. Additionally incremental sort may enable
-			 * a cheaper startup path to win out despite higher total cost.
-			 */
-			if (!enable_incremental_sort)
-				continue;
-
-			/* Likewise, if the path can't be used for incremental sort. */
-			if (!presorted_keys)
-				continue;
-
-			/* Also consider incremental sort. */
-			sorted_path = (Path *) create_incremental_sort_path(root,
-																ordered_rel,
-																input_path,
-																root->sort_pathkeys,
-																presorted_keys);
-
-			/* Add projection step if needed */
-			if (sorted_path->pathtarget != target)
-				sorted_path = apply_projection_to_path(root, ordered_rel,
-													   sorted_path, target);
-
-			add_path(ordered_rel, sorted_path);
 		}
 	}
 

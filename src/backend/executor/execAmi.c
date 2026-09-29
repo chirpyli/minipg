@@ -21,7 +21,6 @@
 #include "executor/nodeBitmapOr.h"
 #include "executor/nodeHash.h"
 #include "executor/nodeHashjoin.h"
-#include "executor/nodeIncrementalSort.h"
 #include "executor/nodeIndexonlyscan.h"
 #include "executor/nodeIndexscan.h"
 #include "executor/nodeMaterial.h"
@@ -185,10 +184,6 @@ ExecReScan(PlanState *node)
 
 		case T_SortState:
 			ExecReScanSort((SortState *) node);
-			break;
-
-		case T_IncrementalSortState:
-			ExecReScanIncrementalSort((IncrementalSortState *) node);
 			break;
 
 		case T_UniqueState:

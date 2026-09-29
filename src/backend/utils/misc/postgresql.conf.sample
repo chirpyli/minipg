@@ -187,7 +187,6 @@
 #enable_bitmapscan = on
 #enable_gathermerge = on
 #enable_hashjoin = on
-#enable_incremental_sort = on
 #enable_indexscan = on
 #enable_indexonlyscan = on
 #enable_material = on

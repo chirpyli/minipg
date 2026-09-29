@@ -64,7 +64,6 @@ typedef enum NodeTag
 	T_HashJoin,
 	T_Material,
 	T_Sort,
-	T_IncrementalSort,
 	T_Unique,
 	T_Hash,
 	/* these aren't subclasses of Plan: */
@@ -99,7 +98,6 @@ typedef enum NodeTag
 	T_HashJoinState,
 	T_MaterialState,
 	T_SortState,
-	T_IncrementalSortState,
 	T_UniqueState,
 	T_HashState,
 
@@ -180,7 +178,6 @@ typedef enum NodeTag
 	T_ProjectionPath,
 	T_ProjectSetPath,
 	T_SortPath,
-	T_IncrementalSortPath,
 	T_UpperUniquePath,
 	T_ModifyTablePath,
 	/* these aren't subclasses of Path: */

@@ -75,7 +75,6 @@
 #include "executor/nodeBitmapOr.h"
 #include "executor/nodeHash.h"
 #include "executor/nodeHashjoin.h"
-#include "executor/nodeIncrementalSort.h"
 #include "executor/nodeIndexonlyscan.h"
 #include "executor/nodeIndexscan.h"
 #include "executor/nodeMaterial.h"
@@ -243,11 +242,6 @@ ExecInitNode(Plan *node, EState *estate, int eflags)
 		case T_Sort:
 			result = (PlanState *) ExecInitSort((Sort *) node,
 												estate, eflags);
-			break;
-
-		case T_IncrementalSort:
-			result = (PlanState *) ExecInitIncrementalSort((IncrementalSort *) node,
-														   estate, eflags);
 			break;
 
 		case T_Unique:
@@ -541,10 +535,6 @@ ExecEndNode(PlanState *node)
 
 		case T_SortState:
 			ExecEndSort((SortState *) node);
-			break;
-
-		case T_IncrementalSortState:
-			ExecEndIncrementalSort((IncrementalSortState *) node);
 			break;
 
 		case T_UniqueState:

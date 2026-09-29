@@ -312,7 +312,6 @@ RelOptInfo      - 一个关系或若干已连接的关系
   ProjectionPath - 带子节点的 Result 计划节点（用于投影）
   ProjectSetPath - 施加于某个子路径的 ProjectSet 计划节点
   SortPath      - 施加于某个子路径的 Sort 计划节点
-  IncrementalSortPath - 施加于某个子路径的 IncrementalSort 计划节点
   UpperUniquePath - 施加于某个子路径的 Unique 计划节点
   ModifyTablePath - 施加于某个（些）子路径的 ModifyTable 计划节点
   NestPath      - 嵌套循环连接

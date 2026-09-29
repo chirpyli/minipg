@@ -610,16 +610,6 @@ _outSort(StringInfo str, const Sort *node)
 }
 
 static void
-_outIncrementalSort(StringInfo str, const IncrementalSort *node)
-{
-	WRITE_NODE_TYPE("INCREMENTALSORT");
-
-	_outSortInfo(str, (const Sort *) node);
-
-	WRITE_INT_FIELD(nPresortedCols);
-}
-
-static void
 _outUnique(StringInfo str, const Unique *node)
 {
 	WRITE_NODE_TYPE("UNIQUE");
@@ -1337,16 +1327,6 @@ _outSortPath(StringInfo str, const SortPath *node)
 	WRITE_NODE_TYPE("SORTPATH");
 
 	_outSortPathInfo(str, node);
-}
-
-static void
-_outIncrementalSortPath(StringInfo str, const IncrementalSortPath *node)
-{
-	WRITE_NODE_TYPE("INCREMENTALSORTPATH");
-
-	_outSortPathInfo(str, (const SortPath *) node);
-
-	WRITE_INT_FIELD(nPresortedCols);
 }
 
 static void
@@ -2331,9 +2311,6 @@ outNode(StringInfo str, const void *obj)
 			case T_Sort:
 				_outSort(str, obj);
 				break;
-			case T_IncrementalSort:
-				_outIncrementalSort(str, obj);
-				break;
 			case T_Unique:
 				_outUnique(str, obj);
 				break;
@@ -2492,9 +2469,6 @@ outNode(StringInfo str, const void *obj)
 				break;
 			case T_SortPath:
 				_outSortPath(str, obj);
-				break;
-			case T_IncrementalSortPath:
-				_outIncrementalSortPath(str, obj);
 				break;
 			case T_UpperUniquePath:
 				_outUpperUniquePath(str, obj);

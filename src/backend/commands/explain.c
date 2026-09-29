@@ -65,17 +65,13 @@ static void show_upper_qual(List *qual, const char *qlabel,
 							ExplainState *es);
 static void show_sort_keys(SortState *sortstate, List *ancestors,
 						   ExplainState *es);
-static void show_incremental_sort_keys(IncrementalSortState *incrsortstate,
-									   List *ancestors, ExplainState *es);
 static void show_sort_group_keys(PlanState *planstate, const char *qlabel,
-								 int nkeys, int nPresortedKeys, AttrNumber *keycols,
+								 int nkeys, AttrNumber *keycols,
 								 Oid *sortOperators, Oid *collations, bool *nullsFirst,
 								 List *ancestors, ExplainState *es);
 static void show_sortorder_options(StringInfo buf, Node *sortexpr,
 								   Oid sortOperator, Oid collation, bool nullsFirst);
 static void show_sort_info(SortState *sortstate, ExplainState *es);
-static void show_incremental_sort_info(IncrementalSortState *incrsortstate,
-									   ExplainState *es);
 static void show_hash_info(HashState *hashstate, ExplainState *es);
 static void show_tidbitmap_info(BitmapHeapScanState *planstate,
 								ExplainState *es);
@@ -643,9 +639,6 @@ ExplainNode(PlanState *planstate, List *ancestors,
 		case T_Sort:
 			pname = "Sort";
 			break;
-		case T_IncrementalSort:
-			pname = "Incremental Sort";
-			break;
 		case T_Unique:
 			pname = "Unique";
 			break;
@@ -960,12 +953,6 @@ ExplainNode(PlanState *planstate, List *ancestors,
 			show_sort_keys(castNode(SortState, planstate), ancestors, es);
 			show_sort_info(castNode(SortState, planstate), es);
 			break;
-		case T_IncrementalSort:
-			show_incremental_sort_keys(castNode(IncrementalSortState, planstate),
-									   ancestors, es);
-			show_incremental_sort_info(castNode(IncrementalSortState, planstate),
-									   es);
-			break;
 		case T_Result:
 			show_upper_qual((List *) ((Result *) plan)->resconstantqual,
 							"One-Time Filter", planstate, ancestors, es);
@@ -1172,26 +1159,9 @@ show_sort_keys(SortState *sortstate, List *ancestors, ExplainState *es)
 	Sort	   *plan = (Sort *) sortstate->ss.ps.plan;
 
 	show_sort_group_keys((PlanState *) sortstate, "Sort Key",
-						 plan->numCols, 0, plan->sortColIdx,
+						 plan->numCols, plan->sortColIdx,
 						 plan->sortOperators, plan->collations,
 						 plan->nullsFirst,
-						 ancestors, es);
-}
-
-/*
- * Show the sort keys for a IncrementalSort node.
- */
-static void
-show_incremental_sort_keys(IncrementalSortState *incrsortstate,
-						   List *ancestors, ExplainState *es)
-{
-	IncrementalSort *plan = (IncrementalSort *) incrsortstate->ss.ps.plan;
-
-	show_sort_group_keys((PlanState *) incrsortstate, "Sort Key",
-						 plan->sort.numCols, plan->nPresortedCols,
-						 plan->sort.sortColIdx,
-						 plan->sort.sortOperators, plan->sort.collations,
-						 plan->sort.nullsFirst,
 						 ancestors, es);
 }
 
@@ -1202,14 +1172,13 @@ show_incremental_sort_keys(IncrementalSortState *incrsortstate,
  */
 static void
 show_sort_group_keys(PlanState *planstate, const char *qlabel,
-					 int nkeys, int nPresortedKeys, AttrNumber *keycols,
+					 int nkeys, AttrNumber *keycols,
 					 Oid *sortOperators, Oid *collations, bool *nullsFirst,
 					 List *ancestors, ExplainState *es)
 {
 	Plan	   *plan = planstate->plan;
 	List	   *context;
 	List	   *result = NIL;
-	List	   *resultPresorted = NIL;
 	StringInfoData sortkeybuf;
 	bool		useprefix;
 	int			keyno;
@@ -1249,13 +1218,9 @@ show_sort_group_keys(PlanState *planstate, const char *qlabel,
 								   nullsFirst[keyno]);
 		/* Emit one property-list item per sort key */
 		result = lappend(result, pstrdup(sortkeybuf.data));
-		if (keyno < nPresortedKeys)
-			resultPresorted = lappend(resultPresorted, exprstr);
 	}
 
 	ExplainPropertyList(qlabel, result, es);
-	if (nPresortedKeys > 0)
-		ExplainPropertyList("Presorted Key", resultPresorted, es);
 }
 
 /*
@@ -1342,111 +1307,6 @@ show_sort_info(SortState *sortstate, ExplainState *es)
 		ExplainIndentText(es);
 		appendStringInfo(es->str, "Sort Method: %s  %s: " INT64_FORMAT "kB\n",
 						 sortMethod, spaceType, spaceUsed);
-	}
-
-}
-
-/*
- * Incremental sort nodes sort in (a potentially very large number of) batches,
- * so EXPLAIN ANALYZE needs to roll up the tuplesort stats from each batch into
- * an intelligible summary.
- *
- * This function is used for both a non-parallel node and each worker in a
- * parallel incremental sort node.
- */
-static void
-show_incremental_sort_group_info(IncrementalSortGroupInfo *groupInfo,
-								 const char *groupLabel, bool indent, ExplainState *es)
-{
-	ListCell   *methodCell;
-	List	   *methodNames = NIL;
-
-	/* Generate a list of sort methods used across all groups. */
-	for (int bit = 0; bit < NUM_TUPLESORTMETHODS; bit++)
-	{
-		TuplesortMethod sortMethod = (1 << bit);
-
-		if (groupInfo->sortMethods & sortMethod)
-		{
-			const char *methodName = tuplesort_method_name(sortMethod);
-
-			methodNames = lappend(methodNames, unconstify(char *, methodName));
-		}
-	}
-
-	if (indent)
-		appendStringInfoSpaces(es->str, es->indent * 2);
-	appendStringInfo(es->str, "%s Groups: " INT64_FORMAT "  Sort Method", groupLabel,
-					 groupInfo->groupCount);
-	/* plural/singular based on methodNames size */
-	if (list_length(methodNames) > 1)
-		appendStringInfoString(es->str, "s: ");
-	else
-		appendStringInfoString(es->str, ": ");
-	foreach(methodCell, methodNames)
-	{
-		appendStringInfoString(es->str, (char *) methodCell->ptr_value);
-		if (foreach_current_index(methodCell) < list_length(methodNames) - 1)
-			appendStringInfoString(es->str, ", ");
-	}
-
-	if (groupInfo->maxMemorySpaceUsed > 0)
-	{
-		int64		avgSpace = groupInfo->totalMemorySpaceUsed / groupInfo->groupCount;
-		const char *spaceTypeName;
-
-		spaceTypeName = tuplesort_space_type_name(SORT_SPACE_TYPE_MEMORY);
-		appendStringInfo(es->str, "  Average %s: " INT64_FORMAT "kB  Peak %s: " INT64_FORMAT "kB",
-						 spaceTypeName, avgSpace,
-						 spaceTypeName, groupInfo->maxMemorySpaceUsed);
-	}
-
-	if (groupInfo->maxDiskSpaceUsed > 0)
-	{
-		int64		avgSpace = groupInfo->totalDiskSpaceUsed / groupInfo->groupCount;
-		const char *spaceTypeName;
-
-		spaceTypeName = tuplesort_space_type_name(SORT_SPACE_TYPE_DISK);
-		appendStringInfo(es->str, "  Average %s: " INT64_FORMAT "kB  Peak %s: " INT64_FORMAT "kB",
-						 spaceTypeName, avgSpace,
-						 spaceTypeName, groupInfo->maxDiskSpaceUsed);
-	}
-}
-
-/*
- * If it's EXPLAIN ANALYZE, show tuplesort stats for an incremental sort node
- */
-static void
-show_incremental_sort_info(IncrementalSortState *incrsortstate,
-						   ExplainState *es)
-{
-	IncrementalSortGroupInfo *fullsortGroupInfo;
-	IncrementalSortGroupInfo *prefixsortGroupInfo;
-
-	fullsortGroupInfo = &incrsortstate->incsort_info.fullsortGroupInfo;
-
-	if (!es->analyze)
-		return;
-
-	/*
-	 * Since we never have any prefix groups unless we've first sorted a full
-	 * groups and transitioned modes (copying the tuples into a prefix group),
-	 * we don't need to do anything if there were 0 full groups.
-	 *
-	 * We still have to continue after this block if there are no full groups,
-	 * though, since it's possible that we have workers that did real work
-	 * even if the leader didn't participate.
-	 */
-	if (fullsortGroupInfo->groupCount > 0)
-	{
-		show_incremental_sort_group_info(fullsortGroupInfo, "Full-sort", true, es);
-		prefixsortGroupInfo = &incrsortstate->incsort_info.prefixsortGroupInfo;
-		if (prefixsortGroupInfo->groupCount > 0)
-		{
-			appendStringInfoChar(es->str, '\n');
-			show_incremental_sort_group_info(prefixsortGroupInfo, "Pre-sorted", true, es);
-		}
-		appendStringInfoChar(es->str, '\n');
 	}
 
 }

@@ -1418,21 +1418,6 @@ _readSort(void)
 }
 
 /*
- * _readIncrementalSort
- */
-static IncrementalSort *
-_readIncrementalSort(void)
-{
-	READ_LOCALS(IncrementalSort);
-
-	ReadCommonSort(&local_node->sort);
-
-	READ_INT_FIELD(nPresortedCols);
-
-	READ_DONE();
-}
-
-/*
  * _readUnique
  */
 static Unique *
@@ -1684,8 +1669,6 @@ parseNodeString(void)
 		return_value = _readMaterial();
 	else if (MATCH("SORT", 4))
 		return_value = _readSort();
-	else if (MATCH("INCREMENTALSORT", 15))
-		return_value = _readIncrementalSort();
 	else if (MATCH("UNIQUE", 6))
 		return_value = _readUnique();
 	else if (MATCH("HASH", 4))

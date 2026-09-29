@@ -1508,20 +1508,6 @@ typedef struct MaterialState
 } MaterialState;
 
 /* ----------------
- *	 When performing sorting by multiple keys, it's possible that the input
- *	 dataset is already sorted on a prefix of those keys. We call these
- *	 "presorted keys".
- *	 PresortedKeyData represents information about one such key.
- * ----------------
- */
-typedef struct PresortedKeyData
-{
-	FmgrInfo	flinfo;			/* comparison function info */
-	FunctionCallInfo fcinfo;	/* comparison function call info */
-	OffsetNumber attno;			/* attribute number in tuple */
-} PresortedKeyData;
-
-/* ----------------
  *	 SortState information
  * ----------------
  */
@@ -1537,60 +1523,6 @@ typedef struct SortState
 	void	   *tuplesortstate; /* private state of tuplesort.c */
 	bool		am_worker;		/* are we a worker? */
 } SortState;
-
-/* ----------------
- *	 Instrumentation information for IncrementalSort
- * ----------------
- */
-typedef struct IncrementalSortGroupInfo
-{
-	int64		groupCount;
-	int64		maxDiskSpaceUsed;
-	int64		totalDiskSpaceUsed;
-	int64		maxMemorySpaceUsed;
-	int64		totalMemorySpaceUsed;
-	bits32		sortMethods;	/* bitmask of TuplesortMethod */
-} IncrementalSortGroupInfo;
-
-typedef struct IncrementalSortInfo
-{
-	IncrementalSortGroupInfo fullsortGroupInfo;
-	IncrementalSortGroupInfo prefixsortGroupInfo;
-} IncrementalSortInfo;
-
-/* ----------------
- *	 IncrementalSortState information
- * ----------------
- */
-typedef enum
-{
-	INCSORT_LOADFULLSORT,
-	INCSORT_LOADPREFIXSORT,
-	INCSORT_READFULLSORT,
-	INCSORT_READPREFIXSORT,
-} IncrementalSortExecutionStatus;
-
-typedef struct IncrementalSortState
-{
-	ScanState	ss;				/* its first field is NodeTag */
-	bool		bounded;		/* is the result set bounded? */
-	int64		bound;			/* if bounded, how many tuples are needed */
-	bool		outerNodeDone;	/* finished fetching tuples from outer node */
-	int64		bound_Done;		/* value of bound we did the sort with */
-	IncrementalSortExecutionStatus execution_status;
-	int64		n_fullsort_remaining;
-	Tuplesortstate *fullsort_state; /* private state of tuplesort.c */
-	Tuplesortstate *prefixsort_state;	/* private state of tuplesort.c */
-	/* the keys by which the input path is already sorted */
-	PresortedKeyData *presorted_keys;
-
-	IncrementalSortInfo incsort_info;
-
-	/* slot for pivot tuple defining values of presorted keys within group */
-	TupleTableSlot *group_pivot;
-	TupleTableSlot *transfer_tuple;
-	bool		am_worker;		/* are we a worker? */
-} IncrementalSortState;
 
 /* ----------------
  *	 UniqueState information

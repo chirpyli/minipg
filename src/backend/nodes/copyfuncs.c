@@ -635,28 +635,6 @@ _copySort(const Sort *from)
 
 
 /*
- * _copyIncrementalSort
- */
-static IncrementalSort *
-_copyIncrementalSort(const IncrementalSort *from)
-{
-	IncrementalSort *newnode = makeNode(IncrementalSort);
-
-	/*
-	 * copy node superclass fields
-	 */
-	CopySortFields((const Sort *) from, (Sort *) newnode);
-
-	/*
-	 * copy remainder of node
-	 */
-	COPY_SCALAR_FIELD(nPresortedCols);
-
-	return newnode;
-}
-
-
-/*
  * _copyUnique
  */
 static Unique *
@@ -2271,9 +2249,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_Sort:
 			retval = _copySort(from);
-			break;
-		case T_IncrementalSort:
-			retval = _copyIncrementalSort(from);
 			break;
 		case T_Unique:
 			retval = _copyUnique(from);

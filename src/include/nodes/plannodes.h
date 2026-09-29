@@ -557,16 +557,6 @@ typedef struct Sort
 } Sort;
 
 /* ----------------
- *		incremental sort node
- * ----------------
- */
-typedef struct IncrementalSort
-{
-	Sort		sort;
-	int			nPresortedCols; /* number of presorted columns */
-} IncrementalSort;
-
-/* ----------------
  *		unique node
  * ----------------
  */
