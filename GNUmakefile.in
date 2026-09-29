@@ -10,42 +10,21 @@ include $(top_builddir)/src/Makefile.global
 
 $(call recurse,all install,src config)
 
-docs:
-	$(MAKE) -C doc all
+# 注：doc 与 contrib 均已在 minipg 裁剪中删除，从 world / install-world /
+# clean / distclean 等递归列表中移除。
+$(call recurse,world,src config,all)
 
-$(call recurse,world,doc src config contrib,all)
+$(call recurse,world-bin,src config,all)
 
-# build src/ before contrib/
-world-contrib-recurse: world-src-recurse
+$(call recurse,install-world,src config,install)
 
-$(call recurse,world-bin,src config contrib,all)
+$(call recurse,install-world-bin,src config,install)
 
-# build src/ before contrib/
-world-bin-contrib-recurse: world-bin-src-recurse
+$(call recurse,installdirs uninstall init-po update-po,src config)
 
-html man:
-	$(MAKE) -C doc $@
+$(call recurse,distprep coverage,src config)
 
-install-docs:
-	$(MAKE) -C doc install
-
-$(call recurse,install-world,doc src config contrib,install)
-
-# build src/ before contrib/
-install-world-contrib-recurse: install-world-src-recurse
-
-$(call recurse,install-world-bin,src config contrib,install)
-
-# build src/ before contrib/
-install-world-bin-contrib-recurse: install-world-bin-src-recurse
-
-$(call recurse,installdirs uninstall init-po update-po,doc src config)
-
-$(call recurse,distprep coverage,doc src config contrib)
-
-# clean, distclean, etc should apply to contrib too, even though
-# it's not built by default
-$(call recurse,clean,contrib src config)
+$(call recurse,clean,src config)
 clean:
 	rm -rf tmp_install/ portlock/
 # Garbage from autoconf:
@@ -54,7 +33,6 @@ clean:
 # Important: distclean `src' last, otherwise Makefile.global
 # will be gone too soon.
 distclean maintainer-clean:
-	$(MAKE) -C contrib $@
 	$(MAKE) -C config $@
 	$(MAKE) -C src $@
 	rm -rf tmp_install/ portlock/
@@ -67,11 +45,12 @@ check check-tests installcheck installcheck-parallel installcheck-tests: CHECKPR
 check check-tests installcheck installcheck-parallel installcheck-tests: submake-generated-headers
 	$(MAKE) -C src/test/regress $@
 
-# 注：src/interfaces/ecpg 已在 minipg 裁剪（阶段 2）中删除，从 world 递归列表移除。
-$(call recurse,check-world,src/test contrib src/bin,check)
-$(call recurse,checkprep,  src/test contrib src/bin)
+# 注：src/interfaces/ecpg 已在 minipg 裁剪（阶段 2）中删除，contrib 亦已整体删除，
+# 均从 world / check 递归列表移除。
+$(call recurse,check-world,src/test src/bin,check)
+$(call recurse,checkprep,  src/test src/bin)
 
-$(call recurse,installcheck-world,src/test contrib src/bin,installcheck)
+$(call recurse,installcheck-world,src/test src/bin,installcheck)
 $(call recurse,install-tests,src/test/regress,install-tests)
 
 GNUmakefile: GNUmakefile.in $(top_builddir)/config.status
