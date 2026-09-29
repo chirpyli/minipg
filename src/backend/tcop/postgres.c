@@ -1258,22 +1258,6 @@ ProcessInterrupts(void)
 		}
 	}
 
-	if (IdleInTransactionSessionTimeoutPending)
-	{
-		/*
-		 * If the GUC has been reset to zero, ignore the signal.  This is
-		 * important because the GUC update itself won't disable any pending
-		 * interrupt.
-		 */
-		if (IdleInTransactionSessionTimeout > 0)
-			ereport(FATAL,
-					(errcode(ERRCODE_IDLE_IN_TRANSACTION_SESSION_TIMEOUT),
-					 errmsg("terminating connection due to idle-in-transaction timeout")));
-		else
-			IdleInTransactionSessionTimeoutPending = false;
-	}
-
-
 	if (ProcSignalBarrierPending)
 		ProcessProcSignalBarrier();
 
@@ -1799,7 +1783,6 @@ PostgresMain(int argc, char *argv[],
 
 	/* these must be volatile to ensure state is preserved across longjmp: */
 	volatile bool send_ready_for_query = true;
-	volatile bool idle_in_transaction_timeout_enabled = false;
 
 	/* Initialize startup process environment if necessary. */
 	if (!IsUnderPostmaster)
@@ -2049,7 +2032,6 @@ PostgresMain(int argc, char *argv[],
 		 */
 		disable_all_timeouts(false);	/* do first to avoid race condition */
 		QueryCancelPending = false;
-		idle_in_transaction_timeout_enabled = false;
 
 		/* Not reading from the client anymore. */
 		DoingCommandRead = false;
@@ -2139,34 +2121,16 @@ PostgresMain(int argc, char *argv[],
 		 * processing of batched messages, and because we don't want to report
 		 * uncommitted updates (that confuses autovacuum).  The notification
 		 * processor wants a call too, if we are not in a transaction block.
-		 *
-		 * Also, if an idle timeout is enabled, start the timer for that.
 		 */
 		if (send_ready_for_query)
 		{
 			if (IsAbortedTransactionBlockState())
 			{
 				set_ps_display("idle in transaction (aborted)");
-
-				/* Start the idle-in-transaction timer */
-				if (IdleInTransactionSessionTimeout > 0)
-				{
-					idle_in_transaction_timeout_enabled = true;
-					enable_timeout_after(IDLE_IN_TRANSACTION_SESSION_TIMEOUT,
-										 IdleInTransactionSessionTimeout);
-				}
 			}
 			else if (IsTransactionOrTransactionBlock())
 			{
 				set_ps_display("idle in transaction");
-
-				/* Start the idle-in-transaction timer */
-				if (IdleInTransactionSessionTimeout > 0)
-				{
-					idle_in_transaction_timeout_enabled = true;
-					enable_timeout_after(IDLE_IN_TRANSACTION_SESSION_TIMEOUT,
-										 IdleInTransactionSessionTimeout);
-				}
 			}
 			else
 			{
@@ -2199,21 +2163,7 @@ PostgresMain(int argc, char *argv[],
 		firstchar = ReadCommand(&input_message);
 
 		/*
-		 * (4) turn off the idle-in-transaction and idle-session timeouts, if
-		 * active.  We do this before step (5) so that any last-moment timeout
-		 * is certain to be detected in step (5).
-		 *
-		 * At most one of these timeouts will be active, so there's no need to
-		 * worry about combining the timeout.c calls into one.
-		 */
-		if (idle_in_transaction_timeout_enabled)
-		{
-			disable_timeout(IDLE_IN_TRANSACTION_SESSION_TIMEOUT, false);
-			idle_in_transaction_timeout_enabled = false;
-		}
-
-		/*
-		 * (5) disable async signal conditions again.
+		 * (4) disable async signal conditions again.
 		 *
 		 * Query cancel is supposed to be a no-op when there is no query in
 		 * progress, so if a query cancel arrived while we were idle, just
@@ -2235,7 +2185,7 @@ PostgresMain(int argc, char *argv[],
 		}
 
 		/*
-		 * (7) process the command.
+		 * (6) process the command.
 		 */
 		switch (firstchar)
 		{

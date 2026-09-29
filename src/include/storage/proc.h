@@ -340,7 +340,6 @@ extern PGDLLIMPORT PROC_HDR *ProcGlobal;
 /* configurable options */
 extern PGDLLIMPORT int DeadlockTimeout;
 extern PGDLLIMPORT int LockTimeout;
-extern PGDLLIMPORT int IdleInTransactionSessionTimeout;
 extern bool log_lock_waits;
 
 
