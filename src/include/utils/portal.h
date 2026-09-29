@@ -42,11 +42,6 @@
  * PORTAL_ONE_SELECT：Portal 中包含一条 SELECT 查询。我们按结果被请求
  * 的节奏增量式地运行执行器。
  *
- * PORTAL_ONE_MOD_WITH：Portal 中包含一条 SELECT 查询，但它带有
- * 数据修改型 CTE。由于可能需要触发触发器，目前将其完整运行，
- * 并把结果转储进 Portal 的 tuplestore。未来其行为可能会更接近
- * PORTAL_ONE_SELECT。
- *
  * PORTAL_UTIL_SELECT：Portal 中包含一条返回类 SELECT 结果的实用语句
  * （例如 EXPLAIN 或 SHOW）。首次执行时，我们运行该语句并将其结果转储进
  * Portal 的 tuplestore；随后按客户端请求返回这些结果。
@@ -57,7 +52,6 @@
 typedef enum PortalStrategy
 {
 	PORTAL_ONE_SELECT,
-	PORTAL_ONE_MOD_WITH,
 	PORTAL_UTIL_SELECT,
 	PORTAL_MULTI_QUERY
 } PortalStrategy;
@@ -128,8 +122,7 @@ typedef struct PortalData
 	Snapshot	portalSnapshot; /* active snapshot, or NULL if none */
 
 	/*
-	 * Where we store tuples for a PORTAL_ONE_MOD_WITH,
-	 * or PORTAL_UTIL_SELECT query.
+	 * Where we store tuples for a PORTAL_UTIL_SELECT query.
 	 */
 	Tuplestorestate *holdStore; /* store for stashed query results */
 	MemoryContext holdContext;	/* memory containing holdStore */

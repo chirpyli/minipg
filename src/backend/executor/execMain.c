@@ -160,11 +160,9 @@ standard_ExecutorStart(QueryDesc *queryDesc, int eflags)
 		case CMD_SELECT:
 
 			/*
-			 * SELECT FOR [KEY] UPDATE/SHARE and modifying CTEs need to mark
-			 * tuples
+			 * SELECT FOR [KEY] UPDATE/SHARE needs to mark tuples
 			 */
-			if (queryDesc->plannedstmt->rowMarks != NIL ||
-				queryDesc->plannedstmt->hasModifyingCTE)
+			if (queryDesc->plannedstmt->rowMarks != NIL)
 				estate->es_output_cid = GetCurrentCommandId(true);
 			break;
 
@@ -486,7 +484,7 @@ ExecCheckXactReadOnly(PlannedStmt *plannedstmt)
 		if (rte->rtekind != RTE_RELATION)
 			continue;
 
-		if (plannedstmt->commandType == CMD_SELECT && !plannedstmt->hasModifyingCTE)
+		if (plannedstmt->commandType == CMD_SELECT)
 			continue;
 
 		PreventCommandIfReadOnly(CreateCommandName((Node *) plannedstmt));

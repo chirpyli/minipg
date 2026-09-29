@@ -556,8 +556,7 @@ init_execution_state(List *queryTree_list,
 	{
 		lasttages->setsResult = true;
 		if (lazyEvalOK &&
-			lasttages->stmt->commandType == CMD_SELECT &&
-			!lasttages->stmt->hasModifyingCTE)
+			lasttages->stmt->commandType == CMD_SELECT)
 			fcache->lazyEval = lasttages->lazyEval = true;
 	}
 

@@ -74,10 +74,7 @@ CommandIsReadOnly(PlannedStmt *pstmt)
 	switch (pstmt->commandType)
 	{
 		case CMD_SELECT:
-			if (pstmt->hasModifyingCTE)
-				return false;	/* data-modifying CTE */
-			else
-				return true;
+			return true;
 		case CMD_UPDATE:
 		case CMD_INSERT:
 		case CMD_DELETE:

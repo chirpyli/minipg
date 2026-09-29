@@ -109,8 +109,7 @@ FreeQueryDesc(QueryDesc *qdesc)
 
 /*
  * ProcessQuery
- *		Execute a single plannable query within a PORTAL_MULTI_QUERY,
- *		or PORTAL_ONE_MOD_WITH portal
+ *		Execute a single plannable query within a PORTAL_MULTI_QUERY portal
  *
  *	plan: the plan tree for the query
  *	sourceText: the source text of the query
@@ -197,7 +196,6 @@ ChoosePortalStrategy(List *stmts)
 	/*
 	 * PORTAL_ONE_SELECT 与 PORTAL_UTIL_SELECT 只需考虑单语句情形，
 	 * 因为不存在能向 SELECT 或实用命令追加辅助查询的重写规则。
-	 * PORTAL_ONE_MOD_WITH 同样只允许一个顶层语句。
 	 */
 	if (list_length(stmts) == 1)
 	{
@@ -228,12 +226,7 @@ ChoosePortalStrategy(List *stmts)
 			if (pstmt->canSetTag)
 			{
 				if (pstmt->commandType == CMD_SELECT)
-				{
-					if (pstmt->hasModifyingCTE)
-						return PORTAL_ONE_MOD_WITH;
-					else
-						return PORTAL_ONE_SELECT;
-				}
+					return PORTAL_ONE_SELECT;
 				if (pstmt->commandType == CMD_UTILITY)
 				{
 					if (UtilityReturnsTuples(pstmt->utilityStmt))
@@ -435,28 +428,6 @@ PortalStart(Portal portal, ParamListInfo params,
 				PopActiveSnapshot();
 				break;
 
-			case PORTAL_ONE_MOD_WITH:
-
-				/*
-				 * We don't start the executor until we are told to run the
-				 * portal.  We do need to set up the result tupdesc.
-				 */
-				{
-					PlannedStmt *pstmt;
-
-					pstmt = PortalGetPrimaryStmt(portal);
-					portal->tupDesc =
-						ExecCleanTypeFromTL(pstmt->planTree->targetlist);
-				}
-
-				/*
-								 * Reset portal position data to "start of query"
-								 */
-				portal->atStart = true;
-				portal->atEnd = false;	/* allow fetches */
-				portal->portalPos = 0;
-				break;
-
 			case PORTAL_UTIL_SELECT:
 
 				/*
@@ -604,18 +575,16 @@ PortalRun(Portal portal, long count, bool isTopLevel,
 	MarkPortalActive(portal);
 
 	/*
-	 * Set up global portal context pointers.
+	 * 设置全局 portal 上下文指针。
 	 *
-	 * We have to play a special game here to support utility commands like
-	 * VACUUM and CLUSTER, which internally start and commit transactions.
-	 * When we are called to execute such a command, CurrentResourceOwner will
-	 * be pointing to the TopTransactionResourceOwner --- which will be
-	 * destroyed and replaced in the course of the internal commit and
-	 * restart.  So we need to be prepared to restore it as pointing to the
-	 * exit-time TopTransactionResourceOwner.  (Ain't that ugly?  This idea of
-	 * internally starting whole new transactions is not good.)
-	 * CurrentMemoryContext has a similar problem, but the other pointers we
-	 * save here will be NULL or pointing to longer-lived objects.
+	 * 为支持 VACUUM、CLUSTER 这类内部会自行开启并提交事务的实用命令，
+	 * 我们不得不在此做一点特殊的处理。当被调用去执行这类命令时，
+	 * CurrentResourceOwner 会指向 TopTransactionResourceOwner —— 而该对象
+	 * 会在内部提交与重启的过程中被销毁并替换。因此我们必须做好准备，
+	 * 在退出时把它恢复为指向退出时刻的 TopTransactionResourceOwner。
+	 * （是不是很难看？这种在内部开启全新事务的做法并不好。）
+	 * CurrentMemoryContext 有类似的问题，但我们在此保存的其它指针
+	 * 要么为 NULL，要么指向生命周期更长的对象。
 	 */
 	saveTopTransactionResourceOwner = TopTransactionResourceOwner;
 	saveTopTransactionContext = TopTransactionContext;
@@ -635,7 +604,6 @@ PortalRun(Portal portal, long count, bool isTopLevel,
 		switch (portal->strategy)
 		{
 			case PORTAL_ONE_SELECT:
-			case PORTAL_ONE_MOD_WITH:
 			case PORTAL_UTIL_SELECT:
 
 				/*
@@ -728,7 +696,7 @@ PortalRun(Portal portal, long count, bool isTopLevel,
  * PortalRunSelect
  *		Execute a portal's query in PORTAL_ONE_SELECT mode, and also
  *		when fetching from a completed holdStore in
- *		PORTAL_ONE_MOD_WITH and PORTAL_UTIL_SELECT cases.
+ *		the PORTAL_UTIL_SELECT case.
  *
  * This handles simple N-rows-forward cases.
  *
@@ -752,8 +720,7 @@ PortalRunSelect(Portal portal,
 
 	/*
 	 * NB: queryDesc will be NULL if we are fetching from a completed
-	 * PORTAL_ONE_MOD_WITH or PORTAL_UTIL_SELECT query; can't use it in
-	 * that path.
+	 * PORTAL_UTIL_SELECT query; can't use it in that path.
 	 */
 	queryDesc = portal->queryDesc;
 
@@ -817,7 +784,7 @@ PortalRunSelect(Portal portal,
  * FillPortalStore
  *		Run the query and load result tuples into the portal's tuple store.
  *
- * This is used for PORTAL_ONE_MOD_WITH and PORTAL_UTIL_SELECT cases only.
+ * This is used for the PORTAL_UTIL_SELECT case only.
  */
 static void
 FillPortalStore(Portal portal, bool isTopLevel)
@@ -833,18 +800,6 @@ FillPortalStore(Portal portal, bool isTopLevel)
 
 	switch (portal->strategy)
 	{
-		case PORTAL_ONE_MOD_WITH:
-
-			/*
-			 * Run the portal to completion just as for the default
-			 * PORTAL_MULTI_QUERY case, but send the primary query's output to
-			 * the tuplestore.  Auxiliary query outputs are discarded. Set the
-			 * portal's holdSnapshot to the snapshot used (or a copy of it).
-			 */
-			PortalRunMulti(portal, isTopLevel, true,
-						   treceiver, None_Receiver, &qc);
-			break;
-
 		case PORTAL_UTIL_SELECT:
 			PortalRunUtility(portal, linitial_node(PlannedStmt, portal->stmts),
 							 isTopLevel, true, treceiver, &qc);
