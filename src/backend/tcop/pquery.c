@@ -62,8 +62,7 @@ CreateQueryDesc(PlannedStmt *plannedstmt,
 				Snapshot snapshot,
 				Snapshot crosscheck_snapshot,
 				DestReceiver *dest,
-				ParamListInfo params,
-				int instrument_options)
+				ParamListInfo params)
 {
 	QueryDesc  *qd = (QueryDesc *) palloc(sizeof(QueryDesc));
 
@@ -75,13 +74,11 @@ CreateQueryDesc(PlannedStmt *plannedstmt,
 	qd->crosscheck_snapshot = RegisterSnapshot(crosscheck_snapshot);
 	qd->dest = dest;			/* output dest */
 	qd->params = params;		/* parameter values passed into query */
-	qd->instrument_options = instrument_options;	/* instrumentation wanted? */
 
 	/* null these fields until set by ExecutorStart */
 	qd->tupDesc = NULL;
 	qd->estate = NULL;
 	qd->planstate = NULL;
-	qd->totaltime = NULL;
 
 	/* not yet executed */
 	qd->already_executed = false;
@@ -136,7 +133,7 @@ ProcessQuery(PlannedStmt *plan,
 	 */
 	queryDesc = CreateQueryDesc(plan, sourceText,
 								GetActiveSnapshot(), InvalidSnapshot,
-								dest, params, 0);
+								dest, params);
 
 	/*
 	 * Call ExecutorStart to prepare the plan for execution
@@ -400,8 +397,7 @@ PortalStart(Portal portal, ParamListInfo params,
 											GetActiveSnapshot(),
 											InvalidSnapshot,
 											None_Receiver,
-											params,
-											0);
+											params);
 
 				/*
 				 * Call ExecutorStart to prepare the plan for execution

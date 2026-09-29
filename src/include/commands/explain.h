@@ -22,12 +22,7 @@ typedef struct ExplainState
 	StringInfo	str;			/* output buffer */
 	/* options */
 	bool		verbose;		/* be verbose */
-	bool		analyze;		/* print actual times */
 	bool		costs;			/* print estimated costs */
-	bool		buffers;		/* print buffer usage */
-	bool		wal;			/* print WAL usage */
-	bool		timing;			/* print detailed node timing */
-	bool		summary;		/* print total planning and execution timing */
 	bool		settings;		/* print modified settings */
 	/* state for output formatting --- not reset for each new plan tree */
 	int			indent;			/* current indentation level */
@@ -65,9 +60,7 @@ extern void ExplainOneUtility(Node *utilityStmt, ExplainState *es,
 
 extern void ExplainOnePlan(PlannedStmt *plannedstmt, ExplainState *es,
 						   const char *queryString,
-						   ParamListInfo params,
-						   const instr_time *planduration,
-						   const BufferUsage *bufusage);
+						   ParamListInfo params);
 
 extern void ExplainPrintPlan(ExplainState *es, QueryDesc *queryDesc);
 
@@ -79,8 +72,6 @@ extern void ExplainPropertyInteger(const char *qlabel, const char *unit,
 								   int64 value, ExplainState *es);
 extern void ExplainPropertyUInteger(const char *qlabel, const char *unit,
 									uint64 value, ExplainState *es);
-extern void ExplainPropertyFloat(const char *qlabel, const char *unit,
-								 double value, int ndigits, ExplainState *es);
 extern void ExplainPropertyBool(const char *qlabel, bool value,
 								ExplainState *es);
 

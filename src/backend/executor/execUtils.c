@@ -138,7 +138,6 @@ CreateExecutorState(void)
 	estate->es_processed = 0;
 
 	estate->es_top_eflags = 0;
-	estate->es_instrument = 0;
 	estate->es_finished = false;
 
 	estate->es_exprcontexts = NIL;
@@ -761,8 +760,7 @@ ExecInitResultRelation(EState *estate, ResultRelInfo *resultRelInfo,
 	resultRelationDesc = ExecGetRangeTableRelation(estate, rti);
 	InitResultRelInfo(resultRelInfo,
 					  resultRelationDesc,
-					  rti,
-					  estate->es_instrument);
+					  rti);
 
 	if (estate->es_result_relations == NULL)
 		estate->es_result_relations = (ResultRelInfo **)

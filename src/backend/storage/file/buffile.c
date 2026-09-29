@@ -41,7 +41,6 @@
 
 #include "postgres.h"
 
-#include "executor/instrument.h"
 #include "miscadmin.h"
 #include "utils/wait_event.h"
 #include "storage/buf_internals.h"
@@ -246,9 +245,6 @@ BufFileLoadBuffer(BufFile *file)
 	}
 
 	/* we choose not to advance curOffset here */
-
-	if (file->nbytes > 0)
-		pgBufferUsage.temp_blks_read++;
 }
 
 /*
@@ -306,8 +302,6 @@ BufFileDumpBuffer(BufFile *file)
 							FilePathName(thisfile))));
 		file->curOffset += bytestowrite;
 		wpos += bytestowrite;
-
-		pgBufferUsage.temp_blks_written++;
 	}
 	file->dirty = false;
 

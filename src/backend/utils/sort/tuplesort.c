@@ -234,19 +234,12 @@ struct Tuplesortstate
 	bool		randomAccess;	/* did caller request random access? */
 	bool		bounded;		/* did caller specify a maximum number of
 								 * tuples to return? */
-	bool		boundUsed;		/* true if we made use of a bounded heap */
 	int			bound;			/* if bounded, the maximum number of tuples */
 	bool		tuples;			/* Can SortTuple.tuple ever be set? */
 	int64		availMem;		/* remaining memory available, in bytes */
 	int64		allowedMem;		/* total memory allowed, in bytes */
 	int			maxTapes;		/* number of tapes (Knuth's T) */
 	int			tapeRange;		/* maxTapes-1 (Knuth's P) */
-	int64		maxSpace;		/* maximum amount of space occupied among sort
-								 * of groups, either in-memory or on-disk */
-	bool		isMaxSpaceDisk; /* true when maxSpace is value for on-disk
-								 * space, false when it's value for in-memory
-								 * space */
-	TupSortStatus maxSpaceStatus;	/* sort status when maxSpace was reached */
 	MemoryContext maincontext;	/* memory context for tuple sort metadata that
 								 * persists across multiple batches */
 	MemoryContext sortcontext;	/* memory context holding most sort data */
@@ -598,7 +591,6 @@ static void readtup_datum(Tuplesortstate *state, SortTuple *stup,
 						  int tapenum, unsigned int len);
 static void free_sort_tuple(Tuplesortstate *state, SortTuple *stup);
 static void tuplesort_free(Tuplesortstate *state);
-static void tuplesort_updatemax(Tuplesortstate *state);
 
 /*
  * Special versions of qsort just for SortTuple objects.  qsort_tuple() sorts
@@ -747,7 +739,6 @@ tuplesort_begin_batch(Tuplesortstate *state)
 
 	state->status = TSS_INITIAL;
 	state->bounded = false;
-	state->boundUsed = false;
 
 	state->availMem = state->allowedMem;
 
@@ -1173,17 +1164,6 @@ tuplesort_set_bound(Tuplesortstate *state, int64 bound)
 }
 
 /*
- * tuplesort_used_bound
- *
- * Allow callers to find out if the sort state was able to use a bound.
- */
-bool
-tuplesort_used_bound(Tuplesortstate *state)
-{
-	return state->boundUsed;
-}
-
-/*
  * tuplesort_free
  *
  *	Internal routine for freeing resources of tuplesort.
@@ -1263,54 +1243,6 @@ tuplesort_end(Tuplesortstate *state)
 }
 
 /*
- * tuplesort_updatemax
- *
- *	Update maximum resource usage statistics.
- */
-static void
-tuplesort_updatemax(Tuplesortstate *state)
-{
-	int64		spaceUsed;
-	bool		isSpaceDisk;
-
-	/*
-	 * Note: it might seem we should provide both memory and disk usage for a
-	 * disk-based sort.  However, the current code doesn't track memory space
-	 * accurately once we have begun to return tuples to the caller (since we
-	 * don't account for pfree's the caller is expected to do), so we cannot
-	 * rely on availMem in a disk sort.  This does not seem worth the overhead
-	 * to fix.  Is it worth creating an API for the memory context code to
-	 * tell us how much is actually used in sortcontext?
-	 */
-	if (state->tapeset)
-	{
-		isSpaceDisk = true;
-		spaceUsed = LogicalTapeSetBlocks(state->tapeset) * BLCKSZ;
-	}
-	else
-	{
-		isSpaceDisk = false;
-		spaceUsed = state->allowedMem - state->availMem;
-	}
-
-	/*
-	 * Sort evicts data to the disk when it wasn't able to fit that data into
-	 * main memory.  This is why we assume space used on the disk to be more
-	 * important for tracking resource usage than space used in memory. Note
-	 * that the amount of space occupied by some tupleset on the disk might be
-	 * less than amount of space occupied by the same tupleset in memory due
-	 * to more compact representation.
-	 */
-	if ((isSpaceDisk && !state->isMaxSpaceDisk) ||
-		(isSpaceDisk == state->isMaxSpaceDisk && spaceUsed > state->maxSpace))
-	{
-		state->maxSpace = spaceUsed;
-		state->isMaxSpaceDisk = isSpaceDisk;
-		state->maxSpaceStatus = state->status;
-	}
-}
-
-/*
  * tuplesort_reset
  *
  *	Reset the tuplesort.  Reset all the data in the tuplesort, but leave the
@@ -1321,7 +1253,6 @@ tuplesort_updatemax(Tuplesortstate *state)
 void
 tuplesort_reset(Tuplesortstate *state)
 {
-	tuplesort_updatemax(state);
 	tuplesort_free(state);
 
 	/*
@@ -3040,87 +2971,6 @@ tuplesort_restorepos(Tuplesortstate *state)
 }
 
 /*
- * tuplesort_get_stats - extract summary statistics
- *
- * This can be called after tuplesort_performsort() finishes to obtain
- * printable summary information about how the sort was performed.
- */
-void
-tuplesort_get_stats(Tuplesortstate *state,
-					TuplesortInstrumentation *stats)
-{
-	/*
-	 * Note: it might seem we should provide both memory and disk usage for a
-	 * disk-based sort.  However, the current code doesn't track memory space
-	 * accurately once we have begun to return tuples to the caller (since we
-	 * don't account for pfree's the caller is expected to do), so we cannot
-	 * rely on availMem in a disk sort.  This does not seem worth the overhead
-	 * to fix.  Is it worth creating an API for the memory context code to
-	 * tell us how much is actually used in sortcontext?
-	 */
-	tuplesort_updatemax(state);
-
-	if (state->isMaxSpaceDisk)
-		stats->spaceType = SORT_SPACE_TYPE_DISK;
-	else
-		stats->spaceType = SORT_SPACE_TYPE_MEMORY;
-	stats->spaceUsed = (state->maxSpace + 1023) / 1024;
-
-	switch (state->maxSpaceStatus)
-	{
-		case TSS_SORTEDINMEM:
-			if (state->boundUsed)
-				stats->sortMethod = SORT_TYPE_TOP_N_HEAPSORT;
-			else
-				stats->sortMethod = SORT_TYPE_QUICKSORT;
-			break;
-		case TSS_SORTEDONTAPE:
-			stats->sortMethod = SORT_TYPE_EXTERNAL_SORT;
-			break;
-		case TSS_FINALMERGE:
-			stats->sortMethod = SORT_TYPE_EXTERNAL_MERGE;
-			break;
-		default:
-			stats->sortMethod = SORT_TYPE_STILL_IN_PROGRESS;
-			break;
-	}
-}
-
-/*
- * Convert TuplesortMethod to a string.
- */
-const char *
-tuplesort_method_name(TuplesortMethod m)
-{
-	switch (m)
-	{
-		case SORT_TYPE_STILL_IN_PROGRESS:
-			return "still in progress";
-		case SORT_TYPE_TOP_N_HEAPSORT:
-			return "top-N heapsort";
-		case SORT_TYPE_QUICKSORT:
-			return "quicksort";
-		case SORT_TYPE_EXTERNAL_SORT:
-			return "external sort";
-		case SORT_TYPE_EXTERNAL_MERGE:
-			return "external merge";
-	}
-
-	return "unknown";
-}
-
-/*
- * Convert TuplesortSpaceType to a string.
- */
-const char *
-tuplesort_space_type_name(TuplesortSpaceType t)
-{
-	Assert(t == SORT_SPACE_TYPE_DISK || t == SORT_SPACE_TYPE_MEMORY);
-	return t == SORT_SPACE_TYPE_DISK ? "Disk" : "Memory";
-}
-
-
-/*
  * Heap manipulation routines, per Knuth's Algorithm 5.2.3H.
  */
 
@@ -3212,7 +3062,6 @@ sort_bounded_heap(Tuplesortstate *state)
 	reversedirection(state);
 
 	state->status = TSS_SORTEDINMEM;
-	state->boundUsed = true;
 }
 
 /*

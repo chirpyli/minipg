@@ -51,12 +51,7 @@ MultiExecBitmapIndexScan(BitmapIndexScanState *node)
 {
 	TIDBitmap  *tbm;
 	IndexScanDesc scandesc;
-	double		nTuples = 0;
 	bool		doscan;
-
-	/* must provide our own instrumentation support */
-	if (node->ss.ps.instrument)
-		InstrStartNode(node->ss.ps.instrument);
 
 	/*
 	 * extract necessary information from index scan node
@@ -100,7 +95,7 @@ MultiExecBitmapIndexScan(BitmapIndexScanState *node)
 	 */
 	while (doscan)
 	{
-		nTuples += (double) index_getbitmap(scandesc, tbm);
+		(void) index_getbitmap(scandesc, tbm);
 
 		CHECK_FOR_INTERRUPTS();
 
@@ -111,10 +106,6 @@ MultiExecBitmapIndexScan(BitmapIndexScanState *node)
 						 node->biss_ScanKeys, node->biss_NumScanKeys,
 						 NULL, 0);
 	}
-
-	/* must provide our own instrumentation support */
-	if (node->ss.ps.instrument)
-		InstrStopNode(node->ss.ps.instrument, nTuples);
 
 	return (Node *) tbm;
 }

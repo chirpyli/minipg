@@ -78,15 +78,7 @@ ExecHash(PlanState *pstate)
 Node *
 MultiExecHash(HashState *node)
 {
-	/* must provide our own instrumentation support */
-	if (node->ps.instrument)
-		InstrStartNode(node->ps.instrument);
-
 	MultiExecPrivateHash(node);
-
-	/* must provide our own instrumentation support */
-	if (node->ps.instrument)
-		InstrStopNode(node->ps.instrument, node->hashtable->partialTuples);
 
 	/*
 	 * We do not return the hash table directly because it's not a subtype of
@@ -1709,42 +1701,6 @@ ExecHashRemoveNextSkewBucket(HashJoinTable hashtable)
 	}
 }
 
-
-
-
-/*
- * Accumulate the hash table stats into the given instrumentation.
- */
-void
-ExecHashAccumInstrumentation(HashInstrumentation *instrument,
-							 HashJoinTable hashtable)
-{
-	instrument->nbuckets = Max(instrument->nbuckets,
-							   hashtable->nbuckets);
-	instrument->nbuckets_original = Max(instrument->nbuckets_original,
-										hashtable->nbuckets_original);
-	instrument->nbatch = Max(instrument->nbatch,
-							 hashtable->nbatch);
-	instrument->nbatch_original = Max(instrument->nbatch_original,
-									  hashtable->nbatch_original);
-	instrument->space_peak = Max(instrument->space_peak,
-								 hashtable->spacePeak);
-}
-
-/*
- * Collect EXPLAIN stats if needed into local storage.
- */
-void
-ExecShutdownHash(HashState *node)
-{
-	/* Allocate save space if EXPLAIN'ing and we didn't do so already */
-	if (node->ps.instrument && !node->hinstrument)
-		node->hinstrument = (HashInstrumentation *)
-			palloc0(sizeof(HashInstrumentation));
-	/* Now accumulate data for the current (final) hash table */
-	if (node->hinstrument && node->hashtable)
-		ExecHashAccumInstrumentation(node->hinstrument, node->hashtable);
-}
 
 
 

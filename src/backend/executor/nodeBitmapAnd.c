@@ -114,10 +114,6 @@ MultiExecBitmapAnd(BitmapAndState *node)
 	int			i;
 	TIDBitmap  *result = NULL;
 
-	/* must provide our own instrumentation support */
-	if (node->ps.instrument)
-		InstrStartNode(node->ps.instrument);
-
 	/*
 	 * get information from the node
 	 */
@@ -158,10 +154,6 @@ MultiExecBitmapAnd(BitmapAndState *node)
 
 	if (result == NULL)
 		elog(ERROR, "BitmapAnd doesn't support zero inputs");
-
-	/* must provide our own instrumentation support */
-	if (node->ps.instrument)
-		InstrStopNode(node->ps.instrument, 0 /* XXX */ );
 
 	return (Node *) result;
 }

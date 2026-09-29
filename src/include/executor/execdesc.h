@@ -41,8 +41,6 @@ typedef struct QueryDesc
 	DestReceiver *dest;			/* the destination for tuple output */
 	ParamListInfo params;		/* param values being passed in */
 
-	int			instrument_options; /* OR of InstrumentOption flags */
-
 	/* These fields are set by ExecutorStart */
 	TupleDesc	tupDesc;		/* descriptor for result tuples */
 	EState	   *estate;			/* executor's query-wide state */
@@ -50,9 +48,6 @@ typedef struct QueryDesc
 
 	/* This field is set by ExecutePlan */
 	bool		already_executed;	/* true if previously executed */
-
-	/* This is always set NULL by the core system, but plugins can change it */
-	struct Instrumentation *totaltime;	/* total time spent in ExecutorRun */
 } QueryDesc;
 
 /* in pquery.c */
@@ -61,8 +56,7 @@ extern QueryDesc *CreateQueryDesc(PlannedStmt *plannedstmt,
 								  Snapshot snapshot,
 								  Snapshot crosscheck_snapshot,
 								  DestReceiver *dest,
-								  ParamListInfo params,
-								  int instrument_options);
+								  ParamListInfo params);
 
 extern void FreeQueryDesc(QueryDesc *qdesc);
 

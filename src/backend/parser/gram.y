@@ -260,7 +260,7 @@ static Node *makeAArrayExpr(List *elements, int location);
 %type <node>	join_qual
 %type <jtype>	join_type
 
-%type <boolean> opt_unique opt_concurrently opt_verbose
+%type <boolean> opt_unique opt_concurrently
 
 %type <ival>	opt_set_data
 %type <objtype>	object_type_any_name
@@ -1977,11 +1977,6 @@ utility_option_arg:
 			| /* EMPTY */							{ $$ = NULL; }
 		;
 
-opt_verbose:
-			VERBOSE									{ $$ = true; }
-			| /*EMPTY*/								{ $$ = false; }
-		;
-
 opt_name_list:
 			'(' name_list ')'						{ $$ = $2; }
 			| /*EMPTY*/								{ $$ = NIL; }
@@ -2010,7 +2005,7 @@ opt_vacuum_relation_list:
 /*****************************************************************************
  *
  *		QUERY:
- *				EXPLAIN [ANALYZE] [VERBOSE] query
+ *				EXPLAIN [VERBOSE] query
  *				EXPLAIN ( options ) query
  *
  *****************************************************************************/
@@ -2021,16 +2016,6 @@ ExplainStmt:
 					ExplainStmt *n = makeNode(ExplainStmt);
 					n->query = $2;
 					n->options = NIL;
-					$$ = (Node *) n;
-				}
-		| EXPLAIN analyze_keyword opt_verbose ExplainableStmt
-				{
-					ExplainStmt *n = makeNode(ExplainStmt);
-					n->query = $4;
-					n->options = list_make1(makeDefElem("analyze", NULL, @2));
-					if ($3)
-						n->options = lappend(n->options,
-											 makeDefElem("verbose", NULL, @3));
 					$$ = (Node *) n;
 				}
 		| EXPLAIN VERBOSE ExplainableStmt

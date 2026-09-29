@@ -43,7 +43,6 @@
 #include "catalog/storage.h"
 #include "commands/dbcommands.h"
 #include "commands/vacuum.h"
-#include "executor/instrument.h"
 #include "miscadmin.h"
 #include "optimizer/paths.h"
 #include "portability/instr_time.h"
@@ -315,8 +314,6 @@ heap_vacuum_rel(Relation rel, VacuumParams *params,
 	LVRelState *vacrel;
 	PGRUsage	ru0;
 	TimestampTz starttime = 0;
-	WalUsage	walusage_start = pgWalUsage;
-	WalUsage	walusage = {0, 0, 0};
 	long		secs;
 	int			usecs;
 	double		read_rate,
@@ -545,9 +542,6 @@ heap_vacuum_rel(Relation rel, VacuumParams *params,
 
 			TimestampDifference(starttime, endtime, &secs, &usecs);
 
-			memset(&walusage, 0, sizeof(WalUsage));
-			WalUsageAccumDiff(&walusage, &pgWalUsage, &walusage_start);
-
 			read_rate = 0;
 			write_rate = 0;
 			if ((secs > 0) || (usecs > 0))
@@ -647,11 +641,6 @@ heap_vacuum_rel(Relation rel, VacuumParams *params,
 							 (long long) VacuumPageHit,
 							 (long long) VacuumPageMiss,
 							 (long long) VacuumPageDirty);
-			appendStringInfo(&buf,
-							 _("WAL usage: %lld records, %lld full page images, %llu bytes\n"),
-							 (long long) walusage.wal_records,
-							 (long long) walusage.wal_fpi,
-							 (unsigned long long) walusage.wal_bytes);
 			appendStringInfo(&buf, _("system usage: %s"), pg_rusage_show(&ru0));
 
 			ereport(LOG,

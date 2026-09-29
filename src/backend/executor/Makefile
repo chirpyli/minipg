@@ -26,7 +26,6 @@ OBJS = \
 	execTuples.o \
 	execUtils.o \
 	functions.o \
-	instrument.o \
 	nodeBitmapAnd.o \
 	nodeBitmapHeapscan.o \
 	nodeBitmapIndexscan.o \

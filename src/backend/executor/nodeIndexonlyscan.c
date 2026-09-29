@@ -168,7 +168,6 @@ IndexOnlyNext(IndexOnlyScanState *node)
 			/*
 			 * Rats, we have to visit the heap to check visibility.
 			 */
-			InstrCountTuples2(node, 1);
 			if (!index_fetch_heap(scandesc, node->ioss_TableSlot))
 				continue;		/* no visible tuple, try next index entry */
 
@@ -205,7 +204,6 @@ IndexOnlyNext(IndexOnlyScanState *node)
 			if (!ExecQualAndReset(node->recheckqual, econtext))
 			{
 				/* Fails recheck, so drop it and loop back for another */
-				InstrCountFiltered2(node, 1);
 				continue;
 			}
 		}

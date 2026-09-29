@@ -17,12 +17,10 @@
 #include "catalog/pg_type.h"
 #include "commands/defrem.h"
 #include "commands/explain.h"
-#include "executor/nodeHash.h"
 #include "nodes/makefuncs.h"
 #include "nodes/nodeFuncs.h"
 #include "parser/analyze.h"
 #include "parser/parsetree.h"
-#include "storage/bufmgr.h"
 #include "tcop/tcopprot.h"
 #include "utils/builtins.h"
 #include "utils/guc_tables.h"
@@ -30,7 +28,6 @@
 #include "utils/rel.h"
 #include "utils/ruleutils.h"
 #include "utils/snapmgr.h"
-#include "utils/tuplesort.h"
 #include "utils/typcache.h"
 
 
@@ -44,7 +41,6 @@ explain_get_index_name_hook_type explain_get_index_name_hook = NULL;
 static void ExplainOneQuery(Query *query, int cursorOptions,
 							ExplainState *es,
 							const char *queryString, ParamListInfo params);
-static double elapsed_time(instr_time *starttime);
 static bool ExplainPreScanNode(PlanState *planstate, Bitmapset **rels_used);
 static void ExplainNode(PlanState *planstate, List *ancestors,
 						const char *relationship, const char *plan_name,
@@ -71,16 +67,7 @@ static void show_sort_group_keys(PlanState *planstate, const char *qlabel,
 								 List *ancestors, ExplainState *es);
 static void show_sortorder_options(StringInfo buf, Node *sortexpr,
 								   Oid sortOperator, Oid collation, bool nullsFirst);
-static void show_sort_info(SortState *sortstate, ExplainState *es);
-static void show_hash_info(HashState *hashstate, ExplainState *es);
-static void show_tidbitmap_info(BitmapHeapScanState *planstate,
-								ExplainState *es);
-static void show_instrumentation_count(const char *qlabel, int which,
-									   PlanState *planstate, ExplainState *es);
 static const char *explain_get_index_name(Oid indexId);
-static void show_buffer_usage(ExplainState *es, const BufferUsage *usage,
-							  bool planning);
-static void show_wal_usage(ExplainState *es, const WalUsage *usage);
 static void ExplainIndexScanDetails(Oid indexid, ScanDirection indexorderdir,
 									ExplainState *es);
 static void ExplainScanTarget(Scan *plan, ExplainState *es);
@@ -109,36 +96,18 @@ ExplainQuery(ParseState *pstate, ExplainStmt *stmt,
 	TupOutputState *tstate;
 	Query	   *query;
 	ListCell   *lc;
-	bool		timing_set = false;
-	bool		summary_set = false;
 
 	/* Parse options list. */
 	foreach(lc, stmt->options)
 	{
 		DefElem    *opt = (DefElem *) lfirst(lc);
 
-		if (strcmp(opt->defname, "analyze") == 0)
-			es->analyze = defGetBoolean(opt);
-		else if (strcmp(opt->defname, "verbose") == 0)
+		if (strcmp(opt->defname, "verbose") == 0)
 			es->verbose = defGetBoolean(opt);
 		else if (strcmp(opt->defname, "costs") == 0)
 			es->costs = defGetBoolean(opt);
-		else if (strcmp(opt->defname, "buffers") == 0)
-			es->buffers = defGetBoolean(opt);
-		else if (strcmp(opt->defname, "wal") == 0)
-			es->wal = defGetBoolean(opt);
 		else if (strcmp(opt->defname, "settings") == 0)
 			es->settings = defGetBoolean(opt);
-		else if (strcmp(opt->defname, "timing") == 0)
-		{
-			timing_set = true;
-			es->timing = defGetBoolean(opt);
-		}
-		else if (strcmp(opt->defname, "summary") == 0)
-		{
-			summary_set = true;
-			es->summary = defGetBoolean(opt);
-		}
 		else
 			ereport(ERROR,
 					(errcode(ERRCODE_SYNTAX_ERROR),
@@ -146,23 +115,6 @@ ExplainQuery(ParseState *pstate, ExplainStmt *stmt,
 							opt->defname),
 					 parser_errposition(pstate, opt->location)));
 	}
-
-	if (es->wal && !es->analyze)
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				 errmsg("EXPLAIN option WAL requires ANALYZE")));
-
-	/* if the timing was not set explicitly, set default value */
-	es->timing = (timing_set) ? es->timing : es->analyze;
-
-	/* check that timing is used with EXPLAIN ANALYZE */
-	if (es->timing && !es->analyze)
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				 errmsg("EXPLAIN option TIMING requires ANALYZE")));
-
-	/* if the summary was not set explicitly, set default value */
-	es->summary = (summary_set) ? es->summary : es->analyze;
 
 	query = castNode(Query, stmt->query);
 
@@ -238,31 +190,12 @@ ExplainOneQuery(Query *query, int cursorOptions,
 	else
 	{
 		PlannedStmt *plan;
-		instr_time	planstart,
-					planduration;
-		BufferUsage bufusage_start,
-					bufusage;
-
-		if (es->buffers)
-			bufusage_start = pgBufferUsage;
-		INSTR_TIME_SET_CURRENT(planstart);
 
 		/* plan the query */
 		plan = pg_plan_query(query, queryString, cursorOptions, params);
 
-		INSTR_TIME_SET_CURRENT(planduration);
-		INSTR_TIME_SUBTRACT(planduration, planstart);
-
-		/* calc differences of buffer counters. */
-		if (es->buffers)
-		{
-			memset(&bufusage, 0, sizeof(BufferUsage));
-			BufferUsageAccumDiff(&bufusage, &pgBufferUsage, &bufusage_start);
-		}
-
-		/* run it (if needed) and produce output */
-		ExplainOnePlan(plan, es, queryString, params,
-					   &planduration, (es->buffers ? &bufusage : NULL));
+		/* produce output */
+		ExplainOnePlan(plan, es, queryString, params);
 	}
 }
 
@@ -292,35 +225,12 @@ ExplainOneUtility(Node *utilityStmt, ExplainState *es,
  */
 void
 ExplainOnePlan(PlannedStmt *plannedstmt, ExplainState *es,
-			   const char *queryString, ParamListInfo params,
-			   const instr_time *planduration,
-			   const BufferUsage *bufusage)
+			   const char *queryString, ParamListInfo params)
 {
 	DestReceiver *dest;
 	QueryDesc  *queryDesc;
-	instr_time	starttime;
-	double		totaltime = 0;
-	int			eflags;
-	int			instrument_option = 0;
 
 	Assert(plannedstmt->commandType != CMD_UTILITY);
-
-	if (es->analyze && es->timing)
-		instrument_option |= INSTRUMENT_TIMER;
-	else if (es->analyze)
-		instrument_option |= INSTRUMENT_ROWS;
-
-	if (es->buffers)
-		instrument_option |= INSTRUMENT_BUFFERS;
-	if (es->wal)
-		instrument_option |= INSTRUMENT_WAL;
-
-	/*
-	 * We always collect timing for the entire statement, even when node-level
-	 * timing is off, so we don't look at es->timing here.  (We could skip
-	 * this if !es->summary, but it's hardly worth the complication.)
-	 */
-	INSTR_TIME_SET_CURRENT(starttime);
 
 	/*
 	 * Use a snapshot with an updated command ID to ensure this query sees
@@ -337,75 +247,22 @@ ExplainOnePlan(PlannedStmt *plannedstmt, ExplainState *es,
 	/* Create a QueryDesc for the query */
 	queryDesc = CreateQueryDesc(plannedstmt, queryString,
 								GetActiveSnapshot(), InvalidSnapshot,
-								dest, params, instrument_option);
-
-	/* Select execution options */
-	if (es->analyze)
-		eflags = 0;				/* default run-to-completion flags */
-	else
-		eflags = EXEC_FLAG_EXPLAIN_ONLY;
+								dest, params);
 
 	/* call ExecutorStart to prepare the plan for execution */
-	ExecutorStart(queryDesc, eflags);
-
-	/* Execute the plan for statistics if asked for */
-	if (es->analyze)
-	{
-		ScanDirection dir;
-
-		dir = ForwardScanDirection;
-
-		/* run the plan */
-		ExecutorRun(queryDesc, dir, 0L, true);
-
-		/* run cleanup too */
-		ExecutorFinish(queryDesc);
-
-		/* We can't run ExecutorEnd 'till we're done printing the stats... */
-		totaltime += elapsed_time(&starttime);
-	}
+	ExecutorStart(queryDesc, EXEC_FLAG_EXPLAIN_ONLY);
 
 	/* Create textual dump of plan tree */
 	ExplainPrintPlan(es, queryDesc);
 
-	/* Show buffer usage in planning */
-	if (bufusage)
-		show_buffer_usage(es, bufusage, true);
-
-	if (es->summary && planduration)
-	{
-		double		plantime = INSTR_TIME_GET_DOUBLE(*planduration);
-
-		ExplainPropertyFloat("Planning Time", "ms", 1000.0 * plantime, 3, es);
-	}
-
 	/*
-	 * Close down the query and free resources.  Include time for this in the
-	 * total execution time (although it should be pretty minimal).
+	 * Close down the query and free resources.
 	 */
-	INSTR_TIME_SET_CURRENT(starttime);
-
 	ExecutorEnd(queryDesc);
 
 	FreeQueryDesc(queryDesc);
 
 	PopActiveSnapshot();
-
-	/* We need a CCI just in case query expanded to multiple plans */
-	if (es->analyze)
-		CommandCounterIncrement();
-
-	totaltime += elapsed_time(&starttime);
-
-	/*
-	 * We only report execution time if we actually ran the query (that is,
-	 * the user specified ANALYZE), and if summary reporting is enabled (the
-	 * user can set SUMMARY OFF to not have the timing information included in
-	 * the output).  By default, ANALYZE sets SUMMARY to true.
-	 */
-	if (es->summary && es->analyze)
-		ExplainPropertyFloat("Execution Time", "ms", 1000.0 * totaltime, 3,
-							 es);
 }
 
 /*
@@ -485,17 +342,6 @@ ExplainPrintPlan(ExplainState *es, QueryDesc *queryDesc)
 	 * don't match the built-in defaults.
 	 */
 	ExplainPrintSettings(es);
-}
-
-/* Compute elapsed time in seconds since given timestamp */
-static double
-elapsed_time(instr_time *starttime)
-{
-	instr_time	endtime;
-
-	INSTR_TIME_SET_CURRENT(endtime);
-	INSTR_TIME_SUBTRACT(endtime, *starttime);
-	return INSTR_TIME_GET_DOUBLE(endtime);
 }
 
 /*
@@ -760,41 +606,6 @@ ExplainNode(PlanState *planstate, List *ancestors,
 						 plan->plan_rows, plan->plan_width);
 	}
 
-	/*
-	 * We have to forcibly clean up the instrumentation state because we
-	 * haven't done ExecutorEnd yet.  This is pretty grotty ...
-	 *
-	 * Note: contrib/auto_explain could cause instrumentation to be set up
-	 * even though we didn't ask for it here.  Be careful not to print any
-	 * instrumentation results the user didn't ask for.  But we do the
-	 * InstrEndLoop call anyway, if possible, to reduce the number of cases
-	 * auto_explain has to contend with.
-	 */
-	if (planstate->instrument)
-		InstrEndLoop(planstate->instrument);
-
-	if (es->analyze &&
-		planstate->instrument && planstate->instrument->nloops > 0)
-	{
-		double		nloops = planstate->instrument->nloops;
-		double		startup_ms = 1000.0 * planstate->instrument->startup / nloops;
-		double		total_ms = 1000.0 * planstate->instrument->total / nloops;
-		double		rows = planstate->instrument->ntuples / nloops;
-
-		if (es->timing)
-			appendStringInfo(es->str,
-							 " (actual time=%.3f..%.3f rows=%.0f loops=%.0f)",
-							 startup_ms, total_ms, rows, nloops);
-		else
-			appendStringInfo(es->str,
-							 " (actual rows=%.0f loops=%.0f)",
-							 rows, nloops);
-	}
-	else if (es->analyze)
-	{
-		appendStringInfoString(es->str, " (never executed)");
-	}
-
 	/* first line ends here */
 	appendStringInfoChar(es->str, '\n');
 
@@ -825,31 +636,16 @@ ExplainNode(PlanState *planstate, List *ancestors,
 		case T_IndexScan:
 			show_scan_qual(((IndexScan *) plan)->indexqualorig,
 						   "Index Cond", planstate, ancestors, es);
-			if (((IndexScan *) plan)->indexqualorig)
-				show_instrumentation_count("Rows Removed by Index Recheck", 2,
-										   planstate, es);
 			show_scan_qual(((IndexScan *) plan)->indexorderbyorig,
 						   "Order By", planstate, ancestors, es);
 			show_scan_qual(plan->qual, "Filter", planstate, ancestors, es);
-			if (plan->qual)
-				show_instrumentation_count("Rows Removed by Filter", 1,
-										   planstate, es);
 			break;
 		case T_IndexOnlyScan:
 			show_scan_qual(((IndexOnlyScan *) plan)->indexqual,
 						   "Index Cond", planstate, ancestors, es);
-			if (((IndexOnlyScan *) plan)->recheckqual)
-				show_instrumentation_count("Rows Removed by Index Recheck", 2,
-										   planstate, es);
 			show_scan_qual(((IndexOnlyScan *) plan)->indexorderby,
 						   "Order By", planstate, ancestors, es);
 			show_scan_qual(plan->qual, "Filter", planstate, ancestors, es);
-			if (plan->qual)
-				show_instrumentation_count("Rows Removed by Filter", 1,
-										   planstate, es);
-			if (es->analyze)
-				ExplainPropertyFloat("Heap Fetches", NULL,
-									 planstate->instrument->ntuples2, 0, es);
 			break;
 		case T_BitmapIndexScan:
 			show_scan_qual(((BitmapIndexScan *) plan)->indexqualorig,
@@ -858,25 +654,12 @@ ExplainNode(PlanState *planstate, List *ancestors,
 		case T_BitmapHeapScan:
 			show_scan_qual(((BitmapHeapScan *) plan)->bitmapqualorig,
 						   "Recheck Cond", planstate, ancestors, es);
-			if (((BitmapHeapScan *) plan)->bitmapqualorig)
-				show_instrumentation_count("Rows Removed by Index Recheck", 2,
-										   planstate, es);
 			show_scan_qual(plan->qual, "Filter", planstate, ancestors, es);
-			if (plan->qual)
-				show_instrumentation_count("Rows Removed by Filter", 1,
-										   planstate, es);
-			if (es->analyze)
-				show_tidbitmap_info((BitmapHeapScanState *) planstate, es);
 			break;
 		case T_SeqScan:
 		case T_ValuesScan:
 		case T_SubqueryScan:
 			show_scan_qual(plan->qual, "Filter", planstate, ancestors, es);
-			if (plan->qual)
-				show_instrumentation_count("Rows Removed by Filter", 1,
-										   planstate, es);
-			break;
-			break;
 			break;
 		case T_TidScan:
 			{
@@ -890,9 +673,6 @@ ExplainNode(PlanState *planstate, List *ancestors,
 					tidquals = list_make1(make_orclause(tidquals));
 				show_scan_qual(tidquals, "TID Cond", planstate, ancestors, es);
 				show_scan_qual(plan->qual, "Filter", planstate, ancestors, es);
-				if (plan->qual)
-					show_instrumentation_count("Rows Removed by Filter", 1,
-											   planstate, es);
 			}
 			break;
 		case T_TidRangeScan:
@@ -907,77 +687,42 @@ ExplainNode(PlanState *planstate, List *ancestors,
 					tidquals = list_make1(make_andclause(tidquals));
 				show_scan_qual(tidquals, "TID Cond", planstate, ancestors, es);
 				show_scan_qual(plan->qual, "Filter", planstate, ancestors, es);
-				if (plan->qual)
-					show_instrumentation_count("Rows Removed by Filter", 1,
-											   planstate, es);
 			}
 			break;
 		case T_NestLoop:
 			show_upper_qual(((NestLoop *) plan)->join.joinqual,
 							"Join Filter", planstate, ancestors, es);
-			if (((NestLoop *) plan)->join.joinqual)
-				show_instrumentation_count("Rows Removed by Join Filter", 1,
-										   planstate, es);
 			show_upper_qual(plan->qual, "Filter", planstate, ancestors, es);
-			if (plan->qual)
-				show_instrumentation_count("Rows Removed by Filter", 2,
-										   planstate, es);
 			break;
 		case T_MergeJoin:
 			show_upper_qual(((MergeJoin *) plan)->mergeclauses,
 							"Merge Cond", planstate, ancestors, es);
 			show_upper_qual(((MergeJoin *) plan)->join.joinqual,
 							"Join Filter", planstate, ancestors, es);
-			if (((MergeJoin *) plan)->join.joinqual)
-				show_instrumentation_count("Rows Removed by Join Filter", 1,
-										   planstate, es);
 			show_upper_qual(plan->qual, "Filter", planstate, ancestors, es);
-			if (plan->qual)
-				show_instrumentation_count("Rows Removed by Filter", 2,
-										   planstate, es);
 			break;
 		case T_HashJoin:
 			show_upper_qual(((HashJoin *) plan)->hashclauses,
 							"Hash Cond", planstate, ancestors, es);
 			show_upper_qual(((HashJoin *) plan)->join.joinqual,
 							"Join Filter", planstate, ancestors, es);
-			if (((HashJoin *) plan)->join.joinqual)
-				show_instrumentation_count("Rows Removed by Join Filter", 1,
-										   planstate, es);
 			show_upper_qual(plan->qual, "Filter", planstate, ancestors, es);
-			if (plan->qual)
-				show_instrumentation_count("Rows Removed by Filter", 2,
-										   planstate, es);
 			break;
 		case T_Sort:
 			show_sort_keys(castNode(SortState, planstate), ancestors, es);
-			show_sort_info(castNode(SortState, planstate), es);
 			break;
 		case T_Result:
 			show_upper_qual((List *) ((Result *) plan)->resconstantqual,
 							"One-Time Filter", planstate, ancestors, es);
 			show_upper_qual(plan->qual, "Filter", planstate, ancestors, es);
-			if (plan->qual)
-				show_instrumentation_count("Rows Removed by Filter", 1,
-										   planstate, es);
 			break;
 		case T_ModifyTable:
 			show_modifytable_info(castNode(ModifyTableState, planstate), ancestors,
 								  es);
 			break;
-		case T_Hash:
-			show_hash_info(castNode(HashState, planstate), es);
-			break;
 		default:
 			break;
 	}
-
-	/* Show buffer/WAL usage */
-	if (es->buffers && planstate->instrument)
-		show_buffer_usage(es, &planstate->instrument->bufusage, false);
-	if (es->wal && planstate->instrument)
-		show_wal_usage(es, &planstate->instrument->walusage);
-
 
 	/* Get ready to display the child plans */
 	haschildren = planstate->initPlan ||
@@ -1283,134 +1028,6 @@ show_sortorder_options(StringInfo buf, Node *sortexpr,
 }
 
 /*
- * If it's EXPLAIN ANALYZE, show tuplesort stats for a sort node
- */
-static void
-show_sort_info(SortState *sortstate, ExplainState *es)
-{
-	if (!es->analyze)
-		return;
-
-	if (sortstate->sort_Done && sortstate->tuplesortstate != NULL)
-	{
-		Tuplesortstate *state = (Tuplesortstate *) sortstate->tuplesortstate;
-		TuplesortInstrumentation stats;
-		const char *sortMethod;
-		const char *spaceType;
-		int64		spaceUsed;
-
-		tuplesort_get_stats(state, &stats);
-		sortMethod = tuplesort_method_name(stats.sortMethod);
-		spaceType = tuplesort_space_type_name(stats.spaceType);
-		spaceUsed = stats.spaceUsed;
-
-		ExplainIndentText(es);
-		appendStringInfo(es->str, "Sort Method: %s  %s: " INT64_FORMAT "kB\n",
-						 sortMethod, spaceType, spaceUsed);
-	}
-
-}
-
-/*
- * Show information on hash buckets/batches.
- */
-static void
-show_hash_info(HashState *hashstate, ExplainState *es)
-{
-	HashInstrumentation hinstrument = {0};
-
-	/*
-	 * Collect stats from the local process, even when it's a parallel query.
-	 * In a parallel query, the leader process may or may not have run the
-	 * hash join, and even if it did it may not have built a hash table due to
-	 * timing (if it started late it might have seen no tuples in the outer
-	 * relation and skipped building the hash table).  Therefore we have to be
-	 * prepared to get instrumentation data from all participants.
-	 */
-	if (hashstate->hinstrument)
-		memcpy(&hinstrument, hashstate->hinstrument,
-			   sizeof(HashInstrumentation));
-
-
-	if (hinstrument.nbatch > 0)
-	{
-		long		spacePeakKb = (hinstrument.space_peak + 1023) / 1024;
-
-		if (hinstrument.nbatch_original != hinstrument.nbatch ||
-			hinstrument.nbuckets_original != hinstrument.nbuckets)
-		{
-			ExplainIndentText(es);
-			appendStringInfo(es->str,
-							 "Buckets: %d (originally %d)  Batches: %d (originally %d)  Memory Usage: %ldkB\n",
-							 hinstrument.nbuckets,
-							 hinstrument.nbuckets_original,
-							 hinstrument.nbatch,
-							 hinstrument.nbatch_original,
-							 spacePeakKb);
-		}
-		else
-		{
-			ExplainIndentText(es);
-			appendStringInfo(es->str,
-							 "Buckets: %d  Batches: %d  Memory Usage: %ldkB\n",
-							 hinstrument.nbuckets, hinstrument.nbatch,
-							 spacePeakKb);
-		}
-	}
-}
-
-/*
- * If it's EXPLAIN ANALYZE, show exact/lossy pages for a BitmapHeapScan node
- */
-static void
-show_tidbitmap_info(BitmapHeapScanState *planstate, ExplainState *es)
-{
-	if (planstate->exact_pages > 0 || planstate->lossy_pages > 0)
-	{
-		ExplainIndentText(es);
-		appendStringInfoString(es->str, "Heap Blocks:");
-		if (planstate->exact_pages > 0)
-			appendStringInfo(es->str, " exact=%ld", planstate->exact_pages);
-		if (planstate->lossy_pages > 0)
-			appendStringInfo(es->str, " lossy=%ld", planstate->lossy_pages);
-		appendStringInfoChar(es->str, '\n');
-	}
-}
-
-/*
- * If it's EXPLAIN ANALYZE, show instrumentation information for a plan node
- *
- * "which" identifies which instrumentation counter to print
- */
-static void
-show_instrumentation_count(const char *qlabel, int which,
-						   PlanState *planstate, ExplainState *es)
-{
-	double		nfiltered;
-	double		nloops;
-
-	if (!es->analyze || !planstate->instrument)
-		return;
-
-	if (which == 2)
-		nfiltered = planstate->instrument->nfiltered2;
-	else
-		nfiltered = planstate->instrument->nfiltered1;
-	nloops = planstate->instrument->nloops;
-
-	/* suppress zero counts; they're not interesting enough */
-	if (nfiltered > 0)
-	{
-		if (nloops > 0)
-			ExplainPropertyFloat(qlabel, NULL, nfiltered / nloops, 0, es);
-		else
-			ExplainPropertyFloat(qlabel, NULL, 0.0, 0, es);
-	}
-}
-
-
-
-/*
  * Fetch the name of an index in an EXPLAIN
  *
  * We allow plugins to get control here so that plans involving hypothetical
@@ -1436,117 +1053,6 @@ explain_get_index_name(Oid indexId)
 			elog(ERROR, "cache lookup failed for index %u", indexId);
 	}
 	return result;
-}
-
-/*
- * Show buffer usage details.
- */
-static void
-show_buffer_usage(ExplainState *es, const BufferUsage *usage, bool planning)
-{
-	bool		has_shared = (usage->shared_blks_hit > 0 ||
-							  usage->shared_blks_read > 0 ||
-							  usage->shared_blks_dirtied > 0 ||
-							  usage->shared_blks_written > 0);
-	bool		has_local = (usage->local_blks_hit > 0 ||
-							 usage->local_blks_read > 0 ||
-							 usage->local_blks_dirtied > 0 ||
-							 usage->local_blks_written > 0);
-	bool		has_temp = (usage->temp_blks_read > 0 ||
-							usage->temp_blks_written > 0);
-	bool		show_planning = (planning && (has_shared ||
-											  has_local || has_temp));
-
-	if (show_planning)
-	{
-		ExplainIndentText(es);
-		appendStringInfoString(es->str, "Planning:\n");
-		es->indent++;
-	}
-
-	/* Show only positive counter values. */
-	if (has_shared || has_local || has_temp)
-	{
-		ExplainIndentText(es);
-		appendStringInfoString(es->str, "Buffers:");
-
-		if (has_shared)
-		{
-			appendStringInfoString(es->str, " shared");
-			if (usage->shared_blks_hit > 0)
-				appendStringInfo(es->str, " hit=%lld",
-								 (long long) usage->shared_blks_hit);
-			if (usage->shared_blks_read > 0)
-				appendStringInfo(es->str, " read=%lld",
-								 (long long) usage->shared_blks_read);
-			if (usage->shared_blks_dirtied > 0)
-				appendStringInfo(es->str, " dirtied=%lld",
-								 (long long) usage->shared_blks_dirtied);
-			if (usage->shared_blks_written > 0)
-				appendStringInfo(es->str, " written=%lld",
-								 (long long) usage->shared_blks_written);
-			if (has_local || has_temp)
-				appendStringInfoChar(es->str, ',');
-		}
-		if (has_local)
-		{
-			appendStringInfoString(es->str, " local");
-			if (usage->local_blks_hit > 0)
-				appendStringInfo(es->str, " hit=%lld",
-								 (long long) usage->local_blks_hit);
-			if (usage->local_blks_read > 0)
-				appendStringInfo(es->str, " read=%lld",
-								 (long long) usage->local_blks_read);
-			if (usage->local_blks_dirtied > 0)
-				appendStringInfo(es->str, " dirtied=%lld",
-								 (long long) usage->local_blks_dirtied);
-			if (usage->local_blks_written > 0)
-				appendStringInfo(es->str, " written=%lld",
-								 (long long) usage->local_blks_written);
-			if (has_temp)
-				appendStringInfoChar(es->str, ',');
-		}
-		if (has_temp)
-		{
-			appendStringInfoString(es->str, " temp");
-			if (usage->temp_blks_read > 0)
-				appendStringInfo(es->str, " read=%lld",
-								 (long long) usage->temp_blks_read);
-			if (usage->temp_blks_written > 0)
-				appendStringInfo(es->str, " written=%lld",
-								 (long long) usage->temp_blks_written);
-		}
-		appendStringInfoChar(es->str, '\n');
-	}
-
-	if (show_planning)
-		es->indent--;
-}
-
-/*
- * Show WAL usage details.
- */
-static void
-show_wal_usage(ExplainState *es, const WalUsage *usage)
-{
-	/* Show only positive counter values. */
-	if ((usage->wal_records > 0) || (usage->wal_fpi > 0) ||
-		(usage->wal_bytes > 0))
-	{
-		ExplainIndentText(es);
-		appendStringInfoString(es->str, "WAL:");
-
-		if (usage->wal_records > 0)
-			appendStringInfo(es->str, " records=%lld",
-							 (long long) usage->wal_records);
-		if (usage->wal_fpi > 0)
-			appendStringInfo(es->str, " fpi=%lld",
-							 (long long) usage->wal_fpi);
-		if (usage->wal_bytes > 0)
-			appendStringInfo(es->str, " bytes=" UINT64_FORMAT,
-							 usage->wal_bytes);
-		appendStringInfoChar(es->str, '\n');
-	}
 }
 
 /*
@@ -1846,21 +1352,6 @@ ExplainPropertyUInteger(const char *qlabel, const char *unit, uint64 value,
 
 	snprintf(buf, sizeof(buf), UINT64_FORMAT, value);
 	ExplainProperty(qlabel, unit, buf, es);
-}
-
-/*
- * Explain a float-valued property, using the specified number of
- * fractional digits.
- */
-void
-ExplainPropertyFloat(const char *qlabel, const char *unit, double value,
-					 int ndigits, ExplainState *es)
-{
-	char	   *buf;
-
-	buf = psprintf("%.*f", ndigits, value);
-	ExplainProperty(qlabel, unit, buf, es);
-	pfree(buf);
 }
 
 /*

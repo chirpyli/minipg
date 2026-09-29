@@ -16,7 +16,6 @@
 #include "postgres.h"
 
 #include "catalog/catalog.h"
-#include "executor/instrument.h"
 #include "storage/buf_internals.h"
 #include "storage/bufmgr.h"
 #include "utils/guc.h"
@@ -226,8 +225,6 @@ LocalBufferAlloc(SMgrRelation smgr, ForkNumber forkNum, BlockNumber blockNum,
 		/* Mark not-dirty now in case we error out below */
 		buf_state &= ~BM_DIRTY;
 		pg_atomic_unlocked_write_u32(&bufHdr->state, buf_state);
-
-		pgBufferUsage.local_blks_written++;
 	}
 
 	/*
@@ -299,9 +296,6 @@ MarkLocalBufferDirty(Buffer buffer)
 	bufHdr = GetLocalBufferDescriptor(bufid);
 
 	buf_state = pg_atomic_read_u32(&bufHdr->state);
-
-	if (!(buf_state & BM_DIRTY))
-		pgBufferUsage.local_blks_dirtied++;
 
 	buf_state |= BM_DIRTY;
 

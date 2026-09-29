@@ -798,8 +798,7 @@ postquel_start(execution_state *es, SQLFunctionCachePtr fcache)
 							 GetActiveSnapshot(),
 							 InvalidSnapshot,
 							 dest,
-							 fcache->paramLI,
-							 0);
+							 fcache->paramLI);
 
 	/* Utility commands don't need Executor. */
 	if (es->qd->operation != CMD_UTILITY)

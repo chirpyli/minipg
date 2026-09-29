@@ -40,43 +40,6 @@ typedef struct Tuplesortstate Tuplesortstate;
  * Sharedsort) has been cropped together with parallel query. */
 
 /*
- * Data structures for reporting sort statistics.  Note that
- * TuplesortInstrumentation can't contain any pointers because we
- * sometimes put it in shared memory.
- *
- * The parallel-sort infrastructure relies on having a zero TuplesortMethod
- * to indicate that a worker never did anything, so we assign zero to
- * SORT_TYPE_STILL_IN_PROGRESS.  The other values of this enum can be
- * OR'ed together to represent a situation where different workers used
- * different methods, so we need a separate bit for each one.  Keep the
- * NUM_TUPLESORTMETHODS constant in sync with the number of bits!
- */
-typedef enum
-{
-	SORT_TYPE_STILL_IN_PROGRESS = 0,
-	SORT_TYPE_TOP_N_HEAPSORT = 1 << 0,
-	SORT_TYPE_QUICKSORT = 1 << 1,
-	SORT_TYPE_EXTERNAL_SORT = 1 << 2,
-	SORT_TYPE_EXTERNAL_MERGE = 1 << 3
-} TuplesortMethod;
-
-#define NUM_TUPLESORTMETHODS 4
-
-typedef enum
-{
-	SORT_SPACE_TYPE_DISK,
-	SORT_SPACE_TYPE_MEMORY
-} TuplesortSpaceType;
-
-typedef struct TuplesortInstrumentation
-{
-	TuplesortMethod sortMethod; /* sort algorithm used */
-	TuplesortSpaceType spaceType;	/* type of space spaceUsed represents */
-	int64		spaceUsed;		/* space consumption, in kB */
-} TuplesortInstrumentation;
-
-
-/*
  * We provide multiple interfaces to what is essentially the same code,
  * since different callers have different data to be sorted and want to
  * specify the sort key information differently.  There are two APIs for
@@ -133,7 +96,6 @@ extern Tuplesortstate *tuplesort_begin_datum(Oid datumType,
 											 bool randomAccess);
 
 extern void tuplesort_set_bound(Tuplesortstate *state, int64 bound);
-extern bool tuplesort_used_bound(Tuplesortstate *state);
 
 extern void tuplesort_puttupleslot(Tuplesortstate *state,
 								   TupleTableSlot *slot);
@@ -157,11 +119,6 @@ extern bool tuplesort_getdatum(Tuplesortstate *state, bool forward,
 extern void tuplesort_end(Tuplesortstate *state);
 
 extern void tuplesort_reset(Tuplesortstate *state);
-
-extern void tuplesort_get_stats(Tuplesortstate *state,
-								TuplesortInstrumentation *stats);
-extern const char *tuplesort_method_name(TuplesortMethod m);
-extern const char *tuplesort_space_type_name(TuplesortSpaceType t);
 
 extern int	tuplesort_merge_order(int64 allowedMem);
 

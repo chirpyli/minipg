@@ -40,7 +40,6 @@
 #include "catalog/pg_tablespace_d.h"
 #endif
 #include "catalog/storage.h"
-#include "executor/instrument.h"
 #include "lib/binaryheap.h"
 #include "miscadmin.h"
 #include "utils/wait_event.h"
@@ -811,16 +810,7 @@ ReadBuffer_common(SMgrRelation smgr, char relpersistence, ForkNumber forkNum,
 	}
 
 	if (isLocalBuf)
-	{
 		bufHdr = LocalBufferAlloc(smgr, forkNum, blockNum, &found);
-		if (found)
-			pgBufferUsage.local_blks_hit++;
-		else if (isExtend)
-			pgBufferUsage.local_blks_written++;
-		else if (mode == RBM_NORMAL || mode == RBM_NORMAL_NO_LOG ||
-				 mode == RBM_ZERO_ON_ERROR)
-			pgBufferUsage.local_blks_read++;
-	}
 	else
 	{
 		/*
@@ -829,13 +819,6 @@ ReadBuffer_common(SMgrRelation smgr, char relpersistence, ForkNumber forkNum,
 		 */
 		bufHdr = BufferAlloc(smgr, relpersistence, forkNum, blockNum,
 							 strategy, &found);
-		if (found)
-			pgBufferUsage.shared_blks_hit++;
-		else if (isExtend)
-			pgBufferUsage.shared_blks_written++;
-		else if (mode == RBM_NORMAL || mode == RBM_NORMAL_NO_LOG ||
-				 mode == RBM_ZERO_ON_ERROR)
-			pgBufferUsage.shared_blks_read++;
 	}
 
 	/* At this point we do NOT hold any locks. */
@@ -1517,7 +1500,6 @@ MarkBufferDirty(Buffer buffer)
 	if (!(old_buf_state & BM_DIRTY))
 	{
 		VacuumPageDirty++;
-		pgBufferUsage.shared_blks_dirtied++;
 		if (VacuumCostActive)
 			VacuumCostBalance += VacuumCostPageDirty;
 	}
@@ -2851,8 +2833,6 @@ FlushBuffer(BufferDesc *buf, SMgrRelation reln)
 			  bufToWrite,
 			  false);
 
-	pgBufferUsage.shared_blks_written++;
-
 	/*
 	 * Mark the buffer as clean (unless BM_JUST_DIRTIED has become set) and
 	 * end the BM_IO_IN_PROGRESS state.
@@ -3827,7 +3807,6 @@ MarkBufferDirtyHint(Buffer buffer, bool buffer_std)
 		if (dirtied)
 		{
 			VacuumPageDirty++;
-			pgBufferUsage.shared_blks_dirtied++;
 			if (VacuumCostActive)
 				VacuumCostBalance += VacuumCostPageDirty;
 		}

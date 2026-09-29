@@ -95,8 +95,6 @@
 #include "nodes/nodeFuncs.h"
 
 static TupleTableSlot *ExecProcNodeFirst(PlanState *node);
-static TupleTableSlot *ExecProcNodeInstr(PlanState *node);
-static bool ExecShutdownNode_walker(PlanState *node, void *context);
 
 
 /* ------------------------------------------------------------------------
@@ -278,10 +276,6 @@ ExecInitNode(Plan *node, EState *estate, int eflags)
 	}
 	result->initPlan = subps;
 
-	/* Set up instrumentation for this node if requested */
-	if (estate->es_instrument)
-		result->instrument = InstrAlloc(1, estate->es_instrument, false);
-
 	return result;
 }
 
@@ -297,9 +291,9 @@ ExecSetExecProcNode(PlanState *node, ExecProcNodeMtd function)
 {
 	/*
 	 * Add a wrapper around the ExecProcNode callback that checks stack depth
-	 * during the first execution and maybe adds an instrumentation wrapper.
-	 * When the callback is changed after execution has already begun that
-	 * means we'll superfluously execute ExecProcNodeFirst, but that seems ok.
+	 * during the first execution.  When the callback is changed after
+	 * execution has already begun that means we'll superfluously execute
+	 * ExecProcNodeFirst, but that seems ok.
 	 */
 	node->ExecProcNodeReal = function;
 	node->ExecProcNode = ExecProcNodeFirst;
@@ -308,7 +302,7 @@ ExecSetExecProcNode(PlanState *node, ExecProcNodeMtd function)
 
 /*
  * ExecProcNode wrapper that performs some one-time checks, before calling
- * the relevant node method (possibly via an instrumentation wrapper).
+ * the relevant node method.
  */
 static TupleTableSlot *
 ExecProcNodeFirst(PlanState *node)
@@ -323,36 +317,12 @@ ExecProcNodeFirst(PlanState *node)
 	check_stack_depth();
 
 	/*
-	 * If instrumentation is required, change the wrapper to one that just
-	 * does instrumentation.  Otherwise we can dispense with all wrappers and
-	 * have ExecProcNode() directly call the relevant function from now on.
+	 * We can now dispense with the wrapper and have ExecProcNode() directly
+	 * call the relevant function from now on.
 	 */
-	if (node->instrument)
-		node->ExecProcNode = ExecProcNodeInstr;
-	else
-		node->ExecProcNode = node->ExecProcNodeReal;
+	node->ExecProcNode = node->ExecProcNodeReal;
 
 	return node->ExecProcNode(node);
-}
-
-
-/*
- * ExecProcNode wrapper that performs instrumentation calls.  By keeping
- * this a separate function, we avoid overhead in the normal case where
- * no instrumentation is wanted.
- */
-static TupleTableSlot *
-ExecProcNodeInstr(PlanState *node)
-{
-	TupleTableSlot *result;
-
-	InstrStartNode(node->instrument);
-
-	result = node->ExecProcNodeReal(node);
-
-	InstrStopNode(node->instrument, TupIsNull(result) ? 0.0 : 1.0);
-
-	return result;
 }
 
 
@@ -363,10 +333,7 @@ ExecProcNodeInstr(PlanState *node)
  *		(it might return a hashtable, bitmap, etc).  Caller should
  *		check it got back the expected kind of Node.
  *
- * This has essentially the same responsibilities as ExecProcNode,
- * but it does not do InstrStartNode/InstrStopNode (mainly because
- * it can't tell how many returned tuples to count).  Each per-node
- * function must provide its own instrumentation support.
+ * This has essentially the same responsibilities as ExecProcNode.
  * ----------------------------------------------------------------
  */
 Node *
@@ -550,52 +517,4 @@ ExecEndNode(PlanState *node)
 			break;
 	}
 }
-
-/*
- * ExecShutdownNode
- *
- * Give execution nodes a chance to stop asynchronous resource consumption
- * and release any resources still held.
- */
-bool
-ExecShutdownNode(PlanState *node)
-{
-	return ExecShutdownNode_walker(node, NULL);
-}
-
-static bool
-ExecShutdownNode_walker(PlanState *node, void *context)
-{
-	if (node == NULL)
-		return false;
-
-	check_stack_depth();
-
-	/*
-	 * Treat the node as running while we shut it down, but only if it's run
-	 * at least once already.  We don't expect much CPU consumption during
-	 * node shutdown.  We skip this if the node has never been executed, so as
-	 * to avoid incorrectly making it appear that it has.
-	 */
-	if (node->instrument && node->instrument->running)
-		InstrStartNode(node->instrument);
-
-	planstate_tree_walker(node, ExecShutdownNode_walker, context);
-
-	switch (nodeTag(node))
-	{
-		case T_HashState:
-			ExecShutdownHash((HashState *) node);
-			break;
-		default:
-			break;
-	}
-
-	/* Stop the node if we started it above, reporting 0 tuples. */
-	if (node->instrument && node->instrument->running)
-		InstrStopNode(node->instrument, 0);
-
-	return false;
-}
-
 

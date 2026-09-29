@@ -15,7 +15,6 @@
 #define EXECNODES_H
 
 #include "access/tupconvert.h"
-#include "executor/instrument.h"
 #include "fmgr.h"
 #include "lib/ilist.h"
 #include "lib/pairingheap.h"
@@ -456,7 +455,6 @@ typedef struct EState
 	uint64		es_processed;	/* # of tuples processed */
 
 	int			es_top_eflags;	/* eflags passed to ExecutorStart */
-	int			es_instrument;	/* OR of InstrumentOption flags */
 	bool		es_finished;	/* true when ExecutorFinish is done */
 
 	List	   *es_exprcontexts;	/* List of ExprContexts within EState */
@@ -765,8 +763,6 @@ typedef struct PlanState
 	ExecProcNodeMtd ExecProcNodeReal;	/* actual function, if above is a
 										 * wrapper */
 
-	Instrumentation *instrument;	/* Optional runtime stats for this node */
-
 	/*
 	 * Common structural data for all Plan types.  These links to subsidiary
 	 * state trees parallel links in the associated plan tree (except for the
@@ -846,23 +842,6 @@ typedef struct PlanState
  */
 #define innerPlanState(node)		(((PlanState *)(node))->righttree)
 #define outerPlanState(node)		(((PlanState *)(node))->lefttree)
-
-/* Macros for inline access to certain instrumentation counters */
-#define InstrCountTuples2(node, delta) \
-	do { \
-		if (((PlanState *)(node))->instrument) \
-			((PlanState *)(node))->instrument->ntuples2 += (delta); \
-	} while (0)
-#define InstrCountFiltered1(node, delta) \
-	do { \
-		if (((PlanState *)(node))->instrument) \
-			((PlanState *)(node))->instrument->nfiltered1 += (delta); \
-	} while(0)
-#define InstrCountFiltered2(node, delta) \
-	do { \
-		if (((PlanState *)(node))->instrument) \
-			((PlanState *)(node))->instrument->nfiltered2 += (delta); \
-	} while(0)
 
 /*
  * EPQState is state for executing an EvalPlanQual recheck on candidate
@@ -1542,19 +1521,6 @@ typedef struct UniqueState
 } UniqueState;
 
 /* ----------------
- *	 Values displayed by EXPLAIN ANALYZE
- * ----------------
- */
-typedef struct HashInstrumentation
-{
-	int			nbuckets;		/* number of buckets at end of execution */
-	int			nbuckets_original;	/* planned number of buckets */
-	int			nbatch;			/* number of batches at end of execution */
-	int			nbatch_original;	/* planned number of batches */
-	Size		space_peak;		/* peak memory usage in bytes */
-} HashInstrumentation;
-
-/* ----------------
  *	 HashState information
  * ----------------
  */
@@ -1563,12 +1529,6 @@ typedef struct HashState
 	PlanState	ps;				/* its first field is NodeTag */
 	HashJoinTable hashtable;	/* hash table for the hashjoin */
 	List	   *hashkeys;		/* list of ExprState nodes */
-
-	/*
-	 * If we are collecting hash stats, this points to an initially-zeroed
-	 * collection area.
-	 */
-	HashInstrumentation *hinstrument;
 } HashState;
 
 #endif							/* EXECNODES_H */

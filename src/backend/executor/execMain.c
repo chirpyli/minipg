@@ -184,7 +184,6 @@ standard_ExecutorStart(QueryDesc *queryDesc, int eflags)
 	estate->es_snapshot = RegisterSnapshot(queryDesc->snapshot);
 	estate->es_crosscheck_snapshot = RegisterSnapshot(queryDesc->crosscheck_snapshot);
 	estate->es_top_eflags = eflags;
-	estate->es_instrument = queryDesc->instrument_options;
 
 	/*
 	 * Initialize the plan state tree
@@ -257,10 +256,6 @@ standard_ExecutorRun(QueryDesc *queryDesc,
 	 */
 	oldcontext = MemoryContextSwitchTo(estate->es_query_cxt);
 
-	/* Allow instrumentation of Executor overall runtime */
-	if (queryDesc->totaltime)
-		InstrStartNode(queryDesc->totaltime);
-
 	/*
 	 * extract information from the query descriptor and the query feature.
 	 */
@@ -294,9 +289,6 @@ standard_ExecutorRun(QueryDesc *queryDesc,
 	if (sendTuples)
 		dest->rShutdown(dest);
 
-	if (queryDesc->totaltime)
-		InstrStopNode(queryDesc->totaltime, estate->es_processed);
-
 	MemoryContextSwitchTo(oldcontext);
 }
 
@@ -305,8 +297,8 @@ standard_ExecutorRun(QueryDesc *queryDesc,
  *
  *		This routine must be called after the last ExecutorRun call.
  *		It performs cleanup such as firing AFTER triggers.  It is
- *		separate from ExecutorEnd because EXPLAIN ANALYZE needs to
- *		include these actions in the total runtime.
+ *		separate from ExecutorEnd so that any final actions are performed
+ *		before the executor is shut down.
  *
  *		We provide a function hook variable that lets loadable plugins
  *		get control when ExecutorFinish is called.  Such a plugin would
@@ -340,15 +332,8 @@ standard_ExecutorFinish(QueryDesc *queryDesc)
 	/* Switch into per-query memory context */
 	oldcontext = MemoryContextSwitchTo(estate->es_query_cxt);
 
-	/* Allow instrumentation of Executor overall runtime */
-	if (queryDesc->totaltime)
-		InstrStartNode(queryDesc->totaltime);
-
 	/* Run ModifyTable nodes to completion */
 	ExecPostprocessPlan(estate);
-
-	if (queryDesc->totaltime)
-		InstrStopNode(queryDesc->totaltime, 0);
 
 	MemoryContextSwitchTo(oldcontext);
 
@@ -420,7 +405,6 @@ standard_ExecutorEnd(QueryDesc *queryDesc)
 	queryDesc->tupDesc = NULL;
 	queryDesc->estate = NULL;
 	queryDesc->planstate = NULL;
-	queryDesc->totaltime = NULL;
 }
 
 /* ----------------------------------------------------------------
@@ -737,8 +721,7 @@ CheckValidRowMarkRel(Relation rel)
 void
 InitResultRelInfo(ResultRelInfo *resultRelInfo,
 				  Relation resultRelationDesc,
-				  Index resultRelationIndex,
-				  int instrument_options)
+				  Index resultRelationIndex)
 {
 	MemSet(resultRelInfo, 0, sizeof(ResultRelInfo));
 	resultRelInfo->type = T_ResultRelInfo;
@@ -980,13 +963,6 @@ ExecutePlan(QueryDesc *queryDesc,
 		if (numberTuples && numberTuples == current_tuple_count)
 			break;
 	}
-
-	/*
-	 * If we know we won't need to back up, we can release resources at this
-	 * point.
-	 */
-	if (!(estate->es_top_eflags & EXEC_FLAG_BACKWARD))
-		(void) ExecShutdownNode(planstate);
 }
 
 
@@ -1448,7 +1424,6 @@ EvalPlanQualStart(EPQState *epqstate, Plan *planTree)
 	 */
 	rcestate->es_result_relations = NULL;
 	rcestate->es_top_eflags = parentestate->es_top_eflags;
-	rcestate->es_instrument = parentestate->es_instrument;
 	/* es_auxmodifytables must NOT be copied */
 
 	/*

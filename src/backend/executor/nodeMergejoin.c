@@ -470,8 +470,6 @@ MJFillOuter(MergeJoinState *node)
 
 		return ExecProject(node->js.ps.ps_ProjInfo);
 	}
-	else
-		InstrCountFiltered2(node, 1);
 
 	return NULL;
 }
@@ -501,8 +499,6 @@ MJFillInner(MergeJoinState *node)
 
 		return ExecProject(node->js.ps.ps_ProjInfo);
 	}
-	else
-		InstrCountFiltered2(node, 1);
 
 	return NULL;
 }
@@ -827,11 +823,7 @@ ExecMergeJoin(PlanState *pstate)
 
 						return ExecProject(node->js.ps.ps_ProjInfo);
 					}
-					else
-						InstrCountFiltered2(node, 1);
 				}
-				else
-					InstrCountFiltered1(node, 1);
 				break;
 
 				/*

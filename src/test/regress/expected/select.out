@@ -715,16 +715,6 @@ select * from onek2 where unique2 = 11 and stringu1 = 'ATAAAA';
      494 |      11 |   0 |    2 |   4 |     14 |       4 |       94 |          94 |       494 |      494 |   8 |    9 | ATAAAA   | LAAAAA   | VVVVxx
 (1 row)
 
--- actually run the query with an analyze to use the partial index
-explain (costs off, analyze on, timing off, summary off)
-select * from onek2 where unique2 = 11 and stringu1 = 'ATAAAA';
-                         QUERY PLAN                         
-------------------------------------------------------------
- Seq Scan on onek2 (actual rows=1 loops=1)
-   Filter: ((unique2 = 11) AND (stringu1 = 'ATAAAA'::name))
-   Rows Removed by Filter: 999
-(3 rows)
-
 explain (costs off)
 select unique2 from onek2 where unique2 = 11 and stringu1 = 'ATAAAA';
                          QUERY PLAN                         

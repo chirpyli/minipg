@@ -52,10 +52,6 @@
 void
 ExecReScan(PlanState *node)
 {
-	/* If collecting timing stats, update them */
-	if (node->instrument)
-		InstrEndLoop(node->instrument);
-
 	/*
 	 * If we have changed parameters, propagate that info.
 	 *

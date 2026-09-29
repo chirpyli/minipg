@@ -144,7 +144,6 @@ IndexNext(IndexScanState *node)
 			if (!ExecQualAndReset(node->indexqualorig, econtext))
 			{
 				/* Fails recheck, so drop it and loop back for another */
-				InstrCountFiltered2(node, 1);
 				continue;
 			}
 		}
@@ -281,7 +280,6 @@ next_indextuple:
 			if (!ExecQualAndReset(node->indexqualorig, econtext))
 			{
 				/* Fails recheck, so drop it and loop back for another */
-				InstrCountFiltered2(node, 1);
 				/* allow this loop to be cancellable */
 				CHECK_FOR_INTERRUPTS();
 				goto next_indextuple;

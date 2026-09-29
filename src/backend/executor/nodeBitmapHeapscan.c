@@ -242,7 +242,6 @@ BitmapHeapNext(BitmapHeapScanState *node)
 				if (!ExecQualAndReset(node->bitmapqualorig, econtext))
 				{
 					/* Fails recheck, so drop it and loop back for another */
-					InstrCountFiltered2(node, 1);
 					ExecClearTuple(slot);
 					continue;
 				}

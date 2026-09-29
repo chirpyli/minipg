@@ -144,8 +144,7 @@ extern void CheckValidResultRelNew(ResultRelInfo *resultRelInfo, CmdType operati
 extern void CheckValidResultRel(ResultRelInfo *resultRelInfo, CmdType operation);
 extern void InitResultRelInfo(ResultRelInfo *resultRelInfo,
 							  Relation resultRelationDesc,
-							  Index resultRelationIndex,
-							  int instrument_options);
+							  Index resultRelationIndex);
 extern LockTupleMode ExecUpdateLockMode(EState *estate, ResultRelInfo *relinfo);
 extern ExecRowMark *ExecFindRowMark(EState *estate, Index rti);
 extern ExecAuxRowMark *ExecBuildAuxRowMark(ExecRowMark *erm, List *targetlist);
@@ -174,7 +173,7 @@ extern PlanState *ExecInitNode(Plan *node, EState *estate, int eflags);
 extern void ExecSetExecProcNode(PlanState *node, ExecProcNodeMtd function);
 extern Node *MultiExecProcNode(PlanState *node);
 extern void ExecEndNode(PlanState *node);
-extern bool ExecShutdownNode(PlanState *node);
+
 
 
 /* ----------------------------------------------------------------
