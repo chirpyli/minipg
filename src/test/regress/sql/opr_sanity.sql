@@ -32,8 +32,7 @@ WHERE p1.prolang = 0 OR p1.prorettype = 0 OR
        procost <= 0 OR
        CASE WHEN proretset THEN prorows <= 0 ELSE prorows != 0 END OR
        prokind NOT IN ('f', 'a', 'w', 'p') OR
-       provolatile NOT IN ('i', 's', 'v') OR
-       proparallel NOT IN ('s', 'r', 'u');
+       provolatile NOT IN ('i', 's', 'v');
 
 -- prosrc should never be null nor empty
 SELECT p1.oid, p1.proname
@@ -47,15 +46,6 @@ WHERE prosrc = '' OR prosrc = '-';
 SELECT p1.oid, p1.proname
 FROM pg_proc AS p1
 WHERE proretset AND prokind != 'f';
-
--- probin should be non-empty for C functions, null everywhere else
-SELECT p1.oid, p1.proname
-FROM pg_proc as p1
-WHERE prolang = 13 AND (probin IS NULL OR probin = '' OR probin = '-');
-
-SELECT p1.oid, p1.proname
-FROM pg_proc as p1
-WHERE prolang != 13 AND probin IS NOT NULL;
 
 -- Look for conflicting proc definitions (same names and input datatypes).
 -- (This test should be dead code now that we have the unique index
@@ -325,12 +315,6 @@ where proname in (
 and pronamespace = (select oid from pg_catalog.pg_namespace
                     where nspname = 'pg_catalog')
 order by 1;
-
--- Check that all immutable functions are marked parallel safe
-SELECT p1.oid, p1.proname
-FROM pg_proc AS p1
-WHERE provolatile = 'i' AND proparallel = 'u';
-
 
 -- **************** pg_cast ****************
 

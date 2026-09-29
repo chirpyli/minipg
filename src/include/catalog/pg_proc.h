@@ -67,9 +67,6 @@ CATALOG(pg_proc,1255,ProcedureRelationId) BKI_BOOTSTRAP BKI_ROWTYPE_OID(81,Proce
 	/* see PROVOLATILE_ categories below */
 	char		provolatile BKI_DEFAULT(i);
 
-	/* see PROPARALLEL_ categories below */
-	char		proparallel BKI_DEFAULT(s);
-
 	/* number of arguments */
 	/* Note: need not be given in pg_proc.dat; genbki.pl will compute it */
 	int16		pronargs;
@@ -93,9 +90,6 @@ CATALOG(pg_proc,1255,ProcedureRelationId) BKI_BOOTSTRAP BKI_ROWTYPE_OID(81,Proce
 
 	/* procedure source text */
 	text		prosrc;
-
-	/* secondary procedure info (can be NULL) */
-	text		probin BKI_DEFAULT(_null_);
 #endif
 } FormData_pg_proc;
 
@@ -142,15 +136,6 @@ DECLARE_UNIQUE_INDEX(pg_proc_proname_args_nsp_index, 2691, on pg_proc using btre
 #define PROVOLATILE_IMMUTABLE	'i' /* never changes for given input */
 #define PROVOLATILE_STABLE		's' /* does not change within a scan */
 #define PROVOLATILE_VOLATILE	'v' /* can change even within a scan */
-
-/*
- * Symbolic values for proparallel column: these indicate whether a function
- * can be safely be run in a parallel backend, during parallelism but
- * necessarily in the leader, or only in non-parallel mode.
- */
-#define PROPARALLEL_SAFE		's' /* can run in worker or leader */
-#define PROPARALLEL_RESTRICTED	'r' /* can run in parallel leader only */
-#define PROPARALLEL_UNSAFE		'u' /* banned while in parallel mode */
 
 /*
  * Symbolic values for proargmodes column.  Note that these must agree with
