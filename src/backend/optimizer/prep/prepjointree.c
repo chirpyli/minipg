@@ -838,9 +838,6 @@ pull_up_simple_subquery(PlannerInfo *root, Node *jtnode, RangeTblEntry *rte,
 	subroot->update_colnos = NIL;
 
 	subroot->qual_security_level = 0;
-	subroot->hasRecursion = false;
-	subroot->wt_param_id = -1;
-	subroot->non_recursive_path = NULL;
 
 	/*
 	 * If the FROM clause is empty, replace it with a dummy RTE_RESULT RTE, so

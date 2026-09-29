@@ -133,8 +133,7 @@ standard_planner(Query *parse, const char *query_string, int cursorOptions,
 	tuple_fraction = 0.0;
 
 	/* primary planning entry point (may recurse for subqueries) */
-	root = subquery_planner(glob, parse, NULL,
-							false, tuple_fraction);
+	root = subquery_planner(glob, parse, NULL, tuple_fraction);
 
 	/* Select best Path and turn it into a Plan */
 	final_rel = fetch_upper_rel(root, UPPERREL_FINAL, NULL);
@@ -211,7 +210,6 @@ standard_planner(Query *parse, const char *query_string, int cursorOptions,
  * glob 是当前规划器运行的全局状态。
  * parse 是由解析器与重写器生成的查询树。
  * parent_root 是紧邻的父查询的 PlannerInfo（顶层时为 NULL）。
- * hasRecursion 如果为真，表示这是一条递归 WITH 查询。
  * tuple_fraction 是我们预期会被取回的元组所占的比例。
  * tuple_fraction 的含义与下文 upper_planner 中的说明相同。
  *
@@ -232,7 +230,7 @@ standard_planner(Query *parse, const char *query_string, int cursorOptions,
 PlannerInfo *
 subquery_planner(PlannerGlobal *glob, Query *parse,
 				 PlannerInfo *parent_root,
-				 bool hasRecursion, double tuple_fraction)
+				 double tuple_fraction)
 {
 	PlannerInfo *root;
 	bool		hasOuterJoins;
@@ -265,12 +263,6 @@ subquery_planner(PlannerGlobal *glob, Query *parse,
 
 	root->qual_security_level = 0;
 	root->hasPseudoConstantQuals = false;
-	root->hasRecursion = hasRecursion;
-	if (hasRecursion)
-		root->wt_param_id = assign_special_exec_param(root);
-	else
-		root->wt_param_id = -1;
-	root->non_recursive_path = NULL;
 
 
 	/*

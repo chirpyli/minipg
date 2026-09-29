@@ -190,8 +190,7 @@ make_subplan(PlannerInfo *root, Query *orig_subquery,
 
 	/* Generate Paths for the subquery */
 	subroot = subquery_planner(root->glob, subquery,
-							   root,
-							   false, tuple_fraction);
+							   root, tuple_fraction);
 
 	/* Isolate the params needed by this specific subplan */
 	plan_params = root->plan_params;
@@ -1234,9 +1233,6 @@ SS_identify_outer_params(PlannerInfo *root)
 				outer_params = bms_add_member(outer_params, lfirst_int(l2));
 			}
 		}
-		/* Include worktable ID, if a recursive query is being planned */
-		if (proot->wt_param_id >= 0)
-			outer_params = bms_add_member(outer_params, proot->wt_param_id);
 	}
 	root->outer_params = outer_params;
 }

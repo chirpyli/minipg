@@ -298,11 +298,6 @@ struct PlannerInfo
 	bool		hasLateralRTEs; /* true if any RTEs are marked LATERAL */
 	bool		hasPseudoConstantQuals; /* true if any RestrictInfo has
 									 * pseudoconstant = true */
-	bool		hasRecursion;	/* true if planning a recursive WITH item */
-
-	/* These fields are used only when hasRecursion is true: */
-	int			wt_param_id;	/* PARAM_EXEC ID for the work table */
-	struct Path *non_recursive_path;	/* a path for non-recursive term */
 
 	/* These fields are workspace for createplan.c */
 	Relids		curOuterRels;	/* outer rels above current node */
