@@ -461,14 +461,10 @@ PostmasterMain(int argc, char *argv[])
 	 * tcop/postgres.c (the option sets should not conflict) and with the
 	 * common help() function in main/main.c.
 	 */
-	while ((opt = getopt(argc, argv, "B:bc:C:D:d:EeFf:h:ijN:nOPp:r:S:T:W:-:")) != -1)
+	while ((opt = getopt(argc, argv, "bc:C:D:d:EFf:jnOPp:r:T:W:-:")) != -1)
 	{
 		switch (opt)
 		{
-			case 'B':
-				SetConfigOption("shared_buffers", optarg, PGC_POSTMASTER, PGC_S_ARGV);
-				break;
-
 			case 'b':
 				/* Undocumented flag used for binary upgrades */
 				IsBinaryUpgrade = true;
@@ -486,10 +482,6 @@ PostmasterMain(int argc, char *argv[])
 				set_debug_options(atoi(optarg), PGC_POSTMASTER, PGC_S_ARGV);
 				break;
 
-			case 'e':
-				SetConfigOption("datestyle", "euro", PGC_POSTMASTER, PGC_S_ARGV);
-				break;
-
 			case 'F':
 				SetConfigOption("fsync", "false", PGC_POSTMASTER, PGC_S_ARGV);
 				break;
@@ -503,20 +495,8 @@ PostmasterMain(int argc, char *argv[])
 				}
 				break;
 
-			case 'h':
-				SetConfigOption("listen_addresses", optarg, PGC_POSTMASTER, PGC_S_ARGV);
-				break;
-
-			case 'i':
-				SetConfigOption("listen_addresses", "*", PGC_POSTMASTER, PGC_S_ARGV);
-				break;
-
 			case 'j':
 				/* only used by interactive backend */
-				break;
-
-			case 'N':
-				SetConfigOption("max_connections", optarg, PGC_POSTMASTER, PGC_S_ARGV);
 				break;
 
 			case 'n':
@@ -539,11 +519,6 @@ PostmasterMain(int argc, char *argv[])
 			case 'r':
 				/* only used by single-user backend */
 				break;
-
-			case 'S':
-				SetConfigOption("work_mem", optarg, PGC_POSTMASTER, PGC_S_ARGV);
-				break;
-
 
 			case 'T':
 

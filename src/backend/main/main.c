@@ -154,18 +154,12 @@ help(const char *progname)
 	printf(_("%s is the PostgreSQL server.\n\n"), progname);
 	printf(_("Usage:\n  %s [OPTION]...\n\n"), progname);
 	printf(_("Options:\n"));
-	printf(_("  -B NBUFFERS        number of shared buffers\n"));
 	printf(_("  -c NAME=VALUE      set run-time parameter\n"));
 	printf(_("  -C NAME            print value of run-time parameter, then exit\n"));
 	printf(_("  -d 1-5             debugging level\n"));
 	printf(_("  -D DATADIR         database directory\n"));
-	printf(_("  -e                 use European date input format (DMY)\n"));
 	printf(_("  -F                 turn fsync off\n"));
-	printf(_("  -h HOSTNAME        host name or IP address to listen on\n"));
-	printf(_("  -i                 enable TCP/IP connections\n"));
-	printf(_("  -N MAX-CONNECT     maximum number of allowed connections\n"));
 	printf(_("  -p PORT            port number to listen on\n"));
-	printf(_("  -S WORK-MEM        set amount of memory for sorts (in kB)\n"));
 	printf(_("  -V, --version      output version information, then exit\n"));
 	printf(_("  --NAME=VALUE       set run-time parameter\n"));
 	printf(_("  -?, --help         show this help, then exit\n"));

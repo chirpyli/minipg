@@ -1628,14 +1628,10 @@ process_postgres_switches(int argc, char *argv[], GucContext ctx,
 	 * postmaster/postmaster.c (the option sets should not conflict) and with
 	 * the common help() function in main/main.c.
 	 */
-	while ((flag = getopt(argc, argv, "B:bc:C:D:d:EeFf:h:ijN:nOPp:r:S:T:v:W:-:")) != -1)
+	while ((flag = getopt(argc, argv, "bc:C:D:d:EFf:jnOPp:r:T:v:W:-:")) != -1)
 	{
 		switch (flag)
 		{
-			case 'B':
-				SetConfigOption("shared_buffers", optarg, ctx, gucsource);
-				break;
-
 			case 'b':
 				/* Undocumented flag used for binary upgrades */
 				if (secure)
@@ -1660,10 +1656,6 @@ process_postgres_switches(int argc, char *argv[], GucContext ctx,
 					EchoQuery = true;
 				break;
 
-			case 'e':
-				SetConfigOption("datestyle", "euro", ctx, gucsource);
-				break;
-
 			case 'F':
 				SetConfigOption("fsync", "false", ctx, gucsource);
 				break;
@@ -1673,21 +1665,9 @@ process_postgres_switches(int argc, char *argv[], GucContext ctx,
 					errs++;
 				break;
 
-			case 'h':
-				SetConfigOption("listen_addresses", optarg, ctx, gucsource);
-				break;
-
-			case 'i':
-				SetConfigOption("listen_addresses", "*", ctx, gucsource);
-				break;
-
 			case 'j':
 				if (secure)
 					UseSemiNewlineNewline = true;
-				break;
-
-			case 'N':
-				SetConfigOption("max_connections", optarg, ctx, gucsource);
 				break;
 
 			case 'n':
@@ -1711,11 +1691,6 @@ process_postgres_switches(int argc, char *argv[], GucContext ctx,
 				if (secure)
 					strlcpy(OutputFileName, optarg, MAXPGPATH);
 				break;
-
-			case 'S':
-				SetConfigOption("work_mem", optarg, ctx, gucsource);
-				break;
-
 
 			case 'T':
 				/* ignored for consistency with the postmaster */
