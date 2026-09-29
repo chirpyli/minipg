@@ -40,26 +40,24 @@ typedef enum CAC_state
 
 
 /*
- * This is used by the postmaster in its communication with frontends.  It
- * contains all state information needed during this communication before the
- * backend is run.  The Port structure is kept in malloc'd memory and is
- * still available when a backend is running (see MyProcPort).  The data
- * it points to must also be malloc'd, or else palloc'd in TopMemoryContext,
- * so that it survives into PostgresMain execution!
+ * 该结构由 postmaster 在其与前端的通信中使用。它包含在后端运行之前，这次
+ * 通信过程中所需的全部状态信息。Port 结构保存在 malloc 分配的内存中，并且
+ * 在后端运行期间仍然可用（参见 MyProcPort）。它所指向的数据也必须是 malloc
+ * 分配的，或者在 TopMemoryContext 中用 palloc 分配，以便它能存活到
+ * PostgresMain 执行期间！
  *
- * remote_hostname is set if we did a successful reverse lookup of the
- * client's IP address during connection setup.
- * remote_hostname_resolv tracks the state of hostname verification:
- *	+1 = remote_hostname is known to resolve to client's IP address
- *	-1 = remote_hostname is known NOT to resolve to client's IP address
- *	 0 = we have not done the forward DNS lookup yet
- *	-2 = there was an error in name resolution
- * If reverse lookup of the client IP address fails, remote_hostname will be
- * left NULL while remote_hostname_resolv is set to -2.  If reverse lookup
- * succeeds but forward lookup fails, remote_hostname_resolv is also set to -2
- * (the case is distinguishable because remote_hostname isn't NULL).  In
- * either of the -2 cases, remote_hostname_errcode saves the lookup return
- * code for possible later use with gai_strerror.
+ * 如果在连接建立期间成功地对客户端的 IP 地址做了反向查询，就会设置
+ * remote_hostname。
+ * remote_hostname_resolv 跟踪主机名验证的状态：
+ *	+1 = 已知 remote_hostname 能解析到客户端的 IP 地址
+ *	-1 = 已知 remote_hostname *不能*解析到客户端的 IP 地址
+ *	 0 = 我们尚未做正向 DNS 查询
+ *	-2 = 名称解析时出错
+ * 如果对客户端 IP 地址的反向查询失败，remote_hostname 将保持为 NULL，而
+ * remote_hostname_resolv 被设为 -2。如果反向查询成功但正向查询失败，
+ * remote_hostname_resolv 同样被设为 -2（这两种情况可以区分，因为前一种情况下
+ * remote_hostname 不是 NULL）。在上述两种 -2 情况下，remote_hostname_errcode
+ * 保存着查询的返回码，以便日后可能配合 gai_strerror 使用。
  */
 
 typedef struct Port

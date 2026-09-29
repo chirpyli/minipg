@@ -59,11 +59,10 @@ typedef enum UpperRelationKind
 
 /*----------
  * PlannerGlobal
- *		Global information for planning/optimization
+ *		用于规划/优化的全局信息
  *
- * PlannerGlobal holds state for an entire planner invocation; this state
- * is shared across all levels of sub-Queries that exist in the command being
- * planned.
+ * PlannerGlobal 保存一次完整规划器调用（planner invocation）的状态；该状态在被
+ * 规划的命令中存在的所有层级的子查询（sub-Query）之间共享。
  *----------
  */
 typedef struct PlannerGlobal
@@ -325,157 +324,132 @@ struct PlannerInfo
 
 /*----------
  * RelOptInfo
- *		Per-relation information for planning/optimization
+ *		用于规划/优化的按关系（per-relation）信息
  *
- * For planning purposes, a "base rel" is either a plain relation (a table)
- * or the output of a sub-SELECT or function that appears in the range table.
- * In either case it is uniquely identified by an RT index.  A "joinrel"
- * is the joining of two or more base rels.  A joinrel is identified by
- * the set of RT indexes for its component baserels.  We create RelOptInfo
- * nodes for each baserel and joinrel, and store them in the PlannerInfo's
- * simple_rel_array and join_rel_list respectively.
+ * 就规划而言，一个"基关系"（base rel）要么是一个普通关系（表），要么是出现在
+ * 范围表（range table）中的某个子 SELECT 或函数的输出。无论哪种情况，它都由一个
+ * RT 索引唯一标识。一个"连接关系"（joinrel）是两个或更多基关系的连接。一个
+ * joinrel 由组成它的各基关系的 RT 索引集合来标识。我们为每个基关系和 joinrel
+ * 创建 RelOptInfo 节点，并分别存储在 PlannerInfo 的 simple_rel_array 和
+ * join_rel_list 中。
  *
- * Note that there is only one joinrel for any given set of component
- * baserels, no matter what order we assemble them in; so an unordered
- * set is the right datatype to identify it with.
+ * 注意，对于任意给定的组成基关系集合，无论我们以何种顺序组装它们，都只有一个
+ * joinrel；因此，用无序集合来标识它是正确的数据类型。
  *
- * We also have "other rels", which are like base rels in that they refer to
- * single RT indexes; but they are not part of the join tree, and are given
- * a different RelOptKind to identify them.
- * Currently the only kind of otherrels are those made for member relations
- * of an "append relation", that is an inheritance set or UNION ALL subquery.
- * An append relation has a parent RTE that is a base rel, which represents
- * the entire append relation.  The member RTEs are otherrels.  The parent
- * is present in the query join tree but the members are not.  The member
- * RTEs and otherrels are used to plan the scans of the individual tables or
- * subqueries of the append set; then the parent baserel is given Append
- * paths comprising the best paths for the individual
- * member rels.  (See comments for AppendRelInfo for more information.)
+ * 我们还有"其他关系"（other rels），它们与基关系类似，都只引用单个 RT 索引；
+ * 但它们不属于连接树的一部分，并且被赋予不同的 RelOptKind 来标识。
+ * 目前，唯一一种 otherrel 是为"追加关系"（append relation）的成员关系创建的，
+ * 即继承集（inheritance set）或 UNION ALL 子查询。一个追加关系有一个父 RTE，
+ * 它是一个基关系，代表整个追加关系。成员 RTE 则是 otherrel。父关系出现在查询
+ * 连接树中，而成员则不然。成员 RTE 和 otherrel 用于规划追加集中各个表或子查询的
+ * 扫描；随后，父基关系会获得由各成员关系的最佳路径组成的 Append 路径。（更多
+ * 信息参见 AppendRelInfo 的注释。）
  *
- * At one time we also made otherrels to represent join RTEs, for use in
- * handling join alias Vars.  Currently this is not needed because all join
- * alias Vars are expanded to non-aliased form during preprocess_expression.
+ * 曾经我们也创建 otherrel 来表示 join RTE，用于处理连接别名 Var。目前不再需要
+ * 这样做，因为所有连接别名 Var 都在 preprocess_expression 期间被展开为非别名
+ * 形式。
  *
- * There is also a RelOptKind for "upper" relations, which are RelOptInfos
- * that describe post-scan/join processing steps, such as aggregation.
- * Many of the fields in these RelOptInfos are meaningless, but their Path
- * fields always hold Paths showing ways to do that processing step.
+ * 还有一种 RelOptKind 用于"上层"（upper）关系，这些 RelOptInfo 描述的是扫描/连接
+ * 之后的处理步骤，例如聚合。这些 RelOptInfo 中的许多字段是无意义的，但它们的
+ * Path 字段始终保存着表示执行该处理步骤的各种方式的 Path。
  *
- * Lastly, there is a RelOptKind for "dead" relations, which are base rels
- * that we have proven we don't need to join after all.
+ * 最后，还有一种 RelOptKind 用于"死亡"（dead）关系，即我们已证明最终无需连接的
+ * 那些基关系。
  *
- * Parts of this data structure are specific to various scan and join
- * mechanisms.  It didn't seem worth creating new node types for them.
+ * 本数据结构的某些部分是针对各种扫描和连接机制的。为它们创建新的节点类型似乎
+ * 并不值得。
  *
- *		relids - Set of base-relation identifiers; it is a base relation
- *				if there is just one, a join relation if more than one
- *		rows - estimated number of tuples in the relation after restriction
- *			   clauses have been applied (ie, output rows of a plan for it)
- *		consider_startup - true if there is any value in keeping plain paths for
- *						   this rel on the basis of having cheap startup cost
- *		consider_param_startup - the same for parameterized paths
- *		reltarget - Default Path output tlist for this rel; normally contains
- *					Var and PlaceHolderVar nodes for the values we need to
- *					output from this relation.
- *					List is in no particular order, but all rels of an
- *					appendrel set must use corresponding orders.
- *					NOTE: in an appendrel child relation, may contain
- *					arbitrary expressions pulled up from a subquery!
- *		pathlist - List of Path nodes, one for each potentially useful
- *				   method of generating the relation
- *		ppilist - ParamPathInfo nodes for parameterized Paths, if any
- *		cheapest_startup_path - the pathlist member with lowest startup cost
- *			(regardless of ordering) among the unparameterized paths;
- *			or NULL if there is no unparameterized path
- *		cheapest_total_path - the pathlist member with lowest total cost
- *			(regardless of ordering) among the unparameterized paths;
- *			or if there is no unparameterized path, the path with lowest
- *			total cost among the paths with minimum parameterization
- *		cheapest_unique_path - for caching cheapest path to produce unique
- *			(no duplicates) output from relation; NULL if not yet requested
- *		cheapest_parameterized_paths - best paths for their parameterizations;
- *			always includes cheapest_total_path, even if that's unparameterized
- *		direct_lateral_relids - rels this rel has direct LATERAL references to
- *		lateral_relids - required outer rels for LATERAL, as a Relids set
- *			(includes both direct and indirect lateral references)
+ *		relids - 基关系标识符集合；如果只有一个，就是基关系，
+ *				如果有多个，就是连接关系
+ *		rows - 应用限制子句后关系中元组的估计数量
+ *			   （即，该关系对应计划的输出行数）
+ *		consider_startup - 若因启动代价低而值得为该关系保留普通路径，则为 true
+ *		consider_param_startup - 对于参数化路径同理
+ *		reltarget - 该关系的默认 Path 输出目标列表（tlist）；通常包含我们
+ *					需要从该关系输出的值所对应的 Var 和 PlaceHolderVar 节点。
+ *					列表中元素的顺序无所谓，但一个 appendrel 集合的所有关系
+ *					必须使用相对应的顺序。
+ *					注意：在 appendrel 子关系中，可能包含从子查询提升上来的
+ *					任意表达式！
+ *		pathlist - Path 节点列表，每个对应一种可能有用
+ *				   的生成该关系的方法
+ *		ppilist - 参数化 Path 的 ParamPathInfo 节点（如果有）
+ *		cheapest_startup_path - 在非参数化路径中启动代价最低的 pathlist 成员
+ *			（不考虑排序）；若不存在非参数化路径则为 NULL
+ *		cheapest_total_path - 在非参数化路径中总代价最低的 pathlist 成员
+ *			（不考虑排序）；若不存在非参数化路径，则为参数化程度最小的
+ *			路径中总代价最低的那条
+ *		cheapest_unique_path - 用于缓存从该关系产生唯一（无重复）输出的
+ *			最低代价路径；若尚未请求则为 NULL
+ *		cheapest_parameterized_paths - 各自参数化方式下的最佳路径；
+ *			始终包含 cheapest_total_path，即使它是非参数化的
+ *		direct_lateral_relids - 该关系直接 LATERAL 引用的关系
+ *		lateral_relids - LATERAL 所需的外部关系，以 Relids 集合表示
+ *			（同时包含直接和间接的 lateral 引用）
  *
- * If the relation is a base relation it will have these fields set:
+ * 如果该关系是基关系，则它会有以下字段被设置：
  *
- *		relid - RTE index (this is redundant with the relids field, but
- *				is provided for convenience of access)
- *		rtekind - copy of RTE's rtekind field
- *		min_attr, max_attr - range of valid AttrNumbers for rel
- *		attr_needed - array of bitmapsets indicating the highest joinrel
- *				in which each attribute is needed; if bit 0 is set then
- *				the attribute is needed as part of final targetlist
- *		attr_widths - cache space for per-attribute width estimates;
- *					  zero means not computed yet
- *		lateral_vars - lateral cross-references of rel, if any (list of
- *					   Vars and PlaceHolderVars)
- *		lateral_referencers - relids of rels that reference this one laterally
- *				(includes both direct and indirect lateral references)
- *		indexlist - list of IndexOptInfo nodes for relation's indexes
- *					(always NIL if it's not a table)
- *		pages - number of disk pages in relation (zero if not a table)
- *		tuples - number of tuples in relation (not considering restrictions)
- *		allvisfrac - fraction of disk pages that are marked all-visible
- *		eclass_indexes - EquivalenceClasses that mention this rel (filled
- *						 only after EC merging is complete)
- *		subroot - PlannerInfo for subquery (NULL if it's not a subquery)
- *		subplan_params - list of PlannerParamItems to be passed to subquery
+ *		relid - RTE 索引（这与 relids 字段冗余，但为了访问方便而提供）
+ *		rtekind - RTE 的 rtekind 字段的副本
+ *		min_attr, max_attr - 该关系有效 AttrNumber 的范围
+ *		attr_needed - 一个 bitmapset 数组，指示每个属性所需达到的最高 joinrel；
+ *				若第 0 位被置位，则表示该属性作为最终 targetlist 的一部分
+ *				而被需要
+ *		attr_widths - 每个属性宽度估算的缓存空间；
+ *					  为零表示尚未计算
+ *		lateral_vars - 该关系的 lateral 交叉引用（如果有）（Var 和
+ *					   PlaceHolderVar 的列表）
+ *		lateral_referencers - 以 lateral 方式引用该关系的那些关系的 relid
+ *				（同时包含直接和间接的 lateral 引用）
+ *		indexlist - 该关系各索引的 IndexOptInfo 节点列表
+ *					（若不是表则总是 NIL）
+ *		pages - 该关系中的磁盘页数（若不是表则为零）
+ *		tuples - 该关系中的元组数（不考虑限制条件）
+ *		allvisfrac - 被标记为 all-visible 的磁盘页所占比例
+ *		eclass_indexes - 提及该关系的等价类（只有当 EC 合并完成后才填充）
+ *		subroot - 子查询的 PlannerInfo（若不是子查询则为 NULL）
+ *		subplan_params - 要传递给子查询的 PlannerParamItem 列表
  *
- *		Note: for a subquery, tuples and subroot are not set immediately
- *		upon creation of the RelOptInfo object; they are filled in when
- *		set_subquery_pathlist processes the object.
+ *		注意：对于子查询，tuples 和 subroot 并不会在创建 RelOptInfo 对象时
+ *		立即设置；它们是在 set_subquery_pathlist 处理该对象时才被填充的。
  *
- *		For otherrels that are appendrel members, these fields are filled
- *		in just as for a baserel, except we don't bother with lateral_vars.
+ *		对于作为 appendrel 成员的 otherrel，这些字段的填充方式与基关系完全
+ *		相同，只是我们不去管 lateral_vars。
  *
  *
- * Two fields are used to cache knowledge acquired during the join search
- * about whether this rel is provably unique when being joined to given other
- * relation(s), ie, it can have at most one row matching any given row from
- * that join relation.  Currently we only attempt such proofs, and thus only
- * populate these fields, for base rels; but someday they might be used for
- * join rels too:
+ * 有两个字段用于缓存连接搜索期间获得的知识，即关于该关系在与给定其他关系连接时
+ * 是否可证明唯一，也就是说，它至多只有一行能与来自该连接关系的任意给定行匹配。
+ * 目前我们只对基关系尝试此类证明，因而也只填充这些字段；但将来也许会把它们用于
+ * 连接关系：
  *
- *		unique_for_rels - list of Relid sets, each one being a set of other
- *					rels for which this one has been proven unique
- *		non_unique_for_rels - list of Relid sets, each one being a set of
- *					other rels for which we have tried and failed to prove
- *					this one unique
+ *		unique_for_rels - Relid 集合的列表，其中每一个都是已证明该关系对其
+ *					唯一的一组其他关系
+ *		non_unique_for_rels - Relid 集合的列表，其中每一个都是我们已尝试
+ *					但未能证明该关系对其唯一的一组其他关系
  *
- * The presence of the following fields depends on the restrictions
- * and joins that the relation participates in:
+ * 以下字段是否存在取决于该关系所参与的限制条件和连接：
  *
- *		baserestrictinfo - List of RestrictInfo nodes, containing info about
- *					each non-join qualification clause in which this relation
- *					participates (only used for base rels)
- *		baserestrictcost - Estimated cost of evaluating the baserestrictinfo
- *					clauses at a single tuple (only used for base rels)
- *		baserestrict_min_security - Smallest security_level found among
- *					clauses in baserestrictinfo
- *		joininfo  - List of RestrictInfo nodes, containing info about each
- *					join clause in which this relation participates (but
- *					note this excludes clauses that might be derivable from
- *					EquivalenceClasses)
- *		has_eclass_joins - flag that EquivalenceClass joins are possible
+ *		baserestrictinfo - RestrictInfo 节点列表，包含有关该关系所参与的每个
+ *					非连接限定条件子句的信息（仅用于基关系）
+ *		baserestrictcost - 在单个元组上求值 baserestrictinfo 子句的估计代价
+ *					（仅用于基关系）
+ *		baserestrict_min_security - baserestrictinfo 各子句中最小的
+ *					security_level
+ *		joininfo  - RestrictInfo 节点列表，包含有关该关系所参与的每个连接
+ *					子句的信息（但注意这排除了可能由等价类导出的子句）
+ *		has_eclass_joins - 表示等价类连接是否可能的标志
  *
- * Note: Keeping a restrictinfo list in the RelOptInfo is useful only for
- * base rels, because for a join rel the set of clauses that are treated as
- * restrict clauses varies depending on which sub-relations we choose to join.
- * (For example, in a 3-base-rel join, a clause relating rels 1 and 2 must be
- * treated as a restrictclause if we join {1} and {2 3} to make {1 2 3}; but
- * if we join {1 2} and {3} then that clause will be a restrictclause in {1 2}
- * and should not be processed again at the level of {1 2 3}.)	Therefore,
- * the restrictinfo list in the join case appears in individual JoinPaths
- * (field joinrestrictinfo), not in the parent relation.  But it's OK for
- * the RelOptInfo to store the joininfo list, because that is the same
- * for a given rel no matter how we form it.
+ * 注意：在 RelOptInfo 中保存 restrictinfo 列表只对基关系有用，因为对于连接关系
+ * 而言，被视为限制子句的子句集合会随我们选择连接哪些子关系而变化。（例如，在
+ * 一个 3 基关系的连接中，关联关系 1 和 2 的子句，如果我们把 {1} 和 {2 3} 连接
+ * 成 {1 2 3}，就必须被视为一个限制子句；但如果我们把 {1 2} 和 {3} 连接，那么
+ * 该子句在 {1 2} 中就会是一个限制子句，不应在 {1 2 3} 这一层级上再处理一次。）
+ * 因此，连接情形下的 restrictinfo 列表出现在各个 JoinPath 中（字段
+ * joinrestrictinfo），而不是出现在父关系中。但 RelOptInfo 保存 joininfo 列表
+ * 是可以的，因为对于给定的关系而言，无论我们如何构造它，该列表都是相同的。
  *
- * We store baserestrictcost in the RelOptInfo (for base relations) because
- * we know we will need it at least once (to price the sequential scan)
- * and may need it multiple times to price index scans.
+ * 我们把 baserestrictcost 存储在 RelOptInfo 中（对于基关系），因为我们知道
+ * 至少会需要它一次（用于为顺序扫描计价），并且可能多次需要它来为索引扫描计价。
  *----------
  */
 
@@ -1376,143 +1350,106 @@ typedef struct ModifyTablePath
 
 
 /*
- * Restriction clause info.
+ * 限制条件（Restriction clause）信息。
  *
- * We create one of these for each AND sub-clause of a restriction condition
- * (WHERE or JOIN/ON clause).  Since the restriction clauses are logically
- * ANDed, we can use any one of them or any subset of them to filter out
- * tuples, without having to evaluate the rest.  The RestrictInfo node itself
- * stores data used by the optimizer while choosing the best query plan.
+ * 我们为限制条件（WHERE 或 JOIN/ON 子句）的每一个 AND 子子句创建一个该结构。
+ * 由于限制子句在逻辑上是 AND 连接的，我们可以用其中任意一个或任意子集来过滤
+ * 元组，而无需计算其余子句。RestrictInfo 节点本身存储了优化器在选择最佳查询
+ * 计划时所使用的数据。
  *
- * If a restriction clause references a single base relation, it will appear
- * in the baserestrictinfo list of the RelOptInfo for that base rel.
+ * 如果某个限制子句只引用单个基关系，它就会出现在该基关系对应 RelOptInfo 的
+ * baserestrictinfo 列表中。
  *
- * If a restriction clause references more than one base rel, it will
- * appear in the joininfo list of every RelOptInfo that describes a strict
- * subset of the base rels mentioned in the clause.  The joininfo lists are
- * used to drive join tree building by selecting plausible join candidates.
- * The clause cannot actually be applied until we have built a join rel
- * containing all the base rels it references, however.
+ * 如果某个限制子句引用多于一个基关系，它会出现在每一个 RelOptInfo 的 joininfo
+ * 列表中，只要该 RelOptInfo 描述的是该子句所涉及基关系的一个真子集。joininfo
+ * 列表用于驱动连接树的构建，通过挑选可能的连接候选者。然而，只有当构建出包含该
+ * 子句所引用的全部基关系的连接关系（join rel）后，该子句才能真正被应用。
  *
- * When we construct a join rel that includes all the base rels referenced
- * in a multi-relation restriction clause, we place that clause into the
- * joinrestrictinfo lists of paths for the join rel, if neither left nor
- * right sub-path includes all base rels referenced in the clause.  The clause
- * will be applied at that join level, and will not propagate any further up
- * the join tree.  (Note: the "predicate migration" code was once intended to
- * push restriction clauses up and down the plan tree based on evaluation
- * costs, but it's dead code and is unlikely to be resurrected in the
- * foreseeable future.)
+ * 当我们构建出一个连接关系，且它包含了某个多关系限制子句所引用的全部基关系时，
+ * 如果左子路径和右子路径都没有包含该子句所引用的全部基关系，我们就把它放入该
+ * 连接关系各路径的 joinrestrictinfo 列表中。该子句将在该连接层级上被应用，并且
+ * 不会再向上传播到连接树的其他部分。（注：曾经的"谓词迁移"（predicate migration）
+ * 代码本打算根据求值代价在计划树中上下推动限制子句，但它是死代码，在可预见的
+ * 将来也不太可能被复活。）
  *
- * Note that in the presence of more than two rels, a multi-rel restriction
- * might reach different heights in the join tree depending on the join
- * sequence we use.  So, these clauses cannot be associated directly with
- * the join RelOptInfo, but must be kept track of on a per-join-path basis.
+ * 注意，当涉及两个以上关系时，一个多关系限制条件在连接树中到达的高度可能取决于
+ * 我们使用的连接顺序。因此，这类子句不能直接关联到连接的 RelOptInfo 上，而必须
+ * 按每个连接路径（per-join-path）来跟踪。
  *
- * RestrictInfos that represent equivalence conditions (i.e., mergejoinable
- * equalities that are not outerjoin-delayed) are handled a bit differently.
- * Initially we attach them to the EquivalenceClasses that are derived from
- * them.  When we construct a scan or join path, we look through all the
- * EquivalenceClasses and generate derived RestrictInfos representing the
- * minimal set of conditions that need to be checked for this particular scan
- * or join to enforce that all members of each EquivalenceClass are in fact
- * equal in all rows emitted by the scan or join.
+ * 表示等价条件（即，可归并连接（mergejoinable）的相等条件，且未被外连接延迟）的
+ * RestrictInfo 处理方式略有不同。最初我们把它们挂到由它们导出的等价类
+ * （EquivalenceClass）上。当我们构建扫描路径或连接路径时，我们会遍历所有等价类，
+ * 并生成派生的 RestrictInfo，表示针对该特定扫描或连接，为强制每个等价类的所有
+ * 成员在该扫描或连接输出的所有行中确实相等所需检查的最小条件集合。
  *
- * When dealing with outer joins we have to be very careful about pushing qual
- * clauses up and down the tree.  An outer join's own JOIN/ON conditions must
- * be evaluated exactly at that join node, unless they are "degenerate"
- * conditions that reference only Vars from the nullable side of the join.
- * Quals appearing in WHERE or in a JOIN above the outer join cannot be pushed
- * down below the outer join, if they reference any nullable Vars.
- * RestrictInfo nodes contain a flag to indicate whether a qual has been
- * pushed down to a lower level than its original syntactic placement in the
- * join tree would suggest.  If an outer join prevents us from pushing a qual
- * down to its "natural" semantic level (the level associated with just the
- * base rels used in the qual) then we mark the qual with a "required_relids"
- * value including more than just the base rels it actually uses.  By
- * pretending that the qual references all the rels required to form the outer
- * join, we prevent it from being evaluated below the outer join's joinrel.
- * When we do form the outer join's joinrel, we still need to distinguish
- * those quals that are actually in that join's JOIN/ON condition from those
- * that appeared elsewhere in the tree and were pushed down to the join rel
- * because they used no other rels.  That's what the is_pushed_down flag is
- * for; it tells us that a qual is not an OUTER JOIN qual for the set of base
- * rels listed in required_relids.  A clause that originally came from WHERE
- * or an INNER JOIN condition will *always* have its is_pushed_down flag set.
- * It's possible for an OUTER JOIN clause to be marked is_pushed_down too,
- * if we decide that it can be pushed down into the nullable side of the join.
- * In that case it acts as a plain filter qual for wherever it gets evaluated.
- * (In short, is_pushed_down is only false for non-degenerate outer join
- * conditions.  Possibly we should rename it to reflect that meaning?  But
- * see also the comments for RINFO_IS_PUSHED_DOWN, below.)
+ * 在处理外连接时，我们必须非常小心地在树中上下推动限定条件（qual clause）。
+ * 外连接自身的 JOIN/ON 条件必须恰好在该连接节点处求值，除非它们是"退化"
+ * （degenerate）条件——即只引用连接可空侧（nullable side）的 Var。出现在 WHERE 中
+ * 或外连接之上的 JOIN 中的限定条件，只要引用了任何可空 Var，就不能下推到外连接
+ * 之下。RestrictInfo 节点包含一个标志，用来表示某个限定条件是否已被下推到比其
+ * 在连接树中的原始语法位置更低的层级。如果某个外连接阻止我们把限定条件下推到它
+ * 的"自然"语义层级（即仅由该限定条件所使用的基关系所关联的层级），那么我们就给
+ * 该限定条件标记一个 required_relids 值，其中包含的不仅仅是它实际使用到的基关系。
+ * 通过假装该限定条件引用了构建该外连接所需的全部关系，我们就能阻止它在该外连接的
+ * joinrel 之下被求值。当我们真正构建外连接的 joinrel 时，我们仍然需要区分那些
+ * 实际属于该连接 JOIN/ON 条件的限定条件，和那些出现在树中其他位置、因未使用其他
+ * 关系而被下推到该 joinrel 的限定条件。is_pushed_down 标志正是为此而设；它告诉
+ * 我们：一个限定条件对于 required_relids 中列出的那组基关系而言，并不是一个
+ * OUTER JOIN 限定条件。原本来自 WHERE 或 INNER JOIN 条件的子句，其 is_pushed_down
+ * 标志*总是*会被置位。一个 OUTER JOIN 子句也有可能被标记为 is_pushed_down，如果
+ * 我们判定它可以被下推到连接的可空侧。在这种情况下，无论它在何处求值，它都充当
+ * 一个普通的过滤限定条件。（简而言之，is_pushed_down 仅对非退化的外连接条件为
+ * false。也许我们应该重命名它以反映这一含义？但另见下面关于 RINFO_IS_PUSHED_DOWN
+ * 的注释。）
  *
- * RestrictInfo nodes also contain an outerjoin_delayed flag, which is true
- * if the clause's applicability must be delayed due to any outer joins
- * appearing below it (ie, it has to be postponed to some join level higher
- * than the set of relations it actually references).
+ * RestrictInfo 节点还包含一个 outerjoin_delayed 标志，如果由于该子句下方存在任何
+ * 外连接而必须延迟其适用性，则该标志为 true（即，它必须被推迟到比它实际引用的
+ * 关系集合更高的某个连接层级）。
  *
- * There is also an outer_relids field, which is NULL except for outer join
- * clauses; for those, it is the set of relids on the outer side of the
- * clause's outer join.  (These are rels that the clause cannot be applied to
- * in parameterized scans, since pushing it into the join's outer side would
- * lead to wrong answers.)
+ * 还有一个 outer_relids 字段，除了外连接子句外均为 NULL；对于外连接子句，它是
+ * 该子句所属外连接外侧（outer side）上的关系集合。（这些关系是：在参数化扫描中
+ * 该子句不能应用到的关系，因为把它推入连接的外侧会导致错误的结果。）
  *
- * There is also a nullable_relids field, which is the set of rels the clause
- * references that can be forced null by some outer join below the clause.
+ * 还有一个 nullable_relids 字段，它是该子句所引用的、可能被该子句下方的某些外
+ * 连接强制置空的关系集合。
  *
- * outerjoin_delayed = true is subtly different from nullable_relids != NULL:
- * a clause might reference some nullable rels and yet not be
- * outerjoin_delayed because it also references all the other rels of the
- * outer join(s). A clause that is not outerjoin_delayed can be enforced
- * anywhere it is computable.
+ * outerjoin_delayed = true 与 nullable_relids != NULL 有微妙差别：一个子句可能
+ * 引用了一些可空关系，但却不是 outerjoin_delayed，因为它也引用了外连接的其他所有
+ * 关系。一个非 outerjoin_delayed 的子句可以在任何它能被计算的地方被强制执行。
  *
- * To handle security-barrier conditions efficiently, we mark RestrictInfo
- * nodes with a security_level field, in which higher values identify clauses
- * coming from less-trusted sources.  The exact semantics are that a clause
- * cannot be evaluated before another clause with a lower security_level value
- * unless the first clause is leakproof.  As with outer-join clauses, this
- * creates a reason for clauses to sometimes need to be evaluated higher in
- * the join tree than their contents would suggest; and even at a single plan
- * node, this rule constrains the order of application of clauses.
+ * 为了高效处理安全屏障（security-barrier）条件，我们用 security_level 字段标记
+ * RestrictInfo 节点，其中较高的值标识来自较不可信来源的子句。确切语义是：一个
+ * 子句不能在另一个 security_level 值更低的子句之前被求值，除非第一个子句是
+ * leakproof（防泄漏）的。与外连接子句一样，这造成了一种原因：子句有时需要在连接
+ * 树中比其内容所暗示的更高的位置求值；而且即使在单个计划节点内，这条规则也约束
+ * 了子句的应用顺序。
  *
- * In general, the referenced clause might be arbitrarily complex.  The
- * kinds of clauses we can handle as indexscan quals, mergejoin clauses,
- * or hashjoin clauses are limited (e.g., no volatile functions).  The code
- * for each kind of path is responsible for identifying the restrict clauses
- * it can use and ignoring the rest.  Clauses not implemented by an indexscan,
- * mergejoin, or hashjoin will be placed in the plan qual or joinqual field
- * of the finished Plan node, where they will be enforced by general-purpose
- * qual-expression-evaluation code.  (But we are still entitled to count
- * their selectivity when estimating the result tuple count, if we
- * can guess what it is...)
+ * 一般而言，被引用的子句可能是任意复杂的。我们能够作为索引扫描限定条件
+ * （indexscan quals）、归并连接子句或哈希连接子句处理的子句种类是有限的
+ * （例如，不允许易变（volatile）函数）。每种路径的代码负责识别它能够使用的限制
+ * 子句，并忽略其余部分。索引扫描、归并连接或哈希连接未实现的子句将被放入最终
+ * Plan 节点的 plan qual 或 joinqual 字段中，在那里由通用的限定条件表达式求值代码
+ * 来强制执行。（但如果我们能猜出它的选择性，我们仍然有权在估算结果元组数时计入
+ * 它的选择性……）
  *
- * When the referenced clause is an OR clause, we generate a modified copy
- * in which additional RestrictInfo nodes are inserted below the top-level
- * OR/AND structure.  This is a convenience for OR indexscan processing:
- * indexquals taken from either the top level or an OR subclause will have
- * associated RestrictInfo nodes.
+ * 当被引用的子句是一个 OR 子句时，我们会生成一个修改过的副本，在其中向顶层 OR/AND
+ * 结构之下插入额外的 RestrictInfo 节点。这是为 OR 索引扫描处理提供便利：无论取自
+ * 顶层还是取自某个 OR 子子句的索引限定条件，都会有与之关联的 RestrictInfo 节点。
  *
- * The can_join flag is set true if the clause looks potentially useful as
- * a merge or hash join clause, that is if it is a binary opclause with
- * nonoverlapping sets of relids referenced in the left and right sides.
- * (Whether the operator is actually merge or hash joinable isn't checked,
- * however.)
+ * 如果某个子句看起来可能可用作归并连接或哈希连接子句，即它是一个二元操作符子句，
+ * 且左、右两侧引用的 relid 集合不重叠，则 can_join 标志被置为 true。（但该操作符
+ * 实际上是否可归并连接或可哈希连接，并不在此检查。）
  *
- * The pseudoconstant flag is set true if the clause contains no Vars of
- * the current query level and no volatile functions.  Such a clause can be
- * pulled out and used as a one-time qual in a gating Result node.  We keep
- * pseudoconstant clauses in the same lists as other RestrictInfos so that
- * the regular clause-pushing machinery can assign them to the correct join
- * level, but they need to be treated specially for cost and selectivity
- * estimates.  Note that a pseudoconstant clause can never be an indexqual
- * or merge or hash join clause, so it's of no interest to large parts of
- * the planner.
+ * 如果某个子句不包含当前查询层级的任何 Var，也不包含易变函数，则 pseudoconstant
+ * 标志被置为 true。这样的子句可以被提取出来，作为门控 Result 节点中的一次性限定
+ * 条件使用。我们把伪常量子句与其他 RestrictInfo 一起保留在相同的列表中，以便常规
+ * 的子句推动机制能把它们分配到正确的连接层级，但在代价估算和选择性估算时需要对
+ * 它们做特殊处理。注意，伪常量子句永远不可能成为索引限定条件、归并连接或哈希
+ * 连接子句，因此规划器的大部分部分对它并不感兴趣。
  *
- * When join clauses are generated from EquivalenceClasses, there may be
- * several equally valid ways to enforce join equivalence, of which we need
- * apply only one.  We mark clauses of this kind by setting parent_ec to
- * point to the generating EquivalenceClass.  Multiple clauses with the same
- * parent_ec in the same join are redundant.
+ * 当归并子句由等价类生成时，可能存在若干种同样有效的强制执行连接等价性的方式，
+ * 而我们只需要应用其中一种。我们通过设置 parent_ec 指向生成它的等价类来标记这类
+ * 子句。在同一连接中，多个具有相同 parent_ec 的子句是冗余的。
  */
 
 typedef struct RestrictInfo

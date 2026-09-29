@@ -1,60 +1,48 @@
 /*-------------------------------------------------------------------------
  *
  * dest.h
- *	  support for communication destinations
+ *	  通信目的地（communication destinations）支持
  *
- * Whenever the backend executes a query that returns tuples, the results
- * have to go someplace.  For example:
+ * 每当后端执行一个返回元组的查询时，结果都必须送往某个地方。例如：
  *
- *	  - stdout is the destination only when we are running a
- *		standalone backend (no postmaster) and are returning results
- *		back to an interactive user.
+ *	  - 只有当我们运行的是独立后端（standalone backend，没有 postmaster），
+ *		并且把结果返回给交互式用户时，stdout 才是目的地。
  *
- *	  - a remote process is the destination when we are
- *		running a backend with a frontend and the frontend executes
- *		PQexec().  In this case, the results are sent
- *		to the frontend via the functions in backend/libpq.
+ *	  - 当我们运行的是带前端的后端，并且前端执行了 PQexec() 时，
+ *		目的地是一个远程进程。在这种情况下，结果通过 backend/libpq 中的
+ *		函数发送给前端。
  *
- *	  - DestNone is the destination when the system executes
- *		a query internally.  The results are discarded.
+ *	  - 当系统在内部执行查询时，目的地是 DestNone。结果被丢弃。
  *
- * dest.c defines three functions that implement destination management:
+ * dest.c 定义了三个实现目的地管理的函数：
  *
- * BeginCommand: initialize the destination at start of command.
- * CreateDestReceiver: return a pointer to a struct of destination-specific
- * receiver functions.
- * EndCommand: clean up the destination at end of command.
+ * BeginCommand：在命令开始时初始化目的地。
+ * CreateDestReceiver：返回一个指向特定目的地的接收器（receiver）函数结构体的
+ * 指针。
+ * EndCommand：在命令结束时清理目的地。
  *
- * BeginCommand/EndCommand are executed once per received SQL query.
+ * BeginCommand/EndCommand 每收到一条 SQL 查询就执行一次。
  *
- * CreateDestReceiver returns a receiver object appropriate to the specified
- * destination.  The executor, as well as utility statements that can return
- * tuples, are passed the resulting DestReceiver* pointer.  Each executor run
- * or utility execution calls the receiver's rStartup method, then the
- * receiveSlot method (zero or more times), then the rShutdown method.
- * The same receiver object may be re-used multiple times; eventually it is
- * destroyed by calling its rDestroy method.
+ * CreateDestReceiver 返回一个适合指定目的地的接收器对象。执行器以及能够返回
+ * 元组的工具语句（utility statement）会收到由此产生的 DestReceiver* 指针。
+ * 每次执行器运行或工具执行都会先调用接收器的 rStartup 方法，然后调用 receiveSlot
+ * 方法（零次或多次），最后调用 rShutdown 方法。同一个接收器对象可以被多次重用；
+ * 最终通过调用它的 rDestroy 方法销毁。
  *
- * In some cases, receiver objects require additional parameters that must
- * be passed to them after calling CreateDestReceiver.  Since the set of
- * parameters varies for different receiver types, this is not handled by
- * this module, but by direct calls from the calling code to receiver type
- * specific functions.
+ * 在某些情况下，接收器对象需要额外的参数，这些参数必须在调用 CreateDestReceiver
+ * 之后传递给它们。由于参数集合因接收器类型而异，这一点不由本模块处理，而是由调用
+ * 代码直接调用接收器类型特有的函数来完成。
  *
- * The DestReceiver object returned by CreateDestReceiver may be a statically
- * allocated object (for destination types that require no local state),
- * in which case rDestroy is a no-op.  Alternatively it can be a palloc'd
- * object that has DestReceiver as its first field and contains additional
- * fields (see printtup.c for an example).  These additional fields are then
- * accessible to the DestReceiver functions by casting the DestReceiver*
- * pointer passed to them.  The palloc'd object is pfree'd by the rDestroy
- * method.  Note that the caller of CreateDestReceiver should take care to
- * do so in a memory context that is long-lived enough for the receiver
- * object not to disappear while still needed.
+ * CreateDestReceiver 返回的 DestReceiver 对象可以是一个静态分配的对象（用于那些
+ * 不需要本地状态的目的地类型），此时 rDestroy 是一个空操作。它也可以是一个
+ * palloc 分配的对象，以 DestReceiver 作为其第一个字段，并含有额外字段
+ * （示例见 printtup.c）。这些额外字段随后可以通过把传给 DestReceiver 函数的
+ * DestReceiver* 指针进行强制转换来访问。该 palloc 分配的对象由 rDestroy 方法
+ * 用 pfree 释放。注意，CreateDestReceiver 的调用者应当确保在一个足够长寿的内存
+ * 上下文中进行分配，以便接收器对象在仍被需要时不会消失。
  *
- * Special provision: None_Receiver is a permanently available receiver
- * object for the DestNone destination.  This avoids useless creation/destroy
- * calls in portal and cursor manipulations.
+ * 特殊安排：None_Receiver 是供 DestNone 目的地使用的、永久可用的接收器对象。
+ * 这避免了在 portal 和游标（cursor）操作中进行无用的创建/销毁调用。
  *
  *
  * Portions Copyright (c) 1996-2021, PostgreSQL Global Development Group
@@ -94,14 +82,12 @@ typedef enum
 } CommandDest;
 
 /* ----------------
- *		DestReceiver is a base type for destination-specific local state.
- *		In the simplest cases, there is no state info, just the function
- *		pointers that the executor must call.
+ *		DestReceiver 是特定目的地局部状态的基类型。
+ *		在最简单的情况下，没有状态信息，只有执行器必须调用的函数指针。
  *
- * Note: the receiveSlot routine must be passed a slot containing a TupleDesc
- * identical to the one given to the rStartup routine.  It returns bool where
- * a "true" value means "continue processing" and a "false" value means
- * "stop early, just as if we'd reached the end of the scan".
+ * 注意：传给 receiveSlot 例程的 slot 所包含的 TupleDesc 必须与传给 rStartup
+ * 例程的 TupleDesc 完全相同。它返回 bool，其中"true"值表示"继续处理"，而
+ * "false"值表示"提前停止，就像我们已经到达扫描末尾一样"。
  * ----------------
  */
 typedef struct _DestReceiver DestReceiver;

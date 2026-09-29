@@ -378,33 +378,27 @@ PostmasterMain(int argc, char *argv[])
 	getInstallationPaths(argv[0]);
 
 	/*
-	 * Set up signal handlers for the postmaster process.
+	 * 为 postmaster 进程设置信号处理器。
 	 *
-	 * In the postmaster, we use pqsignal_pm() rather than pqsignal() (which
-	 * is used by all child processes and client processes).  That has a
-	 * couple of special behaviors:
+	 * 在 postmaster 中，我们使用 pqsignal_pm() 而非 pqsignal()（后者供所有子进程
+	 * 和客户端进程使用）。前者有几个特殊行为：
 	 *
-	 * 1. Except on Windows, we tell sigaction() to block all signals for the
-	 * duration of the signal handler.  This is faster than our old approach
-	 * of blocking/unblocking explicitly in the signal handler, and it should
-	 * also prevent excessive stack consumption if signals arrive quickly.
+	 * 1. 除 Windows 外，我们告诉 sigaction() 在信号处理器执行期间阻塞所有信号。
+	 * 这比我们过去在信号处理器中显式阻塞/解除阻塞的做法更快，而且如果有信号
+	 * 迅速连续到达，它也应该能防止过度的栈消耗。
 	 *
-	 * 2. We do not set the SA_RESTART flag.  This is because signals will be
-	 * blocked at all times except when ServerLoop is waiting for something to
-	 * happen, and during that window, we want signals to exit the select(2)
-	 * wait so that ServerLoop can respond if anything interesting happened.
-	 * On some platforms, signals marked SA_RESTART would not cause the
-	 * select() wait to end.
+	 * 2. 我们不设置 SA_RESTART 标志。这是因为除 ServerLoop 等待某事件发生之外，
+	 * 信号在所有时刻都处于阻塞状态；而在那个窗口期内，我们希望信号能让 select(2)
+	 * 等待退出，以便 ServerLoop 在发生任何值得关注的事情时能够做出响应。在某些
+	 * 平台上，标记了 SA_RESTART 的信号不会使 select() 等待结束。
 	 *
-	 * Child processes will generally want SA_RESTART, so pqsignal() sets that
-	 * flag.  We expect children to set up their own handlers before
-	 * unblocking signals.
+	 * 子进程通常需要 SA_RESTART，因此 pqsignal() 会设置该标志。我们期望子进程在
+	 * 解除信号阻塞之前自行设置它们的处理器。
 	 *
-	 * CAUTION: when changing this list, check for side-effects on the signal
-	 * handling setup of child processes.  See tcop/postgres.c,
-	 * bootstrap/bootstrap.c, postmaster/bgwriter.c, postmaster/walwriter.c,
-	 * postmaster/syslogger.c and
-	 * postmaster/checkpointer.c.
+	 * 注意：修改此列表时，请检查它对子进程信号处理设置造成的副作用。参见
+	 * tcop/postgres.c、bootstrap/bootstrap.c、postmaster/bgwriter.c、
+	 * postmaster/walwriter.c、postmaster/syslogger.c 和
+	 * postmaster/checkpointer.c。
 	 */
 	pqinitmask();
 	PG_SETMASK(&BlockSig);
