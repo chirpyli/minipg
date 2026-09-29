@@ -78,16 +78,15 @@ volatile OldSnapshotControlData *oldSnapshotControl;
 
 
 /*
- * CurrentSnapshot points to the only snapshot taken in transaction-snapshot
- * mode, and to the latest one taken in a read-committed transaction.
- * SecondarySnapshot is a snapshot that's always up-to-date as of the current
- * instant, even in transaction-snapshot mode.  It should only be used for
- * special-purpose code (say, RI checking.)  CatalogSnapshot points to an
- * MVCC snapshot intended to be used for catalog scans; we must invalidate it
- * whenever a system catalog change occurs.
+ * 在 transaction-snapshot 模式下，CurrentSnapshot 指向唯一的一份快照；
+ * 在 read-committed 事务中，它指向最近取得的那份快照。
+ * SecondarySnapshot 是一份始终反映当前时刻最新状态的快照，
+ * 即使在 transaction-snapshot 模式下也是如此。它只应用于特殊用途的代码
+ * （例如 RI checking）。CatalogSnapshot 指向用于 catalog scans 的 MVCC 快照；
+ * 每当 system catalog 发生变更时，我们必须将其失效。
  *
- * These SnapshotData structs are static to simplify memory allocation
- * (see the hack in GetSnapshotData to avoid repeated malloc/free).
+ * 这些 SnapshotData 结构体之所以是 static 的，是为了简化内存分配
+ * （参见 GetSnapshotData 中为避免反复 malloc/free 而采用的技巧）。
  */
 static SnapshotData CurrentSnapshotData = {SNAPSHOT_MVCC};
 static SnapshotData SecondarySnapshotData = {SNAPSHOT_MVCC};
@@ -101,20 +100,20 @@ static Snapshot SecondarySnapshot = NULL;
 static Snapshot CatalogSnapshot = NULL;
 
 /*
- * These are updated by GetSnapshotData.  We initialize them this way
- * for the convenience of TransactionIdIsInProgress: even in bootstrap
- * mode, we don't want it to say that BootstrapTransactionId is in progress.
+ * 这些变量由 GetSnapshotData 更新。我们这样初始化它们，是为了
+ * 方便 TransactionIdIsInProgress：即使在 bootstrap 模式下，
+ * 我们也不希望它认为 BootstrapTransactionId 正在进行中。
  */
 TransactionId TransactionXmin = FirstNormalTransactionId;
 TransactionId RecentXmin = FirstNormalTransactionId;
 
 /*
- * Elements of the active snapshot stack.
+ * active snapshot 栈的元素。
  *
- * Each element here accounts for exactly one active_count on SnapshotData.
+ * 这里的每个元素恰好对应 SnapshotData 上的一个 active_count。
  *
- * NB: the code assumes that elements in this list are in non-increasing
- * order of as_level; also, the list must be NULL-terminated.
+ * 注意：代码假定该链表中的元素按 as_level 非递增顺序排列；
+ * 此外，该链表必须以 NULL 结尾。
  */
 typedef struct ActiveSnapshotElt
 {
@@ -130,8 +129,8 @@ static ActiveSnapshotElt *ActiveSnapshot = NULL;
 static ActiveSnapshotElt *OldestActiveSnapshot = NULL;
 
 /*
- * Currently registered Snapshots.  Ordered in a heap by xmin, so that we can
- * quickly find the one with lowest xmin, to advance our MyProc->xmin.
+ * 当前已注册的 Snapshots。它们按 xmin 组织成一个堆，这样我们就能
+ * 快速找到 xmin 最小的那个，从而推进 MyProc->xmin。
  */
 static int	xmin_cmp(const pairingheap_node *a, const pairingheap_node *b,
 					 void *arg);
@@ -142,9 +141,10 @@ static pairingheap RegisteredSnapshots = {&xmin_cmp, NULL, NULL};
 bool		FirstSnapshotSet = false;
 
 /*
- * Remember the serializable transaction snapshot, if any.  We cannot trust
- * FirstSnapshotSet in combination with IsolationUsesXactSnapshot(), because
- * GUC may be reset before us, changing the value of IsolationUsesXactSnapshot.
+ * 记住 serializable 事务快照（如果存在）。我们不能信赖
+ * FirstSnapshotSet 与 IsolationUsesXactSnapshot() 的组合，
+ * 因为 GUC 可能在我们之前被重置，从而改变
+ * IsolationUsesXactSnapshot 的值。
  */
 static Snapshot FirstXactSnapshot = NULL;
 
@@ -232,22 +232,21 @@ SnapMgrInit(void)
 
 /*
  * GetTransactionSnapshot
- *		Get the appropriate snapshot for a new query in a transaction.
+ *		为一个事务中的新查询获取合适的快照。
  *
- * Note that the return value may point at static storage that will be modified
- * by future calls and by CommandCounterIncrement().  Callers should call
- * RegisterSnapshot or PushActiveSnapshot on the returned snap if it is to be
- * used very long.
+ * 注意：返回值可能指向静态存储，该存储会被后续调用以及
+ * CommandCounterIncrement() 修改。如果调用方需要长期使用返回的快照，
+ * 应当对它调用 RegisterSnapshot 或 PushActiveSnapshot。
  */
 Snapshot
 GetTransactionSnapshot(void)
 {
-	/* First call in transaction? */
-	if (!FirstSnapshotSet)
+	/* 是否为事务中的首次调用？ */
+	if (!FirstSnapshotSet) // 本事务是否已经取过快照
 	{
 		/*
-		 * Don't allow catalog snapshot to be older than xact snapshot.  Must
-		 * do this first to allow the empty-heap Assert to succeed.
+		 * 不允许 catalog snapshot 比 xact snapshot 更旧。必须先做这一步，
+		 * 才能让后面空堆的 Assert 成立。
 		 */
 		InvalidateCatalogSnapshot();
 
@@ -255,23 +254,23 @@ GetTransactionSnapshot(void)
 		Assert(FirstXactSnapshot == NULL);
 
 		/*
-		 * In transaction-snapshot mode, the first snapshot must live until
-		 * end of xact regardless of what the caller does with it, so we must
-		 * make a copy of it rather than returning CurrentSnapshotData
-		 * directly.  Furthermore, if we're running in serializable mode,
-		 * predicate.c needs to wrap the snapshot fetch in its own processing.
+		 * 在 transaction-snapshot 模式下，无论调用方如何使用它，第一份
+		 * snapshot 都必须存活到事务结束，因此我们必须对它做一份拷贝，
+		 * 而不能直接返回 CurrentSnapshotData。此外，如果我们运行在
+		 * serializable 模式下，predicate.c 需要把 snapshot 的获取包装进
+		 * 它自己的处理流程中。
 		 */
 		if (IsolationUsesXactSnapshot())
 		{
-			/* First, create the snapshot in CurrentSnapshotData */
+			/* 首先，在 CurrentSnapshotData 中创建 snapshot */
 			if (IsolationIsSerializable())
 				CurrentSnapshot = GetSerializableTransactionSnapshot(&CurrentSnapshotData);
 			else
 				CurrentSnapshot = GetSnapshotData(&CurrentSnapshotData);
-			/* Make a saved copy */
+			/* 制作一份保存下来的拷贝 */
 			CurrentSnapshot = CopySnapshot(CurrentSnapshot);
 			FirstXactSnapshot = CurrentSnapshot;
-			/* Mark it as "registered" in FirstXactSnapshot */
+			/* 将其标记为在 FirstXactSnapshot 中"已注册" */
 			FirstXactSnapshot->regd_count++;
 			pairingheap_add(&RegisteredSnapshots, &FirstXactSnapshot->ph_node);
 		}
@@ -285,7 +284,7 @@ GetTransactionSnapshot(void)
 	if (IsolationUsesXactSnapshot())
 		return CurrentSnapshot;
 
-	/* Don't allow catalog snapshot to be older than xact snapshot. */
+	/* 不允许 catalog snapshot 比 xact snapshot 更旧。 */
 	InvalidateCatalogSnapshot();
 
 	CurrentSnapshot = GetSnapshotData(&CurrentSnapshotData);
@@ -402,13 +401,12 @@ GetNonHistoricCatalogSnapshot(Oid relid)
 
 /*
  * InvalidateCatalogSnapshot
- *		Mark the current catalog snapshot, if any, as invalid
+ *		将当前的 catalog snapshot（如果存在）标记为无效
  *
- * We could change this API to allow the caller to provide more fine-grained
- * invalidation details, so that a change to relation A wouldn't prevent us
- * from using our cached snapshot to scan relation B, but so far there's no
- * evidence that the CPU cycles we spent tracking such fine details would be
- * well-spent.
+ * 我们本可以修改这个 API，让调用方提供更细粒度的失效信息，这样
+ * relation A 的变更就不会妨碍我们使用缓存的 snapshot 去扫描
+ * relation B；但到目前为止，还没有证据表明我们为跟踪这些细节所花费的
+ * CPU 周期是值得的。
  */
 void
 InvalidateCatalogSnapshot(void)
