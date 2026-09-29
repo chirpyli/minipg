@@ -87,7 +87,5 @@ extern bool innerrel_is_unique(PlannerInfo *root,
  * prototypes for plan/setrefs.c
  */
 extern Plan *set_plan_references(PlannerInfo *root, Plan *plan);
-extern void record_plan_function_dependency(PlannerInfo *root, Oid funcid);
-extern bool extract_query_dependencies_walker(Node *node, PlannerInfo *root);
 
 #endif							/* PLANMAIN_H */

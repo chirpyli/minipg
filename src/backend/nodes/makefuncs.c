@@ -501,38 +501,14 @@ makeFuncExpr(Oid funcid, Oid rettype, List *args,
 /*
  * makeDefElem -
  *	build a DefElem node
- *
- * This is sufficient for the "typical" case with an unqualified option name
- * and no special action.
  */
 DefElem *
 makeDefElem(char *name, Node *arg, int location)
 {
 	DefElem    *res = makeNode(DefElem);
 
-	res->defnamespace = NULL;
 	res->defname = name;
 	res->arg = arg;
-	res->defaction = DEFELEM_UNSPEC;
-	res->location = location;
-
-	return res;
-}
-
-/*
- * makeDefElemExtended -
- *	build a DefElem node with all fields available to be specified
- */
-DefElem *
-makeDefElemExtended(char *nameSpace, char *name, Node *arg,
-					DefElemAction defaction, int location)
-{
-	DefElem    *res = makeNode(DefElem);
-
-	res->defnamespace = nameSpace;
-	res->defname = name;
-	res->arg = arg;
-	res->defaction = defaction;
 	res->location = location;
 
 	return res;

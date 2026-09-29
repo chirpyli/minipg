@@ -270,7 +270,6 @@ _readSortGroupClause(void)
 	READ_OID_FIELD(eqop);
 	READ_OID_FIELD(sortop);
 	READ_BOOL_FIELD(nulls_first);
-	READ_BOOL_FIELD(hashable);
 
 	READ_DONE();
 }
@@ -941,7 +940,6 @@ _readRangeTblEntry(void)
 	READ_BITMAPSET_FIELD(selectedCols);
 	READ_BITMAPSET_FIELD(insertedCols);
 	READ_BITMAPSET_FIELD(updatedCols);
-	READ_BITMAPSET_FIELD(extraUpdatedCols);
 
 	READ_DONE();
 }
@@ -956,10 +954,8 @@ _readDefElem(void)
 {
 	READ_LOCALS(DefElem);
 
-	READ_STRING_FIELD(defnamespace);
 	READ_STRING_FIELD(defname);
 	READ_NODE_FIELD(arg);
-	READ_ENUM_FIELD(defaction, DefElemAction);
 	READ_LOCATION_FIELD(location);
 
 	READ_DONE();
@@ -1006,7 +1002,6 @@ ReadCommonPlan(Plan *local_node)
 	READ_FLOAT_FIELD(total_cost);
 	READ_FLOAT_FIELD(plan_rows);
 	READ_INT_FIELD(plan_width);
-	READ_INT_FIELD(plan_node_id);
 	READ_NODE_FIELD(targetlist);
 	READ_NODE_FIELD(qual);
 	READ_NODE_FIELD(lefttree);
@@ -1448,7 +1443,6 @@ _readHash(void)
 	READ_NODE_FIELD(hashkeys);
 	READ_OID_FIELD(skewTable);
 	READ_INT_FIELD(skewColumn);
-	READ_BOOL_FIELD(skewInherit);
 
 	READ_DONE();
 }
@@ -1479,20 +1473,6 @@ _readPlanRowMark(void)
 	READ_UINT_FIELD(rti);
 	READ_UINT_FIELD(rowmarkId);
 	READ_ENUM_FIELD(markType, RowMarkType);
-
-	READ_DONE();
-}
-
-/*
- * _readPlanInvalItem
- */
-static PlanInvalItem *
-_readPlanInvalItem(void)
-{
-	READ_LOCALS(PlanInvalItem);
-
-	READ_INT_FIELD(cacheId);
-	READ_UINT_FIELD(hashValue);
 
 	READ_DONE();
 }
@@ -1677,8 +1657,6 @@ parseNodeString(void)
 		return_value = _readNestLoopParam();
 	else if (MATCH("PLANROWMARK", 11))
 		return_value = _readPlanRowMark();
-	else if (MATCH("PLANINVALITEM", 13))
-		return_value = _readPlanInvalItem();
 	else if (MATCH("SUBPLAN", 7))
 		return_value = _readSubPlan();
 	else

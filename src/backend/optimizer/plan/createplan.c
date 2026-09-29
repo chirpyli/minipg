@@ -183,8 +183,7 @@ static HashJoin *make_hashjoin(List *tlist,
 static Hash *make_hash(Plan *lefttree,
 					   List *hashkeys,
 					   Oid skewTable,
-					   AttrNumber skewColumn,
-					   bool skewInherit);
+					   AttrNumber skewColumn);
 static MergeJoin *make_mergejoin(List *tlist,
 								 List *joinclauses, List *otherclauses,
 								 List *mergeclauses,
@@ -1115,7 +1114,6 @@ create_unique_plan(PlannerInfo *root, UniquePath *best_path, int flags)
 		sortcl->eqop = eqop;
 		sortcl->sortop = sortop;
 		sortcl->nulls_first = false;
-		sortcl->hashable = false;	/* no need to make this accurate */
 		sortList = lappend(sortList, sortcl);
 		groupColPos++;
 	}
@@ -2651,7 +2649,6 @@ create_hashjoin_plan(PlannerInfo *root,
 	List	   *outer_hashkeys = NIL;
 	Oid			skewTable = InvalidOid;
 	AttrNumber	skewColumn = InvalidAttrNumber;
-	bool		skewInherit = false;
 	ListCell   *lc;
 
 	/*
@@ -2739,7 +2736,6 @@ create_hashjoin_plan(PlannerInfo *root,
 			{
 				skewTable = rte->relid;
 				skewColumn = var->varattno;
-				skewInherit = false;
 			}
 		}
 	}
@@ -2768,8 +2764,7 @@ create_hashjoin_plan(PlannerInfo *root,
 	hash_plan = make_hash(inner_plan,
 						  inner_hashkeys,
 						  skewTable,
-						  skewColumn,
-						  skewInherit);
+						  skewColumn);
 
 	/*
 	 * Set Hash node's startup & total costs equal to total cost of input
@@ -3623,8 +3618,7 @@ static Hash *
 make_hash(Plan *lefttree,
 		  List *hashkeys,
 		  Oid skewTable,
-		  AttrNumber skewColumn,
-		  bool skewInherit)
+		  AttrNumber skewColumn)
 {
 	Hash	   *node = makeNode(Hash);
 	Plan	   *plan = &node->plan;
@@ -3637,7 +3631,6 @@ make_hash(Plan *lefttree,
 	node->hashkeys = hashkeys;
 	node->skewTable = skewTable;
 	node->skewColumn = skewColumn;
-	node->skewInherit = skewInherit;
 
 	return node;
 }

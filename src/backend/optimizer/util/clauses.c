@@ -1543,11 +1543,6 @@ rowtype_field_matches(Oid rowtypeid, int fieldnum,
  * will not be pre-evaluated here, although we will reduce their
  * arguments as far as possible.
  *
- * Whenever a function is eliminated from the expression by means of
- * constant-expression evaluation or inlining, we add the function to
- * root->glob->invalItems.  This ensures the plan is known to depend on
- * such functions, even though they aren't referenced anymore.
- *
  * We assume that the tree has already been type-checked and contains
  * only operators and functions that are reasonable to try to execute.
  *
@@ -3759,13 +3754,6 @@ inline_function(Oid funcid, Oid result_type, Oid result_collid,
 			newexpr = (Node *) newnode;
 		}
 	}
-
-	/*
-	 * Since there is now no trace of the function in the plan tree, we must
-	 * explicitly record the plan's dependency on the function.
-	 */
-	if (context->root)
-		record_plan_function_dependency(context->root, funcid);
 
 	/*
 	 * Recursively try to simplify the modified expression.  Here we must add

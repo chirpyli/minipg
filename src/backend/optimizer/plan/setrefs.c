@@ -155,14 +155,6 @@ static Node *fix_upper_expr_mutator(Node *node,
  * 6. We compute regproc OIDs for operators (ie, we look up the function
  * that implements each op).
  *
- * 7. We create lists of specific objects that the plan depends on.
- * Relation dependencies are represented by OIDs, and everything else by
- * PlanInvalItems (this distinction is motivated by the shared-inval APIs).
- * Currently, relations, user-defined functions, and domains are the only
- * types of objects that are explicitly tracked this way.
- *
- * 9. We assign every plan node in the tree a unique ID.
- *
  * We also perform one final optimization step, which is to delete
  * SubqueryScan and Append plan nodes that aren't doing
  * anything useful.  The reason for doing this last is that
@@ -185,8 +177,6 @@ static Node *fix_upper_expr_mutator(Node *node,
  * Also, rowmarks entries are appended to root->glob->finalrowmarks, and the
  * RT indexes of ModifyTable result relations to root->glob->resultRelations,
  * and flattened AppendRelInfos are appended to root->glob->appendRelations.
- * Plan dependencies are appended to root->glob->relationOids (for relations)
- * and root->glob->invalItems (for everything else).
  *
  * Notice that we modify Plan nodes in-place, but use expression_tree_mutator
  * to process targetlist and qual expressions.  We can assume that the Plan
@@ -388,7 +378,7 @@ flatten_rtes_walker(Node *node, PlannerGlobal *glob)
  * needed by the executor; this reduces the storage space and copying cost
  * for cached plans.  We keep only the ctename, alias and eref Alias fields,
  * which are needed by EXPLAIN, and the selectedCols, insertedCols,
- * updatedCols, and extraUpdatedCols bitmaps, which are needed for
+ * and updatedCols bitmaps, which are needed for
  * executor-startup permissions checking and for trigger event checking.
  */
 static void
@@ -431,20 +421,6 @@ add_rte_to_flat_rtable(PlannerGlobal *glob, RangeTblEntry *rte)
 		ereport(ERROR,
 				(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
 				 errmsg("too many range table entries")));
-
-	/*
-	 * If it's a plain relation RTE, add the table to relationOids.
-	 *
-	 * We do this even though the RTE might be unreferenced in the plan tree;
-	 * this would correspond to cases such as views that were expanded, child
-	 * tables that were eliminated by constraint exclusion, etc. Schema
-	 * invalidation on such a rel must still force rebuilding of the plan.
-	 *
-	 * Note we don't bother to avoid making duplicate list entries.  We could,
-	 * but it would probably cost more cycles than it would save.
-	 */
-	if (newrte->rtekind == RTE_RELATION)
-		glob->relationOids = lappend_oid(glob->relationOids, newrte->relid);
 }
 
 /*
@@ -457,9 +433,6 @@ set_plan_refs(PlannerInfo *root, Plan *plan, int rtoffset)
 
 	if (plan == NULL)
 		return NULL;
-
-	/* Assign this node a unique ID. */
-	plan->plan_node_id = root->glob->lastPlanNodeId++;
 
 	/*
 	 * Plan-type-specific fixes
@@ -1024,54 +997,29 @@ copyVar(Var *var)
  *		Do generic set_plan_references processing on an expression node
  *
  * This is code that is common to all variants of expression-fixing.
- * We must look up operator opcode info for OpExpr and related nodes,
- * add OIDs from regclass Const nodes into root->glob->relationOids, and
- * add PlanInvalItems for user-defined functions into root->glob->invalItems.
+ * We must look up operator opcode info for OpExpr and related nodes.
  * We also fill in column index lists for GROUPING() expressions.
  *
  * We assume it's okay to update opcode info in-place.  So this could possibly
  * scribble on the planner's input data structures, but it's OK.
  */
 static void
-fix_expr_common(PlannerInfo *root, Node *node)
+fix_expr_common(Node *node)
 {
 	/* We assume callers won't call us on a NULL pointer */
-	if (IsA(node, FuncExpr))
-	{
-		record_plan_function_dependency(root,
-										((FuncExpr *) node)->funcid);
-	}
-	else if (IsA(node, OpExpr))
+	if (IsA(node, OpExpr))
 	{
 		set_opfuncid((OpExpr *) node);
-		record_plan_function_dependency(root,
-										((OpExpr *) node)->opfuncid);
 	}
 	else if (IsA(node, NullIfExpr))
 	{
 		set_opfuncid((OpExpr *) node);	/* rely on struct equivalence */
-		record_plan_function_dependency(root,
-										((NullIfExpr *) node)->opfuncid);
 	}
 	else if (IsA(node, ScalarArrayOpExpr))
 	{
 		ScalarArrayOpExpr *saop = (ScalarArrayOpExpr *) node;
 
 		set_sa_opfuncid(saop);
-		record_plan_function_dependency(root, saop->opfuncid);
-
-		if (OidIsValid(saop->hashfuncid))
-			record_plan_function_dependency(root, saop->hashfuncid);
-	}
-	else if (IsA(node, Const))
-	{
-		Const	   *con = (Const *) node;
-
-		/* Check for regclass reference */
-		if (ISREGCLASSCONST(con))
-			root->glob->relationOids =
-				lappend_oid(root->glob->relationOids,
-							DatumGetObjectId(con->constvalue));
 	}
 
 }
@@ -1094,8 +1042,7 @@ fix_param_node(PlannerInfo *root, Param *p)
  *
  * This consists of incrementing all Vars' varnos by rtoffset,
  * expanding PlaceHolderVars,
- * looking up operator opcode info for OpExpr and related nodes,
- * and adding OIDs from regclass Const nodes into root->glob->relationOids.
+ * and looking up operator opcode info for OpExpr and related nodes.
  *
  * 'node': the expression to be modified
  * 'rtoffset': how much to increment varnos by
@@ -1164,7 +1111,7 @@ fix_scan_expr_mutator(Node *node, fix_scan_expr_context *context)
 
 		return fix_scan_expr_mutator((Node *) phv->phexpr, context);
 	}
-	fix_expr_common(context->root, node);
+	fix_expr_common(node);
 	return expression_tree_mutator(node, fix_scan_expr_mutator,
 								   (void *) context);
 }
@@ -1176,7 +1123,7 @@ fix_scan_expr_walker(Node *node, fix_scan_expr_context *context)
 		return false;
 	Assert(!(IsA(node, Var) && ((Var *) node)->varno == ROWID_VAR));
 	Assert(!IsA(node, PlaceHolderVar));
-	fix_expr_common(context->root, node);
+	fix_expr_common(node);
 	return expression_tree_walker(node, fix_scan_expr_walker,
 								  (void *) context);
 }
@@ -1187,7 +1134,7 @@ fix_scan_expr_walker(Node *node, fix_scan_expr_context *context)
  *	  subplans, by setting the varnos to OUTER_VAR or INNER_VAR and setting
  *	  attno values to the result domain number of either the corresponding
  *	  outer or inner join tuple item.  Also perform opcode lookup for these
- *	  expressions, and add regclass OIDs to root->glob->relationOids.
+ *	  expressions.
  */
 static void
 set_join_references(PlannerInfo *root, Join *join, int rtoffset)
@@ -1319,8 +1266,7 @@ set_join_references(PlannerInfo *root, Join *join, int rtoffset)
  * set_upper_references
  *	  Update the targetlist and quals of an upper-level plan node
  *	  to refer to the tuples returned by its lefttree subplan.
- *	  Also perform opcode lookup for these expressions, and
- *	  add regclass OIDs to root->glob->relationOids.
+ *	  Also perform opcode lookup for these expressions.
  *
  * This is used for single-input plan types like Result, Sort, Unique.
  *
@@ -1629,8 +1575,7 @@ search_indexed_tlist_for_sortgroupref(Expr *node,
  *	   Create a new set of targetlist entries or join qual clauses by
  *	   changing the varno/varattno values of variables in the clauses
  *	   to reference target list values from the outer and inner join
- *	   relation target lists.  Also perform opcode lookup and add
- *	   regclass OIDs to root->glob->relationOids.
+ *	   relation target lists.  Also perform opcode lookup.
  *
  * This is used in two different scenarios:
  * 1) a normal join clause, where all the Vars in the clause *must* be
@@ -1764,7 +1709,7 @@ fix_join_expr_mutator(Node *node, fix_join_expr_context *context)
 	/* Special cases (apply only AFTER failing to match to lower tlist) */
 	if (IsA(node, Param))
 		return fix_param_node(context->root, (Param *) node);
-	fix_expr_common(context->root, node);
+	fix_expr_common(node);
 	return expression_tree_mutator(node,
 								   fix_join_expr_mutator,
 								   (void *) context);
@@ -1773,8 +1718,7 @@ fix_join_expr_mutator(Node *node, fix_join_expr_context *context)
 /*
  * fix_upper_expr
  *		Modifies an expression tree so that all Var nodes reference outputs
- *		of a subplan.  Also performs opcode lookup, and adds regclass OIDs to
- *		root->glob->relationOids.
+ *		of a subplan.  Also performs opcode lookup.
  *
  * This is used to fix up target and qual expressions of non-join upper-level
  * plan nodes, as well as index-only scan nodes.
@@ -1862,140 +1806,9 @@ fix_upper_expr_mutator(Node *node, fix_upper_expr_context *context)
 	/* Special cases (apply only AFTER failing to match to lower tlist) */
 	if (IsA(node, Param))
 		return fix_param_node(context->root, (Param *) node);
-	fix_expr_common(context->root, node);
+	fix_expr_common(node);
 	return expression_tree_mutator(node,
 								   fix_upper_expr_mutator,
 								   (void *) context);
 }
 
-
-/*****************************************************************************
- *					QUERY DEPENDENCY MANAGEMENT
- *****************************************************************************/
-
-/*
- * record_plan_function_dependency
- *		Mark the current plan as depending on a particular function.
- *
- * This is exported so that the function-inlining code can record a
- * dependency on a function that it's removed from the plan tree.
- */
-void
-record_plan_function_dependency(PlannerInfo *root, Oid funcid)
-{
-	/*
-	 * For performance reasons, we don't bother to track built-in functions;
-	 * we just assume they'll never change (or at least not in ways that'd
-	 * invalidate plans using them).  For this purpose we can consider a
-	 * built-in function to be one with OID less than FirstBootstrapObjectId.
-	 * Note that the OID generator guarantees never to generate such an OID
-	 * after startup, even at OID wraparound.
-	 */
-	if (funcid >= (Oid) FirstBootstrapObjectId)
-	{
-		PlanInvalItem *inval_item = makeNode(PlanInvalItem);
-
-		/*
-		 * It would work to use any syscache on pg_proc, but the easiest is
-		 * PROCOID since we already have the function's OID at hand.
-		 */
-		inval_item->cacheId = PROCOID;
-		inval_item->hashValue = GetSysCacheHashValue1(PROCOID,
-													  ObjectIdGetDatum(funcid));
-
-		root->glob->invalItems = lappend(root->glob->invalItems, inval_item);
-	}
-}
-
-/*
- * extract_query_dependencies
- *		Given a rewritten, but not yet planned, query or queries
- *		(i.e. a Query node or list of Query nodes), extract dependencies
- *		just as set_plan_references would do.  Also detect whether any
- *		rewrite steps were affected by RLS.
- *
- * This is needed to handle invalidation of cached unplanned queries.
- *
- * Note: this does not go through eval_const_expressions, and hence doesn't
- * reflect its additions of inlined functions to the invalItems list.  This is
- * obviously OK for functions, since we'll see them in the original query
- * tree anyway.
- */
-void
-extract_query_dependencies(Node *query,
-						   List **relationOids,
-						   List **invalItems)
-{
-	PlannerGlobal glob;
-	PlannerInfo root;
-
-	/* Make up dummy planner state so we can use this module's machinery */
-	MemSet(&glob, 0, sizeof(glob));
-	glob.type = T_PlannerGlobal;
-	glob.relationOids = NIL;
-	glob.invalItems = NIL;
-
-	MemSet(&root, 0, sizeof(root));
-	root.type = T_PlannerInfo;
-	root.glob = &glob;
-
-	(void) extract_query_dependencies_walker(query, &root);
-
-	*relationOids = glob.relationOids;
-	*invalItems = glob.invalItems;
-}
-
-/*
- * Tree walker for extract_query_dependencies.
- *
- * This is exported so that expression_planner_with_deps can call it on
- * simple expressions (post-planning, not before planning, in that case).
- * In that usage, glob.dependsOnRole isn't meaningful, but the relationOids
- * and invalItems lists are added to as needed.
- */
-bool
-extract_query_dependencies_walker(Node *node, PlannerInfo *context)
-{
-	if (node == NULL)
-		return false;
-	Assert(!IsA(node, PlaceHolderVar));
-	if (IsA(node, Query))
-	{
-		Query	   *query = (Query *) node;
-		ListCell   *lc;
-
-		if (query->commandType == CMD_UTILITY)
-		{
-			/*
-			 * This logic must handle any utility command for which parse
-			 * analysis was nontrivial (cf. stmt_requires_parse_analysis).
-			 */
-			/*
-			 * Ignore other utility statements, except those (such as EXPLAIN)
-			 * that contain a parsed-but-not-planned query.  For those, we
-			 * just need to transfer our attention to the contained query.
-			 */
-			query = UtilityContainsQuery(query->utilityStmt);
-			if (query == NULL)
-				return false;
-		}
-
-		/* Collect relation OIDs in this Query's rtable */
-		foreach(lc, query->rtable)
-		{
-			RangeTblEntry *rte = (RangeTblEntry *) lfirst(lc);
-
-			if (rte->rtekind == RTE_RELATION)
-				context->glob->relationOids =
-					lappend_oid(context->glob->relationOids, rte->relid);
-		}
-
-		/* And recurse into the query's subexpressions */
-		return query_tree_walker(query, extract_query_dependencies_walker,
-								 (void *) context, 0);
-	}
-	/* Extract function dependencies and check for regclass Consts */
-	fix_expr_common(context, node);
-	return expression_tree_walker(node, extract_query_dependencies_walker,
-								  (void *) context);
-}

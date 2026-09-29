@@ -320,7 +320,6 @@ _outPlanInfo(StringInfo str, const Plan *node)
 	WRITE_FLOAT_FIELD(total_cost, "%.2f");
 	WRITE_FLOAT_FIELD(plan_rows, "%.0f");
 	WRITE_INT_FIELD(plan_width);
-	WRITE_INT_FIELD(plan_node_id);
 	WRITE_NODE_FIELD(targetlist);
 	WRITE_NODE_FIELD(qual);
 	WRITE_NODE_FIELD(lefttree);
@@ -632,7 +631,6 @@ _outHash(StringInfo str, const Hash *node)
 	WRITE_NODE_FIELD(hashkeys);
 	WRITE_OID_FIELD(skewTable);
 	WRITE_INT_FIELD(skewColumn);
-	WRITE_BOOL_FIELD(skewInherit);
 }
 
 
@@ -653,15 +651,6 @@ _outPlanRowMark(StringInfo str, const PlanRowMark *node)
 	WRITE_UINT_FIELD(rti);
 	WRITE_UINT_FIELD(rowmarkId);
 	WRITE_ENUM_FIELD(markType, RowMarkType);
-}
-
-static void
-_outPlanInvalItem(StringInfo str, const PlanInvalItem *node)
-{
-	WRITE_NODE_TYPE("PLANINVALITEM");
-
-	WRITE_INT_FIELD(cacheId);
-	WRITE_UINT_FIELD(hashValue);
 }
 
 /*****************************************************************************
@@ -1407,14 +1396,9 @@ _outPlannerGlobal(StringInfo str, const PlannerGlobal *node)
 	WRITE_NODE_FIELD(finalrowmarks);
 	WRITE_NODE_FIELD(resultRelations);
 	WRITE_NODE_FIELD(appendRelations);
-	WRITE_NODE_FIELD(relationOids);
-	WRITE_NODE_FIELD(invalItems);
 	WRITE_NODE_FIELD(paramExecTypes);
 	WRITE_UINT_FIELD(lastPHId);
 	WRITE_UINT_FIELD(lastRowMarkId);
-	WRITE_INT_FIELD(lastPlanNodeId);
-	WRITE_BOOL_FIELD(transientPlan);
-	WRITE_BOOL_FIELD(dependsOnRole);
 }
 
 static void
@@ -1811,10 +1795,8 @@ _outDefElem(StringInfo str, const DefElem *node)
 {
 	WRITE_NODE_TYPE("DEFELEM");
 
-	WRITE_STRING_FIELD(defnamespace);
 	WRITE_STRING_FIELD(defname);
 	WRITE_NODE_FIELD(arg);
-	WRITE_ENUM_FIELD(defaction, DefElemAction);
 	WRITE_LOCATION_FIELD(location);
 }
 
@@ -1828,7 +1810,6 @@ _outColumnDef(StringInfo str, const ColumnDef *node)
 	WRITE_CHAR_FIELD(storage);
 	WRITE_NODE_FIELD(raw_default);
 	WRITE_NODE_FIELD(cooked_default);
-	WRITE_CHAR_FIELD(generated);
 	WRITE_NODE_FIELD(constraints);
 	WRITE_LOCATION_FIELD(location);
 }
@@ -1925,7 +1906,6 @@ _outSortGroupClause(StringInfo str, const SortGroupClause *node)
 	WRITE_OID_FIELD(eqop);
 	WRITE_OID_FIELD(sortop);
 	WRITE_BOOL_FIELD(nulls_first);
-	WRITE_BOOL_FIELD(hashable);
 }
 
 
@@ -1983,7 +1963,6 @@ _outRangeTblEntry(StringInfo str, const RangeTblEntry *node)
 	WRITE_BITMAPSET_FIELD(selectedCols);
 	WRITE_BITMAPSET_FIELD(insertedCols);
 	WRITE_BITMAPSET_FIELD(updatedCols);
-	WRITE_BITMAPSET_FIELD(extraUpdatedCols);
 }
 
 static void
@@ -2187,7 +2166,6 @@ _outConstraint(StringInfo str, const Constraint *node)
 	{
 		case CONSTR_DEFAULT:
 			appendStringInfoString(str, "DEFAULT");
-			WRITE_NODE_FIELD(raw_expr);
 			break;
 
 		case CONSTR_PRIMARY:
@@ -2322,9 +2300,6 @@ outNode(StringInfo str, const void *obj)
 				break;
 			case T_PlanRowMark:
 				_outPlanRowMark(str, obj);
-				break;
-			case T_PlanInvalItem:
-				_outPlanInvalItem(str, obj);
 				break;
 			case T_Alias:
 				_outAlias(str, obj);

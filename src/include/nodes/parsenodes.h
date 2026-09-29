@@ -383,7 +383,6 @@ typedef struct ColumnDef
 	char		storage;		/* attstorage setting, or 0 for default */
 	Node	   *raw_default;	/* default value (untransformed parse tree) */
 	Node	   *cooked_default; /* default value (transformed expr tree) */
-	char		generated;		/* attgenerated setting */
 	List	   *constraints;	/* other constraints on column */
 	int			location;		/* parse location, or -1 if none/unknown */
 } ColumnDef;
@@ -409,26 +408,12 @@ typedef struct IndexElem
 
 /*
  * DefElem - a generic "name = value" option definition
- *
- * In some contexts the name can be qualified.  Also, certain SQL commands
- * allow a SET/ADD/DROP action to be attached to option settings, so it's
- * convenient to carry a field for that too.  (Note: currently, it is our
- * practice that the grammar allows namespace and action only in statements
- * where they are relevant; C code can just ignore those fields in other
- * statements.)
  */
-typedef enum DefElemAction
-{
-	DEFELEM_UNSPEC,				/* no action given */
-} DefElemAction;
-
 typedef struct DefElem
 {
 	NodeTag		type;
-	char	   *defnamespace;	/* NULL if unqualified name */
 	char	   *defname;
 	Node	   *arg;			/* a (Value *) or a (TypeName *) */
-	DefElemAction defaction;	/* unspecified action, or SET/ADD/DROP */
 	int			location;		/* token location, or -1 if unknown */
 } DefElem;
 
@@ -497,8 +482,6 @@ typedef struct DefElem
  *	  updatedCols is also used in some other places, for example, to determine
  *	  which triggers to fire and in FDWs to know which changed columns they
  *	  need to ship off.
- *
- *	  extraUpdatedCols is no longer used or maintained; it's always empty.
  *--------------------
  */
 typedef enum RTEKind
@@ -627,7 +610,6 @@ typedef struct RangeTblEntry
 	Bitmapset  *selectedCols;	/* columns needing SELECT permission */
 	Bitmapset  *insertedCols;	/* columns needing INSERT permission */
 	Bitmapset  *updatedCols;	/* columns needing UPDATE permission */
-	Bitmapset  *extraUpdatedCols;	/* generated columns being updated */
 } RangeTblEntry;
 
 /*
@@ -651,8 +633,6 @@ typedef struct RangeTblEntry
  *		or InvalidOid if not available.
  * nulls_first means about what you'd expect.  If sortop is InvalidOid
  *		then nulls_first is meaningless and should be set to false.
- * hashable is true if eqop is hashable (note this condition also depends
- *		on the datatype of the input expression).
  *
  * In an ORDER BY item, all fields must be valid.  (The eqop isn't essential
  * here, but it's cheap to get it along with the sortop, and requiring it
@@ -674,11 +654,6 @@ typedef struct RangeTblEntry
  * and nulls_first to false.  A grouping item of this kind can only be
  * implemented by hashing, and of course it'll never match an ORDER BY item.
  *
- * The hashable flag is provided since we generally have the requisite
- * information readily available when the SortGroupClause is constructed,
- * and it's relatively expensive to get it again later.  Note there is no
- * need for a "sortable" flag since OidIsValid(sortop) serves the purpose.
- *
  * A query might have both ORDER BY and DISTINCT clauses.  In SELECT DISTINCT,
  * the distinctClause list is as long or longer than the sortClause list.  The
  * two lists must match up to the end of the shorter one --- the parser
@@ -694,7 +669,6 @@ typedef struct SortGroupClause
 	Oid			eqop;			/* the equality operator ('=' op) */
 	Oid			sortop;			/* the ordering operator ('<' op), or 0 */
 	bool		nulls_first;	/* do NULLs come before normal values? */
-	bool		hashable;		/* can eqop be implemented by hashing? */
 } SortGroupClause;
 
 /*****************************************************************************
@@ -1037,9 +1011,6 @@ typedef struct Constraint
 	/* Fields used for most/all constraint types: */
 	char	   *conname;		/* Constraint name, or NULL if unnamed */
 	int			location;		/* token location, or -1 if unknown */
-
-	/* Fields used for constraints with expressions (DEFAULT): */
-	Node	   *raw_expr;		/* expr, as untransformed parse tree */
 
 	/* Fields used for unique constraints (UNIQUE and PRIMARY KEY): */
 	List	   *keys;			/* String nodes naming referenced key

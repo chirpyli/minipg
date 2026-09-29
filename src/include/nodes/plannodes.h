@@ -105,7 +105,6 @@ typedef struct Plan
 	/*
 	 * Common structural data for all Plan types.
 	 */
-	int			plan_node_id;	/* unique across entire final plan tree */
 	List	   *targetlist;		/* target list to be computed at this node */
 	List	   *qual;			/* implicitly-ANDed qual conditions */
 	struct Plan *lefttree;		/* input plan tree(s) */
@@ -573,7 +572,7 @@ typedef struct Unique
  *		hash build node
  *
  * If the executor is supposed to try to apply skew join optimization, then
- * skewTable/skewColumn/skewInherit identify the outer relation's join key
+ * skewTable/skewColumn identify the outer relation's join key
  * column, from which the relevant MCV statistics can be fetched.
  * ----------------
  */
@@ -588,7 +587,6 @@ typedef struct Hash
 	List	   *hashkeys;		/* hash keys for the hashjoin condition */
 	Oid			skewTable;		/* outer join key's table OID, or InvalidOid */
 	AttrNumber	skewColumn;		/* outer join key's column #, or zero */
-	bool		skewInherit;	/* is outer join rel an inheritance tree? */
 	/* all other info is in the parent HashJoin node */
 } Hash;
 
@@ -644,21 +642,5 @@ typedef struct PlanRowMark
 } PlanRowMark;
 
 
-
-/*
- * Plan invalidation info
- *
- * We track the objects on which a PlannedStmt depends in two ways:
- * relations are recorded as a simple list of OIDs, and everything else
- * is represented as a list of PlanInvalItems.  A PlanInvalItem is designed
- * to be used with the syscache invalidation mechanism, so it identifies a
- * system catalog entry by cache ID and hash value.
- */
-typedef struct PlanInvalItem
-{
-	NodeTag		type;
-	int			cacheId;		/* a syscache ID, see utils/syscache.h */
-	uint32		hashValue;		/* hash value of object's cache lookup key */
-} PlanInvalItem;
 
 #endif							/* PLANNODES_H */

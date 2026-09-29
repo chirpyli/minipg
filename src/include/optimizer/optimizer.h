@@ -89,18 +89,9 @@ extern struct PlannedStmt *standard_planner(Query *parse,
 											struct ParamListInfoData *boundParams);
 
 extern Expr *expression_planner(Expr *expr);
-extern Expr *expression_planner_with_deps(Expr *expr,
-										  List **relationOids,
-										  List **invalItems);
 
 /* minipg: plan_cluster_use_sort() is gone; VACUUM FULL always rewrites in
  * physical order, so there is no index-vs-sort decision to make. */
-
-/* in plan/setrefs.c: */
-
-extern void extract_query_dependencies(Node *query,
-									   List **relationOids,
-									   List **invalItems);
 
 /* in prep/prepqual.c: */
 

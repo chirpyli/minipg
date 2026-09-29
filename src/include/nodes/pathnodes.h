@@ -86,21 +86,11 @@ typedef struct PlannerGlobal
 
 	List	   *appendRelations;	/* "flat" list of AppendRelInfos */
 
-	List	   *relationOids;	/* OIDs of relations the plan depends on */
-
-	List	   *invalItems;		/* other dependencies, as PlanInvalItems */
-
 	List	   *paramExecTypes; /* type OIDs for PARAM_EXEC Params */
 
 	Index		lastPHId;		/* highest PlaceHolderVar ID assigned */
 
 	Index		lastRowMarkId;	/* highest PlanRowMark ID assigned */
-
-	int			lastPlanNodeId; /* highest plan node ID assigned */
-
-	bool		transientPlan;	/* redo plan when TransactionXmin changes? */
-
-	bool		dependsOnRole;	/* is plan specific to current role? */
 
 } PlannerGlobal;
 

@@ -110,7 +110,6 @@ CopyPlanFields(const Plan *from, Plan *newnode)
 	COPY_SCALAR_FIELD(total_cost);
 	COPY_SCALAR_FIELD(plan_rows);
 	COPY_SCALAR_FIELD(plan_width);
-	COPY_SCALAR_FIELD(plan_node_id);
 	COPY_NODE_FIELD(targetlist);
 	COPY_NODE_FIELD(qual);
 	COPY_NODE_FIELD(lefttree);
@@ -677,7 +676,6 @@ _copyHash(const Hash *from)
 	COPY_NODE_FIELD(hashkeys);
 	COPY_SCALAR_FIELD(skewTable);
 	COPY_SCALAR_FIELD(skewColumn);
-	COPY_SCALAR_FIELD(skewInherit);
 
 	return newnode;
 }
@@ -708,20 +706,6 @@ _copyPlanRowMark(const PlanRowMark *from)
 	COPY_SCALAR_FIELD(rti);
 	COPY_SCALAR_FIELD(rowmarkId);
 	COPY_SCALAR_FIELD(markType);
-
-	return newnode;
-}
-
-/*
- * _copyPlanInvalItem
- */
-static PlanInvalItem *
-_copyPlanInvalItem(const PlanInvalItem *from)
-{
-	PlanInvalItem *newnode = makeNode(PlanInvalItem);
-
-	COPY_SCALAR_FIELD(cacheId);
-	COPY_SCALAR_FIELD(hashValue);
 
 	return newnode;
 }
@@ -1517,7 +1501,6 @@ _copyRangeTblEntry(const RangeTblEntry *from)
 	COPY_BITMAPSET_FIELD(selectedCols);
 	COPY_BITMAPSET_FIELD(insertedCols);
 	COPY_BITMAPSET_FIELD(updatedCols);
-	COPY_BITMAPSET_FIELD(extraUpdatedCols);
 
 	return newnode;
 }
@@ -1531,7 +1514,6 @@ _copySortGroupClause(const SortGroupClause *from)
 	COPY_SCALAR_FIELD(eqop);
 	COPY_SCALAR_FIELD(sortop);
 	COPY_SCALAR_FIELD(nulls_first);
-	COPY_SCALAR_FIELD(hashable);
 
 	return newnode;
 }
@@ -1753,7 +1735,6 @@ _copyColumnDef(const ColumnDef *from)
 	COPY_SCALAR_FIELD(storage);
 	COPY_NODE_FIELD(raw_default);
 	COPY_NODE_FIELD(cooked_default);
-	COPY_SCALAR_FIELD(generated);
 	COPY_NODE_FIELD(constraints);
 	COPY_LOCATION_FIELD(location);
 
@@ -1768,7 +1749,6 @@ _copyConstraint(const Constraint *from)
 	COPY_SCALAR_FIELD(contype);
 	COPY_STRING_FIELD(conname);
 	COPY_LOCATION_FIELD(location);
-	COPY_NODE_FIELD(raw_expr);
 	COPY_NODE_FIELD(keys);
 	COPY_NODE_FIELD(including);
 	COPY_NODE_FIELD(options);
@@ -1784,10 +1764,8 @@ _copyDefElem(const DefElem *from)
 {
 	DefElem    *newnode = makeNode(DefElem);
 
-	COPY_STRING_FIELD(defnamespace);
 	COPY_STRING_FIELD(defname);
 	COPY_NODE_FIELD(arg);
-	COPY_SCALAR_FIELD(defaction);
 	COPY_LOCATION_FIELD(location);
 
 	return newnode;
@@ -2261,9 +2239,6 @@ copyObjectImpl(const void *from)
 			break;
 		case T_PlanRowMark:
 			retval = _copyPlanRowMark(from);
-			break;
-		case T_PlanInvalItem:
-			retval = _copyPlanInvalItem(from);
 			break;
 
 			/*

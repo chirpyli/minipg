@@ -1365,7 +1365,6 @@ addTargetToSortList(ParseState *pstate, TargetEntry *tle,
 	Oid			restype = exprType((Node *) tle->expr);
 	Oid			sortop;
 	Oid			eqop;
-	bool		hashable;
 	bool		reverse;
 	int			location;
 	ParseCallbackState pcbstate;
@@ -1402,21 +1401,20 @@ addTargetToSortList(ParseState *pstate, TargetEntry *tle,
 			get_sort_group_operators(restype,
 									 true, true, false,
 									 &sortop, &eqop, NULL,
-									 &hashable);
+									 NULL);
 			reverse = false;
 			break;
 		case SORTBY_DESC:
 			get_sort_group_operators(restype,
 									 false, true, true,
 									 NULL, &eqop, &sortop,
-									 &hashable);
+									 NULL);
 			reverse = true;
 			break;
 		default:
 			elog(ERROR, "unrecognized sortby_dir: %d", sortby->sortby_dir);
 			sortop = InvalidOid;	/* keep compiler quiet */
 			eqop = InvalidOid;
-			hashable = false;
 			reverse = false;
 			break;
 	}
@@ -1432,7 +1430,6 @@ addTargetToSortList(ParseState *pstate, TargetEntry *tle,
 
 		sortcl->eqop = eqop;
 		sortcl->sortop = sortop;
-		sortcl->hashable = hashable;
 
 		switch (sortby->sortby_nulls)
 		{
@@ -1499,7 +1496,6 @@ addTargetToGroupList(ParseState *pstate, TargetEntry *tle,
 		SortGroupClause *grpcl = makeNode(SortGroupClause);
 		Oid			sortop;
 		Oid			eqop;
-		bool		hashable;
 		ParseCallbackState pcbstate;
 
 		setup_parser_errposition_callback(&pcbstate, pstate, location);
@@ -1508,7 +1504,7 @@ addTargetToGroupList(ParseState *pstate, TargetEntry *tle,
 		get_sort_group_operators(restype,
 								 false, true, false,
 								 &sortop, &eqop, NULL,
-								 &hashable);
+								 NULL);
 
 		cancel_parser_errposition_callback(&pcbstate);
 
@@ -1516,7 +1512,6 @@ addTargetToGroupList(ParseState *pstate, TargetEntry *tle,
 		grpcl->eqop = eqop;
 		grpcl->sortop = sortop;
 		grpcl->nulls_first = false; /* OK with or without sortop */
-		grpcl->hashable = hashable;
 
 		grouplist = lappend(grouplist, grpcl);
 	}

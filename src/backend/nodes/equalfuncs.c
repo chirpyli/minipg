@@ -1117,7 +1117,6 @@ _equalColumnDef(const ColumnDef *a, const ColumnDef *b)
 	COMPARE_SCALAR_FIELD(storage);
 	COMPARE_NODE_FIELD(raw_default);
 	COMPARE_NODE_FIELD(cooked_default);
-	COMPARE_SCALAR_FIELD(generated);
 	COMPARE_NODE_FIELD(constraints);
 	COMPARE_LOCATION_FIELD(location);
 
@@ -1130,7 +1129,6 @@ _equalConstraint(const Constraint *a, const Constraint *b)
 	COMPARE_SCALAR_FIELD(contype);
 	COMPARE_STRING_FIELD(conname);
 	COMPARE_LOCATION_FIELD(location);
-	COMPARE_NODE_FIELD(raw_expr);
 	COMPARE_NODE_FIELD(keys);
 	COMPARE_NODE_FIELD(including);
 	COMPARE_NODE_FIELD(options);
@@ -1144,10 +1142,8 @@ _equalConstraint(const Constraint *a, const Constraint *b)
 static bool
 _equalDefElem(const DefElem *a, const DefElem *b)
 {
-	COMPARE_STRING_FIELD(defnamespace);
 	COMPARE_STRING_FIELD(defname);
 	COMPARE_NODE_FIELD(arg);
-	COMPARE_SCALAR_FIELD(defaction);
 	COMPARE_LOCATION_FIELD(location);
 
 	return true;
@@ -1179,7 +1175,6 @@ _equalRangeTblEntry(const RangeTblEntry *a, const RangeTblEntry *b)
 	COMPARE_BITMAPSET_FIELD(selectedCols);
 	COMPARE_BITMAPSET_FIELD(insertedCols);
 	COMPARE_BITMAPSET_FIELD(updatedCols);
-	COMPARE_BITMAPSET_FIELD(extraUpdatedCols);
 
 	return true;
 }
@@ -1194,7 +1189,6 @@ _equalSortGroupClause(const SortGroupClause *a, const SortGroupClause *b)
 	COMPARE_SCALAR_FIELD(eqop);
 	COMPARE_SCALAR_FIELD(sortop);
 	COMPARE_SCALAR_FIELD(nulls_first);
-	COMPARE_SCALAR_FIELD(hashable);
 
 	return true;
 }

@@ -98,8 +98,6 @@ extern IndexInfo *makeIndexInfo(int numattrs, int numkeyattrs, Oid amoid,
 								bool unique, bool isready, bool concurrent);
 
 extern DefElem *makeDefElem(char *name, Node *arg, int location);
-extern DefElem *makeDefElemExtended(char *nameSpace, char *name, Node *arg,
-									DefElemAction defaction, int location);
 
 extern VacuumRelation *makeVacuumRelation(RangeVar *relation, Oid oid, List *va_cols);
 
