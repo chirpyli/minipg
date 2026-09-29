@@ -549,10 +549,6 @@ pg_analyze_and_rewrite_params(RawStmt *parsetree,
 
 	pgstat_report_query_id(query->queryId, false);
 
-	if (Debug_print_parse)
-		elog_node_display(LOG, "parse tree", query,
-						  Debug_pretty_print);
-
 	/*
 	 * minipg: the rule rewriter has been cropped, so one raw parsetree can
 	 * only produce one Query node.

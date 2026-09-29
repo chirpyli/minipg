@@ -87,8 +87,6 @@ static Result *create_result_plan(PlannerInfo *root,
 static ProjectSet *create_project_set_plan(PlannerInfo *root, ProjectSetPath *best_path);
 static Material *create_material_plan(PlannerInfo *root, MaterialPath *best_path,
 									  int flags);
-static Memoize *create_memoize_plan(PlannerInfo *root, MemoizePath *best_path,
-									int flags);
 static Plan *create_unique_plan(PlannerInfo *root, UniquePath *best_path,
 								int flags);
 static Plan *create_projection_plan(PlannerInfo *root,
@@ -220,10 +218,6 @@ static Sort *make_sort_from_pathkeys(Plan *lefttree, List *pathkeys,
 static IncrementalSort *make_incrementalsort_from_pathkeys(Plan *lefttree,
 														   List *pathkeys, Relids relids, int nPresortedCols);
 static Material *make_material(Plan *lefttree);
-static Memoize *make_memoize(Plan *lefttree, Oid *hashoperators,
-							 Oid *collations, List *param_exprs,
-							 bool singlerow, bool binary_mode,
-							 uint32 est_entries, Bitmapset *keyparamids);
 static Unique *make_unique_from_sortclauses(Plan *lefttree, List *distinctList);
 static Unique *make_unique_from_pathkeys(Plan *lefttree,
 										 List *pathkeys, int numCols);
@@ -361,11 +355,6 @@ create_plan_recurse(PlannerInfo *root, Path *best_path, int flags)
 			plan = (Plan *) create_material_plan(root,
 												 (MaterialPath *) best_path,
 												 flags);
-			break;
-		case T_Memoize:
-			plan = (Plan *) create_memoize_plan(root,
-												(MemoizePath *) best_path,
-												flags);
 			break;
 		case T_Unique:
 			if (IsA(best_path, UpperUniquePath))
@@ -997,60 +986,6 @@ create_material_plan(PlannerInfo *root, MaterialPath *best_path, int flags)
 								  flags | CP_SMALL_TLIST);
 
 	plan = make_material(subplan);
-
-	copy_generic_path_info(&plan->plan, (Path *) best_path);
-
-	return plan;
-}
-
-/*
- * create_memoize_plan
- *	  Create a Memoize plan for 'best_path' and (recursively) plans for its
- *	  subpaths.
- *
- *	  Returns a Plan node.
- */
-static Memoize *
-create_memoize_plan(PlannerInfo *root, MemoizePath *best_path, int flags)
-{
-	Memoize    *plan;
-	Bitmapset  *keyparamids;
-	Plan	   *subplan;
-	Oid		   *operators;
-	Oid		   *collations;
-	List	   *param_exprs = NIL;
-	ListCell   *lc;
-	ListCell   *lc2;
-	int			nkeys;
-	int			i;
-
-	subplan = create_plan_recurse(root, best_path->subpath,
-								  flags | CP_SMALL_TLIST);
-
-	param_exprs = (List *) replace_nestloop_params(root, (Node *)
-												   best_path->param_exprs);
-
-	nkeys = list_length(param_exprs);
-	Assert(nkeys > 0);
-	operators = palloc(nkeys * sizeof(Oid));
-	collations = palloc(nkeys * sizeof(Oid));
-
-	i = 0;
-	forboth(lc, param_exprs, lc2, best_path->hash_operators)
-	{
-		Expr	   *param_expr = (Expr *) lfirst(lc);
-		Oid			opno = lfirst_oid(lc2);
-
-		operators[i] = opno;
-		collations[i] = exprCollation((Node *) param_expr);
-		i++;
-	}
-
-	keyparamids = pull_paramids((Expr *) param_exprs);
-
-	plan = make_memoize(subplan, operators, collations, param_exprs,
-						best_path->singlerow, best_path->binary_mode,
-						best_path->est_entries, keyparamids);
 
 	copy_generic_path_info(&plan->plan, (Path *) best_path);
 
@@ -4230,31 +4165,6 @@ materialize_finished_plan(Plan *subplan)
 	return matplan;
 }
 
-static Memoize *
-make_memoize(Plan *lefttree, Oid *hashoperators, Oid *collations,
-			 List *param_exprs, bool singlerow, bool binary_mode,
-			 uint32 est_entries, Bitmapset *keyparamids)
-{
-	Memoize    *node = makeNode(Memoize);
-	Plan	   *plan = &node->plan;
-
-	plan->targetlist = lefttree->targetlist;
-	plan->qual = NIL;
-	plan->lefttree = lefttree;
-	plan->righttree = NULL;
-
-	node->numKeys = list_length(param_exprs);
-	node->hashOperators = hashoperators;
-	node->collations = collations;
-	node->param_exprs = param_exprs;
-	node->singlerow = singlerow;
-	node->binary_mode = binary_mode;
-	node->est_entries = est_entries;
-	node->keyparamids = keyparamids;
-
-	return node;
-}
-
 /*
  * distinctList is a list of SortGroupClauses, identifying the targetlist items
  * that should be considered by the Unique filter.  The input path must
@@ -4503,7 +4413,6 @@ is_projection_capable_path(Path *path)
 	{
 		case T_Hash:
 		case T_Material:
-		case T_Memoize:
 		case T_Sort:
 		case T_IncrementalSort:
 		case T_Unique:
@@ -4544,7 +4453,6 @@ is_projection_capable_plan(Plan *plan)
 	{
 		case T_Hash:
 		case T_Material:
-		case T_Memoize:
 		case T_Sort:
 		case T_Unique:
 		case T_ModifyTable:

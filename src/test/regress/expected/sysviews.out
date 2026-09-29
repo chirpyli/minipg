@@ -48,11 +48,10 @@ select name, setting
  enable_indexonlyscan    | on
  enable_indexscan        | on
  enable_material         | on
- enable_memoize          | on
  enable_mergejoin        | on
  enable_nestloop         | on
  enable_seqscan          | on
  enable_sort             | on
  enable_tidscan          | on
-(12 rows)
+(11 rows)
 

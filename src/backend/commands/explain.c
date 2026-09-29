@@ -77,8 +77,6 @@ static void show_sort_info(SortState *sortstate, ExplainState *es);
 static void show_incremental_sort_info(IncrementalSortState *incrsortstate,
 									   ExplainState *es);
 static void show_hash_info(HashState *hashstate, ExplainState *es);
-static void show_memoize_info(MemoizeState *mstate, List *ancestors,
-							  ExplainState *es);
 static void show_tidbitmap_info(BitmapHeapScanState *planstate,
 								ExplainState *es);
 static void show_instrumentation_count(const char *qlabel, int which,
@@ -660,9 +658,6 @@ ExplainNode(PlanState *planstate, List *ancestors,
 		case T_Material:
 			pname = "Materialize";
 			break;
-		case T_Memoize:
-			pname = "Memoize";
-			break;
 		case T_Sort:
 			pname = "Sort";
 			break;
@@ -1003,10 +998,6 @@ ExplainNode(PlanState *planstate, List *ancestors,
 			break;
 		case T_Hash:
 			show_hash_info(castNode(HashState, planstate), es);
-			break;
-		case T_Memoize:
-			show_memoize_info(castNode(MemoizeState, planstate), ancestors,
-							  es);
 			break;
 		default:
 			break;
@@ -1525,76 +1516,6 @@ show_hash_info(HashState *hashstate, ExplainState *es)
 		}
 	}
 }
-
-/*
- * Show information on memoize hits/misses/evictions and memory usage.
- */
-static void
-show_memoize_info(MemoizeState *mstate, List *ancestors, ExplainState *es)
-{
-	Plan	   *plan = ((PlanState *) mstate)->plan;
-	ListCell   *lc;
-	List	   *context;
-	StringInfoData keystr;
-	char	   *seperator = "";
-	bool		useprefix;
-	int64		memPeakKb;
-
-	initStringInfo(&keystr);
-
-	/*
-	 * It's hard to imagine having a memoize node with fewer than 2 RTEs, but
-	 * let's just keep the same useprefix logic as elsewhere in this file.
-	 */
-	useprefix = list_length(es->rtable) > 1 || es->verbose;
-
-	/* Set up deparsing context */
-	context = set_deparse_context_plan(es->deparse_cxt,
-									   plan,
-									   ancestors);
-
-	foreach(lc, ((Memoize *) plan)->param_exprs)
-	{
-		Node	   *expr = (Node *) lfirst(lc);
-
-		appendStringInfoString(&keystr, seperator);
-
-		appendStringInfoString(&keystr, deparse_expression(expr, context,
-														   useprefix, false));
-		seperator = ", ";
-	}
-
-	ExplainIndentText(es);
-	appendStringInfo(es->str, "Cache Key: %s\n", keystr.data);
-	ExplainIndentText(es);
-	appendStringInfo(es->str, "Cache Mode: %s\n", mstate->binary_mode ? "binary" : "logical");
-
-	pfree(keystr.data);
-
-	if (!es->analyze)
-		return;
-
-	if (mstate->stats.cache_misses > 0)
-	{
-		/*
-		 * mem_peak is only set when we freed memory, so we must use mem_used
-		 * when mem_peak is 0.
-		 */
-		if (mstate->stats.mem_peak > 0)
-			memPeakKb = (mstate->stats.mem_peak + 1023) / 1024;
-		else
-			memPeakKb = (mstate->mem_used + 1023) / 1024;
-
-		ExplainIndentText(es);
-		appendStringInfo(es->str,
-						 "Hits: " UINT64_FORMAT "  Misses: " UINT64_FORMAT "  Evictions: " UINT64_FORMAT "  Overflows: " UINT64_FORMAT "  Memory Usage: " INT64_FORMAT "kB\n",
-						 mstate->stats.cache_hits,
-						 mstate->stats.cache_misses,
-						 mstate->stats.cache_evictions,
-						 mstate->stats.cache_overflows,
-						 memPeakKb);
-						 }
-						 }
 
 /*
  * If it's EXPLAIN ANALYZE, show exact/lossy pages for a BitmapHeapScan node

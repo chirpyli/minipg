@@ -1588,12 +1588,6 @@ finalize_plan(PlannerInfo *root, Plan *plan,
 							  &context);
 			break;
 
-
-		case T_Memoize:
-			finalize_primnode((Node *) ((Memoize *) plan)->param_exprs,
-							  &context);
-			break;
-
 		case T_ProjectSet:
 		case T_Material:
 		case T_Sort:

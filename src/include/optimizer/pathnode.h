@@ -67,14 +67,6 @@ extern ResultPath *create_result_path(PlannerInfo *root,
 												 PathTarget *target,
 												 List *quals);
 extern MaterialPath *create_material_path(RelOptInfo *rel, Path *subpath);
-extern MemoizePath *create_memoize_path(PlannerInfo *root,
-										RelOptInfo *rel,
-										Path *subpath,
-										List *param_exprs,
-										List *hash_operators,
-										bool singlerow,
-										bool binary_mode,
-										double calls);
 extern UniquePath *create_unique_path(PlannerInfo *root, RelOptInfo *rel,
 									  Path *subpath, SpecialJoinInfo *sjinfo);
 extern SubqueryScanPath *create_subqueryscan_path(PlannerInfo *root,

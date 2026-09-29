@@ -36,6 +36,4 @@ extern int	NumRelids(PlannerInfo *root, Node *clause);
 
 extern void CommuteOpExpr(OpExpr *clause);
 
-extern Bitmapset *pull_paramids(Expr *expr);
-
 #endif							/* CLAUSES_H */

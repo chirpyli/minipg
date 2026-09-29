@@ -37,7 +37,6 @@ OBJS = \
 	nodeIndexonlyscan.o \
 	nodeIndexscan.o \
 	nodeMaterial.o \
-	nodeMemoize.o \
 	nodeMergejoin.o \
 	nodeModifyTable.o \
 	nodeNestloop.o \

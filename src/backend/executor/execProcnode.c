@@ -83,7 +83,6 @@
 #include "executor/nodeIndexonlyscan.h"
 #include "executor/nodeIndexscan.h"
 #include "executor/nodeMaterial.h"
-#include "executor/nodeMemoize.h"
 #include "executor/nodeMergejoin.h"
 #include "executor/nodeModifyTable.h"
 #include "executor/nodeNestloop.h"
@@ -253,11 +252,6 @@ ExecInitNode(Plan *node, EState *estate, int eflags)
 		case T_IncrementalSort:
 			result = (PlanState *) ExecInitIncrementalSort((IncrementalSort *) node,
 														   estate, eflags);
-			break;
-
-		case T_Memoize:
-			result = (PlanState *) ExecInitMemoize((Memoize *) node, estate,
-												   eflags);
 			break;
 
 		case T_Unique:
@@ -555,10 +549,6 @@ ExecEndNode(PlanState *node)
 
 		case T_IncrementalSortState:
 			ExecEndIncrementalSort((IncrementalSortState *) node);
-			break;
-
-		case T_MemoizeState:
-			ExecEndMemoize((MemoizeState *) node);
 			break;
 
 		case T_UniqueState:

@@ -605,21 +605,6 @@ set_plan_refs(PlannerInfo *root, Plan *plan, int rtoffset)
 			set_hash_references(root, plan, rtoffset);
 			break;
 
-		case T_Memoize:
-			{
-				Memoize    *mplan = (Memoize *) plan;
-
-				/*
-				 * Memoize does not evaluate its targetlist.  It just uses the
-				 * same targetlist from its outer subnode.
-				 */
-				set_dummy_tlist_references(plan, rtoffset);
-
-				mplan->param_exprs = fix_scan_list(root, mplan->param_exprs,
-												   rtoffset);
-				break;
-			}
-
 		case T_Material:
 		case T_Sort:
 		case T_IncrementalSort:

@@ -25,7 +25,6 @@
 #include "executor/nodeIndexonlyscan.h"
 #include "executor/nodeIndexscan.h"
 #include "executor/nodeMaterial.h"
-#include "executor/nodeMemoize.h"
 #include "executor/nodeMergejoin.h"
 #include "executor/nodeModifyTable.h"
 #include "executor/nodeNestloop.h"
@@ -182,10 +181,6 @@ ExecReScan(PlanState *node)
 
 		case T_MaterialState:
 			ExecReScanMaterial((MaterialState *) node);
-			break;
-
-		case T_MemoizeState:
-			ExecReScanMemoize((MemoizeState *) node);
 			break;
 
 		case T_SortState:

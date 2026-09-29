@@ -774,16 +774,6 @@ static struct config_bool ConfigureNamesBool[] =
 		NULL, NULL, NULL
 	},
 	{
-		{"enable_memoize", PGC_USERSET, QUERY_TUNING_METHOD,
-			gettext_noop("Enables the planner's use of memoization."),
-			NULL,
-			GUC_EXPLAIN
-		},
-		&enable_memoize,
-		true,
-		NULL, NULL, NULL
-	},
-	{
 		{"enable_nestloop", PGC_USERSET, QUERY_TUNING_METHOD,
 			gettext_noop("Enables the planner's use of nested-loop join plans."),
 			NULL,

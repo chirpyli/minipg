@@ -1395,28 +1395,6 @@ _readMaterial(void)
 }
 
 /*
- * _readMemoize
- */
-static Memoize *
-_readMemoize(void)
-{
-	READ_LOCALS(Memoize);
-
-	ReadCommonPlan(&local_node->plan);
-
-	READ_INT_FIELD(numKeys);
-	READ_OID_ARRAY(hashOperators, local_node->numKeys);
-	READ_OID_ARRAY(collations, local_node->numKeys);
-	READ_NODE_FIELD(param_exprs);
-	READ_BOOL_FIELD(singlerow);
-	READ_BOOL_FIELD(binary_mode);
-	READ_UINT_FIELD(est_entries);
-	READ_BITMAPSET_FIELD(keyparamids);
-
-	READ_DONE();
-}
-
-/*
  * ReadCommonSort
  *	Assign the basic stuff of all nodes that inherit from Sort
  */
@@ -1712,8 +1690,6 @@ parseNodeString(void)
 		return_value = _readHashJoin();
 	else if (MATCH("MATERIAL", 8))
 		return_value = _readMaterial();
-	else if (MATCH("MEMOIZE", 7))
-		return_value = _readMemoize();
 	else if (MATCH("SORT", 4))
 		return_value = _readSort();
 	else if (MATCH("INCREMENTALSORT", 15))

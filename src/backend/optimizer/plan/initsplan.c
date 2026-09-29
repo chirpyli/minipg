@@ -33,7 +33,6 @@
 #include "parser/analyze.h"
 #include "rewrite/rewriteManip.h"
 #include "utils/lsyscache.h"
-#include "utils/typcache.h"
 
 /* These parameters are set by GUC */
 int			from_collapse_limit;
@@ -75,7 +74,6 @@ static bool check_equivalence_delay(PlannerInfo *root,
 static bool check_redundant_nullability_qual(PlannerInfo *root, Node *clause);
 static void check_mergejoinable(RestrictInfo *restrictinfo);
 static void check_hashjoinable(RestrictInfo *restrictinfo);
-static void check_memoizable(RestrictInfo *restrictinfo);
 
 
 /*****************************************************************************
@@ -2047,13 +2045,6 @@ distribute_restrictinfo_to_rels(PlannerInfo *root,
 			check_hashjoinable(restrictinfo);
 
 			/*
-			 * Likewise, check if the clause is suitable to be used with a
-			 * Memoize node to cache inner tuples during a parameterized
-			 * nested loop.
-			 */
-			check_memoizable(restrictinfo);
-
-			/*
 			 * Add clause to the join lists of all the relevant relations.
 			 */
 			add_join_clause_to_rels(root, restrictinfo, relids);
@@ -2293,7 +2284,6 @@ build_implied_join_equality(PlannerInfo *root,
 	/* Set mergejoinability/hashjoinability flags */
 	check_mergejoinable(restrictinfo);
 	check_hashjoinable(restrictinfo);
-	check_memoizable(restrictinfo);
 
 	return restrictinfo;
 }
@@ -2375,44 +2365,3 @@ check_hashjoinable(RestrictInfo *restrictinfo)
 		restrictinfo->hashjoinoperator = opno;
 }
 
-/*
- * check_memoizable
- *	  If the restrictinfo's clause is suitable to be used for a Memoize node,
- *	  set the hasheqoperator to the hash equality operator that will be needed
- *	  during caching.
- */
-static void
-check_memoizable(RestrictInfo *restrictinfo)
-{
-	TypeCacheEntry *typentry;
-	Expr	   *clause = restrictinfo->clause;
-	Oid			lefttype;
-	Oid			righttype;
-
-	if (restrictinfo->pseudoconstant)
-		return;
-	if (!is_opclause(clause))
-		return;
-	if (list_length(((OpExpr *) clause)->args) != 2)
-		return;
-
-	lefttype = exprType(linitial(((OpExpr *) clause)->args));
-	righttype = exprType(lsecond(((OpExpr *) clause)->args));
-
-	/*
-	 * Really there should be a field for both the left and right hash
-	 * equality operator, however, in v14, there's only a single field in
-	 * RestrictInfo to record the operator in, so we must insist that the left
-	 * and right types match.
-	 */
-	if (lefttype != righttype)
-		return;
-
-	typentry = lookup_type_cache(lefttype, TYPECACHE_HASH_PROC |
-										   TYPECACHE_EQ_OPR);
-
-	if (!OidIsValid(typentry->hash_proc) || !OidIsValid(typentry->eq_opr))
-		return;
-
-	restrictinfo->hasheqoperator = typentry->eq_opr;
-}
