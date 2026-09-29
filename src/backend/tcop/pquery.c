@@ -195,10 +195,9 @@ PortalStrategy
 ChoosePortalStrategy(List *stmts)
 {
 	/*
-	 * PORTAL_ONE_SELECT and PORTAL_UTIL_SELECT need only consider the
-	 * single-statement case, since there are no rewrite rules that can add
-	 * auxiliary queries to a SELECT or a utility command. PORTAL_ONE_MOD_WITH
-	 * likewise allows only one top-level statement.
+	 * PORTAL_ONE_SELECT 与 PORTAL_UTIL_SELECT 只需考虑单语句情形，
+	 * 因为不存在能向 SELECT 或实用命令追加辅助查询的重写规则。
+	 * PORTAL_ONE_MOD_WITH 同样只允许一个顶层语句。
 	 */
 	if (list_length(stmts) == 1)
 	{
