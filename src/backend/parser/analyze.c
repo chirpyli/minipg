@@ -45,7 +45,6 @@
 #include "parser/parse_type.h"
 #include "parser/parsetree.h"
 #include "rewrite/rewriteManip.h"
-#include "utils/backend_status.h"
 #include "utils/builtins.h"
 #include "utils/guc.h"
 #include "utils/queryjumble.h"
@@ -97,8 +96,6 @@ parse_analyze(RawStmt *parseTree, const char *sourceText,
 		JumbleQuery(query, sourceText);
 
 	free_parsestate(pstate);
-
-	pgstat_report_query_id(query->queryId, false);
 
 	return query;
 }

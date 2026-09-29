@@ -14,7 +14,6 @@ top_builddir = ../../../..
 include $(top_builddir)/src/Makefile.global
 
 OBJS = \
-	backend_status.o \
 	wait_event.o
 
 include $(top_srcdir)/src/backend/common.mk

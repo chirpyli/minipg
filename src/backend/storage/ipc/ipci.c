@@ -22,7 +22,6 @@
 #include "access/subtrans.h"
 #include "access/syncscan.h"
 #include "miscadmin.h"
-#include "utils/backend_status.h"
 
 #include "postmaster/bgwriter.h"
 #include "postmaster/postmaster.h"
@@ -90,7 +89,6 @@ CreateSharedMemoryAndSemaphores(void)
 		size = add_size(size, MultiXactShmemSize());
 		size = add_size(size, LWLockShmemSize());
 		size = add_size(size, ProcArrayShmemSize());
-		size = add_size(size, BackendStatusShmemSize());
 		size = add_size(size, SInvalShmemSize());
 		size = add_size(size, PMSignalShmemSize());
 		size = add_size(size, ProcSignalShmemSize());
@@ -172,7 +170,6 @@ CreateSharedMemoryAndSemaphores(void)
 	if (!IsUnderPostmaster)
 		InitProcGlobal();
 	CreateSharedProcArray();
-	CreateSharedBackendStatus();
 
 	/*
 	 * Set up shared-inval messaging

@@ -42,7 +42,6 @@
 #include "storage/procarray.h"
 #include "storage/sinvaladt.h"
 #include "storage/smgr.h"
-#include "utils/backend_status.h"
 #include "utils/builtins.h"
 #include "utils/catcache.h"
 #include "utils/combocid.h"
@@ -1629,7 +1628,6 @@ StartTransaction(void)
 	 * inside procedures, no longer exists.)
 	 */
 	xactStartTimestamp = stmtStartTimestamp;
-	pgstat_report_xact_timestamp(xactStartTimestamp);
 	/* Mark xactStopTimestamp as unset. */
 	xactStopTimestamp = 0;
 
@@ -1787,7 +1785,6 @@ CommitTransaction(void)
 	AtEOXact_ComboCid();
 	AtEOXact_HashTables(true);
 	AtEOXact_Snapshot(true, false);
-	pgstat_report_xact_timestamp(0);
 
 	CurrentResourceOwner = NULL;
 	ResourceOwnerDelete(TopTransactionResourceOwner);
@@ -1953,7 +1950,6 @@ AbortTransaction(void)
 		AtEOXact_Files(false);
 		AtEOXact_ComboCid();
 		AtEOXact_HashTables(false);
-		pgstat_report_xact_timestamp(0);
 	}
 
 	/*

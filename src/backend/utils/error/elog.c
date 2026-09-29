@@ -69,7 +69,6 @@
 #include "libpq/pqformat.h"
 #include "mb/pg_wchar.h"
 #include "miscadmin.h"
-#include "utils/backend_status.h"
 #include "postmaster/postmaster.h"
 #include "postmaster/syslogger.h"
 #include "storage/ipc.h"
@@ -2351,14 +2350,6 @@ log_line_prefix(StringInfo buf, ErrorData *edata)
 					appendStringInfo(buf, "%*s", padding, unpack_sql_state(edata->sqlerrcode));
 				else
 					appendStringInfoString(buf, unpack_sql_state(edata->sqlerrcode));
-				break;
-			case 'Q':
-				if (padding != 0)
-					appendStringInfo(buf, "%*lld", padding,
-									 (long long) pgstat_get_my_query_id());
-				else
-					appendStringInfo(buf, "%lld",
-									 (long long) pgstat_get_my_query_id());
 				break;
 			default:
 				/* format error - ignore it */

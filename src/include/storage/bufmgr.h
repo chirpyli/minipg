@@ -68,7 +68,6 @@ extern PGDLLIMPORT int NBuffers;
 extern bool zero_damaged_pages;
 extern int	bgwriter_lru_maxpages;
 extern double bgwriter_lru_multiplier;
-extern bool track_io_timing;
 extern int	effective_io_concurrency;
 extern int	maintenance_io_concurrency;
 

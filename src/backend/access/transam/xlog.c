@@ -93,7 +93,6 @@ int			wal_level = WAL_LEVEL_MINIMAL;
 int			CommitDelay = 0;	/* precommit delay in microseconds */
 int			CommitSiblings = 5; /* # concurrent xacts needed to sleep */
 int			wal_retrieve_retry_interval = 5000;
-bool		track_wal_io_timing = false;
 
 #ifdef WAL_DEBUG
 bool		XLOG_DEBUG = false;
@@ -2431,7 +2430,6 @@ XLogWrite(XLogwrtRqst WriteRqst, bool flexible)
 			Size		nbytes;
 			Size		nleft;
 			int			written;
-			instr_time	start;
 
 			/* OK to write the page(s) */
 			from = XLogCtl->pages + startidx * (Size) XLOG_BLCKSZ;
@@ -2441,25 +2439,9 @@ XLogWrite(XLogwrtRqst WriteRqst, bool flexible)
 			{
 				errno = 0;
 
-				/* Measure I/O timing to write WAL data */
-				if (track_wal_io_timing)
-					INSTR_TIME_SET_CURRENT(start);
-
 				pgstat_report_wait_start(WAIT_EVENT_WAL_WRITE);
 				written = pg_pwrite(openLogFile, from, nleft, startoffset);
 				pgstat_report_wait_end();
-
-				/*
-				 * Increment the I/O timing and the number of times WAL data
-				 * were written out to disk.
-				 */
-				if (track_wal_io_timing)
-				{
-					instr_time	duration;
-
-					INSTR_TIME_SET_CURRENT(duration);
-					INSTR_TIME_SUBTRACT(duration, start);
-				}
 
 
 				if (written <= 0)
@@ -8029,7 +8011,6 @@ void
 issue_xlog_fsync(int fd, XLogSegNo segno)
 {
 	char	   *msg = NULL;
-	instr_time	start;
 
 	/*
 	 * Quick exit if fsync is disabled or write() has already synced the WAL
@@ -8039,10 +8020,6 @@ issue_xlog_fsync(int fd, XLogSegNo segno)
 		sync_method == SYNC_METHOD_OPEN ||
 		sync_method == SYNC_METHOD_OPEN_DSYNC)
 		return;
-
-	/* Measure I/O timing to sync the WAL file */
-	if (track_wal_io_timing)
-		INSTR_TIME_SET_CURRENT(start);
 
 	pgstat_report_wait_start(WAIT_EVENT_WAL_SYNC);
 	switch (sync_method)
@@ -8088,18 +8065,6 @@ issue_xlog_fsync(int fd, XLogSegNo segno)
 	}
 
 	pgstat_report_wait_end();
-
-	/*
-	 * Increment the I/O timing and the number of times WAL files were synced.
-	 */
-	if (track_wal_io_timing)
-	{
-		instr_time	duration;
-
-		INSTR_TIME_SET_CURRENT(duration);
-		INSTR_TIME_SUBTRACT(duration, start);
-	}
-
 }
 
 /*

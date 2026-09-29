@@ -1612,10 +1612,8 @@ show_buffer_usage(ExplainState *es, const BufferUsage *usage, bool planning)
 							 usage->local_blks_written > 0);
 	bool		has_temp = (usage->temp_blks_read > 0 ||
 							usage->temp_blks_written > 0);
-	bool		has_timing = (!INSTR_TIME_IS_ZERO(usage->blk_read_time) ||
-							  !INSTR_TIME_IS_ZERO(usage->blk_write_time));
 	bool		show_planning = (planning && (has_shared ||
-											  has_local || has_temp || has_timing));
+											  has_local || has_temp));
 
 	if (show_planning)
 	{
@@ -1676,20 +1674,6 @@ show_buffer_usage(ExplainState *es, const BufferUsage *usage, bool planning)
 				appendStringInfo(es->str, " written=%lld",
 								 (long long) usage->temp_blks_written);
 		}
-		appendStringInfoChar(es->str, '\n');
-	}
-
-	/* As above, show only positive counter values. */
-	if (has_timing)
-	{
-		ExplainIndentText(es);
-		appendStringInfoString(es->str, "I/O Timings:");
-		if (!INSTR_TIME_IS_ZERO(usage->blk_read_time))
-			appendStringInfo(es->str, " read=%0.3f",
-							 INSTR_TIME_GET_MILLISEC(usage->blk_read_time));
-		if (!INSTR_TIME_IS_ZERO(usage->blk_write_time))
-			appendStringInfo(es->str, " write=%0.3f",
-							 INSTR_TIME_GET_MILLISEC(usage->blk_write_time));
 		appendStringInfoChar(es->str, '\n');
 	}
 

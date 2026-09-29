@@ -34,7 +34,6 @@
 #include "libpq/libpq-be.h"
 #include "mb/pg_wchar.h"
 #include "miscadmin.h"
-#include "utils/backend_status.h"
 
 #include "postmaster/postmaster.h"
 #include "storage/bufmgr.h"
@@ -525,10 +524,6 @@ InitPostgres(const char *in_dbname, Oid dboid, const char *username,
 	/* Initialize portal manager */
 	EnablePortalManager();
 
-	/* Initialize status reporting */
-	if (!bootstrap)
-		pgstat_beinit();
-
 	/*
 	 * Load relcache entries for the shared system catalogs.  This must create
 	 * at least entries for pg_database and catalogs used for authentication.
@@ -644,7 +639,6 @@ InitPostgres(const char *in_dbname, Oid dboid, const char *username,
 		 */
 		if (!bootstrap)
 		{
-			pgstat_bestart();
 			CommitTransactionCommand();
 		}
 		return;
@@ -794,10 +788,6 @@ InitPostgres(const char *in_dbname, Oid dboid, const char *username,
 
 	/* initialize client encoding */
 	InitializeClientEncoding();
-
-	/* report this backend in the PgBackendStatus array */
-	if (!bootstrap)
-		pgstat_bestart();
 
 	/* close the transaction we started above */
 	if (!bootstrap)

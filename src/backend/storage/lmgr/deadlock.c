@@ -26,7 +26,6 @@
 #include "postgres.h"
 
 #include "miscadmin.h"
-#include "utils/backend_status.h"
 #include "storage/lmgr.h"
 #include "storage/proc.h"
 #include "utils/memutils.h"
@@ -1077,19 +1076,6 @@ DeadLockReport(void)
 
 	/* Duplicate all the above for the server ... */
 	appendBinaryStringInfo(&logbuf, clientbuf.data, clientbuf.len);
-
-	/* ... and add info about query strings */
-	for (i = 0; i < nDeadlockDetails; i++)
-	{
-		DEADLOCK_INFO *info = &deadlockDetails[i];
-
-		appendStringInfoChar(&logbuf, '\n');
-
-		appendStringInfo(&logbuf,
-						 _("Process %d: %s"),
-						 info->pid,
-						 pgstat_get_backend_current_activity(info->pid, false));
-	}
 
 	ereport(ERROR,
 			(errcode(ERRCODE_T_R_DEADLOCK_DETECTED),

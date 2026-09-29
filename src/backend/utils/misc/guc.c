@@ -64,7 +64,6 @@
 #include "storage/predicate.h"
 #include "storage/proc.h"
 #include "tcop/tcopprot.h"
-#include "utils/backend_status.h"
 #include "utils/builtins.h"
 #include "utils/bytea.h"
 #include "utils/float.h"
@@ -145,7 +144,6 @@ static bool check_effective_io_concurrency(int *newval, void **extra, GucSource 
 static bool check_maintenance_io_concurrency(int *newval, void **extra, GucSource source);
 static bool check_huge_page_size(int *newval, void **extra, GucSource source);
 static bool check_application_name(char **newval, void **extra, GucSource source);
-static void assign_application_name(const char *newval, void *extra);
 static bool check_cluster_name(char **newval, void **extra, GucSource source);
 static const char *show_log_file_mode(void);
 static const char *show_data_directory_mode(void);
@@ -993,36 +991,6 @@ static struct config_bool ConfigureNamesBool[] =
 		true,
 		NULL, NULL, NULL
 	},
-	{
-		{"track_activities", PGC_SUSET, STATS_COLLECTOR,
-			gettext_noop("Collects information about executing commands."),
-			gettext_noop("Enables the collection of information on the currently "
-						 "executing command of each session, along with "
-						 "the time at which that command began execution.")
-		},
-		&pgstat_track_activities,
-		true,
-		NULL, NULL, NULL
-	},
-	{
-		{"track_io_timing", PGC_SUSET, STATS_COLLECTOR,
-			gettext_noop("Collects timing statistics for database I/O activity."),
-			NULL
-		},
-		&track_io_timing,
-		false,
-		NULL, NULL, NULL
-	},
-	{
-		{"track_wal_io_timing", PGC_SUSET, STATS_COLLECTOR,
-			gettext_noop("Collects timing statistics for WAL I/O activity."),
-			NULL
-		},
-		&track_wal_io_timing,
-		false,
-		NULL, NULL, NULL
-	},
-
 	{
 		{"update_process_title", PGC_SUSET, PROCESS_TITLE,
 			gettext_noop("Updates the process title to show the active SQL command."),
@@ -2148,17 +2116,6 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 	{
-		{"track_activity_query_size", PGC_POSTMASTER, STATS_COLLECTOR,
-			gettext_noop("Sets the size reserved for pg_stat_activity.query, in bytes."),
-			NULL,
-			GUC_UNIT_BYTE
-		},
-		&pgstat_track_activity_query_size,
-		1024, 100, 1048576,
-		NULL, NULL, NULL
-	},
-
-	{
 		{"tcp_user_timeout", PGC_USERSET, CONN_AUTH_SETTINGS,
 			gettext_noop("TCP user timeout."),
 			gettext_noop("A value of 0 uses the system default."),
@@ -2501,7 +2458,7 @@ static struct config_string ConfigureNamesString[] =
 		},
 		&application_name,
 		"",
-		check_application_name, assign_application_name, NULL
+		check_application_name, NULL, NULL
 	},
 
 	{
@@ -7883,13 +7840,6 @@ check_application_name(char **newval, void **extra, GucSource source)
 	pg_clean_ascii(*newval);
 
 	return true;
-}
-
-static void
-assign_application_name(const char *newval, void *extra)
-{
-	/* Update the pg_stat_activity view */
-	pgstat_report_appname(newval);
 }
 
 static bool

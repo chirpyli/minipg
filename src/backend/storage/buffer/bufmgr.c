@@ -134,7 +134,6 @@ typedef struct SMgrSortArray
 bool		zero_damaged_pages = false;
 int			bgwriter_lru_maxpages = 100;
 double		bgwriter_lru_multiplier = 2.0;
-bool		track_io_timing = false;
 
 /*
  * How many buffers PrefetchBuffer callers should try to stay ahead of their
@@ -961,22 +960,7 @@ ReadBuffer_common(SMgrRelation smgr, char relpersistence, ForkNumber forkNum,
 		if (mode == RBM_ZERO_AND_LOCK || mode == RBM_ZERO_AND_CLEANUP_LOCK)
 			MemSet((char *) bufBlock, 0, BLCKSZ);
 		else
-		{
-			instr_time	io_start,
-						io_time;
-
-			if (track_io_timing)
-				INSTR_TIME_SET_CURRENT(io_start);
-
 			smgrread(smgr, forkNum, blockNum, (char *) bufBlock);
-
-			if (track_io_timing)
-			{
-				INSTR_TIME_SET_CURRENT(io_time);
-				INSTR_TIME_SUBTRACT(io_time, io_start);
-				INSTR_TIME_ADD(pgBufferUsage.blk_read_time, io_time);
-			}
-		}
 	}
 
 	/*
@@ -2798,8 +2782,6 @@ FlushBuffer(BufferDesc *buf, SMgrRelation reln)
 {
 	XLogRecPtr	recptr;
 	ErrorContextCallback errcallback;
-	instr_time	io_start,
-				io_time;
 	Block		bufBlock;
 	char	   *bufToWrite;
 	uint32		buf_state;
@@ -2863,21 +2845,11 @@ FlushBuffer(BufferDesc *buf, SMgrRelation reln)
 
 	bufToWrite = (char *) bufBlock;
 
-	if (track_io_timing)
-		INSTR_TIME_SET_CURRENT(io_start);
-
 	smgrwrite(reln,
 			  buf->tag.forkNum,
 			  buf->tag.blockNum,
 			  bufToWrite,
 			  false);
-
-	if (track_io_timing)
-	{
-		INSTR_TIME_SET_CURRENT(io_time);
-		INSTR_TIME_SUBTRACT(io_time, io_start);
-		INSTR_TIME_ADD(pgBufferUsage.blk_write_time, io_time);
-	}
 
 	pgBufferUsage.shared_blks_written++;
 

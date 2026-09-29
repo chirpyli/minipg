@@ -319,14 +319,6 @@
 # STATISTICS
 #------------------------------------------------------------------------------
 
-# - Query and Index Statistics Collector -
-
-#track_activities = on
-#track_activity_query_size = 1024	# (change requires restart)
-#track_io_timing = off
-#track_wal_io_timing = off
-
-
 # - Monitoring -
 
 #compute_query_id = auto

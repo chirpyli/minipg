@@ -332,8 +332,6 @@ heap_vacuum_rel(Relation rel, VacuumParams *params,
 	TransactionId new_frozen_xid;
 	MultiXactId new_min_multi;
 	ErrorContextCallback errcallback;
-	instr_time	startreadtime = pgBufferUsage.blk_read_time;
-	instr_time	startwritetime = pgBufferUsage.blk_write_time;
 	TransactionId OldestXmin;
 	TransactionId FreezeLimit;
 	MultiXactId MultiXactCutoff;
@@ -641,23 +639,6 @@ heap_vacuum_rel(Relation rel, VacuumParams *params,
 								 istat->pages_newly_deleted,
 								 istat->pages_deleted,
 								 istat->pages_free);
-			}
-			if (track_io_timing)
-			{
-				instr_time	read_delta;
-				instr_time	write_delta;
-				double		read_ms;
-				double		write_ms;
-
-				read_delta = pgBufferUsage.blk_read_time;
-				INSTR_TIME_SUBTRACT(read_delta, startreadtime);
-				read_ms = INSTR_TIME_GET_MILLISEC(read_delta);
-				write_delta = pgBufferUsage.blk_write_time;
-				INSTR_TIME_SUBTRACT(write_delta, startwritetime);
-				write_ms = INSTR_TIME_GET_MILLISEC(write_delta);
-
-				appendStringInfo(&buf, _("I/O timings: read: %.3f ms, write: %.3f ms\n"),
-								 read_ms, write_ms);
 			}
 			appendStringInfo(&buf, _("avg read rate: %.3f MB/s, avg write rate: %.3f MB/s\n"),
 							 read_rate, write_rate);

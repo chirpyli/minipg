@@ -14,9 +14,7 @@
  * lightweight as possible, they do not check if shared memory (MyProc
  * specifically, where the wait event is stored) is already available. Instead
  * we initially set my_wait_event_info to a process local variable, which then
- * is redirected to shared memory using pgstat_set_wait_event_storage(). For
- * the same reason pgstat_track_activities is not checked - the check adds
- * more work than it saves.
+ * is redirected to shared memory using pgstat_set_wait_event_storage().
  *
  * ----------
  */

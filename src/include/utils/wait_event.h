@@ -195,10 +195,6 @@ extern PGDLLIMPORT uint32 *my_wait_event_info;
  *	for wait event which is sufficient for current usage, 1-byte is
  *	reserved for future usage.
  *
- *	Historically we used to make this reporting conditional on
- *	pgstat_track_activities, but the check for that seems to add more cost
- *	than it saves.
- *
  *	my_wait_event_info initially points to local memory, making it safe to
  *	call this before MyProc has been initialized.
  * ----------

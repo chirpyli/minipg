@@ -33,7 +33,6 @@
 #include "miscadmin.h"
 #include "nodes/makefuncs.h"
 #include "pg_getopt.h"
-#include "utils/backend_status.h"
 #include "utils/wait_event.h"
 #include "postmaster/bgwriter.h"
 #include "postmaster/startup.h"
@@ -387,10 +386,6 @@ AuxiliaryProcessMain(int argc, char *argv[])
 		 * transactions (and, perhaps, other things in future).
 		 */
 		CreateAuxProcessResourceOwner();
-
-		/* Initialize backend status information */
-		pgstat_beinit();
-		pgstat_bestart();
 
 		/* register a before-shutdown callback for LWLock cleanup */
 		before_shmem_exit(ShutdownAuxiliaryProcess, 0);
