@@ -1,49 +1,38 @@
 /*-------------------------------------------------------------------------
  *
  * execExprInterp.c
- *	  Interpreted evaluation of an expression step list.
+ *	  表达式步骤列表的解释执行。
  *
- * This file provides either a "direct threaded" (for gcc, clang and
- * compatible) or a "switch threaded" (for all compilers) implementation of
- * expression evaluation.  The former is amongst the fastest known methods
- * of interpreting programs without resorting to assembly level work, or
- * just-in-time compilation, but it requires support for computed gotos.
- * The latter is amongst the fastest approaches doable in standard C.
+ * 本文件提供两种表达式求值实现：一种 "direct threaded"（适用于 gcc、clang
+ * 及兼容编译器），另一种 "switch threaded"（适用于所有编译器）。前者是已知
+ * 最快的程序解释方法之一，无需借助汇编层面的工作，也无需 just-in-time
+ * compilation，但它要求编译器支持 computed goto。后者则是在标准 C 中能够
+ * 做到的最快方案之一。
  *
- * In either case we use ExprEvalStep->opcode to dispatch to the code block
- * within ExecInterpExpr() that implements the specific opcode type.
+ * 无论采用哪种方式，我们都用 ExprEvalStep->opcode 来分派到 ExecInterpExpr()
+ * 内实现该特定 opcode 类型的代码块。
  *
- * Switch-threading uses a plain switch() statement to perform the
- * dispatch.  This has the advantages of being plain C and allowing the
- * compiler to warn if implementation of a specific opcode has been forgotten.
- * The disadvantage is that dispatches will, as commonly implemented by
- * compilers, happen from a single location, requiring more jumps and causing
- * bad branch prediction.
+ * Switch-threading 使用普通的 switch() 语句来执行分派。它的优点是纯粹的标准
+ * C，并且当某个 opcode 的实现被遗漏时编译器能够给出警告。其缺点是：正如编译器
+ * 通常实现的那样，分派会从同一个位置发生，需要更多跳转，并导致分支预测不佳。
  *
- * In direct threading, we use gcc's label-as-values extension - also adopted
- * by some other compilers - to replace ExprEvalStep->opcode with the address
- * of the block implementing the instruction. Dispatch to the next instruction
- * is done by a "computed goto".  This allows for better branch prediction
- * (as the jumps are happening from different locations) and fewer jumps
- * (as no preparatory jump to a common dispatch location is needed).
+ * Direct threading 则使用 gcc 的 label-as-values 扩展（也被其他一些编译器
+ * 采用），用实现该指令的代码块的地址来替换 ExprEvalStep->opcode。到下一个指令
+ * 的分派通过 "computed goto" 完成。这样能获得更好的分支预测（因为跳转发生在
+ * 不同的位置），并且跳转更少（因为不需要先跳到一个公共的分派位置）。
  *
- * When using direct threading, ExecReadyInterpretedExpr will replace
- * each step's opcode field with the address of the relevant code block and
- * ExprState->flags will contain EEO_FLAG_DIRECT_THREADED to remember that
- * that's been done.
+ * 使用 direct threading 时，ExecReadyInterpretedExpr 会把每个 step 的 opcode
+ * 字段替换为相关代码块的地址，并且 ExprState->flags 中会包含
+ * EEO_FLAG_DIRECT_THREADED，以记录这一替换已经完成。
  *
- * For very simple instructions the overhead of the full interpreter
- * "startup", as minimal as it is, is noticeable.  Therefore
- * ExecReadyInterpretedExpr will choose to implement certain simple
- * opcode patterns using special fast-path routines (ExecJust*).
+ * 对于非常简单的指令，即使是已经做到极简的完整解释器 "startup" 开销也会变得
+ * 明显。因此 ExecReadyInterpretedExpr 会选择用专门的 fast-path 例程
+ * （ExecJust*）来实现某些简单的 opcode 模式。
  *
- * Complex or uncommon instructions are not implemented in-line in
- * ExecInterpExpr(), rather we call out to a helper function appearing later
- * in this file.  For one reason, there'd not be a noticeable performance
- * benefit, but more importantly those complex routines are intended to be
- * shared between different expression evaluation approaches.  For instance
- * a JIT compiler would generate calls to them.  (This is why they are
- * exported rather than being "static" in this file.)
+ * 复杂或不常见的指令不会内联在 ExecInterpExpr() 中实现，而是调用本文件中靠后
+ * 出现的辅助函数。原因之一是内联不会有可见的性能收益；更重要的是，那些复杂例程
+ * 本意是在不同的表达式求值方式之间共享。例如 JIT compiler 就会生成对它们的调用。
+ *（这也是它们被导出、而非在本文件中作为 "static" 的原因。）
  *
  *
  * Portions Copyright (c) 1996-2021, PostgreSQL Global Development Group

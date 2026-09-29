@@ -28,36 +28,33 @@ typedef MinimalTupleData *MinimalTuple;
 
 
 /*
- * HeapTupleData is an in-memory data structure that points to a tuple.
+ * HeapTupleData 是一个指向 tuple 的内存数据结构。
  *
- * There are several ways in which this data structure is used:
+ * 该数据结构有几种使用方式：
  *
- * * Pointer to a tuple in a disk buffer: t_data points directly into the
- *	 buffer (which the code had better be holding a pin on, but this is not
- *	 reflected in HeapTupleData itself).
+ * * 指向 disk buffer 中的 tuple：t_data 直接指向 buffer 内部
+ *	 （代码最好已经在该 buffer 上持有了 pin，但这并不会体现在
+ *	 HeapTupleData 本身中）。
  *
- * * Pointer to nothing: t_data is NULL.  This is used as a failure indication
- *	 in some functions.
+ * * 指向空：t_data 为 NULL。在某些函数中用作失败指示。
  *
- * * Part of a palloc'd tuple: the HeapTupleData itself and the tuple
- *	 form a single palloc'd chunk.  t_data points to the memory location
- *	 immediately following the HeapTupleData struct (at offset HEAPTUPLESIZE).
- *	 This is the output format of heap_form_tuple and related routines.
+ * * 作为 palloc'd tuple 的一部分：HeapTupleData 自身与 tuple
+ *	 共同构成单个 palloc'd chunk。t_data 指向紧随 HeapTupleData 结构体
+ *	 之后的内存位置（偏移量为 HEAPTUPLESIZE）。
+ *	 这是 heap_form_tuple 及相关例程的输出格式。
  *
- * * Separately allocated tuple: t_data points to a palloc'd chunk that
- *	 is not adjacent to the HeapTupleData.  (This case is deprecated since
- *	 it's difficult to tell apart from case #1.  It should be used only in
- *	 limited contexts where the code knows that case #1 will never apply.)
+ * * 单独分配的 tuple：t_data 指向一个 palloc'd chunk，且该 chunk
+ *	 与 HeapTupleData 不相邻。（这种情况已被废弃，因为很难与第 1 种
+ *	 情况区分。它只应用于代码明确知道第 1 种情况不会出现的有限场景。）
  *
- * * Separately allocated minimal tuple: t_data points MINIMAL_TUPLE_OFFSET
- *	 bytes before the start of a MinimalTuple.  As with the previous case,
- *	 this can't be told apart from case #1 by inspection; code setting up
- *	 or destroying this representation has to know what it's doing.
+ * * 单独分配的 minimal tuple：t_data 指向 MinimalTuple 起始位置之前
+ *	 MINIMAL_TUPLE_OFFSET 字节处。与前一种情况一样，通过检查无法
+ *	 与第 1 种情况区分；负责建立或销毁此表示的代码必须清楚它在做什么。
  *
- * t_len should always be valid, except in the pointer-to-nothing case.
- * t_self and t_tableOid should be valid if the HeapTupleData points to
- * a disk buffer, or if it represents a copy of a tuple on disk.  They
- * should be explicitly set invalid in manufactured tuples.
+ * 除指向空的情况外，t_len 应始终有效。
+ * 如果 HeapTupleData 指向 disk buffer，或表示磁盘上 tuple 的副本，
+ * 则 t_self 与 t_tableOid 应有效。在人工构造的 tuple 中，
+ * 它们应被显式置为无效。
  */
 typedef struct HeapTupleData
 {

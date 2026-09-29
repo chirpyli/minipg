@@ -18,20 +18,18 @@
 #include "storage/off.h"
 
 /*
- * ItemPointer:
+ * ItemPointer：
  *
- * This is a pointer to an item within a disk page of a known file
- * (for example, a cross-link from an index to its parent table).
- * ip_blkid tells us which block, ip_posid tells us which entry in
- * the linp (ItemIdData) array we want.
+ * 这是一个指向已知文件某个 disk page 中某个 item 的指针
+ * （例如，从 index 到其父表的一条 cross-link）。
+ * ip_blkid 告诉我们哪个 block，ip_posid 告诉我们想要 linp
+ * (ItemIdData) 数组中的哪一项。
  *
- * Note: because there is an item pointer in each tuple header and index
- * tuple header on disk, it's very important not to waste space with
- * structure padding bytes.  The struct is designed to be six bytes long
- * (it contains three int16 fields) but a few compilers will pad it to
- * eight bytes unless coerced.  We apply appropriate persuasion where
- * possible.  If your compiler can't be made to play along, you'll waste
- * lots of space.
+ * 注意：由于磁盘上每个 tuple header 和 index tuple header 中都有一个
+ * item pointer，因此不把空间浪费在结构体 padding bytes 上非常重要。
+ * 该 struct 被设计为六个字节长（它包含三个 int16 字段），但少数编译器
+ * 会在未强制处理时将其填充到八个字节。我们在可能的情况下施加适当的
+ * "说服"。如果你的编译器无法配合，你将浪费大量空间。
  */
 typedef struct ItemPointerData
 {
