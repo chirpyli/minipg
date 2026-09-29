@@ -298,17 +298,12 @@ _outPlannedStmt(StringInfo str, const PlannedStmt *node)
 
 	WRITE_ENUM_FIELD(commandType, CmdType);
 	WRITE_BOOL_FIELD(canSetTag);
-	WRITE_BOOL_FIELD(transientPlan);
-	WRITE_BOOL_FIELD(dependsOnRole);
 	WRITE_NODE_FIELD(planTree);
 	WRITE_NODE_FIELD(rtable);
-	WRITE_NODE_FIELD(resultRelations);
 	WRITE_NODE_FIELD(appendRelations);
 	WRITE_NODE_FIELD(subplans);
 	WRITE_BITMAPSET_FIELD(rewindPlanIDs);
 	WRITE_NODE_FIELD(rowMarks);
-	WRITE_NODE_FIELD(relationOids);
-	WRITE_NODE_FIELD(invalItems);
 	WRITE_NODE_FIELD(paramExecTypes);
 	WRITE_NODE_FIELD(utilityStmt);
 	WRITE_LOCATION_FIELD(stmt_location);

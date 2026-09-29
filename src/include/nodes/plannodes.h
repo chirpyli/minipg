@@ -44,19 +44,12 @@ typedef struct PlannedStmt
 	NodeTag		type;
 
 	CmdType		commandType;	/* select|insert|update|delete|utility */
-
+	// 这条语句是不是"本次客户端命令的主语句（primary statement）"——由它负责向客户端返回结果集并设置 CommandTag / 行数统计；其余语句只作为副作用执行，不产生命令标签。
 	bool		canSetTag;		/* do I set the command result tag? */
-
-	bool		transientPlan;	/* redo plan when TransactionXmin changes? */
-
-	bool		dependsOnRole;	/* is plan specific to current role? */
 
 	struct Plan *planTree;		/* tree of Plan nodes */
 
 	List	   *rtable;			/* list of RangeTblEntry nodes */
-
-	/* rtable indexes of target relations for INSERT/UPDATE/DELETE */
-	List	   *resultRelations;	/* integer list of RT indexes, or NIL */
 
 	List	   *appendRelations;	/* list of AppendRelInfo nodes */
 
@@ -66,10 +59,6 @@ typedef struct PlannedStmt
 	Bitmapset  *rewindPlanIDs;	/* indices of subplans that require REWIND */
 
 	List	   *rowMarks;		/* a list of PlanRowMark's */
-
-	List	   *relationOids;	/* OIDs of relations the plan depends on */
-
-	List	   *invalItems;		/* other dependencies, as PlanInvalItems */
 
 	List	   *paramExecTypes; /* type OIDs for PARAM_EXEC Params */
 

@@ -83,17 +83,12 @@ _copyPlannedStmt(const PlannedStmt *from)
 
 	COPY_SCALAR_FIELD(commandType);
 	COPY_SCALAR_FIELD(canSetTag);
-	COPY_SCALAR_FIELD(transientPlan);
-	COPY_SCALAR_FIELD(dependsOnRole);
 	COPY_NODE_FIELD(planTree);
 	COPY_NODE_FIELD(rtable);
-	COPY_NODE_FIELD(resultRelations);
 	COPY_NODE_FIELD(appendRelations);
 	COPY_NODE_FIELD(subplans);
 	COPY_BITMAPSET_FIELD(rewindPlanIDs);
 	COPY_NODE_FIELD(rowMarks);
-	COPY_NODE_FIELD(relationOids);
-	COPY_NODE_FIELD(invalItems);
 	COPY_NODE_FIELD(paramExecTypes);
 	COPY_NODE_FIELD(utilityStmt);
 	COPY_LOCATION_FIELD(stmt_location);

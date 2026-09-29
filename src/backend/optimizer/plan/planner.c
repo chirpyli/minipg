@@ -181,17 +181,12 @@ standard_planner(Query *parse, const char *query_string, int cursorOptions,
 
 	result->commandType = parse->commandType;
 	result->canSetTag = parse->canSetTag;
-	result->transientPlan = glob->transientPlan;
-	result->dependsOnRole = glob->dependsOnRole;
 	result->planTree = top_plan;
 	result->rtable = glob->finalrtable;
-	result->resultRelations = glob->resultRelations;
 	result->appendRelations = glob->appendRelations;
 	result->subplans = glob->subplans;
 	result->rewindPlanIDs = glob->rewindPlanIDs;
 	result->rowMarks = glob->finalrowmarks;
-	result->relationOids = glob->relationOids;
-	result->invalItems = glob->invalItems;
 	result->paramExecTypes = glob->paramExecTypes;
 	/* utilityStmt should be null, but we might as well copy it */
 	result->utilityStmt = parse->utilityStmt;
