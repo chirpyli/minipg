@@ -1,11 +1,10 @@
 /*-------------------------------------------------------------------------
  *
  * execProcnode.c
- *	 contains dispatch functions which call the appropriate "initialize",
- *	 "get a tuple", and "cleanup" routines for the given node type.
- *	 If the node has children, then it will presumably call ExecInitNode,
- *	 ExecProcNode, or ExecEndNode on its subnodes and do the appropriate
- *	 processing.
+ *	 包含若干派发（dispatch）函数，它们针对给定的节点类型调用相应的
+ *	 “初始化”、“获取元组”和“清理”例程。
+ *	 如果节点有子节点，则它通常会对其子节点调用 ExecInitNode、
+ *	 ExecProcNode 或 ExecEndNode，并完成相应的处理。
  *
  * Portions Copyright (c) 1996-2021, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
@@ -17,21 +16,20 @@
  *-------------------------------------------------------------------------
  */
 /*
- *	 NOTES
- *		This used to be three files.  It is now all combined into
- *		one file so that it is easier to keep the dispatch routines
- *		in sync when new nodes are added.
+ *	 说明
+ *		这里原本是三个文件。现在合并为一个文件，以便在新增节点时
+ *		更容易保持这些派发例程的同步。
  *
- *	 EXAMPLE
- *		Suppose we want the age of the manager of the shoe department and
- *		the number of employees in that department.  So we have the query:
+ *	 示例
+ *		假设我们想要鞋类部门经理的年龄以及该部门的员工人数。
+ *		于是有下面的查询：
  *
  *				select DEPT.no_emps, EMP.age
  *				from DEPT, EMP
  *				where EMP.name = DEPT.mgr and
  *					  DEPT.name = "shoe"
  *
- *		Suppose the planner gives us the following plan:
+ *		假设优化器给出的执行计划如下：
  *
  *						Nest Loop (DEPT.mgr = EMP.name)
  *						/		\
@@ -40,35 +38,33 @@
  *					DEPT		  EMP
  *				(name = "shoe")
  *
- *		ExecutorStart() is called first.
- *		It calls InitPlan() which calls ExecInitNode() on
- *		the root of the plan -- the nest loop node.
+ *		首先调用 ExecutorStart()。
+ *		它调用 InitPlan()，后者对计划的根节点——nest loop 节点
+ *		调用 ExecInitNode()。
  *
- *	  * ExecInitNode() notices that it is looking at a nest loop and
- *		as the code below demonstrates, it calls ExecInitNestLoop().
- *		Eventually this calls ExecInitNode() on the right and left subplans
- *		and so forth until the entire plan is initialized.  The result
- *		of ExecInitNode() is a plan state tree built with the same structure
- *		as the underlying plan tree.
+ *	  * ExecInitNode() 发现当前处理的是一个 nest loop，
+ *		如下面的代码所示，它调用 ExecInitNestLoop()。
+ *		后者最终会对右、左子计划调用 ExecInitNode()，
+ *		如此递归下去，直到整个计划完成初始化。
+ *		ExecInitNode() 的结果是一棵计划状态树（plan state tree），
+ *		其结构与底层的计划树完全相同。
  *
- *	  * Then when ExecutorRun() is called, it calls ExecutePlan() which calls
- *		ExecProcNode() repeatedly on the top node of the plan state tree.
- *		Each time this happens, ExecProcNode() will end up calling
- *		ExecNestLoop(), which calls ExecProcNode() on its subplans.
- *		Each of these subplans is a sequential scan so ExecSeqScan() is
- *		called.  The slots returned by ExecSeqScan() may contain
- *		tuples which contain the attributes ExecNestLoop() uses to
- *		form the tuples it returns.
+ *	  * 之后当 ExecutorRun() 被调用时，它调用 ExecutePlan()，
+ *		后者在计划状态树的顶层节点上反复调用 ExecProcNode()。
+ *		每次调用时，ExecProcNode() 最终会调用 ExecNestLoop()，
+ *		而 ExecNestLoop() 又会对其子计划调用 ExecProcNode()。
+ *		这些子计划都是顺序扫描，因此会调用 ExecSeqScan()。
+ *		ExecSeqScan() 返回的 slot 中可能包含元组，这些元组含有
+ *		ExecNestLoop() 用来构造其返回元组的属性。
  *
- *	  * Eventually ExecSeqScan() stops returning tuples and the nest
- *		loop join ends.  Lastly, ExecutorEnd() calls ExecEndNode() which
- *		calls ExecEndNestLoop() which in turn calls ExecEndNode() on
- *		its subplans which result in ExecEndSeqScan().
+ *	  * 最终 ExecSeqScan() 不再返回元组，nest loop join 结束。
+ *		最后，ExecutorEnd() 调用 ExecEndNode()，后者调用
+ *		ExecEndNestLoop()，而 ExecEndNestLoop() 又对其子计划调用
+ *		ExecEndNode()，从而执行 ExecEndSeqScan()。
  *
- *		This should show how the executor works by having
- *		ExecInitNode(), ExecProcNode() and ExecEndNode() dispatch
- *		their work to the appropriate node support routines which may
- *		in turn call these routines themselves on their subplans.
+ *		这应当能展示执行器的工作方式：由 ExecInitNode()、ExecProcNode()
+ *		和 ExecEndNode() 将各自的工作派发给相应的节点支持例程，
+ *		而这些例程又可能反过来对它们各自的子计划调用这些例程。
  */
 #include "postgres.h"
 

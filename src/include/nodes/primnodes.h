@@ -1,10 +1,9 @@
 /*-------------------------------------------------------------------------
  *
  * primnodes.h
- *	  Definitions for "primitive" node types, those that are used in more
- *	  than one of the parse/plan/execute stages of the query pipeline.
- *	  Currently, these are mostly nodes for executable expressions
- *	  and join trees.
+ *	  “原始（primitive）”节点类型的定义，这些节点用于查询流水线的
+ *	  解析/计划/执行等多个阶段中。目前，它们大多是可执行表达式
+ *	  和连接树（join tree）所用的节点。
  *
  *
  * Portions Copyright (c) 1996-2021, PostgreSQL Global Development Group
