@@ -1,27 +1,23 @@
 /*-------------------------------------------------------------------------
  *
  * clog.c
- *		PostgreSQL transaction-commit-log manager
+ *		PostgreSQL transaction-commit-log 管理器
  *
- * This module replaces the old "pg_log" access code, which treated pg_log
- * essentially like a relation, in that it went through the regular buffer
- * manager.  The problem with that was that there wasn't any good way to
- * recycle storage space for transactions so old that they'll never be
- * looked up again.  Now we use specialized access code so that the commit
- * log can be broken into relatively small, independent segments.
+ * 本模块取代了旧的 "pg_log" 访问代码，后者基本上把 pg_log 当作一个
+ * relation 来处理，因为它要经过常规的 buffer manager。这样做的问题在于，
+ * 对于那些旧到永远不会再被查询的事务，没有什么好办法来回收其存储空间。
+ * 现在我们使用专门的访问代码，从而可以把 commit log 切分成相对较小的、
+ * 相互独立的 segment。
  *
- * XLOG interactions: this module generates an XLOG record whenever a new
- * CLOG page is initialized to zeroes.  Other writes of CLOG come from
- * recording of transaction commit or abort in xact.c, which generates its
- * own XLOG records for these events and will re-perform the status update
- * on redo; so we need make no additional XLOG entry here.  For synchronous
- * transaction commits, the XLOG is guaranteed flushed through the XLOG commit
- * record before we are called to log a commit, so the WAL rule "write xlog
- * before data" is satisfied automatically.  However, for async commits we
- * must track the latest LSN affecting each CLOG page, so that we can flush
- * XLOG that far and satisfy the WAL rule.  We don't have to worry about this
- * for aborts (whether sync or async), since the post-crash assumption would
- * be that such transactions failed anyway.
+ * 与 XLOG 的交互：每当一个新的 CLOG page 被初始化为全零时，本模块都会生成
+ * 一条 XLOG 记录。CLOG 的其他写入来自 xact.c 中对事务 commit 或 abort 的
+ * 记录，后者会为这些事件生成自己的 XLOG 记录，并会在 redo 时重新执行状态
+ * 更新；因此我们无需在这里添加额外的 XLOG 条目。对于同步事务提交，在我们被
+ * 调用来记录 commit 之前，XLOG 保证已经 flush 到那条 XLOG commit 记录，
+ * 因此 WAL 规则 "write xlog before data" 自动得到满足。然而，对于异步提交，
+ * 我们必须跟踪影响每个 CLOG page 的最新 LSN，以便把 XLOG flush 到那里，
+ * 从而满足 WAL 规则。对于 abort（无论同步还是异步），我们不必操心这一点，
+ * 因为崩溃后的假设本来就是这类事务已经失败。
  *
  * Portions Copyright (c) 1996-2021, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
