@@ -1,33 +1,31 @@
 /*-------------------------------------------------------------------------
  *
  * proc.c
- *	  routines to manage per-process shared memory data structure
+ *	  管理每进程共享内存数据结构的例程
  *
- * Portions Copyright (c) 1996-2021, PostgreSQL Global Development Group
- * Portions Copyright (c) 1994, Regents of the University of California
+ * 版权 (c) 1996-2021, PostgreSQL 全球开发组
+ * 版权 (c) 1994, 加州大学董事会
  *
  *
- * IDENTIFICATION
+ * 标识
  *	  src/backend/storage/lmgr/proc.c
  *
  *-------------------------------------------------------------------------
  */
 /*
- * Interface (a):
- *		ProcSleep(), ProcWakeup(),
- *		ProcQueueAlloc() -- create a shm queue for sleeping processes
- *		ProcQueueInit() -- create a queue without allocing memory
+ * 接口 (a):
+ *		ProcSleep()、ProcWakeup()、
+ *		ProcQueueAlloc() —— 为休眠进程创建一个共享内存队列
+ *		ProcQueueInit() —— 创建一个不分配内存的队列
  *
- * Waiting for a lock causes the backend to be put to sleep.  Whoever releases
- * the lock wakes the process up again (and gives it an error code so it knows
- * whether it was awoken on an error condition).
+ * 等待锁会导致后端进程进入休眠。释放锁的进程会再次唤醒该进程
+ * （并给它一个错误码，以便它知道是否是在错误条件下被唤醒的）。
  *
- * Interface (b):
+ * 接口 (b):
  *
- * ProcReleaseLocks -- frees the locks associated with current transaction
+ * ProcReleaseLocks —— 释放当前事务关联的锁
  *
- * ProcKill -- destroys the shared memory state (and locks)
- * associated with the process.
+ * ProcKill —— 销毁与进程关联的共享内存状态（以及锁）。
  */
 #include "postgres.h"
 
@@ -61,11 +59,10 @@ bool		log_lock_waits = false;
 PGPROC	   *MyProc = NULL; // 进程本地的全局指针
 
 /*
- * This spinlock protects the freelist of recycled PGPROC structures.
- * We cannot use an LWLock because the LWLock manager depends on already
- * having a PGPROC and a wait semaphore!  But these structures are touched
- * relatively infrequently (only at backend startup or shutdown) and not for
- * very long, so a spinlock is okay.
+ * 该自旋锁保护可回收 PGPROC 结构的空闲链表。
+ * 我们不能使用 LWLock，因为 LWLock 管理器依赖于已经持有一个 PGPROC
+ * 和一个等待信号量！但这些结构被访问得相对不频繁（仅在后端启动或关闭时），
+ * 且持有时间不长，因此使用自旋锁是可以的。
  */
 static slock_t *ProcStructLock = NULL;
 
@@ -394,11 +391,11 @@ InitProcess(void)
 }
 
 /*
- * InitProcessPhase2 -- make MyProc visible in the shared ProcArray.
+ * InitProcessPhase2 -- 让 MyProc 在共享的 ProcArray 中可见。
  *
- * This is separate from InitProcess because we can't acquire LWLocks until
- * we've created a PGPROC.  ProcArrayAdd won't work until after we've done
- * CreateSharedMemoryAndSemaphores.
+ * 该过程与 InitProcess 分开，因为在我们创建出 PGPROC 之前无法获取 LWLock。
+ * 而 ProcArrayAdd 要等到我们执行完 CreateSharedMemoryAndSemaphores 之后才能
+ * 正常工作。
  */
 void
 InitProcessPhase2(void)

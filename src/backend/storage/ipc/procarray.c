@@ -1,39 +1,35 @@
 /*-------------------------------------------------------------------------
  *
  * procarray.c
- *	  POSTGRES process array code.
+ *	  POSTGRES 进程数组代码。
  *
  *
- * This module maintains arrays of PGPROC substructures, as well as associated
- * arrays in ProcGlobal, for all active backends.  Although there are several
- * uses for this, the principal one is as a means of determining the set of
- * currently running transactions.
+ * 本模块为所有活跃后端维护 PGPROC 子结构的数组，以及 ProcGlobal 中
+ * 相关联的数组。虽然它有几个用途，但最主要的用途是用于确定当前正在
+ * 运行的事务集合。
  *
- * Because of various subtle race conditions it is critical that a backend
- * hold the correct locks while setting or clearing its xid (in
- * ProcGlobal->xids[]/MyProc->xid).  See notes in
- * src/backend/access/transam/README.
+ * 由于存在各种微妙的竞态条件，后端在设置或清除自己的 xid（位于
+ * ProcGlobal->xids[]/MyProc->xid）时必须持有正确的锁，这一点至关重要。
+ * 参见 src/backend/access/transam/README 中的说明。
  *
- * During hot standby, we also keep a list of XIDs representing transactions
- * that are known to be running on the primary (or more precisely, were running
- * as of the current point in the WAL stream).  This list is kept in the
- * KnownAssignedXids array, and is updated by watching the sequence of
- * arriving XIDs.  This is necessary because if we leave those XIDs out of
- * snapshots taken for standby queries, then they will appear to be already
- * complete, leading to MVCC failures.  Note that in hot standby, the PGPROC
- * array represents standby processes, which by definition are not running
- * transactions that have XIDs.
+ * 在热备（hot standby）期间，我们还会维护一个 XID 列表，表示已知正在
+ * 主库上运行的事务（更准确地说，是在当前 WAL 流位置时正在运行的事务）。
+ * 该列表保存在 KnownAssignedXids 数组中，并通过观察陆续到达的 XID
+ * 序列来更新。这是必要的，因为如果我们把这些 XID 排除在为备库查询
+ * 拍摄的快照之外，那么它们就会显得已经完成，从而导致 MVCC 失败。
+ * 注意，在热备中，PGPROC 数组表示的是备库进程，而按定义这些进程
+ * 并不运行带有 XID 的事务。
  *
- * It is perhaps possible for a backend on the primary to terminate without
- * writing an abort record for its transaction.  While that shouldn't really
- * happen, it would tie up KnownAssignedXids indefinitely, so we protect
- * ourselves by pruning the array when a valid list of running XIDs arrives.
+ * 主库上的后端有可能在没有为其事务写入中止记录的情况下就终止了。
+ * 虽然这不应真的发生，但它会无限期地占用 KnownAssignedXids，因此
+ * 当收到一个有效的正在运行的 XID 列表时，我们通过修剪该数组来保护
+ * 自己。
  *
- * Portions Copyright (c) 1996-2021, PostgreSQL Global Development Group
- * Portions Copyright (c) 1994, Regents of the University of California
+ * 版权 (c) 1996-2021, PostgreSQL 全球开发组
+ * 版权 (c) 1994, 加州大学董事会
  *
  *
- * IDENTIFICATION
+ * 标识
  *	  src/backend/storage/ipc/procarray.c
  *
  *-------------------------------------------------------------------------
@@ -70,76 +66,65 @@ typedef struct ProcArrayStruct
 } ProcArrayStruct;
 
 /*
- * State for the GlobalVisTest* family of functions. Those functions can
- * e.g. be used to decide if a deleted row can be removed without violating
- * MVCC semantics: If the deleted row's xmax is not considered to be running
- * by anyone, the row can be removed.
+ * GlobalVisTest* 系列函数的状态。这些函数例如可用于判断一个已删除的行
+ * 是否可以在不违反 MVCC 语义的前提下被移除：如果该已删除行的 xmax 不
+ * 被任何人视为正在运行，那么该行就可以被移除。
  *
- * To avoid slowing down GetSnapshotData(), we don't calculate a precise
- * cutoff XID while building a snapshot (looking at the frequently changing
- * xmins scales badly). Instead we compute two boundaries while building the
- * snapshot:
+ * 为了避免拖慢 GetSnapshotData()，我们在构建快照时并不计算一个精确的
+ * 截止 XID（观察频繁变化的 xmin 伸缩性很差）。相反，我们在构建快照时
+ * 计算两个边界：
  *
- * 1) definitely_needed, indicating that rows deleted by XIDs >=
- *    definitely_needed are definitely still visible.
+ * 1) definitely_needed，表示被 XID >= definitely_needed 删除的行必定
+ *    仍然可见。
  *
- * 2) maybe_needed, indicating that rows deleted by XIDs < maybe_needed can
- *    definitely be removed
+ * 2) maybe_needed，表示被 XID < maybe_needed 删除的行必定可以被移除。
  *
- * When testing an XID that falls in between the two (i.e. XID >= maybe_needed
- * && XID < definitely_needed), the boundaries can be recomputed (using
- * ComputeXidHorizons()) to get a more accurate answer. This is cheaper than
- * maintaining an accurate value all the time.
+ * 当测试一个落在两者之间的 XID 时（即 XID >= maybe_needed &&
+ * XID < definitely_needed），可以重新计算边界（使用 ComputeXidHorizons()）
+ * 以获得更准确的答案。这比始终维护一个精确值更廉价。
  *
- * As it is not cheap to compute accurate boundaries, we limit the number of
- * times that happens in short succession. See GlobalVisTestShouldUpdate().
+ * 由于计算准确的边界并不廉价，我们限制在短时间内重复计算的次数。
+ * 参见 GlobalVisTestShouldUpdate()。
  *
  *
- * There are three backend lifetime instances of this struct, optimized for
- * different types of relations. As e.g. a normal user defined table in one
- * database is inaccessible to backends connected to another database, a test
- * specific to a relation can be more aggressive than a test for a shared
- * relation.  Currently we track four different states:
+ * 该结构体存在三个后端生存期内的实例，针对不同类型的关系进行了优化。
+ * 例如，某个数据库中的普通用户定义表对于连接到另一个数据库的后端是
+ * 不可访问的，因此针对某个关系的测试可以比针对共享关系的测试更激进。
+ * 目前我们跟踪四种不同的状态：
  *
- * 1) GlobalVisSharedRels, which only considers an XID's
- *    effects visible-to-everyone if neither snapshots in any database, nor a
- *    replication slot's xmin, nor a replication slot's catalog_xmin might
- *    still consider XID as running.
+ * 1) GlobalVisSharedRels，只有当任何数据库中的快照、复制槽的 xmin 以及
+ *    复制槽的 catalog_xmin 都不再把某个 XID 视为正在运行时，才认为该
+ *    XID 的影响对所有进程可见。
  *
- * 2) GlobalVisCatalogRels, which only considers an XID's
- *    effects visible-to-everyone if neither snapshots in the current
- *    database, nor a replication slot's xmin, nor a replication slot's
- *    catalog_xmin might still consider XID as running.
+ * 2) GlobalVisCatalogRels，只有当当前数据库中的快照、复制槽的 xmin 以及
+ *    复制槽的 catalog_xmin 都不再把某个 XID 视为正在运行时，才认为该
+ *    XID 的影响对所有进程可见。
  *
- *    I.e. the difference to GlobalVisSharedRels is that
- *    snapshot in other databases are ignored.
+ *    也就是说，它与 GlobalVisSharedRels 的区别在于忽略了其他数据库中的
+ *    快照。
  *
- * 3) GlobalVisDataRels, which only considers an XID's
- *    effects visible-to-everyone if neither snapshots in the current
- *    database, nor a replication slot's xmin consider XID as running.
+ * 3) GlobalVisDataRels，只有当当前数据库中的快照和复制槽的 xmin 都不再
+ *    把某个 XID 视为正在运行时，才认为该 XID 的影响对所有进程可见。
  *
- *    I.e. the difference to GlobalVisCatalogRels is that
- *    replication slot's catalog_xmin is not taken into account.
+ *    也就是说，它与 GlobalVisCatalogRels 的区别在于不考虑复制槽的
+ *    catalog_xmin。
  *
- * 4) GlobalVisTempRels, which only considers the current session, as temp
- *    tables are not visible to other sessions.
+ * 4) GlobalVisTempRels，只考虑当前会话，因为临时表对其他会话不可见。
  *
- * GlobalVisTestFor(relation) returns the appropriate state
- * for the relation.
+ * GlobalVisTestFor(relation) 会为该关系返回合适的状态。
  *
- * The boundaries are FullTransactionIds instead of TransactionIds to avoid
- * wraparound dangers. There e.g. would otherwise exist no procarray state to
- * prevent maybe_needed to become old enough after the GetSnapshotData()
- * call.
+ * 边界使用 FullTransactionId 而非 TransactionId，以避免回卷（wraparound）
+ * 危险。例如，否则在 GetSnapshotData() 调用之后就不存在任何 procarray
+ * 状态来阻止 maybe_needed 变得足够旧。
  *
- * The typedef is in the header.
+ * typedef 位于头文件中。
  */
 struct GlobalVisState
 {
-	/* XIDs >= are considered running by some backend */
+	/* XID >= 该值的被视为被某个后端视为正在运行 */
 	FullTransactionId definitely_needed;
 
-	/* XIDs < are not considered to be running by any backend */
+	/* XID < 该值的被视为不被任何后端视为正在运行 */
 	FullTransactionId maybe_needed;
 };
 
@@ -754,30 +739,29 @@ MaintainLatestCompletedXid(TransactionId latestXid)
 
 
 /*
- * TransactionIdIsInProgress -- is given transaction running in some backend
+ * TransactionIdIsInProgress —— 判断给定事务是否正在某个后端中运行
  *
- * Aside from some shortcuts such as checking RecentXmin and our own Xid,
- * there are four possibilities for finding a running transaction:
+ * 除了一些快捷判断（例如检查 RecentXmin 和我们自己的 Xid）之外，
+ * 查找正在运行的事务有四种可能的方式：
  *
- * 1. The given Xid is a main transaction Id.  We will find this out cheaply
- * by looking at ProcGlobal->xids.
+ * 1. 给定的 Xid 是一个主事务 Id。我们可以通过查看 ProcGlobal->xids
+ * 廉价地发现这一点。
  *
- * 2. The given Xid is one of the cached subxact Xids in the PGPROC array.
- * We can find this out cheaply too.
+ * 2. 给定的 Xid 是 PGPROC 数组中缓存的某个子事务 Xid。同样可以廉价地
+ * 发现这一点。
  *
- * 3. In Hot Standby mode, we must search the KnownAssignedXids list to see
- * if the Xid is running on the primary.
+ * 3. 在热备（Hot Standby）模式下，我们必须搜索 KnownAssignedXids 列表，
+ * 以判断该 Xid 是否正在主库上运行。
  *
- * 4. Search the SubTrans tree to find the Xid's topmost parent, and then see
- * if that is running according to ProcGlobal->xids[] or KnownAssignedXids.
- * This is the slowest way, but sadly it has to be done always if the others
- * failed, unless we see that the cached subxact sets are complete (none have
- * overflowed).
+ * 4. 搜索 SubTrans 树以找到该 Xid 最顶层的父事务，然后根据
+ * ProcGlobal->xids[] 或 KnownAssignedXids 判断它是否正在运行。
+ * 这是最慢的方式，但遗憾的是，如果其他方式都失败了就必须这样做，
+ * 除非我们看到缓存的子事务集合是完整的（没有发生溢出）。
  *
- * ProcArrayLock has to be held while we do 1, 2, 3.  If we save the top Xids
- * while doing 1 and 3, we can release the ProcArrayLock while we do 4.
- * This buys back some concurrency (and we can't retrieve the main Xids from
- * ProcGlobal->xids[] again anyway; see GetNewTransactionId).
+ * 在执行 1、2、3 时必须持有 ProcArrayLock。如果我们在执行 1 和 3 时
+ * 保存了顶层 Xid，那么在执行 4 时就可以释放 ProcArrayLock。
+ * 这样可以换回一些并发性（而且无论如何我们也不能再次从
+ * ProcGlobal->xids[] 中取回主 Xid；参见 GetNewTransactionId）。
  */
 bool
 TransactionIdIsInProgress(TransactionId xid)
