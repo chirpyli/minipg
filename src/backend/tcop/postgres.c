@@ -541,9 +541,6 @@ pg_analyze_and_rewrite_params(RawStmt *parsetree,
 
 	query = transformTopLevelStmt(pstate, parsetree);
 
-	if (IsQueryIdEnabled())
-		JumbleQuery(query, query_string);
-
 	free_parsestate(pstate);
 
 	/*
@@ -614,7 +611,6 @@ pg_plan_queries(List *querytrees, const char *query_string, int cursorOptions,
 			stmt->utilityStmt = query->utilityStmt;
 			stmt->stmt_location = query->stmt_location;
 			stmt->stmt_len = query->stmt_len;
-			stmt->queryId = query->queryId;
 		}
 		else
 		{

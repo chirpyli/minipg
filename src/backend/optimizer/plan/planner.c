@@ -181,7 +181,6 @@ standard_planner(Query *parse, const char *query_string, int cursorOptions,
 	result = makeNode(PlannedStmt);
 
 	result->commandType = parse->commandType;
-	result->queryId = parse->queryId;
 	result->canSetTag = parse->canSetTag;
 	result->transientPlan = glob->transientPlan;
 	result->dependsOnRole = glob->dependsOnRole;

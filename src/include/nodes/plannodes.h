@@ -36,7 +36,7 @@
  * 为了简化 API，我们也把工具语句（utility statement）包装进 PlannedStmt
  * 节点；在这种情况下 commandType == CMD_UTILITY，语句本身存放在
  * utilityStmt 字段中，结构体的其余部分基本上是占位的。
- *（我们确实会用到 canSetTag、stmt_location、stmt_len，可能还有 queryId。）
+ *（我们确实会用到 canSetTag、stmt_location、stmt_len。）
  * ----------------
  */
 typedef struct PlannedStmt
@@ -44,8 +44,6 @@ typedef struct PlannedStmt
 	NodeTag		type;
 
 	CmdType		commandType;	/* select|insert|update|delete|utility */
-
-	uint64		queryId;		/* query identifier (copied from Query) */
 
 	bool		hasModifyingCTE;	/* has insert|update|delete in WITH? */
 

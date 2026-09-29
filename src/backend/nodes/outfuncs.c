@@ -297,7 +297,6 @@ _outPlannedStmt(StringInfo str, const PlannedStmt *node)
 	WRITE_NODE_TYPE("PLANNEDSTMT");
 
 	WRITE_ENUM_FIELD(commandType, CmdType);
-	WRITE_UINT64_FIELD(queryId);
 	WRITE_BOOL_FIELD(hasModifyingCTE);
 	WRITE_BOOL_FIELD(canSetTag);
 	WRITE_BOOL_FIELD(transientPlan);
@@ -1907,7 +1906,6 @@ _outQuery(StringInfo str, const Query *node)
 
 	WRITE_ENUM_FIELD(commandType, CmdType);
 	WRITE_ENUM_FIELD(querySource, QuerySource);
-	/* we intentionally do not print the queryId field */
 	WRITE_BOOL_FIELD(canSetTag);
 
 	/*

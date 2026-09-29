@@ -73,7 +73,6 @@
 #include "utils/pg_lsn.h"
 #include "utils/portal.h"
 #include "utils/ps_status.h"
-#include "utils/queryjumble.h"
 #include "utils/snapmgr.h"
 #include "utils/inval.h"
 #include "utils/varlena.h"
@@ -251,24 +250,6 @@ static const struct config_enum_entry backslash_quote_options[] = {
 	{"no", BACKSLASH_QUOTE_OFF, true},
 	{"1", BACKSLASH_QUOTE_ON, true},
 	{"0", BACKSLASH_QUOTE_OFF, true},
-	{NULL, 0, false}
-};
-
-/*
- * Although only "on", "off", and "auto" are documented, we accept
- * all the likely variants of "on" and "off".
- */
-static const struct config_enum_entry compute_query_id_options[] = {
-	{"auto", COMPUTE_QUERY_ID_AUTO, false},
-	{"regress", COMPUTE_QUERY_ID_REGRESS, false},
-	{"on", COMPUTE_QUERY_ID_ON, false},
-	{"off", COMPUTE_QUERY_ID_OFF, false},
-	{"true", COMPUTE_QUERY_ID_ON, true},
-	{"false", COMPUTE_QUERY_ID_OFF, true},
-	{"yes", COMPUTE_QUERY_ID_ON, true},
-	{"no", COMPUTE_QUERY_ID_OFF, true},
-	{"1", COMPUTE_QUERY_ID_ON, true},
-	{"0", COMPUTE_QUERY_ID_OFF, true},
 	{NULL, 0, false}
 };
 
@@ -2519,16 +2500,6 @@ static struct config_enum ConfigureNamesEnum[] =
 		},
 		&client_min_messages,
 		NOTICE, client_message_level_options,
-		NULL, NULL, NULL
-	},
-
-	{
-		{"compute_query_id", PGC_SUSET, STATS_MONITORING,
-			gettext_noop("Compute query identifiers."),
-			NULL
-		},
-		&compute_query_id,
-		COMPUTE_QUERY_ID_AUTO, compute_query_id_options,
 		NULL, NULL, NULL
 	},
 

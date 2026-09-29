@@ -47,7 +47,6 @@
 #include "rewrite/rewriteManip.h"
 #include "utils/builtins.h"
 #include "utils/guc.h"
-#include "utils/queryjumble.h"
 #include "utils/rel.h"
 #include "utils/syscache.h"
 
@@ -91,9 +90,6 @@ parse_analyze(RawStmt *parseTree, const char *sourceText,
 		parse_fixed_parameters(pstate, paramTypes, numParams);
 
 	query = transformTopLevelStmt(pstate, parseTree);
-
-	if (IsQueryIdEnabled())
-		JumbleQuery(query, sourceText);
 
 	free_parsestate(pstate);
 

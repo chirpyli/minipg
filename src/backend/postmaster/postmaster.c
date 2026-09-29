@@ -104,7 +104,6 @@
 #include "utils/memutils.h"
 #include "utils/pidfile.h"
 #include "utils/ps_status.h"
-#include "utils/queryjumble.h"
 #include "utils/timeout.h"
 #include "utils/timestamp_core.h"
 #include "utils/varlena.h"

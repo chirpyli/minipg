@@ -100,8 +100,6 @@ typedef struct Query
 
 	QuerySource querySource;	/* where did I come from? */
 
-	uint64		queryId;		/* query identifier (can be set by plugins) */
-
 	bool		canSetTag;		/* do I set the command result tag? */
 
 	Node	   *utilityStmt;	/* non-null if commandType == CMD_UTILITY */

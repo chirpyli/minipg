@@ -15,7 +15,6 @@
 #define ANALYZE_H
 
 #include "parser/parse_node.h"
-#include "utils/queryjumble.h"
 
 
 extern Query *parse_analyze(RawStmt *parseTree, const char *sourceText,
