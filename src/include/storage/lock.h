@@ -39,7 +39,6 @@ extern int	max_locks_per_xact;
 #ifdef LOCK_DEBUG
 extern int	Trace_lock_oidmin;
 extern bool Trace_locks;
-extern bool Trace_userlocks;
 extern int	Trace_lock_table;
 extern bool Debug_deadlocks;
 #endif							/* LOCK_DEBUG */
@@ -124,7 +123,6 @@ typedef uint16 LOCKMETHODID;
 
 /* These identify the known lock methods */
 #define DEFAULT_LOCKMETHOD	1
-#define USER_LOCKMETHOD		2
 
 /*
  * LOCKTAG is the key information needed to look up a LOCK item in the
@@ -143,11 +141,10 @@ typedef enum LockTagType
 	LOCKTAG_TRANSACTION,		/* transaction (for waiting for xact done) */
 	LOCKTAG_VIRTUALTRANSACTION, /* virtual transaction (ditto) */
 	LOCKTAG_OBJECT,				/* non-relation database object */
-	LOCKTAG_USERLOCK,			/* reserved for old contrib/userlock code */
-	LOCKTAG_ADVISORY			/* advisory user locks */
+	LOCKTAG_USERLOCK			/* reserved for old contrib/userlock code */
 } LockTagType;
 
-#define LOCKTAG_LAST_TYPE	LOCKTAG_ADVISORY
+#define LOCKTAG_LAST_TYPE	LOCKTAG_USERLOCK
 
 extern const char *const LockTagTypeNames[];
 
@@ -252,14 +249,6 @@ typedef struct LOCKTAG
 	 (locktag).locktag_field4 = (objsubid), \
 	 (locktag).locktag_type = LOCKTAG_OBJECT, \
 	 (locktag).locktag_lockmethodid = DEFAULT_LOCKMETHOD)
-
-#define SET_LOCKTAG_ADVISORY(locktag,id1,id2,id3,id4) \
-	((locktag).locktag_field1 = (id1), \
-	 (locktag).locktag_field2 = (id2), \
-	 (locktag).locktag_field3 = (id3), \
-	 (locktag).locktag_field4 = (id4), \
-	 (locktag).locktag_type = LOCKTAG_ADVISORY, \
-	 (locktag).locktag_lockmethodid = USER_LOCKMETHOD)
 
 
 /*
@@ -538,7 +527,6 @@ extern void MarkLockClear(LOCALLOCK *locallock);
 extern bool LockRelease(const LOCKTAG *locktag,
 						LOCKMODE lockmode, bool sessionLock);
 extern void LockReleaseAll(LOCKMETHODID lockmethodid, bool allLocks);
-extern void LockReleaseSession(LOCKMETHODID lockmethodid);
 extern void LockReleaseCurrentOwner(LOCALLOCK **locallocks, int nlocks);
 extern void LockReassignCurrentOwner(LOCALLOCK **locallocks, int nlocks);
 extern bool LockHeldByMe(const LOCKTAG *locktag, LOCKMODE lockmode);

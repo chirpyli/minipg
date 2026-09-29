@@ -2062,11 +2062,11 @@ heap_insert(Relation relation, HeapTuple tup, CommandId cid,
 		if (ItemPointerGetOffsetNumber(&(heaptup->t_self)) == FirstOffsetNumber &&
 			PageGetMaxOffsetNumber(page) == FirstOffsetNumber)
 		{
-			info |= XLOG_HEAP_INIT_PAGE;
+			info |= XLOG_HEAP_INIT_PAGE;  // 如果是页的第一个元组，则说明插入前页是空页，则可以整页重建，不需要存储整页镜像，redo时直接把页PageInit重建接口。
 			bufflags |= REGBUF_WILL_INIT;
 		}
 
-		xlrec.offnum = ItemPointerGetOffsetNumber(&heaptup->t_self);
+		xlrec.offnum = ItemPointerGetOffsetNumber(&heaptup->t_self); // 元组偏移（在页中的位置）
 		xlrec.flags = 0;
 		if (all_visible_cleared)
 			xlrec.flags |= XLH_INSERT_ALL_VISIBLE_CLEARED;

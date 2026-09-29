@@ -631,9 +631,6 @@ LockErrorCleanup(void)
  * At main transaction commit, we release standard locks except session locks.
  * At main transaction abort, we release all locks including session locks.
  *
- * Advisory locks are released only if they are transaction-level;
- * session-level holds remain, whether this is a commit or not.
- *
  * At subtransaction commit, we don't release any locks (so this func is not
  * needed at all); we will defer the releasing to the parent transaction.
  * At subtransaction abort, we release all locks held by the subtransaction;
@@ -649,8 +646,6 @@ ProcReleaseLocks(bool isCommit)
 	LockErrorCleanup();
 	/* Release standard locks, including session-level if aborting */
 	LockReleaseAll(DEFAULT_LOCKMETHOD, !isCommit);
-	/* Release transaction-level advisory locks */
-	LockReleaseAll(USER_LOCKMETHOD, false);
 }
 
 

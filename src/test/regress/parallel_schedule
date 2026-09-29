@@ -128,7 +128,8 @@ test: psql
 #   select_views foreign_key dependency alter_table sequence largeobject
 # cluster 已随表继承(INHERITS)功能裁剪而移除
 # portals_p2 已随游标功能裁剪而移除
-test: bitmapops combocid advisory_lock
+# advisory_lock 已随咨询锁功能裁剪而移除
+test: bitmapops combocid
 
 # ----------
 # 以下为核心 SQL 测试，已剔除被裁剪特性的语句后重新纳入调度。

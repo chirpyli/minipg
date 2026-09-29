@@ -996,16 +996,6 @@ static struct config_bool ConfigureNamesBool[] =
 		NULL, NULL, NULL
 	},
 	{
-		{"trace_userlocks", PGC_SUSET, DEVELOPER_OPTIONS,
-			gettext_noop("Emits information about user lock usage."),
-			NULL,
-			GUC_NOT_IN_SAMPLE
-		},
-		&Trace_userlocks,
-		false,
-		NULL, NULL, NULL
-	},
-	{
 		{"trace_lwlocks", PGC_SUSET, DEVELOPER_OPTIONS,
 			gettext_noop("Emits information about lightweight lock usage."),
 			NULL,

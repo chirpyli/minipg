@@ -869,12 +869,6 @@ ShutdownPostgres(int code, Datum arg)
 {
 	/* Make sure we've killed any active transaction */
 	AbortOutOfAnyTransaction();
-
-	/*
-	 * User locks are not released by transaction end, so be sure to release
-	 * them explicitly.
-	 */
-	LockReleaseAll(USER_LOCKMETHOD, true);
 }
 
 /*

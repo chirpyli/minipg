@@ -129,24 +129,12 @@ static const LockMethodData default_lockmethod = {
 #endif
 };
 
-static const LockMethodData user_lockmethod = {
-	AccessExclusiveLock,		/* highest valid lock mode number */
-	LockConflicts,
-	lock_mode_names,
-#ifdef LOCK_DEBUG
-	&Trace_userlocks
-#else
-	&Dummy_trace
-#endif
-};
-
 /*
  * map from lock method id to the lock table data structures
  */
 static const LockMethod LockMethods[] = {
 	NULL,
-	&default_lockmethod,
-	&user_lockmethod
+	&default_lockmethod
 };
 
 
@@ -269,7 +257,6 @@ static ResourceOwner awaitedOwner;
  * The following configuration options are available for lock debugging:
  *
  *	   TRACE_LOCKS		-- give a bunch of output what's going on in this file
- *	   TRACE_USERLOCKS	-- same but for user locks
  *	   TRACE_LOCK_OIDMIN-- do not trace locks for tables below this oid
  *						   (use to avoid output on system tables)
  *	   TRACE_LOCK_TABLE -- trace locks on this table (oid) unconditionally
@@ -284,7 +271,6 @@ static ResourceOwner awaitedOwner;
 
 int			Trace_lock_oidmin = FirstNormalObjectId;
 bool		Trace_locks = false;
-bool		Trace_userlocks = false;
 int			Trace_lock_table = 0;
 bool		Debug_deadlocks = false;
 
@@ -2397,31 +2383,6 @@ LockReleaseAll(LOCKMETHODID lockmethodid, bool allLocks)
 	if (*(lockMethodTable->trace_flag))
 		elog(LOG, "LockReleaseAll done");
 #endif
-}
-
-/*
- * LockReleaseSession -- Release all session locks of the specified lock method
- *		that are held by the current process.
- */
-void
-LockReleaseSession(LOCKMETHODID lockmethodid)
-{
-	HASH_SEQ_STATUS status;
-	LOCALLOCK  *locallock;
-
-	if (lockmethodid <= 0 || lockmethodid >= lengthof(LockMethods))
-		elog(ERROR, "unrecognized lock method: %d", lockmethodid);
-
-	hash_seq_init(&status, LockMethodLocalHash);
-
-	while ((locallock = (LOCALLOCK *) hash_seq_search(&status)) != NULL)
-	{
-		/* Ignore items that are not of the specified lock method */
-		if (LOCALLOCK_LOCKMETHOD(*locallock) != lockmethodid)
-			continue;
-
-		ReleaseLockIfHeld(locallock, true);
-	}
 }
 
 /*

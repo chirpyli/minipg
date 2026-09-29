@@ -667,17 +667,17 @@ PostmasterMain(int argc, char *argv[])
 	InitPostmasterDeathWatchHandle();
 
 	/*
-	 * Forcibly remove the files signaling a standby promotion request.
-	 * Otherwise, the existence of those files triggers a promotion too early,
-	 * whether a user wants that or not.
+	 * 强制删除用于发出 standby promotion 请求的信号文件。
+	 * 否则，只要这些文件存在，就会过早触发 promotion，
+	 * 无论用户是否希望如此。
 	 *
-	 * This removal of files is usually unnecessary because they can exist
-	 * only during a few moments during a standby promotion. However there is
-	 * a race condition: if pg_ctl promote is executed and creates the files
-	 * during a promotion, the files can stay around even after the server is
-	 * brought up to be the primary.  Then, if a new standby starts by using
-	 * the backup taken from the new primary, the files can exist at server
-	 * startup and must be removed in order to avoid an unexpected promotion.
+	 * 通常没有必要删除这些文件，因为它们只会在 standby promotion
+	 * 过程中的少数时刻出现。然而存在一种 race condition：如果在一次
+	 * promotion 期间执行 pg_ctl promote 并创建了这些文件，那么即使
+	 * 服务器被提升为 primary 之后，这些文件仍可能残留在那里。
+	 * 此后，如果一个新的 standby 使用从该新 primary 取得的 backup
+	 * 启动，这些文件就可能存在于服务器启动时，必须将其删除，以避免
+	 * 发生非预期的 promotion。
 	 */
 
 	/*

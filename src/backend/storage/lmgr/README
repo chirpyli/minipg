@@ -677,29 +677,6 @@ worker, and the worker fails to join the lock group unless the given PGPROC
 still has the same PID and is still a lock group leader.  We assume that
 PIDs are not recycled quickly enough for this interlock to fail.
 
-
-User Locks (Advisory Locks)
----------------------------
-
-User locks are handled totally on the application side as long term
-cooperative locks which may extend beyond the normal transaction boundaries.
-Their purpose is to indicate to an application that someone is `working'
-on an item.  So it is possible to put an user lock on a tuple's oid,
-retrieve the tuple, work on it for an hour and then update it and remove
-the lock.  While the lock is active other clients can still read and write
-the tuple but they can be aware that it has been locked at the application
-level by someone.
-
-User locks and normal locks are completely orthogonal and they don't
-interfere with each other.
-
-User locks can be acquired either at session level or transaction level.
-A session-level lock request is not automatically released at transaction
-end, but must be explicitly released by the application.  (However, any
-remaining locks are always released at session end.)  Transaction-level
-user lock requests behave the same as normal lock requests, in that they
-are released at transaction end and do not need explicit unlocking.
-
 Locking during Hot Standby
 --------------------------
 
